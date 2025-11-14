@@ -1,0 +1,118 @@
+{
+    "checkpoint_id": "106d02e9-51ec-4e21-8ede-dc691984bbeb",
+    "workflow_id": "30a991e6-7c9b-441a-8408-4a080f66c4bd",
+    "timestamp": "2025-10-23T03:43:14.260135+00:00",
+    "messages": {
+        "Risk Assessor Agent V2": [
+            {
+                "data": {
+                    "__af_dataclass__": "agent_framework._workflows._executor:AgentExecutorResponse",
+                    "value": {
+                        "executor_id": "Risk Assessor Agent V2",
+                        "agent_run_response": {
+                            "__af_model__": "agent_framework._types:AgentRunResponse",
+                            "strategy": "to_dict",
+                            "value": {
+                                "type": "agent_run_response",
+                                "messages": [
+                                    {
+                                        "type": "chat_message",
+                                        "role": {
+                                            "type": "role",
+                                            "value": "assistant"
+                                        },
+                                        "contents": [
+                                            {
+                                                "type": "text",
+                                                "text": "### Maintenance Requests Submitted for Approval\n\nThe following maintenance requests have been submitted for human approval:\n\n1. **Equipment ID:** exp12345678A\n   - **Action:** Schedule Maintenance\n   - **Type:** Pump\n\n2. **Equipment ID:** exp45982637C\n   - **Action:** Schedule Maintenance\n   - **Type:** Pump\n\n3. **Equipment ID:** reg73829156D\n   - **Action:** Schedule Maintenance\n   - **Type:** Regulator\n\n4. **Equipment ID:** exp91847263E\n   - **Action:** Schedule Maintenance\n   - **Type:** Pump\n\n5. **Equipment ID:** exp00692131D\n   - **Action:** Schedule Maintenance\n   - **Type:** Pump\n\n6. **Equipment ID:** exp62201802R\n   - **Action:** Schedule Maintenance\n   - **Type:** Pump\n\n7. **Equipment ID:** reg66579551W\n   - **Action:** Schedule Maintenance\n   - **Type:** Regulator\n\n8. **Equipment ID:** exp33410322D\n   - **Action:** Schedule Maintenance\n   - **Type:** Pump\n\n### Summary\nAll maintenance requests for the identified anomalies have been successfully submitted for human approval. The Maintenance Scheduler Agent will monitor the status of these requests."
+                                            }
+                                        ],
+                                        "author_name": "Risk Assessor Agent V2",
+                                        "message_id": "run_gA1pjnixqT5JZAFPp9Bc050V",
+                                        "additional_properties": {}
+                                    }
+                                ],
+                                "response_id": "run_gA1pjnixqT5JZAFPp9Bc050V",
+                                "additional_properties": {}
+                            }
+                        },
+                        "full_conversation": [
+                            {
+                                "__af_model__": "agent_framework._types:ChatMessage",
+                                "strategy": "to_dict",
+                                "value": {
+                                    "type": "chat_message",
+                                    "role": {
+                                        "type": "role",
+                                        "value": "user"
+                                    },
+                                    "contents": [
+                                        {
+                                            "type": "text",
+                                            "text": "Analyse data for all equipment items in the approval database and process any approved maintenance requests. Check all pending approvals and equipment items that need attention."
+                                        }
+                                    ],
+                                    "additional_properties": {}
+                                }
+                            },
+                            {
+                                "__af_model__": "agent_framework._types:ChatMessage",
+                                "strategy": "to_dict",
+                                "value": {
+                                    "type": "chat_message",
+                                    "role": {
+                                        "type": "role",
+                                        "value": "assistant"
+                                    },
+                                    "contents": [
+                                        {
+                                            "type": "text",
+                                            "text": "### Analysis of Equipment Data\n\n1. **Equipment ID: exp12345678A**\n   - **Status:** Anomaly\n   - **Details:** Pressure: 16 PSI (Normal range: 20-80 PSI)\n   - **Timestamp:** 2025-10-23T14:42:58.506989\n\n2. **Equipment ID: reg87654321B**\n   - **Status:** Normal\n   - **Details:** Pressure: 44 PSI (Normal range: 20-80 PSI)\n   - **Timestamp:** 2025-10-23T14:42:58.507886\n\n3. **Equipment ID: exp45982637C**\n   - **Status:** Anomaly\n   - **Details:** Flow Rate: 95 LPM (Normal range: 40-90 LPM)\n   - **Timestamp:** 2025-10-23T14:42:58.508733\n\n4. **Equipment ID: reg73829156D**\n   - **Status:** Anomaly\n   - **Details:** Pressure: 82 PSI (Normal range: 20-80 PSI)\n   - **Timestamp:** 2025-10-23T14:42:58.509398\n\n5. **Equipment ID: exp91847263E**\n   - **Status:** Anomaly\n   - **Details:** Pressure: 90 PSI (Normal range: 20-80 PSI), Flow Rate: 39 LPM (Normal range: 40-90 LPM)\n   - **Timestamp:** 2025-10-23T14:42:58.510112\n\n6. **Equipment ID: exp00692131D**\n   - **Status:** Anomaly\n   - **Details:** Pressure: 19 PSI (Normal range: 20-80 PSI), Flow Rate: 23 LPM (Normal range: 40-90 LPM)\n   - **Timestamp:** 2025-10-23T14:42:58.510813\n\n7. **Equipment ID: exp62201802R**\n   - **Status:** Anomaly\n   - **Details:** Pressure: 90 PSI (Normal range: 20-80 PSI)\n   - **Timestamp:** 2025-10-23T14:42:58.511275\n\n8. **Equipment ID: exp39235575S**\n   - **Status:** Normal\n   - **Details:** Pressure: 69 PSI (Normal range: 20-80 PSI)\n   - **Timestamp:** 2025-10-23T14:42:58.511584\n\n9. **Equipment ID: reg66579551W**\n   - **Status:** Anomaly\n   - **Details:** Pressure: 21 PSI (Normal range: 20-80 PSI), Flow Rate: 25 LPM (Normal range: 40-90 LPM)\n   - **Timestamp:** 2025-10-23T14:42:58.511759\n\n10. **Equipment ID: exp33410322D**\n    - **Status:** Anomaly\n    - **Details:** Pressure: 85 PSI (Normal range: 20-80 PSI)\n    - **Timestamp:** 2025-10-23T14:42:58.511922\n\n### Summary of Findings\n- **Total Anomalies Detected:** 7\n- **Total Normal Status:** 3\n\n### Next Steps\n- Pass the analysis results to the Risk Assessor Agent for further evaluation and action on the anomalies detected."
+                                        }
+                                    ],
+                                    "author_name": "Data Analyser Agent",
+                                    "message_id": "run_M5akJLwxe9hcUde8fYRDP5KD",
+                                    "additional_properties": {}
+                                }
+                            },
+                            {
+                                "__af_model__": "agent_framework._types:ChatMessage",
+                                "strategy": "to_dict",
+                                "value": {
+                                    "type": "chat_message",
+                                    "role": {
+                                        "type": "role",
+                                        "value": "assistant"
+                                    },
+                                    "contents": [
+                                        {
+                                            "type": "text",
+                                            "text": "### Maintenance Requests Submitted for Approval\n\nThe following maintenance requests have been submitted for human approval:\n\n1. **Equipment ID:** exp12345678A\n   - **Action:** Schedule Maintenance\n   - **Type:** Pump\n\n2. **Equipment ID:** exp45982637C\n   - **Action:** Schedule Maintenance\n   - **Type:** Pump\n\n3. **Equipment ID:** reg73829156D\n   - **Action:** Schedule Maintenance\n   - **Type:** Regulator\n\n4. **Equipment ID:** exp91847263E\n   - **Action:** Schedule Maintenance\n   - **Type:** Pump\n\n5. **Equipment ID:** exp00692131D\n   - **Action:** Schedule Maintenance\n   - **Type:** Pump\n\n6. **Equipment ID:** exp62201802R\n   - **Action:** Schedule Maintenance\n   - **Type:** Pump\n\n7. **Equipment ID:** reg66579551W\n   - **Action:** Schedule Maintenance\n   - **Type:** Regulator\n\n8. **Equipment ID:** exp33410322D\n   - **Action:** Schedule Maintenance\n   - **Type:** Pump\n\n### Summary\nAll maintenance requests for the identified anomalies have been successfully submitted for human approval. The Maintenance Scheduler Agent will monitor the status of these requests."
+                                        }
+                                    ],
+                                    "author_name": "Risk Assessor Agent V2",
+                                    "message_id": "run_gA1pjnixqT5JZAFPp9Bc050V",
+                                    "additional_properties": {}
+                                }
+                            }
+                        ]
+                    }
+                },
+                "source_id": "Risk Assessor Agent V2",
+                "target_id": null,
+                "trace_contexts": null,
+                "source_span_ids": null
+            }
+        ]
+    },
+    "shared_state": {},
+    "executor_states": {},
+    "iteration_count": 3,
+    "max_iterations": 100,
+    "metadata": {
+        "superstep": 3,
+        "checkpoint_type": "superstep",
+        "graph_signature": "92400043d1437e146b7a4b3227f32cc13435256f7969bebe9a75833ff05a0f56"
+    },
+    "version": "1.0"
+}
