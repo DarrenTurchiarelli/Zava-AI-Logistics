@@ -38,9 +38,9 @@ AZURE_AI_MODEL_DEPLOYMENT_NAME = os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME")
 # Data Analyser -> Parcel Intake Agent (processes new parcels from stores)
 # Risk Assessor -> Sorting Facility Agent (handles parcel routing and exceptions)  
 # Maintenance Scheduler -> Delivery Coordination Agent (manages driver assignments and delivery attempts)
-parcel_intake_agent_id = 'asst_l8rY5GFlxIfRLszGeZeDtxiw' 
-sorting_facility_agent_id = 'asst_pLI7uHnzPDEYtJHkDwZ9NJMO'
-delivery_coordination_agent_id = 'asst_YGrBYMIHD5NfNrIyrQ1NIket'
+parcel_intake_agent_id = 'asst_pon7NbFIzAI59uP1bDMgQHcN' 
+sorting_facility_agent_id = 'asst_TVwvKULVrFL79aUy4Xfaj5Bi'
+delivery_coordination_agent_id = 'asst_i3QHlJwt1F0T6w14YQOi15cj'
 
 # Database-based system for human approval results using Azure Cosmos DB
 # Import Cosmos DB tools from separate module
