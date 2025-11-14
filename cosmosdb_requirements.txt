@@ -1,0 +1,10 @@
+# Requirements for Azure Cosmos DB integration
+azure-cosmos>=4.5.0
+faker>=20.1.0
+
+# Existing requirements (if not already installed)
+azure-identity
+azure-ai-projects
+agent-framework
+python-dotenv
+pydantic
