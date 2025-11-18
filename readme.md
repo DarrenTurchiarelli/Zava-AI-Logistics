@@ -1177,4 +1177,4 @@ def new_feature():
     return render_template('new_feature.html')
 ```
 
-Experience the complete last-mile logistics system with **modern web interface** and **improved modular architecture**! 🇦🇺 🚀
+Experience the complete last-mile logistics system with **modern web interface** and **improved modular architecture**! 
