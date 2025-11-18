@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Home - {{ company.name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Hero Section -->
+    <div class="row justify-content-center text-center py-5">
+        <div class="col-lg-8">
+            <h1 class="display-3 fw-bold text-primary mb-4">
+                <i class="bi bi-truck"></i> {{ company.name }}
+            </h1>
+            <p class="lead text-muted mb-4">
+                {{ company.tagline }}
+            </p>
+            <p class="fs-5 mb-5">
+                Advanced operations center with intelligent fraud detection, 
+                real-time tracking, and automated workflow management
+            </p>
+            {% if not session.logged_in %}
+            <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg px-4 me-md-2">
+                    <i class="bi bi-box-arrow-in-right"></i> Login
+                </a>
+                <a href="{{ url_for('track_parcel_page') }}" class="btn btn-outline-primary btn-lg px-4">
+                    <i class="bi bi-search"></i> Track Parcel
+                </a>
+            </div>
+            {% else %}
+            <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg px-4">
+                <i class="bi bi-speedometer2"></i> Go to Dashboard
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Features -->
+    <div class="row g-4 py-5">
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="feature-icon bg-primary bg-gradient text-white rounded-circle d-inline-flex align-items-center justify-content-center fs-2 mb-3" style="width: 80px; height: 80px;">
+                        <i class="bi bi-shield-check"></i>
+                    </div>
+                    <h3 class="card-title">AI Fraud Detection</h3>
+                    <p class="card-text">
+                        Azure AI-powered fraud analysis protects customers from delivery scams and phishing attempts.
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="feature-icon bg-success bg-gradient text-white rounded-circle d-inline-flex align-items-center justify-content-center fs-2 mb-3" style="width: 80px; height: 80px;">
+                        <i class="bi bi-geo-alt"></i>
+                    </div>
+                    <h3 class="card-title">Real-Time Tracking</h3>
+                    <p class="card-text">
+                        Track parcels in real-time with precise location updates and delivery ETAs.
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="feature-icon bg-info bg-gradient text-white rounded-circle d-inline-flex align-items-center justify-content-center fs-2 mb-3" style="width: 80px; height: 80px;">
+                        <i class="bi bi-robot"></i>
+                    </div>
+                    <h3 class="card-title">Automated Workflows</h3>
+                    <p class="card-text">
+                        Multi-agent AI system with intelligent routing, exception handling, and human approval loops.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats (if logged in) -->
+    {% if session.logged_in %}
+    <div class="row g-4 py-5">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <i class="bi bi-box-seam fs-1"></i>
+                    <h3 class="mt-2">Track Parcels</h3>
+                    <p class="mb-0">Search and monitor</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <i class="bi bi-shield-exclamation fs-1"></i>
+                    <h3 class="mt-2">Report Fraud</h3>
+                    <p class="mb-0">AI-powered detection</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body text-center">
+                    <i class="bi bi-clipboard-check fs-1"></i>
+                    <h3 class="mt-2">Approvals</h3>
+                    <p class="mb-0">Workflow management</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <i class="bi bi-graph-up fs-1"></i>
+                    <h3 class="mt-2">AI Insights</h3>
+                    <p class="mb-0">Analytics dashboard</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

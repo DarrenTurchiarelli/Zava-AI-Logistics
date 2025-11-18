@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}AI Insights - {{ company.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="display-6">
+                <i class="bi bi-graph-up"></i> AI Insights Dashboard
+            </h1>
+            <p class="text-muted">Real-time operational analytics and intelligence</p>
+        </div>
+    </div>
+
+    <!-- Performance Metrics -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card text-center border-primary">
+                <div class="card-body">
+                    <i class="bi bi-box-seam text-primary" style="font-size: 2rem;"></i>
+                    <h3 class="mt-2">{{ insights.total_processed }}</h3>
+                    <p class="text-muted mb-0">Processed Today</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center border-warning">
+                <div class="card-body">
+                    <i class="bi bi-truck text-warning" style="font-size: 2rem;"></i>
+                    <h3 class="mt-2">{{ insights.in_transit }}</h3>
+                    <p class="text-muted mb-0">In Transit</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center border-success">
+                <div class="card-body">
+                    <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+                    <h3 class="mt-2">{{ insights.delivered }}</h3>
+                    <p class="text-muted mb-0">Delivered</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center border-info">
+                <div class="card-body">
+                    <i class="bi bi-speedometer text-info" style="font-size: 2rem;"></i>
+                    <h3 class="mt-2">{{ insights.success_rate }}%</h3>
+                    <p class="text-muted mb-0">Success Rate</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Driver & Delivery Metrics -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-person-badge"></i> Driver Efficiency</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6 mb-3">
+                            <h3 class="text-primary">{{ insights.active_drivers }}</h3>
+                            <p class="text-muted mb-0">Active Drivers</p>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <h3 class="text-success">{{ insights.avg_delivery_time }} min</h3>
+                            <p class="text-muted mb-0">Avg Delivery Time</p>
+                        </div>
+                    </div>
+                    <div class="progress" style="height: 30px;">
+                        <div class="progress-bar bg-success" style="width: 85%">
+                            Fleet Utilization: 85%
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-star"></i> Service Levels</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6 mb-3">
+                            <h3 class="text-success">{{ insights.on_time_rate }}%</h3>
+                            <p class="text-muted mb-0">On-Time Delivery</p>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <h3 class="text-info">{{ insights.nps_score }}</h3>
+                            <p class="text-muted mb-0">NPS Score</p>
+                        </div>
+                    </div>
+                    <div class="progress" style="height: 30px;">
+                        <div class="progress-bar bg-info" style="width: 92%">
+                            First Attempt Success: 92%
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Performance -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-robot"></i> AI Agent Performance</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <i class="bi bi-lightning-charge text-warning" style="font-size: 2rem;"></i>
+                            <h4 class="mt-2">215</h4>
+                            <p class="text-muted">Agent Decisions</p>
+                        </div>
+                        <div class="col-md-3">
+                            <i class="bi bi-check-all text-success" style="font-size: 2rem;"></i>
+                            <h4 class="mt-2">187</h4>
+                            <p class="text-muted">Auto Resolutions</p>
+                        </div>
+                        <div class="col-md-3">
+                            <i class="bi bi-person-check text-info" style="font-size: 2rem;"></i>
+                            <h4 class="mt-2">12</h4>
+                            <p class="text-muted">Human Approvals</p>
+                        </div>
+                        <div class="col-md-3">
+                            <i class="bi bi-stopwatch text-danger" style="font-size: 2rem;"></i>
+                            <h4 class="mt-2">0.6s</h4>
+                            <p class="text-muted">Avg Decision Time</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

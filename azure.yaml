@@ -1,0 +1,17 @@
+# Azure Developer CLI Configuration
+name: dt-logistics-web
+metadata:
+  template: python-web@1.0.0
+
+services:
+  web:
+    project: .
+    language: python
+    host: appservice
+    
+infra:
+  provider: bicep
+  path: infra
+  
+pipeline:
+  provider: github

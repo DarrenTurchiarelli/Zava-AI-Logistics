@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}All Parcels - {{ company.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="display-6">
+                <i class="bi bi-box-seam"></i> All Parcels
+            </h1>
+        </div>
+        <div class="col-auto">
+            <a href="{{ url_for('register_parcel') }}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Register New Parcel
+            </a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            {% if parcels %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Tracking Number</th>
+                            <th>Sender</th>
+                            <th>Recipient</th>
+                            <th>Destination</th>
+                            <th>Service</th>
+                            <th>Status</th>
+                            <th>Weight</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for parcel in parcels %}
+                        <tr>
+                            <td><code>{{ parcel.tracking_number }}</code></td>
+                            <td>{{ parcel.sender_name }}</td>
+                            <td>{{ parcel.recipient_name }}</td>
+                            <td>{{ parcel.destination_state }} {{ parcel.destination_postcode }}</td>
+                            <td>{{ parcel.service_type|title }}</td>
+                            <td>
+                                <span class="badge bg-info">{{ parcel.status }}</span>
+                            </td>
+                            <td>{{ parcel.weight }} kg</td>
+                            <td>
+                                <a href="{{ url_for('track_parcel_page', tracking_number=parcel.tracking_number) }}" 
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-search"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center text-muted py-5">
+                <i class="bi bi-inbox" style="font-size: 4rem;"></i>
+                <p class="mt-3">No parcels found</p>
+                <a href="{{ url_for('register_parcel') }}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Register First Parcel
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

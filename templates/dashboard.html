@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - {{ company.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="display-5">
+                <i class="bi bi-speedometer2"></i> Operations Dashboard
+            </h1>
+            <p class="text-muted">Real-time logistics operations center</p>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-subtitle mb-2 opacity-75">Total Parcels</h6>
+                            <h2 class="card-title mb-0">{{ stats.total_parcels }}</h2>
+                        </div>
+                        <i class="bi bi-box-seam fs-1 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-subtitle mb-2 opacity-75">Pending Approvals</h6>
+                            <h2 class="card-title mb-0">{{ stats.pending_approvals }}</h2>
+                        </div>
+                        <i class="bi bi-clipboard-check fs-1 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-subtitle mb-2 opacity-75">Active Drivers</h6>
+                            <h2 class="card-title mb-0">15</h2>
+                        </div>
+                        <i class="bi bi-person-badge fs-1 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card text-white bg-info">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-subtitle mb-2 opacity-75">On-Time Rate</h6>
+                            <h2 class="card-title mb-0">95%</h2>
+                        </div>
+                        <i class="bi bi-graph-up fs-1 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Parcels -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-clock-history"></i> Recent Parcels</h5>
+                </div>
+                <div class="card-body">
+                    {% if stats.parcels %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Tracking #</th>
+                                    <th>Recipient</th>
+                                    <th>Destination</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for parcel in stats.parcels %}
+                                <tr>
+                                    <td><code>{{ parcel.tracking_number }}</code></td>
+                                    <td>{{ parcel.recipient_name }}</td>
+                                    <td>{{ parcel.destination_state }}</td>
+                                    <td>
+                                        <span class="badge bg-info">{{ parcel.status }}</span>
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('track_parcel_page', tracking_number=parcel.tracking_number) }}" 
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-search"></i> Track
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-4">No parcels registered yet</p>
+                    {% endif %}
+                </div>
+                <div class="card-footer bg-white">
+                    <a href="{{ url_for('all_parcels') }}" class="btn btn-sm btn-outline-primary">
+                        View All Parcels <i class="bi bi-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-lightning"></i> Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('register_parcel') }}" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i> Register Parcel
+                        </a>
+                        <a href="{{ url_for('track_parcel_page') }}" class="btn btn-outline-primary">
+                            <i class="bi bi-search"></i> Track Parcel
+                        </a>
+                        <a href="{{ url_for('report_fraud') }}" class="btn btn-outline-danger">
+                            <i class="bi bi-shield-exclamation"></i> Report Fraud
+                        </a>
+                        <a href="{{ url_for('approvals') }}" class="btn btn-outline-warning">
+                            <i class="bi bi-clipboard-check"></i> Manage Approvals
+                        </a>
+                        <a href="{{ url_for('ai_insights') }}" class="btn btn-outline-info">
+                            <i class="bi bi-graph-up"></i> AI Insights
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Status -->
+            <div class="card shadow-sm mt-3">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-hdd-network"></i> System Status</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-2">
+                            <i class="bi bi-check-circle-fill text-success"></i>
+                            <strong>Cosmos DB:</strong> Connected
+                        </li>
+                        <li class="mb-2">
+                            <i class="bi bi-check-circle-fill text-success"></i>
+                            <strong>AI Agents:</strong> Active
+                        </li>
+                        <li class="mb-2">
+                            <i class="bi bi-check-circle-fill text-success"></i>
+                            <strong>Fraud Detection:</strong> Online
+                        </li>
+                        <li>
+                            <i class="bi bi-check-circle-fill text-success"></i>
+                            <strong>API Status:</strong> Healthy
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Auto-refresh stats every 30 seconds
+setInterval(function() {
+    fetch('/api/stats')
+        .then(response => response.json())
+        .then(data => {
+            console.log('Stats updated:', data);
+            // Update UI if needed
+        });
+}, 30000);
+</script>
+{% endblock %}

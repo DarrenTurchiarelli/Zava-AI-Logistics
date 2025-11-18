@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Register Parcel - {{ company.name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="bi bi-plus-circle"></i> Register New Parcel</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('register_parcel') }}">
+                        <!-- Sender Information -->
+                        <h5 class="mb-3"><i class="bi bi-person"></i> Sender Information</h5>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label for="sender_name" class="form-label">Name *</label>
+                                <input type="text" class="form-control" id="sender_name" name="sender_name" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="sender_phone" class="form-label">Phone *</label>
+                                <input type="tel" class="form-control" id="sender_phone" name="sender_phone" required>
+                            </div>
+                            <div class="col-12">
+                                <label for="sender_address" class="form-label">Address *</label>
+                                <textarea class="form-control" id="sender_address" name="sender_address" rows="2" required></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Recipient Information -->
+                        <h5 class="mb-3"><i class="bi bi-geo-alt"></i> Recipient Information</h5>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label for="recipient_name" class="form-label">Name *</label>
+                                <input type="text" class="form-control" id="recipient_name" name="recipient_name" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="recipient_phone" class="form-label">Phone *</label>
+                                <input type="tel" class="form-control" id="recipient_phone" name="recipient_phone" required>
+                            </div>
+                            <div class="col-12">
+                                <label for="recipient_address" class="form-label">Address *</label>
+                                <textarea class="form-control" id="recipient_address" name="recipient_address" rows="2" required></textarea>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="destination_postcode" class="form-label">Postcode *</label>
+                                <input type="text" class="form-control" id="destination_postcode" name="destination_postcode" pattern="[0-9]{4}" required>
+                                <small class="text-muted">4-digit Australian postcode</small>
+                            </div>
+                        </div>
+
+                        <!-- Parcel Details -->
+                        <h5 class="mb-3"><i class="bi bi-box-seam"></i> Parcel Details</h5>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label for="service_type" class="form-label">Service Type *</label>
+                                <select class="form-select" id="service_type" name="service_type" required>
+                                    <option value="">Select service...</option>
+                                    <option value="standard">Standard</option>
+                                    <option value="express">Express</option>
+                                    <option value="overnight">Overnight</option>
+                                    <option value="registered">Registered</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="weight" class="form-label">Weight (kg) *</label>
+                                <input type="number" step="0.1" class="form-control" id="weight" name="weight" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="declared_value" class="form-label">Value ($)</label>
+                                <input type="number" step="0.01" class="form-control" id="declared_value" name="declared_value" value="0">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="dimensions" class="form-label">Dimensions</label>
+                                <input type="text" class="form-control" id="dimensions" name="dimensions" placeholder="e.g., 30x20x10cm">
+                            </div>
+                            <div class="col-12">
+                                <label for="special_instructions" class="form-label">Special Instructions</label>
+                                <textarea class="form-control" id="special_instructions" name="special_instructions" rows="2"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> Register Parcel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
