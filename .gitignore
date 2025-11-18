@@ -1,0 +1,97 @@
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+*.env
+
+# Azure credentials and configuration
+azure.conf
+azureauth.json
+*.publishsettings
+*.cer
+*.pfx
+*.p12
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Database files (local copies)
+*.db
+*.sqlite
+*.sqlite3
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+
+# Sensitive data files
+secrets.json
+credentials.json
+service-account.json
+*.key
+*.pem
+
+# Local configuration
+config.local.json
+settings.local.json
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/

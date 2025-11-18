@@ -1,10 +1,5 @@
-# Requirements for Azure Cosmos DB integration
-azure-cosmos>=4.5.0
-faker>=20.1.0
+# DT Logistics - Azure Cosmos DB Specific Dependencies
 
-# Existing requirements (if not already installed)
-azure-identity
-azure-ai-projects
-agent-framework
-python-dotenv
-pydantic
+azure-cosmos>=4.5.0
+azure-identity>=1.12.0
+python-dotenv>=1.0.0

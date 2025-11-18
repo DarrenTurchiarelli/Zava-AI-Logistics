@@ -1,2 +1,26 @@
-agent-framework
-# python-dotenv # Installed by above so no need to install again
+# DT Logistics System - Python Dependencies
+
+# Azure AI and Cognitive Services
+azure-ai-projects>=1.0.0
+azure-identity>=1.12.0
+azure-core>=1.26.0
+
+# Azure Cosmos DB
+azure-cosmos>=4.5.0
+
+# Microsoft Agent Framework
+semantic-kernel>=0.9.0
+
+# Data Processing
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+
+# Utilities
+requests>=2.31.0
+python-dateutil>=2.8.2
+uuid>=1.30
+
+# Development and Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+black>=23.0.0
