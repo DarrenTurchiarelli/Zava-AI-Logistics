@@ -2,6 +2,116 @@
 
 A comprehensive parcel tracking system for last-mile logistics operations using Microsoft Agent Framework and Azure Cosmos DB. This system manages the complete logistics journey from store intake through customer delivery with real-time tracking and AI-powered workflow automation.
 
+## 🌐 **NEW: Web-Based Operations Center**
+
+### **Modern Flask Web Application**
+Professional web interface for complete logistics operations management with responsive Bootstrap 5 design.
+
+#### **🚀 Quick Start - Web Interface**
+
+```powershell
+# Start the web application (development mode)
+cd c:\dt_item_scanner
+$env:FLASK_ENV='development'; py app.py
+```
+
+The web interface will be available at: **http://127.0.0.1:5000**
+
+**Default Login Credentials:**
+- Username: `admin`
+- Password: `admin123`
+
+#### **✨ Web Features**
+
+**📊 Dashboard**
+- Real-time parcel statistics and metrics
+- Pending approval counts
+- Recent parcel activity feed
+- Quick action buttons for common operations
+- System status monitoring
+- Auto-refresh every 30 seconds
+
+**📦 Parcel Management**
+- **Register New Parcels**: Multi-section form with sender, recipient, and parcel details
+- **Track Parcels**: Search by tracking number with detailed status display
+- **View All Parcels**: Comprehensive listing with sorting and filtering
+- **Real-time Status Updates**: Live tracking information
+
+**🛡️ Fraud Detection**
+- AI-powered fraud analysis using Azure AI Foundry
+- Report suspicious messages with instant threat assessment
+- Educational security guidance based on detected threat types
+- Threat level classification (Low/Medium/High/Critical)
+- Automatic security team alerts for high-risk threats
+
+**✅ Approval Workflows**
+- View all pending approval requests
+- Approve or reject with comments
+- Priority-based sorting
+- Complete audit trail
+
+**📈 AI Insights Dashboard**
+- Performance metrics and KPIs
+- Delivery success rates
+- Driver efficiency statistics
+- On-time delivery analytics
+- NPS scores and customer satisfaction
+
+**👤 User Management**
+- Secure session-based authentication
+- Role-based access control
+- User activity tracking
+
+#### **🎨 Web Technologies**
+
+- **Backend**: Flask 3.0.0 with async support
+- **Frontend**: Bootstrap 5 responsive design
+- **Database**: Azure Cosmos DB integration
+- **AI**: Azure AI Foundry fraud detection agent
+- **Production**: Gunicorn WSGI server ready
+- **Deployment**: Azure App Service compatible
+
+#### **📱 Responsive Design**
+- Mobile-friendly interface
+- Touch-optimized controls
+- Works on tablets and smartphones
+- Progressive web app capabilities
+
+#### **🔧 Web Configuration**
+
+The web application uses centralized company branding via `company_config.py`:
+
+```python
+# company_config.py - Update once, apply everywhere
+COMPANY_NAME = "DT Logistics"
+COMPANY_PHONE = "1300 384 669"
+COMPANY_EMAIL = "support@dtlogistics.com.au"
+# ... and more
+```
+
+All templates automatically use these values - no hardcoded company information!
+
+#### **🚀 Production Deployment**
+
+Deploy to Azure App Service using the included configuration:
+
+```powershell
+# Deploy using Azure Developer CLI
+azd up
+
+# Or use Azure CLI
+az webapp up --runtime PYTHON:3.11 --sku B1 --name dt-logistics-web
+```
+
+See `DEPLOYMENT.md` for complete deployment instructions including:
+- Azure App Service deployment
+- Environment configuration
+- Scaling options
+- Monitoring setup
+- CI/CD with GitHub Actions
+
+---
+
 ## 🏗️ **Modular Architecture**
 
 The system is built with a **modular architecture** designed for maintainability, reduced complexity, and improved organization.
@@ -511,21 +621,24 @@ This AI-powered logistics system represents the **future of last-mile delivery**
 
 1. Create an Azure AI Foundry project
 2. Deploy a GPT-4o model
-3. Note down the project endpoint
+3. Note down the project endpoint and connection string
 
 ### 4. Environment Configuration
 
-Create a `.env` file and configure:
+Create a `.env` file in the project root:
 
 ```env
-# Azure AI Foundry Configuration
-AZURE_AI_PROJECT_ENDPOINT = "https://your-project.westus.ai.azure.com"
+# Azure AI Foundry Configuration (for fraud detection agent)
+AZURE_AI_PROJECT_CONNECTION_STRING = "your-azure-ai-project-connection-string"
 AZURE_AI_MODEL_DEPLOYMENT_NAME = "gpt-4o"
 
 # Azure Cosmos DB Configuration
-COSMOS_DB_ENDPOINT = "https://your-cosmos-account.documents.azure.com:443/"
-COSMOS_DB_KEY = "your-primary-key-here"
-COSMOS_DB_DATABASE_NAME = "agent_workflow_db"
+COSMOS_CONNECTION_STRING = "AccountEndpoint=https://your-account.documents.azure.com:443/;AccountKey=your-key-here;"
+
+# Flask Configuration (optional)
+FLASK_SECRET_KEY = "your-secret-key-for-sessions"
+FLASK_ENV = "development"
+PORT = 5000
 ```
 
 ### 5. Install Dependencies
@@ -533,6 +646,13 @@ COSMOS_DB_DATABASE_NAME = "agent_workflow_db"
 ```bash
 pip install -r requirements.txt
 ```
+
+**Key Dependencies:**
+- `flask` - Web framework
+- `gunicorn` - Production WSGI server
+- `azure-cosmos` - Cosmos DB client
+- `azure-ai-projects` - Azure AI Foundry SDK
+- `python-dotenv` - Environment variable management
 
 ### 6. Database Initialization
 
@@ -547,7 +667,32 @@ This will:
 - ✅ Add sample test data for demonstration
 - ✅ Verify Azure authentication and connectivity
 
-### 7. RBAC Permissions (if using Azure AD auth)
+### 7. Company Branding Configuration
+
+Edit `company_config.py` to customize branding:
+
+```python
+COMPANY_NAME = "Your Company Name"
+COMPANY_PHONE = "1300 XXX XXX"
+COMPANY_EMAIL = "support@yourcompany.com"
+# ... and more
+```
+
+See `COMPANY_CONFIG_README.md` for complete configuration guide.
+
+### 8. Start the Application
+
+**Web Interface:**
+```powershell
+$env:FLASK_ENV='development'; py app.py
+```
+
+**CLI Interface:**
+```bash
+python main.py
+```
+
+### 9. RBAC Permissions (Optional - if using Azure AD auth)
 
 ```bash
 # Assign Cosmos DB roles for Azure AD authentication
@@ -561,7 +706,14 @@ az cosmosdb sql role assignment create \
 
 ## 🏃‍♂️ **Quick Start**
 
-### **Run the Modular Application**
+### **🌐 Web Interface (Recommended)**
+```powershell
+cd c:\Workbench\dt_item_tracker
+$env:FLASK_ENV='development'; py app.py
+```
+Access at: http://127.0.0.1:5000 (Login: admin/admin123)
+
+### **💻 Command-Line Interface**
 ```bash
 cd c:\Workbench\dt_item_tracker
 python main.py
@@ -587,17 +739,39 @@ asyncio.run(view_all_parcels())
 
 ## 🖥️ Usage
 
-### Interactive Parcel Scanner Demo
+### Web Interface (Recommended)
+
+```powershell
+# Start the Flask development server
+cd c:\Workbench\dt_item_tracker
+$env:FLASK_ENV='development'; py app.py
+```
+
+**Access the Application:**
+- URL: http://127.0.0.1:5000
+- Username: `admin`
+- Password: `admin123`
+
+**Web Features:**
+- ✅ **Dashboard** - Real-time operations center with statistics and metrics
+- ✅ **Register Parcels** - Multi-section form with sender/recipient/parcel details
+- ✅ **Track Parcels** - Search by tracking number with detailed status history
+- ✅ **View All Parcels** - Comprehensive listing with sorting and filtering
+- ✅ **Fraud Detection** - AI-powered analysis of suspicious messages
+- ✅ **Approvals** - Workflow management with approve/reject functionality
+- ✅ **AI Insights** - Performance analytics and operational metrics
+
+### Interactive Parcel Scanner Demo (CLI)
 
 ```bash
 # Legacy monolithic version (still available)
 python Parcel_scanner_cosmosdb_demo.py
 
-# NEW: Modular version (recommended)
+# NEW: Modular version (recommended for CLI)
 python main.py
 ```
 
-**Features:**
+**CLI Features:**
 - ✅ **Register parcels** with manual input or sample data
 - ✅ **View and track parcels** with detailed information
 - ✅ **Location-aware scanning** for depot/facility tracking
@@ -819,8 +993,33 @@ dt_item_tracker/
 ├── .env                                          # Environment configuration  
 ├── requirements.txt                              # Python dependencies
 ├── parcel_tracking_db.py                        # Consolidated database interface
+├── company_config.py                            # Centralized company branding
 │
-├── 🚀 MODULAR APPLICATION (Recommended)
+├── 🌐 WEB APPLICATION (Recommended)
+├── app.py                                        # Flask web application (385 lines)
+├── startup.sh                                    # Azure App Service startup script
+├── azure.yaml                                    # Azure deployment configuration
+├── DEPLOYMENT.md                                 # Complete deployment guide
+├── COMPANY_CONFIG_README.md                      # Branding configuration guide
+├── templates/                                    # Jinja2 HTML templates
+│   ├── base.html                                # Master layout with navigation
+│   ├── index.html                               # Landing page
+│   ├── login.html                               # Authentication
+│   ├── dashboard.html                           # Operations dashboard
+│   ├── register_parcel.html                     # Parcel registration form
+│   ├── track_parcel.html                        # Tracking interface
+│   ├── all_parcels.html                         # Parcel listing
+│   ├── report_fraud.html                        # Fraud reporting with AI
+│   ├── approvals.html                           # Approval workflows
+│   ├── ai_insights.html                         # Analytics dashboard
+│   └── error.html                               # Error pages
+├── static/                                       # Frontend assets
+│   ├── css/
+│   │   └── style.css                            # Custom styling
+│   └── js/
+│       └── app.js                               # Client-side JavaScript
+│
+├── 🚀 MODULAR CLI APPLICATION
 ├── main.py                                       # Entry point and routing (108 lines)
 ├── logistics_common.py                           # Shared utilities (143 lines)  
 ├── logistics_core.py                            # Core operations (328 lines)
@@ -830,6 +1029,8 @@ dt_item_tracker/
 ├── logistics_ai.py                              # AI features (149 lines)
 ├── logistics_admin.py                           # Admin functions (206 lines)
 ├── logistics_menu.py                            # Menu system (89 lines)
+├── logistics_parcel.py                          # Parcel data models
+├── fraud_risk_agent.py                          # AI fraud detection agent
 │
 ├── 📁 Legacy/Reference Files
 ├── Parcel_scanner_cosmosdb_demo.py             # Original monolithic demo (1,700+ lines)
@@ -924,14 +1125,32 @@ This project follows the Microsoft Agent Framework licensing terms.
 ---
 
 **Getting Started**: 
-1. Run `python parcel_tracking_db.py` to initialize the database
-2. **Run `python main.py` to explore the NEW modular logistics system** 🚀
-3. Run `python Scripts/A01_Create_Multiple_Foundry_Agent_Persistent.py` to create all 9 logistics agents
-4. Run `python Scripts/W01_Sequential_Workflow_Human_Approval.py` for AI-powered workflows
+1. Configure `.env` with your Azure credentials
+2. Run `python parcel_tracking_db.py` to initialize the database
+3. **Run `$env:FLASK_ENV='development'; py app.py` to start the web interface** 🌐
+4. Access http://127.0.0.1:5000 (Login: admin/admin123)
+5. Or run `python main.py` for the CLI interface 💻
+
+**For Production Deployment:**
+- See `DEPLOYMENT.md` for Azure App Service deployment
+- Configure environment variables in Azure
+- Use `gunicorn` for production WSGI server
+- Set up monitoring and logging
+
+**For Company Rebranding:**
+- Edit `company_config.py` with your company details
+- See `COMPANY_CONFIG_README.md` for complete guide
+- Restart Flask application to apply changes
 
 ### **Module Dependencies**
 ```
-main.py
+🌐 Web Application (app.py)
+├── company_config.py (branding)
+├── parcel_tracking_db.py (database)
+├── fraud_risk_agent.py (AI fraud detection)
+└── All logistics modules
+
+💻 CLI Application (main.py)
 ├── logistics_menu.py (menu system)
 ├── logistics_common.py (shared utilities) 
 ├── logistics_core.py
@@ -950,6 +1169,12 @@ async def new_customer_feature():
     
 # Import in main.py and add menu option
 from logistics_customer import new_customer_feature
+
+# Or add new web route in app.py
+@app.route('/new-feature')
+@login_required
+def new_feature():
+    return render_template('new_feature.html')
 ```
 
-Experience the complete last-mile logistics system with Australian localization and **improved modular architecture**! 🇦🇺
+Experience the complete last-mile logistics system with **modern web interface** and **improved modular architecture**! 🇦🇺 🚀
