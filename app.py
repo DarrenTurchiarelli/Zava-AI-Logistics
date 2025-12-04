@@ -1023,6 +1023,124 @@ def track_parcel_public():
         flash(f'Error retrieving tracking information: {str(e)}', 'danger')
         return render_template('track_parcel_public.html', tracking_data=None)
 
+# Camera Scanner Routes
+
+@app.route('/camera-scanner')
+def camera_scanner():
+    """Camera scanner page for OCR and barcode detection"""
+    return render_template('camera_scanner.html')
+
+@app.route('/api/analyze-image', methods=['POST'])
+def analyze_image():
+    """Analyze uploaded image with Azure AI Vision OCR"""
+    try:
+        if 'image' not in request.files:
+            return jsonify({'error': 'No image provided'}), 400
+        
+        image_file = request.files['image']
+        if image_file.filename == '':
+            return jsonify({'error': 'No image selected'}), 400
+        
+        # Read image data
+        image_data = image_file.read()
+        
+        # Call Azure AI Vision OCR
+        from azure.ai.vision.imageanalysis import ImageAnalysisClient
+        from azure.ai.vision.imageanalysis.models import VisualFeatures
+        from azure.core.credentials import AzureKeyCredential
+        
+        endpoint = os.getenv('AZURE_VISION_ENDPOINT')
+        key = os.getenv('AZURE_VISION_KEY')
+        
+        if not endpoint or not key:
+            return jsonify({
+                'error': 'Azure Vision not configured',
+                'full_text': 'Please set AZURE_VISION_ENDPOINT and AZURE_VISION_KEY environment variables'
+            }), 500
+        
+        # Create client
+        client = ImageAnalysisClient(
+            endpoint=endpoint,
+            credential=AzureKeyCredential(key)
+        )
+        
+        # Analyze image
+        result = client.analyze(
+            image_data=image_data,
+            visual_features=[VisualFeatures.READ]
+        )
+        
+        # Extract all text
+        full_text = ""
+        text_lines = []
+        
+        if result.read and result.read.blocks:
+            for block in result.read.blocks:
+                for line in block.lines:
+                    text_lines.append(line.text)
+                    full_text += line.text + "\n"
+        
+        # Parse extracted data
+        barcode = extract_barcode(text_lines)
+        address = extract_address(text_lines)
+        recipient_name = extract_recipient_name(text_lines)
+        
+        return jsonify({
+            'success': True,
+            'full_text': full_text.strip(),
+            'text_lines': text_lines,
+            'barcode': barcode,
+            'address': address,
+            'recipient_name': recipient_name
+        })
+        
+    except ImportError:
+        return jsonify({
+            'error': 'Azure AI Vision SDK not installed',
+            'full_text': 'Please install: pip install azure-ai-vision-imageanalysis'
+        }), 500
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'full_text': f'Error: {str(e)}'
+        }), 500
+
+def extract_barcode(text_lines):
+    """Extract barcode from text lines"""
+    for line in text_lines:
+        # Look for patterns like DT202512040001 or LP76996096HK
+        if re.match(r'^[A-Z]{2}\d{12}$', line.strip()):
+            return line.strip()
+        if re.match(r'^[A-Z]{2}\d{8}[A-Z]{2}$', line.strip()):
+            return line.strip()
+    return ""
+
+def extract_address(text_lines):
+    """Extract address from text lines"""
+    address_parts = []
+    for i, line in enumerate(text_lines):
+        # Look for lines with numbers (street numbers) and common address words
+        if any(word in line.lower() for word in ['street', 'st', 'road', 'rd', 'avenue', 'ave', 'nsw', 'vic', 'qld']):
+            # Include this line and potentially the next few lines
+            address_parts.append(line)
+            if i + 1 < len(text_lines):
+                address_parts.append(text_lines[i + 1])
+            break
+    
+    return ', '.join(address_parts) if address_parts else ""
+
+def extract_recipient_name(text_lines):
+    """Extract recipient name (usually first line or after 'To:')"""
+    for i, line in enumerate(text_lines):
+        if line.lower().startswith('to:') or line.lower().startswith('recipient:'):
+            if i + 1 < len(text_lines):
+                return text_lines[i + 1].strip()
+        # First non-barcode, non-address line might be the name
+        if not re.match(r'^[A-Z]{2}\d', line) and len(line.split()) >= 2:
+            return line.strip()
+    
+    return text_lines[0] if text_lines else ""
+
 async def generate_customer_delivery_map(parcel, manifest):
     """Generate approximate delivery map for customer (privacy-protected)"""
     try:

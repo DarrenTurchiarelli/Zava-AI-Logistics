@@ -26,17 +26,13 @@
                     <i class="bi bi-search"></i> Track Parcel
                 </a>
             </div>
-            {% else %}
-            <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg px-4">
-                <i class="bi bi-speedometer2"></i> Go to Dashboard
-            </a>
             {% endif %}
         </div>
     </div>
 
-    <!-- Features -->
+    <!-- Features Grid - Responsive 2x2 layout -->
     <div class="row g-4 py-5">
-        <div class="col-md-4">
+        <div class="col-md-6 col-lg-6">
             <div class="card h-100 shadow-sm">
                 <div class="card-body text-center">
                     <div class="feature-icon bg-primary bg-gradient text-white rounded-circle d-inline-flex align-items-center justify-content-center fs-2 mb-3" style="width: 80px; height: 80px;">
@@ -50,7 +46,7 @@
             </div>
         </div>
         
-        <div class="col-md-4">
+        <div class="col-md-6 col-lg-6">
             <a href="{{ url_for('track_parcel_public') }}" class="text-decoration-none">
                 <div class="card h-100 shadow-sm hover-lift">
                     <div class="card-body text-center">
@@ -69,7 +65,7 @@
             </a>
         </div>
         
-        <div class="col-md-4">
+        <div class="col-md-6 col-lg-6">
             <div class="card h-100 shadow-sm">
                 <div class="card-body text-center">
                     <div class="feature-icon bg-info bg-gradient text-white rounded-circle d-inline-flex align-items-center justify-content-center fs-2 mb-3" style="width: 80px; height: 80px;">
@@ -81,6 +77,25 @@
                     </p>
                 </div>
             </div>
+        </div>
+    
+        <div class="col-md-6 col-lg-6">
+            <a href="{{ url_for('camera_scanner') }}" class="text-decoration-none">
+                <div class="card h-100 shadow-sm hover-lift">
+                    <div class="card-body text-center">
+                        <div class="feature-icon bg-warning bg-gradient text-white rounded-circle d-inline-flex align-items-center justify-content-center fs-2 mb-3" style="width: 80px; height: 80px;">
+                            <i class="bi bi-camera"></i>
+                        </div>
+                        <h3 class="card-title">Camera Scanner</h3>
+                        <p class="card-text text-muted">
+                            Scan barcodes and handwritten addresses with your camera using Azure AI OCR.
+                        </p>
+                        <span class="btn btn-outline-warning mt-2">
+                            <i class="bi bi-camera-fill"></i> Open Scanner
+                        </span>
+                    </div>
+                </div>
+            </a>
         </div>
     </div>
 

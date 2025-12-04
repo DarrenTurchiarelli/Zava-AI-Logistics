@@ -176,3 +176,126 @@ body {
 .clickable:hover {
     background-color: rgba(0,0,0,0.05);
 }
+
+/* Mobile Responsive Enhancements */
+@media (max-width: 768px) {
+    /* Stack navbar items vertically */
+    .navbar-collapse {
+        background-color: var(--dt-primary);
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-top: 0.5rem;
+    }
+    
+    /* Larger touch targets for mobile */
+    .btn {
+        padding: 0.75rem 1.5rem;
+        font-size: 1rem;
+    }
+    
+    /* Full width cards on mobile */
+    .card {
+        margin-bottom: 1rem;
+    }
+    
+    /* Reduce padding on mobile */
+    .container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    /* Hero section text size */
+    .display-3 {
+        font-size: 2.5rem;
+    }
+    
+    .lead {
+        font-size: 1.1rem;
+    }
+    
+    /* Feature icons slightly smaller on mobile */
+    .feature-icon {
+        width: 60px !important;
+        height: 60px !important;
+        font-size: 1.5rem !important;
+    }
+    
+    /* Card titles */
+    .card-title {
+        font-size: 1.25rem;
+    }
+    
+    /* Table responsiveness */
+    .table-responsive {
+        border: none;
+    }
+    
+    /* Camera scanner video full width */
+    #cameraFeed, #capturedCanvas {
+        width: 100% !important;
+        height: auto !important;
+    }
+    
+    /* Map iframes responsive */
+    iframe {
+        width: 100%;
+        height: 300px;
+    }
+}
+
+/* Tablet optimizations */
+@media (min-width: 769px) and (max-width: 991px) {
+    .display-3 {
+        font-size: 3rem;
+    }
+    
+    /* 2 columns on tablets */
+    .col-md-4 {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+}
+
+/* Hover lift effect for clickable cards */
+.hover-lift {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hover-lift:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.2) !important;
+}
+
+/* Smooth scrolling */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Improved focus states for accessibility */
+a:focus, button:focus, input:focus, select:focus, textarea:focus {
+    outline: 2px solid var(--dt-primary);
+    outline-offset: 2px;
+}
+
+/* Touch-friendly spacing */
+@media (max-width: 768px) {
+    .g-4 {
+        --bs-gutter-y: 1.5rem;
+    }
+    
+    /* Larger click areas for dropdowns */
+    .dropdown-item {
+        padding: 0.75rem 1rem;
+    }
+    
+    /* Better spacing for forms */
+    .form-control, .form-select {
+        padding: 0.75rem;
+        font-size: 1rem;
+    }
+    
+    /* Alert improvements */
+    .alert {
+        font-size: 0.95rem;
+    }
+}
