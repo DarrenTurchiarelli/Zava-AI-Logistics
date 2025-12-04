@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Manifests - {{ company.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">
+                <i class="bi bi-clipboard-check"></i> Driver Manifest Management
+            </h2>
+
+            <!-- Create New Manifest -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Create New Manifest</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('create_manifest') }}">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="driver_id" class="form-label">Driver ID</label>
+                                    <input type="text" class="form-control" id="driver_id" name="driver_id" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="driver_name" class="form-label">Driver Name</label>
+                                    <input type="text" class="form-control" id="driver_name" name="driver_name" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="barcodes" class="form-label">Parcel Barcodes (comma or newline separated, max 20)</label>
+                            <textarea class="form-control" id="barcodes" name="barcodes" rows="4" 
+                                      placeholder="ABC123456, DEF789012, GHI345678..." required></textarea>
+                            <small class="form-text text-muted">
+                                Enter up to 20 parcel barcodes separated by commas or line breaks.
+                            </small>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-truck"></i> Create Manifest
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Active Manifests -->
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-list-ul"></i> Active Manifests Today
+                        <span class="badge bg-light text-dark">{{ manifests|length }}</span>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if manifests %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Manifest ID</th>
+                                    <th>Driver</th>
+                                    <th>Items</th>
+                                    <th>Progress</th>
+                                    <th>Route</th>
+                                    <th>Distance</th>
+                                    <th>Est. Time</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for manifest in manifests %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('view_manifest_details', manifest_id=manifest.id) }}" 
+                                           class="text-decoration-none">
+                                            <code class="text-primary">{{ manifest.id }}</code>
+                                            <i class="bi bi-box-arrow-up-right ms-1"></i>
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <strong>{{ manifest.driver_name }}</strong><br>
+                                        <small class="text-muted">ID: {{ manifest.driver_id }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ manifest.total_items }} items</span>
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="min-width: 100px;">
+                                            <div class="progress-bar bg-success" role="progressbar" 
+                                                 style="width: {{ (manifest.completed_items / manifest.total_items * 100)|int }}%">
+                                                {{ manifest.completed_items }}/{{ manifest.total_items }}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if manifest.route_optimized %}
+                                        <span class="badge bg-success">
+                                            <i class="bi bi-check-circle"></i> Optimized
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-warning">
+                                            <i class="bi bi-hourglass-split"></i> Pending
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if manifest.estimated_distance_km %}
+                                        {{ manifest.estimated_distance_km }} km
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if manifest.estimated_duration_minutes %}
+                                        {{ (manifest.estimated_duration_minutes / 60)|round(1) }} hrs
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{{ 'success' if manifest.status == 'completed' else 'primary' }}">
+                                            {{ manifest.status }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <small>{{ manifest.created_timestamp[:19] }}</small>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info mb-0">
+                        <i class="bi bi-info-circle"></i> No active manifests for today.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

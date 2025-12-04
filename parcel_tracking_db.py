@@ -1091,6 +1091,176 @@ class ParcelTrackingDB:
             print(f"❌ Error generating suspicious message analytics: {e}")
             return {}
 
+    # ==================== DRIVER MANIFEST OPERATIONS ====================
+
+    async def create_driver_manifest(self, driver_id: str, driver_name: str, 
+                                     parcel_barcodes: List[str], 
+                                     manifest_date: str = None) -> Optional[str]:
+        """Create a delivery manifest for a driver with up to 20 parcels"""
+        try:
+            if len(parcel_barcodes) > 20:
+                print(f"⚠️ Warning: Manifest limited to 20 items. Truncating list.")
+                parcel_barcodes = parcel_barcodes[:20]
+            
+            manifest_id = f"manifest_{driver_id}_{uuid.uuid4().hex[:8]}"
+            manifest_date = manifest_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            
+            # Get parcel details for each barcode
+            parcels_container = self.database.get_container_client(self.parcels_container)
+            manifest_items = []
+            
+            for barcode in parcel_barcodes:
+                query = "SELECT * FROM c WHERE c.barcode = @barcode"
+                parameters = [{"name": "@barcode", "value": barcode}]
+                
+                async for parcel in parcels_container.query_items(query=query, parameters=parameters):
+                    manifest_items.append({
+                        "barcode": parcel.get("barcode"),
+                        "recipient_name": parcel.get("recipient_name"),
+                        "recipient_address": parcel.get("recipient_address"),
+                        "recipient_phone": parcel.get("recipient_phone"),
+                        "status": parcel.get("status"),
+                        "priority": parcel.get("priority", "normal"),
+                        "delivery_notes": parcel.get("delivery_notes", "")
+                    })
+                    break  # Only take first match
+            
+            manifest = {
+                "id": manifest_id,
+                "driver_id": driver_id,
+                "driver_name": driver_name,
+                "manifest_date": manifest_date,
+                "items": manifest_items,
+                "total_items": len(manifest_items),
+                "completed_items": 0,
+                "status": "active",
+                "created_timestamp": datetime.now(timezone.utc).isoformat(),
+                "route_optimized": False,
+                "optimized_route": None,
+                "estimated_duration_minutes": None,
+                "estimated_distance_km": None
+            }
+            
+            # Store in database (using driver_id as partition key)
+            container = self.database.get_container_client("driver_manifests")
+            await container.create_item(body=manifest)
+            
+            print(f"✅ Created manifest {manifest_id} for driver {driver_name} with {len(manifest_items)} items")
+            return manifest_id
+            
+        except Exception as e:
+            print(f"❌ Error creating driver manifest: {e}")
+            return None
+
+    async def get_driver_manifest(self, driver_id: str, manifest_date: str = None) -> Optional[Dict[str, Any]]:
+        """Get active manifest for a driver on a specific date"""
+        try:
+            container = self.database.get_container_client("driver_manifests")
+            manifest_date = manifest_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            
+            query = """
+                SELECT * FROM c 
+                WHERE c.driver_id = @driver_id 
+                AND c.manifest_date = @date 
+                AND c.status = 'active'
+            """
+            parameters = [
+                {"name": "@driver_id", "value": driver_id},
+                {"name": "@date", "value": manifest_date}
+            ]
+            
+            async for manifest in container.query_items(query=query, parameters=parameters):
+                return manifest  # Return first active manifest
+            
+            return None
+            
+        except Exception as e:
+            print(f"❌ Error retrieving driver manifest: {e}")
+            return None
+
+    async def update_manifest_route(self, manifest_id: str, optimized_route: List[Dict[str, Any]], 
+                                   estimated_duration: int, estimated_distance: float,
+                                   is_optimized: bool = True, traffic_considered: bool = True) -> bool:
+        """Update manifest with optimized route information"""
+        try:
+            container = self.database.get_container_client("driver_manifests")
+            
+            # Get existing manifest
+            query = "SELECT * FROM c WHERE c.id = @manifest_id"
+            parameters = [{"name": "@manifest_id", "value": manifest_id}]
+            
+            async for manifest in container.query_items(query=query, parameters=parameters):
+                manifest["route_optimized"] = True
+                manifest["optimized_route"] = optimized_route
+                manifest["estimated_duration_minutes"] = estimated_duration
+                manifest["estimated_distance_km"] = estimated_distance
+                manifest["route_updated_timestamp"] = datetime.now(timezone.utc).isoformat()
+                manifest["optimized"] = is_optimized
+                manifest["traffic_considered"] = traffic_considered
+                
+                await container.replace_item(item=manifest_id, body=manifest)
+                print(f"✅ Updated manifest {manifest_id} with optimized route")
+                return True
+            
+            print(f"⚠️ Manifest {manifest_id} not found")
+            return False
+            
+        except Exception as e:
+            print(f"❌ Error updating manifest route: {e}")
+            return False
+
+    async def mark_delivery_complete(self, manifest_id: str, barcode: str) -> bool:
+        """Mark a delivery as complete in the manifest"""
+        try:
+            container = self.database.get_container_client("driver_manifests")
+            
+            # Get existing manifest
+            query = "SELECT * FROM c WHERE c.id = @manifest_id"
+            parameters = [{"name": "@manifest_id", "value": manifest_id}]
+            
+            async for manifest in container.query_items(query=query, parameters=parameters):
+                # Update item status
+                for item in manifest["items"]:
+                    if item["barcode"] == barcode:
+                        item["status"] = "delivered"
+                        item["delivered_timestamp"] = datetime.now(timezone.utc).isoformat()
+                
+                # Update counters
+                manifest["completed_items"] = sum(1 for item in manifest["items"] if item.get("status") == "delivered")
+                
+                # Check if all complete
+                if manifest["completed_items"] == manifest["total_items"]:
+                    manifest["status"] = "completed"
+                    manifest["completed_timestamp"] = datetime.now(timezone.utc).isoformat()
+                
+                await container.replace_item(item=manifest_id, body=manifest)
+                return True
+            
+            return False
+            
+        except Exception as e:
+            print(f"❌ Error marking delivery complete: {e}")
+            return False
+
+    async def get_all_active_manifests(self) -> List[Dict[str, Any]]:
+        """Get all active manifests for admin overview"""
+        try:
+            container = self.database.get_container_client("driver_manifests")
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            
+            query = "SELECT * FROM c WHERE c.manifest_date = @date AND c.status = 'active'"
+            parameters = [{"name": "@date", "value": today}]
+            
+            manifests = []
+            async for manifest in container.query_items(query=query, parameters=parameters):
+                manifests.append(manifest)
+            
+            return manifests
+            
+        except Exception as e:
+            print(f"❌ Error retrieving active manifests: {e}")
+            return []
+
     # ==================== STORE-SPECIFIC OPERATIONS ====================
 
     async def get_parcels_by_store(self, store_location: str) -> List[Dict[str, Any]]:

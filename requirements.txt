@@ -28,6 +28,13 @@ aiohttp>=3.9.0  # For async HTTP requests (Security Copilot integration)
 
 # Email and OCR Support for Fraud Detection
 pytesseract>=0.3.10  # OCR text extraction from screenshots
+Pillow>=10.0.0  # Image processing
+extract-msg>=0.45.0  # Outlook MSG file parsing
+
+# Route Optimization
+# Note: Azure Maps requires subscription key in environment variable AZURE_MAPS_SUBSCRIPTION_KEY
+# Get from: https://portal.azure.com -> Create Azure Maps Account -> Authentication -> Primary Key
+# Migrated from Bing Maps (deprecated June 2025) to Azure Maps
 Pillow>=10.0.0       # Image processing for OCR
 # Note: pytesseract requires Tesseract-OCR to be installed on the system
 # Windows: https://github.com/UB-Mannheim/tesseract/wiki

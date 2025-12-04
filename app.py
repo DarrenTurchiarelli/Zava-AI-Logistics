@@ -562,6 +562,244 @@ def api_stats():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# Driver Manifest Routes
+
+@app.route('/driver/manifest')
+@login_required
+def driver_manifest():
+    """View driver's daily manifest"""
+    try:
+        driver_id = session.get('username', 'demo-driver')
+        
+        async def get_manifest():
+            async with ParcelTrackingDB() as db:
+                return await db.get_driver_manifest(driver_id)
+        
+        manifest = run_async(get_manifest())
+        
+        if not manifest:
+            flash('No active manifest for today. Contact dispatch for assignment.', 'info')
+            return render_template('driver_manifest.html', manifest=None)
+        
+        # If route not optimized yet, optimize it now
+        if not manifest.get('route_optimized') and manifest.get('items'):
+            from bing_maps_routes import BingMapsRouter
+            router = BingMapsRouter()
+            
+            # Extract addresses from manifest items
+            addresses = [item['recipient_address'] for item in manifest['items']]
+            
+            # Get depot/starting location from env or use first address
+            start_location = os.getenv('DEPOT_ADDRESS', 'Sydney, NSW 2000, Australia')
+            
+            # Optimize route
+            route_info = router.optimize_route(addresses, start_location)
+            
+            if route_info:
+                # Update manifest with optimized route
+                async def update_route():
+                    async with ParcelTrackingDB() as db:
+                        await db.update_manifest_route(
+                            manifest['id'],
+                            route_info['waypoints'],
+                            route_info['total_duration_minutes'],
+                            route_info['total_distance_km'],
+                            route_info.get('optimized', False),
+                            route_info.get('traffic_considered', False)
+                        )
+                
+                run_async(update_route())
+                
+                # Update local manifest object
+                manifest['route_optimized'] = True
+                manifest['optimized_route'] = route_info['waypoints']
+                manifest['estimated_duration_minutes'] = route_info['total_duration_minutes']
+                manifest['estimated_distance_km'] = route_info['total_distance_km']
+                manifest['route_url'] = route_info['route_url']
+                manifest['embed_url'] = router.generate_embed_url(route_info['waypoints'])
+                manifest['optimized'] = route_info.get('optimized', False)
+                manifest['traffic_considered'] = route_info.get('traffic_considered', False)
+        
+        return render_template('driver_manifest.html', manifest=manifest)
+        
+    except Exception as e:
+        flash(f'Error loading manifest: {str(e)}', 'danger')
+        return render_template('driver_manifest.html', manifest=None)
+
+@app.route('/driver/manifest/<manifest_id>/complete/<barcode>', methods=['POST'])
+@login_required
+def mark_delivery_complete(manifest_id, barcode):
+    """Mark a delivery as complete"""
+    try:
+        async def mark_complete():
+            async with ParcelTrackingDB() as db:
+                success = await db.mark_delivery_complete(manifest_id, barcode)
+                if success:
+                    # Also update the parcel status
+                    await db.update_parcel_status(barcode, "delivered")
+                return success
+        
+        success = run_async(mark_complete())
+        
+        if success:
+            flash(f'Delivery {barcode} marked as complete!', 'success')
+        else:
+            flash(f'Error marking delivery complete', 'danger')
+            
+        return redirect(url_for('driver_manifest'))
+        
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'danger')
+        return redirect(url_for('driver_manifest'))
+
+@app.route('/admin/manifests')
+@login_required
+def admin_manifests():
+    """View all active manifests (admin only)"""
+    try:
+        async def get_all_manifests():
+            async with ParcelTrackingDB() as db:
+                return await db.get_all_active_manifests()
+        
+        manifests = run_async(get_all_manifests())
+        return render_template('admin_manifests.html', manifests=manifests)
+        
+    except Exception as e:
+        flash(f'Error loading manifests: {str(e)}', 'danger')
+        return render_template('admin_manifests.html', manifests=[])
+
+@app.route('/admin/manifests/view/<manifest_id>')
+@login_required
+def view_manifest_details(manifest_id):
+    """View detailed manifest information (admin only)"""
+    try:
+        async def get_manifest_by_id():
+            async with ParcelTrackingDB() as db:
+                # Ensure database is connected
+                if not db.database:
+                    await db.connect()
+                
+                # Get manifest from database
+                container = db.database.get_container_client("driver_manifests")
+                query = "SELECT * FROM c WHERE c.id = @manifest_id"
+                parameters = [{"name": "@manifest_id", "value": manifest_id}]
+                
+                async for manifest in container.query_items(query=query, parameters=parameters):
+                    return manifest
+                return None
+        
+        manifest = run_async(get_manifest_by_id())
+        
+        if not manifest:
+            flash('Manifest not found', 'danger')
+            return redirect(url_for('admin_manifests'))
+        
+        # If route not optimized yet, optimize it now
+        if not manifest.get('route_optimized') and manifest.get('items'):
+            from bing_maps_routes import BingMapsRouter
+            router = BingMapsRouter()
+            
+            # Extract addresses from manifest items
+            addresses = [item['recipient_address'] for item in manifest['items']]
+            
+            # Get depot/starting location from env
+            start_location = os.getenv('DEPOT_ADDRESS', 'Sydney, NSW 2000, Australia')
+            
+            # Optimize route
+            route_info = router.optimize_route(addresses, start_location)
+            
+            if route_info:
+                # Update manifest with optimized route
+                async def update_route():
+                    async with ParcelTrackingDB() as db:
+                        await db.update_manifest_route(
+                            manifest['id'],
+                            route_info['waypoints'],
+                            route_info['total_duration_minutes'],
+                            route_info['total_distance_km'],
+                            route_info.get('optimized', False),
+                            route_info.get('traffic_considered', False)
+                        )
+                
+                run_async(update_route())
+                
+                # Update local manifest object
+                manifest['route_optimized'] = True
+                manifest['optimized_route'] = route_info['waypoints']
+                manifest['estimated_duration_minutes'] = route_info['total_duration_minutes']
+                manifest['estimated_distance_km'] = route_info['total_distance_km']
+                manifest['route_url'] = route_info['route_url']
+                manifest['embed_url'] = router.generate_embed_url(route_info['waypoints'])
+                manifest['optimized'] = route_info.get('optimized', False)
+                manifest['traffic_considered'] = route_info.get('traffic_considered', False)
+        
+        # Always regenerate embed URL to ensure latest map features
+        if manifest.get('route_optimized') and manifest.get('optimized_route'):
+            from bing_maps_routes import BingMapsRouter
+            router = BingMapsRouter()
+            manifest['embed_url'] = router.generate_embed_url(manifest['optimized_route'])
+        
+        # Reorder items according to optimized route if available
+        if manifest.get('route_optimized') and manifest.get('optimized_route') and manifest.get('items'):
+            optimized_route = manifest['optimized_route']
+            original_items = manifest['items']
+            
+            # Create a mapping of addresses to items
+            address_to_item = {item['recipient_address']: item for item in original_items}
+            
+            # Reorder items based on optimized route
+            reordered_items = []
+            for address in optimized_route:
+                # Skip the depot/starting location (first in route)
+                if address in address_to_item:
+                    reordered_items.append(address_to_item[address])
+            
+            # Add any items that weren't in the optimized route (shouldn't happen, but safe)
+            for item in original_items:
+                if item not in reordered_items:
+                    reordered_items.append(item)
+            
+            manifest['items'] = reordered_items
+        
+        return render_template('manifest_details.html', manifest=manifest)
+        
+    except Exception as e:
+        flash(f'Error loading manifest details: {str(e)}', 'danger')
+        return redirect(url_for('admin_manifests'))
+
+@app.route('/admin/manifests/create', methods=['POST'])
+@login_required
+def create_manifest():
+    """Create a new driver manifest"""
+    try:
+        driver_id = request.form.get('driver_id')
+        driver_name = request.form.get('driver_name')
+        barcode_list = request.form.get('barcodes', '').strip()
+        
+        # Parse barcodes (comma or newline separated)
+        barcodes = [b.strip() for b in re.split(r'[,\n]', barcode_list) if b.strip()]
+        
+        if not barcodes:
+            flash('No parcels selected for manifest', 'warning')
+            return redirect(url_for('admin_manifests'))
+        
+        async def create():
+            async with ParcelTrackingDB() as db:
+                return await db.create_driver_manifest(driver_id, driver_name, barcodes)
+        
+        manifest_id = run_async(create())
+        
+        if manifest_id:
+            flash(f'Manifest created successfully! ID: {manifest_id}', 'success')
+        else:
+            flash('Error creating manifest', 'danger')
+            
+        return redirect(url_for('admin_manifests'))
+        
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'danger')
+        return redirect(url_for('admin_manifests'))
+
 # Error handlers
 
 @app.errorhandler(404)

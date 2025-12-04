@@ -42,6 +42,19 @@
                             <li><a class="dropdown-item" href="{{ url_for('all_parcels') }}">View All Parcels</a></li>
                         </ul>
                     </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-truck"></i> Drivers
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('driver_manifest') }}">
+                                <i class="bi bi-clipboard-check"></i> My Manifest
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_manifests') }}">
+                                <i class="bi bi-gear"></i> Manage Manifests
+                            </a></li>
+                        </ul>
+                    </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('report_fraud') }}">
                             <i class="bi bi-shield-exclamation"></i> Report Fraud
