@@ -962,12 +962,29 @@ def track_parcel_public():
                     )
                     print(f"🔍 Map generated - Deliveries away: {deliveries_away}, Map URL exists: {delivery_map_url is not None}")
                 
+                # Determine display status - override if in active manifest
+                display_status = parcel.get('current_status')
+                if is_out_for_delivery and display_status not in ['delivered', 'out_for_delivery']:
+                    display_status = 'out_for_delivery'
+                
+                # Set last_updated to current time if None
+                last_updated = parcel.get('last_updated')
+                if not last_updated:
+                    from datetime import datetime, timezone
+                    last_updated = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+                
+                # Set expected delivery to today if in active manifest
+                expected_delivery = parcel.get('expected_delivery_date')
+                if is_out_for_delivery and manifest:
+                    from datetime import datetime
+                    expected_delivery = datetime.now().strftime('%Y-%m-%d')
+                
                 return {
                     'barcode': parcel.get('barcode'),
-                    'current_status': parcel.get('current_status'),
+                    'current_status': display_status,  # Use computed status for display
                     'recipient_name': parcel.get('recipient_name'),
-                    'expected_delivery': parcel.get('expected_delivery_date'),
-                    'last_updated': parcel.get('last_updated'),
+                    'expected_delivery': expected_delivery,
+                    'last_updated': last_updated,
                     'events': events[::-1] if events else [],  # Reverse to show newest first
                     'delivery_map_url': delivery_map_url,
                     'deliveries_away': deliveries_away
