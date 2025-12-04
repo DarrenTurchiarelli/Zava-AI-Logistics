@@ -131,7 +131,7 @@
                     {% endif %}
 
                     {% if analysis.alert_security_team %}
-                    <div class="alert alert-danger">
+                    <div class="alert alert-permanent alert-danger">
                         <i class="bi bi-bell"></i> <strong>Security Team Alerted:</strong>
                         This high-risk threat has been escalated to our security team for investigation.
                     </div>
@@ -160,6 +160,14 @@
                             </ul>
                         </div>
                     </div>
+                    
+                    <!-- Check Another Message Button -->
+                    <div class="text-center mt-4">
+                        <a href="/fraud/report" class="btn btn-primary btn-lg">
+                            <i class="bi bi-arrow-clockwise"></i> Check Another Message
+                        </a>
+                    </div>
+                    
                     </div>
                     {% endif %}
                 </div>

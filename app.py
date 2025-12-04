@@ -119,27 +119,41 @@ def extract_text_from_eml(file_content):
         return f"[Error extracting email: {str(e)}]", "unknown"
 
 def extract_text_from_msg(file_content):
-    """Extract text from .msg Outlook file (basic extraction)"""
+    """Extract text from .msg Outlook file using extract_msg library"""
     try:
-        # For .msg files, try to extract readable text
-        # Note: Full .msg parsing requires extract_msg or similar library
-        # This is a basic fallback that extracts visible text
-        text = file_content.decode('utf-8', errors='ignore')
+        import extract_msg
+        import io
         
-        # Try to find sender in the decoded content
-        sender_match = re.search(r'From:?\\s*([^\\n]+)', text)
-        sender = sender_match.group(1).strip() if sender_match else "unknown"
+        # Create a file-like object from bytes
+        msg_file = io.BytesIO(file_content)
         
-        # Try to find subject
-        subject_match = re.search(r'Subject:?\\s*([^\\n]+)', text)
-        subject = subject_match.group(1).strip() if subject_match else ""
+        # Parse the MSG file
+        msg = extract_msg.Message(msg_file)
         
-        # Extract main body (very basic)
-        body = text
+        # Extract metadata
+        sender = msg.sender or "unknown"
+        subject = msg.subject or ""
+        body = msg.body or ""
         
-        return f"Subject: {subject}\\n\\n{body[:2000]}", sender
+        # Clean up
+        msg.close()
+        
+        # Combine for analysis
+        full_text = f"Subject: {subject}\\n\\nFrom: {sender}\\n\\n{body}"
+        
+        return full_text, sender
     except Exception as e:
-        return f"[Error extracting Outlook message: {str(e)}. Consider saving as .EML format for better parsing]", "unknown"
+        print(f"⚠️ Error extracting MSG file with extract_msg: {str(e)}")
+        # Fallback to basic extraction
+        try:
+            text = file_content.decode('utf-8', errors='ignore')
+            sender_match = re.search(r'From:?\\s*([^\\n]+)', text)
+            sender = sender_match.group(1).strip() if sender_match else "unknown"
+            subject_match = re.search(r'Subject:?\\s*([^\\n]+)', text)
+            subject = subject_match.group(1).strip() if subject_match else ""
+            return f"Subject: {subject}\\n\\n{text[:2000]}", sender
+        except Exception as e2:
+            return f"[Error extracting Outlook message: {str(e)}. Try saving as .EML format]", "unknown"
 
 def process_uploaded_file(file):
     """Process uploaded file and extract text content"""

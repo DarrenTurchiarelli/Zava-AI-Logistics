@@ -193,20 +193,31 @@ class FraudRiskAgent:
             
             # Prepare prompt for the Fraud & Risk Agent
             analysis_prompt = f"""
-            Analyze this suspicious message for fraud patterns and security risks:
+            You are analyzing a message for DT Logistics customers to detect fraud and scams.
+            
+            CONTEXT: DT Logistics is a delivery/logistics company. Common fraud patterns include:
+            - Fake delivery fee scams (demanding payment for nonexistent packages)
+            - Phishing emails impersonating DT Logistics
+            - Payment scams requesting urgent money transfers
+            - Fake tracking links leading to credential theft
+            
+            NOT FRAUD: Normal business emails, internal communications, legitimate inquiries, 
+            automated notifications from real companies (LinkedIn, Microsoft, etc.), and 
+            professional correspondence should be marked as LOW risk.
 
             MESSAGE CONTENT: "{message_content}"
             SENDER INFO: "{sender_info}"
 
-            Please provide:
-            1. Risk Level (Low/Medium/High/Critical)
-            2. Fraud Type (Payment Scam/Phishing/Impersonation/Delivery Fee Scam/Other)
-            3. Confidence Score (0-100%)
-            4. Risk Indicators (list specific threats found)
+            Analyze carefully and provide:
+            1. Risk Level (Low/Medium/High/Critical) - Only use Medium+ if there are clear fraud indicators
+            2. Fraud Type (Payment Scam/Phishing/Impersonation/Delivery Fee Scam/Other/None)
+            3. Confidence Score (0-100%) - Be conservative, legitimate emails should be <30%
+            4. Risk Indicators (list ONLY specific, concrete threats - not generic observations)
             5. Recommended Actions (specific steps for user)
-            6. Security Alert Level (Yes/No for escalation)
+            6. Security Alert Level (Yes/No for escalation) - Only Yes for High/Critical threats
             7. Related Patterns (if this matches known fraud campaigns)
 
+            BE CONSERVATIVE: Err on the side of marking unclear messages as Low risk rather than false positives.
             Format your response clearly with each section labeled.
             """
             
@@ -224,23 +235,28 @@ class FraudRiskAgent:
             )
             
             # Extract the AI response from the result
-            print(f"🔍 Run result attributes: {[a for a in dir(run_result) if not a.startswith('_')]}")
-            print(f"🔍 Run result type: {type(run_result)}")
+            print(f"🔍 Run result status: {run_result.status}")
+            print(f"🔍 Run thread_id: {run_result.thread_id}")
             
-            ai_response = ""
-            if hasattr(run_result, 'messages') and run_result.messages:
-                print(f"📨 Found {len(run_result.messages)} messages")
-                for message in run_result.messages:
-                    print(f"📝 Message role: {message.role}")
-                    if message.role == "assistant":
-                        for content in message.content:
-                            if hasattr(content, 'text'):
-                                ai_response = content.text.value
-                                print(f"✅ Extracted AI response: {len(ai_response)} chars")
-                                break
-                        break
+            # Get the assistant's response from the thread
+            ai_response_obj = project_client.agents.messages.get_last_message_text_by_role(
+                thread_id=run_result.thread_id,
+                role="assistant"
+            )
+            
+            # Extract text from MessageTextContent object
+            if ai_response_obj:
+                if hasattr(ai_response_obj, 'value'):
+                    ai_response = ai_response_obj.value
+                elif hasattr(ai_response_obj, 'text'):
+                    ai_response = ai_response_obj.text.value if hasattr(ai_response_obj.text, 'value') else str(ai_response_obj.text)
+                else:
+                    ai_response = str(ai_response_obj)
+                print(f"✅ Extracted AI response: {len(ai_response)} chars")
+                print(f"📄 AI Response preview: {ai_response[:500]}...")
             else:
-                print(f"⚠️ No messages attribute or messages empty")
+                print(f"⚠️ No AI response received")
+                ai_response = ""
             
             # Parse the AI response into structured data
             analysis = self._parse_ai_response(ai_response, message_content, sender_info)
@@ -260,19 +276,40 @@ class FraudRiskAgent:
         
         print(f"🔍 Parsing AI response ({len(ai_response)} chars)")
         
-        # Extract threat level
-        threat_level = ThreatLevel.MEDIUM  # Default
+        # Extract threat level - check for explicit level markers first
+        threat_level = ThreatLevel.LOW  # Default to LOW (safer than MEDIUM)
         response_lower = ai_response.lower()
-        if "critical" in response_lower:
+        
+        # Look for structured response format: "Risk Level**: Low/Medium/High/Critical"
+        risk_level_match = re.search(r'risk level[*:\s]+(\w+)', response_lower)
+        if risk_level_match:
+            level = risk_level_match.group(1)
+            if "critical" in level:
+                threat_level = ThreatLevel.CRITICAL
+            elif "high" in level:
+                threat_level = ThreatLevel.HIGH
+            elif "medium" in level:
+                threat_level = ThreatLevel.MEDIUM
+            elif "low" in level:
+                threat_level = ThreatLevel.LOW
+        # Fallback to keyword search
+        elif "critical" in response_lower:
             threat_level = ThreatLevel.CRITICAL
         elif "high risk" in response_lower or "high threat" in response_lower:
             threat_level = ThreatLevel.HIGH
+        elif "medium risk" in response_lower or "medium threat" in response_lower:
+            threat_level = ThreatLevel.MEDIUM
         elif "low risk" in response_lower or "low threat" in response_lower:
             threat_level = ThreatLevel.LOW
         
         # Extract fraud category
         fraud_category = FraudCategory.UNKNOWN  # Default
-        if "payment scam" in response_lower or "delivery fee" in response_lower or "fee scam" in response_lower:
+        
+        # Check for "Fraud Type**: None" pattern first
+        fraud_type_match = re.search(r'fraud type[*:\s]+(\w+)', response_lower)
+        if fraud_type_match and "none" in fraud_type_match.group(1):
+            fraud_category = FraudCategory.UNKNOWN
+        elif "payment scam" in response_lower or "delivery fee" in response_lower or "fee scam" in response_lower:
             fraud_category = FraudCategory.DELIVERY_FEE_SCAM
         elif "phishing" in response_lower:
             fraud_category = FraudCategory.PHISHING
@@ -293,22 +330,33 @@ class FraudRiskAgent:
         risk_indicators = []
         lines = ai_response.split('\n')
         
-        # First pass: Look for explicitly marked indicators
-        in_indicators_section = False
-        for line in lines:
-            line_stripped = line.strip()
-            
-            # Detect indicator sections
-            if any(header in line.lower() for header in ["risk indicator", "red flag", "warning sign", "suspicious element"]):
-                in_indicators_section = True
-                continue
-            
-            # Extract indicators from lists
-            if line_stripped.startswith(('•', '-', '*', '1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.')) and len(line_stripped) > 15:
-                # Clean up the indicator text
-                indicator = re.sub(r'^[•\-*\d\.)\]]\s*', '', line_stripped).strip()
-                if indicator and len(indicator) > 10:
-                    risk_indicators.append(indicator)
+        # Check if AI explicitly said "None" or no threats
+        if any(phrase in response_lower for phrase in ["none identified", "no risk indicators", "no threats", "appears to be legitimate"]):
+            print("✅ AI identified no risk indicators")
+            risk_indicators = []
+        else:
+            # First pass: Look for explicitly marked indicators
+            in_indicators_section = False
+            for line in lines:
+                line_stripped = line.strip()
+                
+                # Detect indicator sections start
+                if any(header in line.lower() for header in ["4. **risk indicator", "risk indicators:"]):
+                    in_indicators_section = True
+                    continue
+                
+                # Detect section end (next numbered section like "5. **Recommended")
+                if in_indicators_section and re.match(r'^\d+\.\s*\*\*[A-Z]', line_stripped):
+                    in_indicators_section = False
+                    continue
+                
+                # Extract indicators only from the indicators section
+                if in_indicators_section:
+                    if line_stripped.startswith(('•', '-', '*')) and len(line_stripped) > 15:
+                        # Clean up the indicator text
+                        indicator = re.sub(r'^[•\-*]\s*', '', line_stripped).strip()
+                        if indicator and len(indicator) > 10 and "none" not in indicator.lower():
+                            risk_indicators.append(indicator)
         
         # Second pass: If no indicators found, extract key phrases
         if len(risk_indicators) < 2:
@@ -322,9 +370,10 @@ class FraudRiskAgent:
             if "click" in response_lower and ("link" in response_lower or "url" in response_lower):
                 risk_indicators.append("Contains suspicious links or URLs")
         
-        # Fallback: Use content-based detection if still no indicators
-        if len(risk_indicators) == 0:
-            print("⚠️ No indicators found in AI response, using content analysis")
+        # Only use fallback if AI response suggests there should be indicators
+        # Don't add fake indicators for legitimate emails
+        if len(risk_indicators) == 0 and threat_level in [ThreatLevel.HIGH, ThreatLevel.CRITICAL]:
+            print("⚠️ High/Critical threat but no indicators found, using content analysis")
             risk_indicators = self._extract_indicators_from_content(message_content)
         
         print(f"📋 Extracted {len(risk_indicators)} risk indicators")
@@ -349,8 +398,11 @@ class FraudRiskAgent:
         # Generate recommendations based on category
         recommended_actions = self._generate_recommendations(fraud_category, threat_level)
         
-        # Determine security alert
-        alert_security = threat_level in [ThreatLevel.HIGH, ThreatLevel.CRITICAL] or "alert" in response_lower
+        # Determine security alert - only for high/critical threats with high confidence
+        alert_security = (
+            threat_level in [ThreatLevel.HIGH, ThreatLevel.CRITICAL] and 
+            confidence_score >= 0.95
+        )
         
         # Educational content
         educational_content = self._get_educational_content(fraud_category, threat_level)
@@ -508,7 +560,7 @@ class FraudRiskAgent:
             risk_indicators=risk_indicators,
             recommended_actions=self._generate_recommendations(fraud_category, threat_level),
             educational_content=self._get_educational_content(fraud_category, threat_level),
-            alert_security_team=threat_level in [ThreatLevel.HIGH, ThreatLevel.CRITICAL],
+            alert_security_team=(threat_level in [ThreatLevel.HIGH, ThreatLevel.CRITICAL] and confidence_score >= 0.95),
             related_patterns=[f"Analyzed {len(message_content)} characters", "Fallback analysis - Azure AI unavailable"],
             ai_response="Fallback analysis used - Azure AI agent was unavailable"
         )
