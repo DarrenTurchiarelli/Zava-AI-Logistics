@@ -167,12 +167,18 @@ class BingMapsRouter:
             coords = self.geocode_address(addr)
             if coords:
                 coordinates.append(coords)
+                print(f"📍 Geocoded: {addr} -> {coords}")
+            else:
+                print(f"❌ Failed to geocode: {addr}")
         
         if not coordinates:
+            print("❌ No coordinates generated for embed URL")
             return ""
         
-        # Center on first coordinate
+        # Use first coordinate as the center (driver's starting point)
         center_lat, center_lon = coordinates[0]
+        print(f"🗺️  Map center: lat={center_lat}, lon={center_lon}")
+        print(f"🗺️  Total stops: {len(coordinates)}")
         
         # Generate inline HTML with Azure Maps
         html_content = f"""
@@ -185,28 +191,42 @@ class BingMapsRouter:
     <script src="https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.js"></script>
     <style>
         body {{ margin: 0; padding: 0; }}
-        #map {{ width: 100%; height: {height}px; }}
+        #map {{ width: 100%; height: {height}px; opacity: 0; transition: opacity 0.3s; }}
+        #map.ready {{ opacity: 1; }}
     </style>
 </head>
 <body>
     <div id="map"></div>
     <script>
+        // Define center coordinates
+        var centerLon = {center_lon};
+        var centerLat = {center_lat};
+        
+        console.log('Map initialization - Center: [' + centerLon + ', ' + centerLat + '], Zoom: 11');
+        
         var map = new atlas.Map('map', {{
-            center: [{center_lon}, {center_lat}],
+            center: [centerLon, centerLat],
             zoom: 11,
             language: 'en-US',
+            renderWorldCopies: false,
+            style: 'road',
             authOptions: {{
                 authType: 'subscriptionKey',
                 subscriptionKey: '{self.subscription_key}'
             }}
         }});
         
+        console.log('Map object created, waiting for ready event...');
+        
         map.events.add('ready', function() {{
+            console.log('Map ready event fired');
             var dataSource = new atlas.source.DataSource();
             map.sources.add(dataSource);
             
             // Add markers for each delivery
             var pins = [{', '.join([f"[{lon}, {lat}]" for lat, lon in coordinates])}];
+            
+            // Add all pins to data source
             pins.forEach(function(pin, index) {{
                 dataSource.add(new atlas.data.Feature(new atlas.data.Point(pin), {{
                     title: 'Stop ' + (index + 1),
@@ -258,15 +278,17 @@ class BingMapsRouter:
                             lineCap: 'round'
                         }}), 'labels');
                         
-                        // Fit map to show entire route
-                        var bounds = atlas.data.BoundingBox.fromData(routeCoordinates);
-                        map.setCamera({{
-                            bounds: bounds,
-                            padding: 50
-                        }});
+                        // Don't change camera - keep initial zoom level focused on first delivery
                     }}
+                    
+                    // Show map once everything is loaded
+                    document.getElementById('map').classList.add('ready');
                 }})
-                .catch(err => console.error('Route fetch error:', err));
+                .catch(function(err) {{ 
+                    console.error('Route fetch error:', err);
+                    // Show map even if route fails
+                    document.getElementById('map').classList.add('ready');
+                }});
         }});
     </script>
 </body>

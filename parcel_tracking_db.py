@@ -1178,6 +1178,22 @@ class ParcelTrackingDB:
             print(f"❌ Error retrieving driver manifest: {e}")
             return None
 
+    async def get_manifest_by_id(self, manifest_id: str) -> Optional[Dict[str, Any]]:
+        """Get manifest by ID"""
+        try:
+            container = self.database.get_container_client("driver_manifests")
+            query = "SELECT * FROM c WHERE c.id = @manifest_id"
+            parameters = [{"name": "@manifest_id", "value": manifest_id}]
+            
+            async for manifest in container.query_items(query=query, parameters=parameters):
+                return manifest
+            
+            return None
+            
+        except Exception as e:
+            print(f"❌ Error retrieving manifest by ID: {e}")
+            return None
+
     async def update_manifest_route(self, manifest_id: str, optimized_route: List[Dict[str, Any]], 
                                    estimated_duration: int, estimated_distance: float,
                                    is_optimized: bool = True, traffic_considered: bool = True) -> bool:

@@ -25,9 +25,13 @@
                             <h6 class="mb-0">
                                 {{ manifest.completed_items }} / {{ manifest.total_items }} Completed
                             </h6>
-                            <div class="progress mt-2" style="height: 8px;">
-                                <div class="progress-bar" role="progressbar" 
-                                     style="width: {{ (manifest.completed_items / manifest.total_items * 100)|int }}%">
+                            <div class="progress mt-2" style="height: 25px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" 
+                                     style="width: {{ (manifest.completed_items / manifest.total_items * 100)|int }}%"
+                                     aria-valuenow="{{ manifest.completed_items }}" 
+                                     aria-valuemin="0" 
+                                     aria-valuemax="{{ manifest.total_items }}">
+                                    <strong>{{ (manifest.completed_items / manifest.total_items * 100)|int }}%</strong>
                                 </div>
                             </div>
                         </div>

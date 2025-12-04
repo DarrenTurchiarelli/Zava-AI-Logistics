@@ -53,6 +53,7 @@ from logistics_admin import (
 )
 from parcel_tracking_db import ParcelTrackingDB
 from fraud_risk_agent import analyze_with_fraud_agent, fraud_risk_agent
+from user_manager import UserManager, has_role, is_admin, is_driver, can_view_all_manifests, can_create_manifest, can_approve_requests
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -207,15 +208,35 @@ def process_uploaded_file(file):
         flash(f'Error processing file: {str(e)}', 'danger')
         return "", "unknown"
 
-# Authentication decorator (simple version - enhance for production)
+# Authentication decorators
+
 def login_required(f):
+    """Require user to be logged in"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not session.get('logged_in'):
+        if not session.get('user'):
             flash('Please log in to access this page.', 'warning')
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
+
+def role_required(*roles):
+    """Require user to have one of the specified roles"""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            user = session.get('user')
+            if not user:
+                flash('Please log in to access this page.', 'warning')
+                return redirect(url_for('login'))
+            
+            if user.get('role') not in roles:
+                flash('You do not have permission to access this page.', 'danger')
+                return redirect(url_for('dashboard'))
+            
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
 
 # Routes
 
@@ -226,19 +247,39 @@ def index():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """Simple login page"""
+    """Login page with role-based authentication"""
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
         
-        # Simple auth (replace with proper authentication in production)
-        if username == 'admin' and password == 'admin123':
-            session['logged_in'] = True
-            session['username'] = username
-            flash('Successfully logged in!', 'success')
-            return redirect(url_for('dashboard'))
-        else:
-            flash('Invalid credentials', 'danger')
+        # Authenticate with UserManager
+        async def auth_user():
+            async with ParcelTrackingDB() as db:
+                if not db.database:
+                    await db.connect()
+                
+                user_mgr = UserManager(db)
+                return await user_mgr.authenticate(username, password)
+        
+        try:
+            user = run_async(auth_user())
+            
+            if user:
+                session['user'] = user
+                session['logged_in'] = True  # Backward compatibility
+                session['username'] = user['username']  # Backward compatibility
+                
+                flash(f"Welcome back, {user['full_name']}!", 'success')
+                
+                # Redirect based on role
+                if user['role'] == UserManager.ROLE_DRIVER:
+                    return redirect(url_for('driver_manifest'))
+                else:
+                    return redirect(url_for('dashboard'))
+            else:
+                flash('Invalid credentials', 'danger')
+        except Exception as e:
+            flash(f'Login error: {str(e)}', 'danger')
     
     return render_template('login.html')
 
@@ -569,7 +610,18 @@ def api_stats():
 def driver_manifest():
     """View driver's daily manifest"""
     try:
-        driver_id = session.get('username', 'demo-driver')
+        user = session.get('user', {})
+        
+        # Determine driver_id based on user role
+        if user.get('role') == UserManager.ROLE_DRIVER:
+            # Driver sees their own manifest
+            driver_id = user.get('driver_id')
+            if not driver_id:
+                flash('Driver ID not configured. Contact administrator.', 'danger')
+                return render_template('driver_manifest.html', manifest=None)
+        else:
+            # Admin/depot manager can view any driver (use query param or default)
+            driver_id = request.args.get('driver_id', 'driver-001')
         
         async def get_manifest():
             async with ParcelTrackingDB() as db:
@@ -578,7 +630,7 @@ def driver_manifest():
         manifest = run_async(get_manifest())
         
         if not manifest:
-            flash('No active manifest for today. Contact dispatch for assignment.', 'info')
+            flash(f'No active manifest for driver {driver_id}. Contact dispatch for assignment.', 'info')
             return render_template('driver_manifest.html', manifest=None)
         
         # If route not optimized yet, optimize it now
@@ -620,6 +672,15 @@ def driver_manifest():
                 manifest['optimized'] = route_info.get('optimized', False)
                 manifest['traffic_considered'] = route_info.get('traffic_considered', False)
         
+        # Always regenerate embed URL to ensure latest map features
+        if manifest.get('route_optimized') and manifest.get('optimized_route'):
+            from bing_maps_routes import BingMapsRouter
+            router = BingMapsRouter()
+            print(f"🗺️  [DRIVER] Generating embed URL for {len(manifest['optimized_route'])} addresses")
+            print(f"🗺️  [DRIVER] First address: {manifest['optimized_route'][0] if manifest['optimized_route'] else 'None'}")
+            manifest['embed_url'] = router.generate_embed_url(manifest['optimized_route'])
+            print(f"🗺️  [DRIVER] Embed URL length: {len(manifest.get('embed_url', ''))} chars")
+        
         return render_template('driver_manifest.html', manifest=manifest)
         
     except Exception as e:
@@ -629,33 +690,71 @@ def driver_manifest():
 @app.route('/driver/manifest/<manifest_id>/complete/<barcode>', methods=['POST'])
 @login_required
 def mark_delivery_complete(manifest_id, barcode):
-    """Mark a delivery as complete"""
+    """Mark a delivery as complete (drivers only)"""
+    user = session.get('user', {})
+    
     try:
-        async def mark_complete():
-            async with ParcelTrackingDB() as db:
-                success = await db.mark_delivery_complete(manifest_id, barcode)
-                if success:
-                    # Also update the parcel status
-                    await db.update_parcel_status(barcode, "delivered")
-                return success
-        
-        success = run_async(mark_complete())
+        # Verify driver can only complete their own deliveries
+        if user.get('role') == UserManager.ROLE_DRIVER:
+            # Check manifest belongs to this driver
+            async def verify_and_complete():
+                async with ParcelTrackingDB() as db:
+                    manifest = await db.get_manifest_by_id(manifest_id)
+                    if not manifest or manifest.get('driver_id') != user.get('driver_id'):
+                        return False, "You can only complete your own deliveries"
+                    
+                    # Find the item to get delivery address
+                    delivery_address = None
+                    for item in manifest.get('items', []):
+                        if item.get('barcode') == barcode:
+                            delivery_address = item.get('recipient_address', 'Unknown')
+                            break
+                    
+                    success = await db.mark_delivery_complete(manifest_id, barcode)
+                    if success and delivery_address:
+                        await db.update_parcel_status(barcode, "delivered", delivery_address, user.get('username', 'driver'))
+                    return success, None
+            
+            success, error_msg = run_async(verify_and_complete())
+            if error_msg:
+                flash(error_msg, 'danger')
+                return redirect(url_for('driver_manifest'))
+        else:
+            # Admin can complete any delivery
+            async def mark_complete():
+                async with ParcelTrackingDB() as db:
+                    manifest = await db.get_manifest_by_id(manifest_id)
+                    if not manifest:
+                        return False
+                    
+                    # Find the item to get delivery address
+                    delivery_address = None
+                    for item in manifest.get('items', []):
+                        if item.get('barcode') == barcode:
+                            delivery_address = item.get('recipient_address', 'Unknown')
+                            break
+                    
+                    success = await db.mark_delivery_complete(manifest_id, barcode)
+                    if success and delivery_address:
+                        await db.update_parcel_status(barcode, "delivered", delivery_address, user.get('username', 'admin'))
+                    return success
+            
+            success = run_async(mark_complete())
         
         if success:
             flash(f'Delivery {barcode} marked as complete!', 'success')
         else:
             flash(f'Error marking delivery complete', 'danger')
             
-        return redirect(url_for('driver_manifest'))
-        
     except Exception as e:
         flash(f'Error: {str(e)}', 'danger')
-        return redirect(url_for('driver_manifest'))
+    
+    return redirect(url_for('driver_manifest'))
 
 @app.route('/admin/manifests')
-@login_required
+@role_required(UserManager.ROLE_ADMIN, UserManager.ROLE_DEPOT_MANAGER)
 def admin_manifests():
-    """View all active manifests (admin only)"""
+    """View all active manifests (admin and depot managers only)"""
     try:
         async def get_all_manifests():
             async with ParcelTrackingDB() as db:
@@ -669,9 +768,9 @@ def admin_manifests():
         return render_template('admin_manifests.html', manifests=[])
 
 @app.route('/admin/manifests/view/<manifest_id>')
-@login_required
+@role_required(UserManager.ROLE_ADMIN, UserManager.ROLE_DEPOT_MANAGER)
 def view_manifest_details(manifest_id):
-    """View detailed manifest information (admin only)"""
+    """View detailed manifest information (admin and depot managers only)"""
     try:
         async def get_manifest_by_id():
             async with ParcelTrackingDB() as db:
@@ -737,7 +836,10 @@ def view_manifest_details(manifest_id):
         if manifest.get('route_optimized') and manifest.get('optimized_route'):
             from bing_maps_routes import BingMapsRouter
             router = BingMapsRouter()
+            print(f"🗺️  [ADMIN] Generating embed URL for {len(manifest['optimized_route'])} addresses")
+            print(f"🗺️  [ADMIN] First address: {manifest['optimized_route'][0] if manifest['optimized_route'] else 'None'}")
             manifest['embed_url'] = router.generate_embed_url(manifest['optimized_route'])
+            print(f"🗺️  [ADMIN] Embed URL length: {len(manifest.get('embed_url', ''))} chars")
         
         # Reorder items according to optimized route if available
         if manifest.get('route_optimized') and manifest.get('optimized_route') and manifest.get('items'):
