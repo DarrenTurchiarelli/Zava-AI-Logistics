@@ -76,6 +76,47 @@
                     {% endif %}
                 </ul>
                 <ul class="navbar-nav">
+                    <!-- Accessibility Settings -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-label="Accessibility Settings">
+                            <i class="bi bi-universal-access"></i> Accessibility
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">Theme</h6></li>
+                            <li><a class="dropdown-item" href="#" onclick="setAccessibilityTheme('default'); return false;">
+                                <i class="bi bi-circle-fill text-primary"></i> Default
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="setAccessibilityTheme('high-contrast'); return false;">
+                                <i class="bi bi-circle-fill" style="color: #000;"></i> High Contrast
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="setAccessibilityTheme('colorblind-deuteranopia'); return false;">
+                                <i class="bi bi-circle-fill text-success"></i> Colorblind (Red-Green)
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="setAccessibilityTheme('colorblind-protanopia'); return false;">
+                                <i class="bi bi-circle-fill text-danger"></i> Colorblind (Protanopia)
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="setAccessibilityTheme('dark'); return false;">
+                                <i class="bi bi-moon-fill"></i> Dark Mode
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header">Font Size</h6></li>
+                            <li><a class="dropdown-item" href="#" onclick="setFontSize('normal'); return false;">Normal</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="setFontSize('large'); return false;">Large</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="setFontSize('extra-large'); return false;">Extra Large</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header">Features</h6></li>
+                            <li><a class="dropdown-item" href="#" onclick="toggleScreenReader(); return false;">
+                                <i class="bi bi-soundwave"></i> Screen Reader Mode
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="toggleReducedMotion(); return false;">
+                                <i class="bi bi-pause-circle"></i> Reduce Motion
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="resetAccessibility(); return false;">
+                                <i class="bi bi-arrow-counterclockwise"></i> Reset All Settings
+                            </a></li>
+                        </ul>
+                    </li>
                     {% if session.logged_in %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
@@ -134,6 +175,201 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Custom JS -->
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    
+    <!-- Accessibility Settings Script -->
+    <script>
+        // Load saved accessibility preferences on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const theme = localStorage.getItem('accessibility-theme') || 'default';
+            const fontSize = localStorage.getItem('accessibility-font-size') || 'normal';
+            const screenReader = localStorage.getItem('accessibility-screen-reader') === 'true';
+            const reducedMotion = localStorage.getItem('accessibility-reduced-motion') === 'true';
+            
+            applyTheme(theme);
+            applyFontSize(fontSize);
+            if (screenReader) applyScreenReader();
+            if (reducedMotion) applyReducedMotion();
+        });
+        
+        function setAccessibilityTheme(theme) {
+            localStorage.setItem('accessibility-theme', theme);
+            applyTheme(theme);
+            announceChange('Theme changed to ' + theme.replace(/-/g, ' '));
+        }
+        
+        function applyTheme(theme) {
+            document.body.classList.remove('theme-default', 'theme-high-contrast', 'theme-colorblind-deuteranopia', 'theme-colorblind-protanopia', 'theme-dark');
+            document.body.classList.add('theme-' + theme);
+        }
+        
+        function setFontSize(size) {
+            localStorage.setItem('accessibility-font-size', size);
+            applyFontSize(size);
+            announceChange('Font size changed to ' + size);
+        }
+        
+        function applyFontSize(size) {
+            document.body.classList.remove('font-size-normal', 'font-size-large', 'font-size-extra-large');
+            document.body.classList.add('font-size-' + size);
+        }
+        
+        function toggleScreenReader() {
+            const current = localStorage.getItem('accessibility-screen-reader') === 'true';
+            localStorage.setItem('accessibility-screen-reader', !current);
+            if (!current) {
+                applyScreenReader();
+                announceChange('Screen reader mode enabled');
+            } else {
+                document.body.classList.remove('screen-reader-mode');
+                announceChange('Screen reader mode disabled');
+            }
+        }
+        
+        function applyScreenReader() {
+            document.body.classList.add('screen-reader-mode');
+        }
+        
+        function toggleReducedMotion() {
+            const current = localStorage.getItem('accessibility-reduced-motion') === 'true';
+            localStorage.setItem('accessibility-reduced-motion', !current);
+            if (!current) {
+                applyReducedMotion();
+                announceChange('Reduced motion enabled');
+            } else {
+                document.body.classList.remove('reduced-motion');
+                announceChange('Reduced motion disabled');
+            }
+        }
+        
+        function applyReducedMotion() {
+            document.body.classList.add('reduced-motion');
+        }
+        
+        function resetAccessibility() {
+            localStorage.removeItem('accessibility-theme');
+            localStorage.removeItem('accessibility-font-size');
+            localStorage.removeItem('accessibility-screen-reader');
+            localStorage.removeItem('accessibility-reduced-motion');
+            location.reload();
+        }
+        
+        function announceChange(message) {
+            // Create ARIA live region for screen readers
+            let announcer = document.getElementById('accessibility-announcer');
+            if (!announcer) {
+                announcer = document.createElement('div');
+                announcer.id = 'accessibility-announcer';
+                announcer.setAttribute('role', 'status');
+                announcer.setAttribute('aria-live', 'polite');
+                announcer.style.position = 'absolute';
+                announcer.style.left = '-10000px';
+                announcer.style.width = '1px';
+                announcer.style.height = '1px';
+                announcer.style.overflow = 'hidden';
+                document.body.appendChild(announcer);
+            }
+            announcer.textContent = message;
+        }
+    </script>
+    
+    <!-- Accessibility CSS -->
+    <style>
+        /* High Contrast Theme */
+        .theme-high-contrast {
+            background: #fff;
+            color: #000;
+        }
+        .theme-high-contrast .navbar,
+        .theme-high-contrast .btn-primary,
+        .theme-high-contrast .bg-primary {
+            background-color: #000 !important;
+            border-color: #000 !important;
+            color: #fff !important;
+        }
+        .theme-high-contrast .card {
+            border: 2px solid #000;
+        }
+        .theme-high-contrast a {
+            color: #0000ff;
+            text-decoration: underline;
+        }
+        
+        /* Colorblind Themes */
+        .theme-colorblind-deuteranopia .bg-success,
+        .theme-colorblind-deuteranopia .btn-success {
+            background-color: #0173b2 !important;
+            border-color: #0173b2 !important;
+        }
+        .theme-colorblind-deuteranopia .bg-danger,
+        .theme-colorblind-deuteranopia .btn-danger {
+            background-color: #de8f05 !important;
+            border-color: #de8f05 !important;
+        }
+        .theme-colorblind-deuteranopia .bg-warning,
+        .theme-colorblind-deuteranopia .btn-warning {
+            background-color: #029e73 !important;
+            border-color: #029e73 !important;
+        }
+        
+        .theme-colorblind-protanopia .bg-success,
+        .theme-colorblind-protanopia .btn-success {
+            background-color: #6699cc !important;
+            border-color: #6699cc !important;
+        }
+        .theme-colorblind-protanopia .bg-danger,
+        .theme-colorblind-protanopia .btn-danger {
+            background-color: #cc9966 !important;
+            border-color: #cc9966 !important;
+        }
+        
+        /* Dark Mode */
+        .theme-dark {
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+        .theme-dark .card {
+            background-color: #2d2d2d;
+            color: #e0e0e0;
+            border-color: #404040;
+        }
+        .theme-dark .navbar {
+            background-color: #0d0d0d !important;
+        }
+        .theme-dark .text-muted {
+            color: #b0b0b0 !important;
+        }
+        
+        /* Font Sizes */
+        .font-size-large {
+            font-size: 1.15rem;
+        }
+        .font-size-extra-large {
+            font-size: 1.3rem;
+        }
+        .font-size-large h1, .font-size-extra-large h1 { font-size: calc(1.375rem * 1.3); }
+        .font-size-large h2, .font-size-extra-large h2 { font-size: calc(1.325rem * 1.3); }
+        .font-size-large h3, .font-size-extra-large h3 { font-size: calc(1.3rem * 1.25); }
+        
+        /* Screen Reader Mode */
+        .screen-reader-mode :focus {
+            outline: 3px solid #ff0 !important;
+            outline-offset: 2px !important;
+        }
+        .screen-reader-mode a:focus,
+        .screen-reader-mode button:focus,
+        .screen-reader-mode input:focus {
+            box-shadow: 0 0 0 3px rgba(255, 255, 0, 0.5) !important;
+        }
+        
+        /* Reduced Motion */
+        .reduced-motion *,
+        .reduced-motion *::before,
+        .reduced-motion *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+        }
+    </style>
     
     {% block extra_js %}{% endblock %}
 </body>
