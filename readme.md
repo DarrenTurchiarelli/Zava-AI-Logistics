@@ -37,6 +37,22 @@ The web interface will be available at: **http://127.0.0.1:5000**
 - **View All Parcels**: Comprehensive listing with sorting and filtering
 - **Real-time Status Updates**: Live tracking information
 
+**🚗 Driver Manifest System**
+- **Automated Route Optimization**: Azure Maps integration with real-time traffic analysis
+- **Daily Manifest Generation**: Assign up to 20 parcels per driver with optimized delivery sequence
+- **Interactive Route Maps**: Embedded Azure Maps with route polylines and numbered stops
+- **Proof of Delivery**: Mobile-friendly interface for drivers to mark deliveries complete
+- **Admin Dashboard**: View all active manifests with progress tracking
+- **Route Analytics**: Distance, duration, and traffic-aware routing
+
+**🗺️ Azure Maps Integration**
+- Real-time geocoding of delivery addresses
+- Traffic-aware route optimization with `computeBestOrder=true`
+- Interactive map visualization with route polylines
+- Automatic route reordering for efficiency
+- Distance and duration calculations
+- Mobile-responsive map interface
+
 **🛡️ Fraud Detection**
 - AI-powered fraud analysis using Azure AI Foundry
 - **Microsoft Security Copilot integration** (optional) for enterprise-grade threat intelligence
@@ -45,7 +61,7 @@ The web interface will be available at: **http://127.0.0.1:5000**
 - Report suspicious messages with instant threat assessment
 - Educational security guidance based on detected threat types
 - Threat level classification (Low/Medium/High/Critical)
-- Automatic security team alerts for high-risk threats
+- Automatic security team alerts for high-risk threats (≥95% confidence + HIGH/CRITICAL severity)
 
 **✅ Approval Workflows**
 - View all pending approval requests
@@ -1128,11 +1144,186 @@ This project follows the Microsoft Agent Framework licensing terms.
 ---
 
 **Getting Started**: 
-1. Configure `.env` with your Azure credentials
+1. Configure `.env` with your Azure credentials (Cosmos DB, AI Foundry, Vision API, Azure Maps)
 2. Run `python parcel_tracking_db.py` to initialize the database
 3. **Run `$env:FLASK_ENV='development'; py app.py` to start the web interface** 🌐
 4. Access http://127.0.0.1:5000 (Login: admin/admin123)
 5. Or run `python main.py` for the CLI interface 💻
+
+## 🗺️ Driver Manifest System (Azure Maps Integration)
+
+### Overview
+The driver manifest system provides automated route optimization for delivery drivers using Azure Maps API with real-time traffic analysis. Each driver can be assigned up to 20 parcels with an optimized delivery sequence.
+
+### Setup Azure Maps
+
+1. **Create Azure Maps Account**:
+   ```bash
+   az maps account create --name dt-logistics-maps --resource-group your-rg --sku S0
+   ```
+
+2. **Configure Environment**:
+   ```bash
+   # Add to .env file
+   AZURE_MAPS_SUBSCRIPTION_KEY="your-primary-key"
+   DEPOT_ADDRESS="123 Collins St, Melbourne VIC 3000"
+   ```
+
+3. **Verify Configuration**:
+   ```bash
+   python test_azure_maps.py
+   ```
+   Expected output: ✅ Geocoding and Route API tests passing
+
+### Features
+
+**🚗 Route Optimization**
+- Real-time traffic analysis with `traffic=true`
+- Automatic waypoint reordering with `computeBestOrder=true`
+- Fastest route calculation considering current conditions
+- Distance and duration estimates
+
+**🗺️ Interactive Maps**
+- Embedded Azure Maps with Web SDK
+- Blue numbered markers for each delivery stop
+- Blue polyline showing optimized driving route
+- Auto-zoom to fit entire route with padding
+
+**📊 Admin Dashboard**
+- View all active manifests
+- Click manifest ID to view detailed route information
+- Progress tracking (completed vs total deliveries)
+- Route statistics (distance, duration, optimization status)
+
+**📱 Driver Interface**
+- Mobile-friendly manifest view
+- Deliveries listed in optimized sequence
+- Mark deliveries complete by barcode
+- Real-time progress updates
+
+### Creating Manifests
+
+**Option 1: Web Interface**
+1. Login as admin at http://127.0.0.1:5000
+2. Navigate to Admin Dashboard → Driver Manifests
+3. Click "Create New Manifest"
+4. Select driver and assign parcels (up to 20)
+5. System automatically optimizes route using Azure Maps
+
+**Option 2: Generate Demo Data**
+```bash
+python generate_demo_manifests.py
+```
+Creates:
+- 20 sample parcels with Sydney addresses
+- 3 driver manifests (driver-001, driver-002, driver-003)
+- Automatic route optimization for each manifest
+
+### Viewing Manifest Details
+
+**Admin View**: `/admin/manifests/view/<manifest_id>`
+
+Components:
+- **Header Card**: Driver info, status, progress bar
+- **Route Statistics**: 
+  - Total distance (km)
+  - Estimated duration (minutes)
+  - Optimization status ("Route optimized considering real-time traffic conditions")
+- **Interactive Map**: 
+  - Embedded Azure Maps iframe
+  - Numbered stops (Stop 1, Stop 2, etc.)
+  - Blue route polyline
+  - Auto-zoom to route bounds
+- **Delivery Details Table**: 
+  - Sorted by optimized route order
+  - Barcode, recipient, address, priority, status
+  - Each row numbered as stop sequence
+- **Route Sequence**: List view of optimized waypoint order
+
+**Driver View**: `/driver/manifest`
+- Current active manifest
+- List of deliveries in optimized order
+- Complete deliveries with barcode scan
+- Route map with current progress
+
+### Database Schema
+
+**Container**: `driver_manifests` (partition key: `/driver_id`)
+
+```json
+{
+  "id": "manifest_driver-001_17e682f2",
+  "driver_id": "driver-001",
+  "driver_name": "John Smith",
+  "created_timestamp": "2025-12-04T10:00:00Z",
+  "route_optimized": true,
+  "route_updated_timestamp": "2025-12-04T10:01:00Z",
+  "optimized": true,
+  "traffic_considered": true,
+  "estimated_distance_km": 45.3,
+  "estimated_duration_minutes": 87.2,
+  "items": [
+    {
+      "barcode": "LP123456",
+      "recipient_name": "Jane Doe",
+      "recipient_address": "123 Collins St, Melbourne VIC 3000",
+      "recipient_phone": "0412345678",
+      "priority": "express",
+      "status": "out_for_delivery",
+      "delivered": false
+    }
+  ],
+  "optimized_route": [
+    "123 Collins St, Melbourne VIC 3000",
+    "456 George St, Sydney NSW 2000"
+  ],
+  "completed_deliveries": 0,
+  "total_deliveries": 6
+}
+```
+
+### API Integration
+
+**Azure Maps Route Directions API**
+```
+GET https://atlas.microsoft.com/route/directions/json
+Parameters:
+  - api-version: 1.0
+  - subscription-key: <key>
+  - query: lat1,lon1:lat2,lon2:lat3,lon3
+  - traffic: true
+  - computeBestOrder: true
+  - routeType: fastest
+  - travelMode: car
+```
+
+**Response Processing**:
+- Extract optimized waypoint order
+- Calculate total distance and duration
+- Generate route polyline for map visualization
+- Store optimized sequence in database
+
+### Troubleshooting
+
+**Map not showing markers/route**:
+- Check browser console for errors
+- Verify `AZURE_MAPS_SUBSCRIPTION_KEY` in `.env`
+- Refresh page to regenerate embed URL with latest code
+- Run `python test_azure_maps.py` to validate API key
+
+**Mock optimization message appearing**:
+- Indicates Azure Maps API not being used
+- Check subscription key is valid
+- Verify no API request errors in Flask logs
+- Database field `optimized: true` should be set
+
+**Route not optimizing**:
+- Maximum 20 waypoints supported
+- Check all addresses can be geocoded
+- Verify API quota not exceeded
+- Review Flask terminal for error messages
+
+---
 
 **For Production Deployment:**
 - See `DEPLOYMENT.md` for Azure App Service deployment
