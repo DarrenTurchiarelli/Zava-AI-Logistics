@@ -927,13 +927,18 @@ def track_parcel_public():
     try:
         async def get_tracking_info(tracking_number):
             async with ParcelTrackingDB() as db:
-                # Get parcel details by barcode (what customers see on labels)
+                # Try to get parcel by barcode first (e.g., DT202512040001)
                 parcel = await db.get_parcel_by_barcode(tracking_number)
+                
+                # If not found, try by tracking number (e.g., LP76996096HK)
+                if not parcel:
+                    parcel = await db.get_parcel_by_tracking_number(tracking_number)
+                
                 if not parcel:
                     return None
                 
-                # Barcode is the input tracking number
-                barcode = tracking_number
+                # Use the parcel's barcode for all subsequent lookups
+                barcode = parcel.get('barcode')
                 
                 # Get tracking events using barcode
                 events = await db.get_parcel_tracking_history(barcode)
