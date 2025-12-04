@@ -13,6 +13,7 @@ Migrated from Bing Maps (deprecated) to Azure Maps
 
 import os
 import requests
+import base64
 from typing import List, Dict, Any, Optional, Tuple
 from dotenv import load_dotenv
 
@@ -358,6 +359,93 @@ class BingMapsRouter:
         except Exception as e:
             print(f"❌ Error geocoding address '{address}': {e}")
             return None
+
+    def generate_approximate_delivery_map(self, approximate_lat: float, approximate_lon: float,
+                                         actual_lat: float, actual_lon: float, radius_km: float = 5,
+                                         width: int = 800, height: int = 400) -> str:
+        """Generate customer-facing delivery map with approximate location for privacy"""
+        if not self.subscription_key:
+            return ""
+        
+        # Calculate radius in meters
+        radius_m = radius_km * 1000
+        
+        html_content = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.css" />
+    <script src="https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.js"></script>
+    <style>
+        body {{ margin: 0; padding: 0; }}
+        #map {{ width: 100%; height: {height}px; }}
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script>
+        var map = new atlas.Map('map', {{
+            center: [{approximate_lon}, {approximate_lat}],
+            zoom: 13,
+            language: 'en-US',
+            renderWorldCopies: false,
+            style: 'road',
+            authOptions: {{
+                authType: 'subscriptionKey',
+                subscriptionKey: '{self.subscription_key}'
+            }}
+        }});
+        
+        map.events.add('ready', function() {{
+            var dataSource = new atlas.source.DataSource();
+            map.sources.add(dataSource);
+            
+            // Add delivery area circle (5km radius around actual location)
+            var circle = new atlas.data.Feature(new atlas.data.Point([{actual_lon}, {actual_lat}]), {{
+                subType: "Circle",
+                radius: {radius_m}
+            }});
+            dataSource.add(circle);
+            
+            // Add circle layer
+            map.layers.add(new atlas.layer.PolygonLayer(dataSource, null, {{
+                fillColor: '#00a2ff',
+                fillOpacity: 0.2,
+                strokeColor: '#0078D4',
+                strokeWidth: 2
+            }}));
+            
+            // Add truck icon at approximate location
+            var truckIcon = new atlas.data.Feature(new atlas.data.Point([{approximate_lon}, {approximate_lat}]), {{
+                title: 'Delivery Vehicle'
+            }});
+            dataSource.add(truckIcon);
+            
+            // Add truck symbol
+            map.layers.add(new atlas.layer.SymbolLayer(dataSource, null, {{
+                filter: ['==', ['get', 'title'], 'Delivery Vehicle'],
+                iconOptions: {{
+                    image: 'pin-blue',
+                    size: 1.2
+                }},
+                textOptions: {{
+                    textField: ['get', 'title'],
+                    offset: [0, -2.5],
+                    color: '#0078D4',
+                    size: 12
+                }}
+            }}));
+        }});
+    </script>
+</body>
+</html>
+        """
+        
+        # Return as data URL for iframe embedding
+        encoded = base64.b64encode(html_content.encode()).decode()
+        return f"data:text/html;base64,{encoded}"
 
 
 # Convenience function for quick route optimization

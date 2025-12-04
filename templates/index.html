@@ -51,17 +51,22 @@
         </div>
         
         <div class="col-md-4">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body text-center">
-                    <div class="feature-icon bg-success bg-gradient text-white rounded-circle d-inline-flex align-items-center justify-content-center fs-2 mb-3" style="width: 80px; height: 80px;">
-                        <i class="bi bi-geo-alt"></i>
+            <a href="{{ url_for('track_parcel_public') }}" class="text-decoration-none">
+                <div class="card h-100 shadow-sm hover-lift">
+                    <div class="card-body text-center">
+                        <div class="feature-icon bg-success bg-gradient text-white rounded-circle d-inline-flex align-items-center justify-content-center fs-2 mb-3" style="width: 80px; height: 80px;">
+                            <i class="bi bi-geo-alt"></i>
+                        </div>
+                        <h3 class="card-title">Track Your Parcel</h3>
+                        <p class="card-text text-muted">
+                            Track your delivery in real-time with live status updates and estimated arrival.
+                        </p>
+                        <span class="btn btn-outline-success mt-2">
+                            <i class="bi bi-search"></i> Track Now
+                        </span>
                     </div>
-                    <h3 class="card-title">Real-Time Tracking</h3>
-                    <p class="card-text">
-                        Track parcels in real-time with precise location updates and delivery ETAs.
-                    </p>
                 </div>
-            </div>
+            </a>
         </div>
         
         <div class="col-md-4">

@@ -1277,6 +1277,33 @@ class ParcelTrackingDB:
             print(f"❌ Error retrieving active manifests: {e}")
             return []
 
+    async def get_manifest_for_parcel(self, barcode: str) -> Optional[Dict[str, Any]]:
+        """Get the active manifest containing a specific parcel"""
+        try:
+            container = self.database.get_container_client("driver_manifests")
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            
+            # Query for active manifests that contain this parcel
+            query = """
+                SELECT * FROM c 
+                WHERE c.manifest_date = @date 
+                AND c.status = 'active'
+                AND ARRAY_CONTAINS(c.items, {'barcode': @barcode}, true)
+            """
+            parameters = [
+                {"name": "@date", "value": today},
+                {"name": "@barcode", "value": barcode}
+            ]
+            
+            async for manifest in container.query_items(query=query, parameters=parameters):
+                return manifest  # Return first match
+            
+            return None
+            
+        except Exception as e:
+            print(f"❌ Error retrieving manifest for parcel: {e}")
+            return None
+
     # ==================== STORE-SPECIFIC OPERATIONS ====================
 
     async def get_parcels_by_store(self, store_location: str) -> List[Dict[str, Any]]:

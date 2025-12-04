@@ -902,6 +902,179 @@ def create_manifest():
         flash(f'Error: {str(e)}', 'danger')
         return redirect(url_for('admin_manifests'))
 
+# Public Parcel Tracking (Customer-Facing)
+
+@app.route('/track', methods=['GET', 'POST'])
+def track_parcel_public():
+    """Public parcel tracking page for customers"""
+    if request.method == 'GET':
+        return render_template('track_parcel_public.html', tracking_results=None)
+    
+    tracking_input = request.form.get('tracking_number', '').strip()
+    
+    if not tracking_input:
+        flash('Please enter at least one tracking number', 'warning')
+        return render_template('track_parcel_public.html', tracking_results=None)
+    
+    # Parse multiple barcodes separated by comma or semicolon
+    import re
+    barcodes = [b.strip() for b in re.split(r'[,;]', tracking_input) if b.strip()]
+    
+    if not barcodes:
+        flash('Please enter valid tracking numbers', 'warning')
+        return render_template('track_parcel_public.html', tracking_results=None)
+    
+    try:
+        async def get_tracking_info(tracking_number):
+            async with ParcelTrackingDB() as db:
+                # Get parcel details by barcode (what customers see on labels)
+                parcel = await db.get_parcel_by_barcode(tracking_number)
+                if not parcel:
+                    return None
+                
+                # Barcode is the input tracking number
+                barcode = tracking_number
+                
+                # Get tracking events using barcode
+                events = await db.get_parcel_tracking_history(barcode)
+                
+                # Check if out for delivery - either status is out_for_delivery OR item is pending in an active manifest
+                manifest = await db.get_manifest_for_parcel(barcode)
+                is_out_for_delivery = parcel.get('current_status') == 'out_for_delivery'
+                
+                # If in active manifest with pending status, consider it out for delivery
+                if manifest and manifest.get('status') == 'active':
+                    # Find the item in manifest
+                    for item in manifest.get('items', []):
+                        if item.get('barcode') == barcode and item.get('status') != 'delivered':
+                            is_out_for_delivery = True
+                            break
+                
+                delivery_map_url = None
+                deliveries_away = None
+                
+                print(f"🔍 Tracking Debug - Barcode: {barcode}, Status: {parcel.get('current_status')}, Manifest: {manifest is not None}, Out for delivery: {is_out_for_delivery}")
+                
+                if is_out_for_delivery and manifest:
+                    print(f"🔍 Generating customer delivery map...")
+                    deliveries_away, delivery_map_url = await generate_customer_delivery_map(
+                        parcel, manifest
+                    )
+                    print(f"🔍 Map generated - Deliveries away: {deliveries_away}, Map URL exists: {delivery_map_url is not None}")
+                
+                return {
+                    'barcode': parcel.get('barcode'),
+                    'current_status': parcel.get('current_status'),
+                    'recipient_name': parcel.get('recipient_name'),
+                    'expected_delivery': parcel.get('expected_delivery_date'),
+                    'last_updated': parcel.get('last_updated'),
+                    'events': events[::-1] if events else [],  # Reverse to show newest first
+                    'delivery_map_url': delivery_map_url,
+                    'deliveries_away': deliveries_away
+                }
+        
+        # Get tracking info for all barcodes
+        async def get_all_tracking():
+            results = []
+            not_found = []
+            for barcode in barcodes:
+                data = await get_tracking_info(barcode)
+                if data:
+                    results.append(data)
+                else:
+                    not_found.append(barcode)
+            return results, not_found
+        
+        tracking_results, not_found = run_async(get_all_tracking())
+        
+        # Show warnings for not found barcodes
+        if not_found:
+            flash(f'Tracking number(s) not found: {", ".join(not_found)}', 'warning')
+        
+        if not tracking_results:
+            flash('No tracking information found for the provided barcode(s)', 'danger')
+            return render_template('track_parcel_public.html', tracking_results=None)
+        
+        return render_template('track_parcel_public.html', tracking_results=tracking_results)
+        
+    except Exception as e:
+        flash(f'Error retrieving tracking information: {str(e)}', 'danger')
+        return render_template('track_parcel_public.html', tracking_data=None)
+
+async def generate_customer_delivery_map(parcel, manifest):
+    """Generate approximate delivery map for customer (privacy-protected)"""
+    try:
+        from bing_maps_routes import BingMapsRouter
+        import random
+        
+        print(f"🗺️ Starting map generation for barcode: {parcel.get('barcode')}")
+        
+        # Find parcel position in manifest
+        items = manifest.get('items', [])
+        print(f"🗺️ Manifest has {len(items)} items")
+        
+        completed_count = sum(1 for item in items if item.get('status') == 'delivered')
+        parcel_index = next((i for i, item in enumerate(items) if item.get('barcode') == parcel.get('barcode')), None)
+        
+        print(f"🗺️ Parcel index in manifest: {parcel_index}, Completed: {completed_count}")
+        
+        if parcel_index is None:
+            print(f"❌ Parcel not found in manifest items")
+            return None, None
+        
+        # Calculate deliveries away
+        deliveries_away = parcel_index - completed_count
+        if deliveries_away < 0:
+            deliveries_away = 0
+        
+        print(f"🗺️ Deliveries away: {deliveries_away}")
+        
+        # Get delivery address
+        delivery_address = parcel.get('recipient_address')
+        if not delivery_address:
+            print(f"❌ No recipient address found")
+            return deliveries_away, None
+        
+        print(f"🗺️ Delivery address: {delivery_address}")
+        
+        router = BingMapsRouter()
+        
+        # Geocode the actual delivery address
+        coords = router.geocode_address(delivery_address)
+        if not coords:
+            print(f"❌ Geocoding failed for address: {delivery_address}")
+            return deliveries_away, None
+        
+        lat, lon = coords
+        print(f"🗺️ Geocoded coordinates: {lat}, {lon}")
+        
+        # Add random offset for privacy (5km radius)
+        # 1 degree ≈ 111km, so 5km ≈ 0.045 degrees
+        lat_offset = random.uniform(-0.045, 0.045)
+        lon_offset = random.uniform(-0.045, 0.045)
+        
+        approximate_lat = lat + lat_offset
+        approximate_lon = lon + lon_offset
+        
+        print(f"🗺️ Approximate coordinates (with privacy offset): {approximate_lat}, {approximate_lon}")
+        
+        # Generate map centered on approximate location with 5km radius circle
+        map_url = router.generate_approximate_delivery_map(
+            approximate_lat, approximate_lon, 
+            actual_lat=lat, actual_lon=lon,
+            radius_km=5
+        )
+        
+        print(f"🗺️ Map URL generated: {len(map_url) if map_url else 0} characters")
+        
+        return f"{deliveries_away} stop{'s' if deliveries_away != 1 else ''}", map_url
+        
+    except Exception as e:
+        print(f"❌ Error generating customer delivery map: {e}")
+        import traceback
+        traceback.print_exc()
+        return None, None
+
 # Error handlers
 
 @app.errorhandler(404)
