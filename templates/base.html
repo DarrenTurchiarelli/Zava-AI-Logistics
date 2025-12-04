@@ -218,15 +218,117 @@
             localStorage.setItem('accessibility-screen-reader', !current);
             if (!current) {
                 applyScreenReader();
-                announceChange('Screen reader mode enabled');
+                speak('Screen reader mode enabled. I will now read aloud elements as you focus on them.');
             } else {
                 document.body.classList.remove('screen-reader-mode');
-                announceChange('Screen reader mode disabled');
+                removeSpeechListeners();
+                stopSpeaking();
+                setTimeout(() => speak('Screen reader mode disabled'), 100);
             }
         }
         
         function applyScreenReader() {
             document.body.classList.add('screen-reader-mode');
+            initializeSpeechListeners();
+        }
+        
+        // Text-to-Speech functionality using Web Speech API
+        let speechSynthesis = window.speechSynthesis;
+        let currentUtterance = null;
+        let focusInListener = null;
+        
+        function speak(text, interrupt = true) {
+            // Check if screen reader is actually enabled
+            if (!localStorage.getItem('accessibility-screen-reader') || localStorage.getItem('accessibility-screen-reader') !== 'true') {
+                return;
+            }
+            
+            if (!text) return;
+            
+            // Stop current speech if interrupting
+            if (interrupt && speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+            }
+            
+            // Create new utterance
+            currentUtterance = new SpeechSynthesisUtterance(text);
+            currentUtterance.rate = 1.0;
+            currentUtterance.pitch = 1.0;
+            currentUtterance.volume = 1.0;
+            
+            // Use default voice or first available
+            const voices = speechSynthesis.getVoices();
+            if (voices.length > 0) {
+                currentUtterance.voice = voices[0];
+            }
+            
+            speechSynthesis.speak(currentUtterance);
+        }
+        
+        function stopSpeaking() {
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+            }
+        }
+        
+        function initializeSpeechListeners() {
+            // Only add listeners if screen reader mode is enabled
+            if (!document.body.classList.contains('screen-reader-mode')) return;
+            
+            // Remove existing listener if present
+            if (focusInListener) {
+                document.removeEventListener('focusin', focusInListener);
+            }
+            
+            // Create and store listener function
+            focusInListener = function(e) {
+                if (localStorage.getItem('accessibility-screen-reader') !== 'true') return;
+                
+                let textToRead = '';
+                const element = e.target;
+                
+                // Get text based on element type
+                if (element.tagName === 'A') {
+                    textToRead = 'Link: ' + (element.textContent.trim() || element.getAttribute('aria-label') || element.title || 'unnamed link');
+                } else if (element.tagName === 'BUTTON') {
+                    textToRead = 'Button: ' + (element.textContent.trim() || element.getAttribute('aria-label') || element.value || 'unnamed button');
+                } else if (element.tagName === 'INPUT') {
+                    const label = document.querySelector('label[for="' + element.id + '"]');
+                    const fieldName = label ? label.textContent.trim() : element.getAttribute('aria-label') || element.placeholder || element.name || 'input field';
+                    const type = element.type;
+                    textToRead = type.charAt(0).toUpperCase() + type.slice(1) + ' field: ' + fieldName;
+                    if (element.value) {
+                        textToRead += ', current value: ' + element.value;
+                    }
+                } else if (element.tagName === 'TEXTAREA') {
+                    const label = document.querySelector('label[for="' + element.id + '"]');
+                    const fieldName = label ? label.textContent.trim() : element.getAttribute('aria-label') || element.placeholder || 'text area';
+                    textToRead = 'Text area: ' + fieldName;
+                } else if (element.tagName === 'SELECT') {
+                    const label = document.querySelector('label[for="' + element.id + '"]');
+                    const fieldName = label ? label.textContent.trim() : element.getAttribute('aria-label') || 'dropdown';
+                    textToRead = 'Dropdown: ' + fieldName;
+                } else if (element.getAttribute('role') === 'button') {
+                    textToRead = 'Button: ' + element.textContent.trim();
+                } else if (element.textContent.trim()) {
+                    textToRead = element.textContent.trim();
+                }
+                
+                if (textToRead) {
+                    speak(textToRead);
+                }
+            };
+            
+            // Add the listener
+            document.addEventListener('focusin', focusInListener);
+        }
+        
+        function removeSpeechListeners() {
+            // Remove focus listener
+            if (focusInListener) {
+                document.removeEventListener('focusin', focusInListener);
+                focusInListener = null;
+            }
         }
         
         function toggleReducedMotion() {
