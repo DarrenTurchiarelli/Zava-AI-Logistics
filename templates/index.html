@@ -13,7 +13,7 @@
             <p class="lead text-muted mb-4">
                 {{ company.tagline }}
             </p>
-            <p class="fs-5 mb-5">
+            <p class="fs-5 mb-3">
                 Advanced operations center with intelligent fraud detection, 
                 real-time tracking, and automated workflow management
             </p>
@@ -31,19 +31,24 @@
     </div>
 
     <!-- Features Grid - Responsive 2x2 layout -->
-    <div class="row g-4 py-5">
+    <div class="row g-4 py-3">
         <div class="col-md-6 col-lg-6">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body text-center">
-                    <div class="feature-icon bg-primary bg-gradient text-white rounded-circle d-inline-flex align-items-center justify-content-center fs-2 mb-3" style="width: 80px; height: 80px;">
-                        <i class="bi bi-shield-check"></i>
+            <a href="{{ url_for('report_fraud') }}" class="text-decoration-none">
+                <div class="card h-100 shadow-sm hover-lift">
+                    <div class="card-body text-center">
+                        <div class="feature-icon bg-primary bg-gradient text-white rounded-circle d-inline-flex align-items-center justify-content-center fs-2 mb-3" style="width: 80px; height: 80px;">
+                            <i class="bi bi-shield-check"></i>
+                        </div>
+                        <h3 class="card-title">AI Fraud Detection</h3>
+                        <p class="card-text text-muted">
+                            Powered by <strong>Azure AI Agents</strong> and <strong>Semantic Kernel</strong> for intelligent fraud analysis and automated threat detection.
+                        </p>
+                        <span class="btn btn-outline-primary mt-2">
+                            <i class="bi bi-exclamation-triangle"></i> Report Fraud
+                        </span>
                     </div>
-                    <h3 class="card-title">AI Fraud Detection</h3>
-                    <p class="card-text">
-                        Azure AI-powered fraud analysis protects customers from delivery scams and phishing attempts.
-                    </p>
                 </div>
-            </div>
+            </a>
         </div>
         
         <div class="col-md-6 col-lg-6">
@@ -55,7 +60,7 @@
                         </div>
                         <h3 class="card-title">Track Your Parcel</h3>
                         <p class="card-text text-muted">
-                            Track your delivery in real-time with live status updates and estimated arrival.
+                            Powered by <strong>Azure Maps</strong> for real-time tracking, route optimization, and intelligent delivery location mapping.
                         </p>
                         <span class="btn btn-outline-success mt-2">
                             <i class="bi bi-search"></i> Track Now
@@ -66,17 +71,22 @@
         </div>
         
         <div class="col-md-6 col-lg-6">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body text-center">
-                    <div class="feature-icon bg-info bg-gradient text-white rounded-circle d-inline-flex align-items-center justify-content-center fs-2 mb-3" style="width: 80px; height: 80px;">
-                        <i class="bi bi-robot"></i>
+            <a href="{{ url_for('approvals') }}" class="text-decoration-none">
+                <div class="card h-100 shadow-sm hover-lift">
+                    <div class="card-body text-center">
+                        <div class="feature-icon bg-info bg-gradient text-white rounded-circle d-inline-flex align-items-center justify-content-center fs-2 mb-3" style="width: 80px; height: 80px;">
+                            <i class="bi bi-robot"></i>
+                        </div>
+                        <h3 class="card-title">Automated Workflows</h3>
+                        <p class="card-text text-muted">
+                            Powered by <strong>Azure AI Agents</strong> and <strong>Multi-Agent Orchestration</strong> for automated approvals and intelligent decision-making.
+                        </p>
+                        <span class="btn btn-outline-info mt-2">
+                            <i class="bi bi-check2-circle"></i> Manage Approvals
+                        </span>
                     </div>
-                    <h3 class="card-title">Automated Workflows</h3>
-                    <p class="card-text">
-                        Multi-agent AI system with intelligent routing, exception handling, and human approval loops.
-                    </p>
                 </div>
-            </div>
+            </a>
         </div>
     
         <div class="col-md-6 col-lg-6">
@@ -86,9 +96,9 @@
                         <div class="feature-icon bg-warning bg-gradient text-white rounded-circle d-inline-flex align-items-center justify-content-center fs-2 mb-3" style="width: 80px; height: 80px;">
                             <i class="bi bi-camera"></i>
                         </div>
-                        <h3 class="card-title">Camera Scanner</h3>
+                        <h3 class="card-title">Self Service Parcel Scanner</h3>
                         <p class="card-text text-muted">
-                            Scan barcodes and handwritten addresses with your camera using Azure AI OCR.
+                            Powered by <strong>Azure AI Vision OCR</strong> for barcode and handwritten address scanning. Auto-lodge with payment or reject unpaid items.
                         </p>
                         <span class="btn btn-outline-warning mt-2">
                             <i class="bi bi-camera-fill"></i> Open Scanner
@@ -99,46 +109,52 @@
         </div>
     </div>
 
-    <!-- Stats (if logged in) -->
-    {% if session.logged_in %}
-    <div class="row g-4 py-5">
+    <!-- Technology & Capabilities Showcase -->
+    <div class="row g-4 py-5 border-top mt-4">
+        <div class="col-12 text-center mb-4">
+            <h2 class="fw-bold">Powered by Azure AI Platform</h2>
+            <p class="text-muted">Enterprise-grade AI services for modern logistics</p>
+        </div>
+        
         <div class="col-md-3">
-            <div class="card bg-primary text-white">
+            <div class="card bg-primary text-white h-100 shadow">
                 <div class="card-body text-center">
-                    <i class="bi bi-box-seam fs-1"></i>
-                    <h3 class="mt-2">Track Parcels</h3>
-                    <p class="mb-0">Search and monitor</p>
+                    <i class="bi bi-lightning-charge-fill fs-1"></i>
+                    <h5 class="mt-3 fw-bold">Real-Time Processing</h5>
+                    <p class="small mb-0">Sub-second response with Azure Maps & CosmosDB</p>
                 </div>
             </div>
         </div>
+        
         <div class="col-md-3">
-            <div class="card bg-success text-white">
+            <div class="card bg-success text-white h-100 shadow">
                 <div class="card-body text-center">
-                    <i class="bi bi-shield-exclamation fs-1"></i>
-                    <h3 class="mt-2">Report Fraud</h3>
-                    <p class="mb-0">AI-powered detection</p>
+                    <i class="bi bi-cpu-fill fs-1"></i>
+                    <h5 class="mt-3 fw-bold">Multi-Agent AI</h5>
+                    <p class="small mb-0">Autonomous decision-making with Semantic Kernel</p>
                 </div>
             </div>
         </div>
+        
         <div class="col-md-3">
-            <div class="card bg-warning text-white">
+            <div class="card bg-warning text-white h-100 shadow">
                 <div class="card-body text-center">
-                    <i class="bi bi-clipboard-check fs-1"></i>
-                    <h3 class="mt-2">Approvals</h3>
-                    <p class="mb-0">Workflow management</p>
+                    <i class="bi bi-eye-fill fs-1"></i>
+                    <h5 class="mt-3 fw-bold">Computer Vision</h5>
+                    <p class="small mb-0">OCR & object detection with Azure AI Vision</p>
                 </div>
             </div>
         </div>
+        
         <div class="col-md-3">
-            <div class="card bg-info text-white">
+            <div class="card bg-info text-white h-100 shadow">
                 <div class="card-body text-center">
-                    <i class="bi bi-graph-up fs-1"></i>
-                    <h3 class="mt-2">AI Insights</h3>
-                    <p class="mb-0">Analytics dashboard</p>
+                    <i class="bi bi-shield-fill-check fs-1"></i>
+                    <h5 class="mt-3 fw-bold">Fraud Prevention</h5>
+                    <p class="small mb-0">AI agents analyze patterns & detect threats</p>
                 </div>
             </div>
         </div>
     </div>
-    {% endif %}
 </div>
 {% endblock %}

@@ -544,6 +544,104 @@ def process_approval(approval_id):
     
     return redirect(url_for('approvals'))
 
+@app.route('/api/run-approval-agent', methods=['POST'])
+@login_required
+def run_approval_agent():
+    """Run AI agent to auto-approve/reject based on predefined criteria"""
+    try:
+        approver = session.get('username', 'ai-agent')
+        
+        async def process_with_agent():
+            async with ParcelTrackingDB() as db:
+                # Get all pending approvals
+                pending = await db.get_all_pending_approvals()
+                
+                approved_count = 0
+                rejected_count = 0
+                skipped_count = 0
+                
+                for approval in pending:
+                    parcel_id = approval.get('parcel_id')
+                    approval_type = approval.get('approval_type', '')
+                    reason = approval.get('reason', '')
+                    
+                    # Auto-approval criteria
+                    auto_approve = False
+                    auto_reject = False
+                    
+                    # Get parcel details for decision making
+                    parcel = await db.get_parcel_by_barcode(parcel_id)
+                    
+                    if parcel:
+                        # Check fraud risk if available
+                        fraud_risk = parcel.get('fraud_risk_score', 0)
+                        value = parcel.get('declared_value', 0)
+                        status = parcel.get('status', '')
+                        
+                        # Auto-rejection criteria
+                        if fraud_risk > 70:
+                            auto_reject = True
+                            reason_text = f"High fraud risk score: {fraud_risk}%"
+                        elif 'blacklist' in reason.lower():
+                            auto_reject = True
+                            reason_text = "Blacklisted address detected"
+                        elif 'duplicate' in reason.lower():
+                            auto_reject = True
+                            reason_text = "Duplicate request detected"
+                        
+                        # Auto-approval criteria (if not auto-rejected)
+                        elif fraud_risk < 30 and value < 500:
+                            auto_approve = True
+                            reason_text = f"Low risk ({fraud_risk}%), standard value (${value})"
+                        elif status == 'delivered' and approval_type == 'delivery_confirmation':
+                            auto_approve = True
+                            reason_text = "Standard delivery confirmation"
+                        elif 'verified' in reason.lower():
+                            auto_approve = True
+                            reason_text = "Verified sender/recipient"
+                        
+                        # Process decision
+                        if auto_approve:
+                            await db.approve_request(
+                                request_id=approval['id'],
+                                approved_by=approver,
+                                comments=f"AI Agent: {reason_text}"
+                            )
+                            approved_count += 1
+                        elif auto_reject:
+                            await db.reject_request(
+                                request_id=approval['id'],
+                                rejected_by=approver,
+                                comments=f"AI Agent: {reason_text}"
+                            )
+                            rejected_count += 1
+                        else:
+                            skipped_count += 1
+                    else:
+                        # Skip if parcel not found
+                        skipped_count += 1
+                
+                return {
+                    'approved': approved_count,
+                    'rejected': rejected_count,
+                    'skipped': skipped_count
+                }
+        
+        results = run_async(process_with_agent())
+        
+        return jsonify({
+            'success': True,
+            'approved': results['approved'],
+            'rejected': results['rejected'],
+            'skipped': results['skipped']
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 # AI & Intelligence
 
 @app.route('/ai/insights')

@@ -11,6 +11,61 @@
             </h1>
             <p class="text-muted">Review and process workflow approvals</p>
         </div>
+        <div class="col-auto">
+            <button type="button" class="btn btn-primary" id="toggleAgentMode">
+                <i class="bi bi-robot"></i> Enable Agent Mode
+            </button>
+        </div>
+    </div>
+
+    <!-- Agent Mode Panel -->
+    <div id="agentModePanel" class="card border-primary mb-4" style="display: none;">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="bi bi-cpu"></i> AI Agent Auto-Approval Mode</h5>
+        </div>
+        <div class="card-body">
+            <p class="mb-3">Configure AI agents to automatically approve or reject pending requests based on predefined criteria.</p>
+            
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <h6>Auto-Approval Criteria:</h6>
+                    <ul class="small">
+                        <li>Value under threshold</li>
+                        <li>Verified sender/recipient</li>
+                        <li>Standard delivery location</li>
+                        <li>No fraud risk indicators</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6>Auto-Rejection Criteria:</h6>
+                    <ul class="small">
+                        <li>High fraud risk score (&gt;70%)</li>
+                        <li>Blacklisted address</li>
+                        <li>Duplicate request</li>
+                        <li>Missing required documentation</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 align-items-center">
+                <button type="button" class="btn btn-success" id="runAgentApproval">
+                    <i class="bi bi-play-circle"></i> Run Auto-Approval Agent
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="configureAgent">
+                    <i class="bi bi-gear"></i> Configure Criteria
+                </button>
+                <div class="ms-auto">
+                    <span id="agentStatus" class="badge bg-secondary">Ready</span>
+                </div>
+            </div>
+
+            <div id="agentResults" class="mt-3" style="display: none;">
+                <div class="alert alert-info">
+                    <strong><i class="bi bi-info-circle"></i> Agent Processing Results:</strong>
+                    <div id="agentResultsContent" class="mt-2"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
     {% if approvals %}
@@ -84,4 +139,96 @@
     </div>
     {% endif %}
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const toggleBtn = document.getElementById('toggleAgentMode');
+    const agentPanel = document.getElementById('agentModePanel');
+    const runAgentBtn = document.getElementById('runAgentApproval');
+    const configureBtn = document.getElementById('configureAgent');
+    const agentStatus = document.getElementById('agentStatus');
+    const agentResults = document.getElementById('agentResults');
+    const agentResultsContent = document.getElementById('agentResultsContent');
+    
+    let agentModeEnabled = false;
+
+    // Toggle agent mode panel
+    toggleBtn.addEventListener('click', function() {
+        agentModeEnabled = !agentModeEnabled;
+        
+        if (agentModeEnabled) {
+            agentPanel.style.display = 'block';
+            toggleBtn.innerHTML = '<i class="bi bi-robot"></i> Disable Agent Mode';
+            toggleBtn.classList.remove('btn-primary');
+            toggleBtn.classList.add('btn-outline-primary');
+        } else {
+            agentPanel.style.display = 'none';
+            toggleBtn.innerHTML = '<i class="bi bi-robot"></i> Enable Agent Mode';
+            toggleBtn.classList.remove('btn-outline-primary');
+            toggleBtn.classList.add('btn-primary');
+            agentResults.style.display = 'none';
+        }
+    });
+
+    // Run auto-approval agent
+    runAgentBtn.addEventListener('click', async function() {
+        agentStatus.className = 'badge bg-warning';
+        agentStatus.textContent = 'Processing...';
+        runAgentBtn.disabled = true;
+        
+        try {
+            const response = await fetch('/api/run-approval-agent', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                agentStatus.className = 'badge bg-success';
+                agentStatus.textContent = 'Completed';
+                
+                agentResultsContent.innerHTML = `
+                    <ul class="mb-0">
+                        <li><strong>Approved:</strong> ${result.approved || 0} requests</li>
+                        <li><strong>Rejected:</strong> ${result.rejected || 0} requests</li>
+                        <li><strong>Skipped:</strong> ${result.skipped || 0} requests (manual review required)</li>
+                    </ul>
+                `;
+                agentResults.style.display = 'block';
+                
+                // Reload page after 3 seconds to show updated approvals
+                setTimeout(() => {
+                    window.location.reload();
+                }, 3000);
+            } else {
+                agentStatus.className = 'badge bg-danger';
+                agentStatus.textContent = 'Error';
+                agentResultsContent.innerHTML = `<p class="text-danger mb-0">Error: ${result.error || 'Unknown error'}</p>`;
+                agentResults.style.display = 'block';
+            }
+        } catch (error) {
+            agentStatus.className = 'badge bg-danger';
+            agentStatus.textContent = 'Error';
+            agentResultsContent.innerHTML = `<p class="text-danger mb-0">Failed to connect to agent service</p>`;
+            agentResults.style.display = 'block';
+        } finally {
+            runAgentBtn.disabled = false;
+            
+            // Reset status after 5 seconds
+            setTimeout(() => {
+                agentStatus.className = 'badge bg-secondary';
+                agentStatus.textContent = 'Ready';
+            }, 5000);
+        }
+    });
+
+    // Configure agent criteria (placeholder for future implementation)
+    configureBtn.addEventListener('click', function() {
+        alert('Agent configuration panel coming soon!\n\nYou will be able to customize:\n- Approval thresholds\n- Fraud risk limits\n- Blacklist rules\n- Required documentation checks');
+    });
+});
+</script>
 {% endblock %}
