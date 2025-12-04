@@ -6,8 +6,22 @@ Flask web interface for the logistics operations center
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
 import asyncio
 import os
+import re
+import email
+import base64
 from datetime import datetime
 from functools import wraps
+from werkzeug.utils import secure_filename
+from pathlib import Path
+
+# Optional OCR support
+try:
+    import pytesseract
+    from PIL import Image
+    import io
+    OCR_AVAILABLE = True
+except ImportError:
+    OCR_AVAILABLE = False
 
 # Import company configuration
 from company_config import get_company_info, COMPANY_NAME, COMPANY_PHONE, COMPANY_EMAIL
@@ -65,6 +79,119 @@ def run_async(coro):
         return loop.run_until_complete(coro)
     finally:
         loop.close()
+
+# File processing utilities for fraud detection
+
+def allowed_file(filename):
+    """Check if file extension is allowed"""
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'eml', 'msg', 'txt'}
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def extract_text_from_eml(file_content):
+    """Extract text and metadata from .eml email file"""
+    try:
+        msg = email.message_from_bytes(file_content)
+        
+        # Extract sender
+        sender = msg.get('From', 'unknown')
+        subject = msg.get('Subject', '')
+        
+        # Extract body
+        body = ""
+        if msg.is_multipart():
+            for part in msg.walk():
+                if part.get_content_type() == "text/plain":
+                    try:
+                        body += part.get_payload(decode=True).decode('utf-8', errors='ignore')
+                    except:
+                        body += str(part.get_payload())
+        else:
+            try:
+                body = msg.get_payload(decode=True).decode('utf-8', errors='ignore')
+            except:
+                body = str(msg.get_payload())
+        
+        # Combine for analysis
+        full_text = f"Subject: {subject}\\n\\n{body}"
+        
+        return full_text, sender
+    except Exception as e:
+        return f"[Error extracting email: {str(e)}]", "unknown"
+
+def extract_text_from_msg(file_content):
+    """Extract text from .msg Outlook file (basic extraction)"""
+    try:
+        # For .msg files, try to extract readable text
+        # Note: Full .msg parsing requires extract_msg or similar library
+        # This is a basic fallback that extracts visible text
+        text = file_content.decode('utf-8', errors='ignore')
+        
+        # Try to find sender in the decoded content
+        sender_match = re.search(r'From:?\\s*([^\\n]+)', text)
+        sender = sender_match.group(1).strip() if sender_match else "unknown"
+        
+        # Try to find subject
+        subject_match = re.search(r'Subject:?\\s*([^\\n]+)', text)
+        subject = subject_match.group(1).strip() if subject_match else ""
+        
+        # Extract main body (very basic)
+        body = text
+        
+        return f"Subject: {subject}\\n\\n{body[:2000]}", sender
+    except Exception as e:
+        return f"[Error extracting Outlook message: {str(e)}. Consider saving as .EML format for better parsing]", "unknown"
+
+def process_uploaded_file(file):
+    """Process uploaded file and extract text content"""
+    try:
+        filename = secure_filename(file.filename)
+        file_ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+        file_content = file.read()
+        
+        extracted_text = ""
+        sender_info = "unknown"
+        
+        if file_ext == 'eml':
+            extracted_text, sender_info = extract_text_from_eml(file_content)
+            flash(f'✅ Email file analyzed. Sender: {sender_info}', 'info')
+        
+        elif file_ext == 'msg':
+            extracted_text, sender_info = extract_text_from_msg(file_content)
+            flash('ℹ️ Outlook .MSG file processed. For better results, save as .EML format.', 'info')
+        
+        elif file_ext == 'txt':
+            extracted_text = file_content.decode('utf-8', errors='ignore')
+            flash('📄 Text file loaded successfully', 'info')
+        
+        elif file_ext in ['png', 'jpg', 'jpeg', 'gif', 'bmp']:
+            # Try OCR if available, otherwise use image description
+            if OCR_AVAILABLE:
+                try:
+                    image = Image.open(io.BytesIO(file_content))
+                    extracted_text = pytesseract.image_to_string(image)
+                    if extracted_text.strip():
+                        flash(f'📸 Screenshot analyzed using OCR - {len(extracted_text)} characters extracted', 'success')
+                    else:
+                        extracted_text = f"[Screenshot {filename} uploaded but no text detected. Image may be unclear or contain only graphics.]"
+                        flash('📸 Screenshot uploaded but no readable text found. Please ensure image is clear.', 'warning')
+                except Exception as ocr_error:
+                    extracted_text = f"[Screenshot {filename} uploaded. OCR error: {str(ocr_error)}. Please ensure Tesseract is installed.]"
+                    flash('⚠️ OCR processing failed. Analyzing image metadata instead.', 'warning')
+            else:
+                # Fallback: provide image metadata for AI to understand context
+                extracted_text = f"[SCREENSHOT UPLOADED: {filename}]\n\n"
+                extracted_text += "A screenshot image was uploaded containing a suspicious message. "
+                extracted_text += "OCR is not currently installed. To enable automatic text extraction from screenshots:\n"
+                extracted_text += "1. Install: pip install pytesseract Pillow\n"
+                extracted_text += "2. Install Tesseract OCR: https://github.com/UB-Mannheim/tesseract/wiki\n\n"
+                extracted_text += "For now, please also paste the text visible in the screenshot in the message field above."
+                flash('📸 Screenshot uploaded. OCR not available - please also paste the visible text in the message field.', 'warning')
+        
+        return extracted_text, sender_info
+        
+    except Exception as e:
+        flash(f'Error processing file: {str(e)}', 'danger')
+        return "", "unknown"
 
 # Authentication decorator (simple version - enhance for production)
 def login_required(f):
@@ -237,15 +364,55 @@ def all_parcels():
 @login_required
 def report_fraud():
     """Report suspicious message"""
+    print(f"\n{'='*60}")
+    print(f"📋 Fraud report route accessed - Method: {request.method}")
+    print(f"{'='*60}")
+    
     analysis = None
     
     if request.method == 'POST':
+        print("📬 Processing POST request...")
         try:
-            message_content = request.form.get('message_content')
-            sender_info = request.form.get('sender_info')
+            message_content = request.form.get('message_content', '').strip()
+            sender_info = request.form.get('sender_info', 'unknown').strip()
+            
+            # Check if file was uploaded
+            file_text = ""
+            file_sender = ""
+            if 'fraud_file' in request.files:
+                file = request.files['fraud_file']
+                if file and file.filename and allowed_file(file.filename):
+                    print(f"📁 Processing uploaded file: {file.filename}")
+                    file_text, file_sender = process_uploaded_file(file)
+                    print(f"📄 Extracted {len(file_text)} characters from file")
+                    
+                    # Use file sender if not provided manually
+                    if sender_info == 'unknown' and file_sender != 'unknown':
+                        sender_info = file_sender
+                        print(f"✉️ Sender extracted from file: {sender_info}")
+            
+            # Combine manual text and file text
+            combined_message = ""
+            if message_content and file_text:
+                combined_message = f"{message_content}\\n\\n--- From uploaded file ---\\n{file_text}"
+                print(f"📝 Combined manual text ({len(message_content)} chars) + file text ({len(file_text)} chars)")
+            elif file_text:
+                combined_message = file_text
+                print(f"📂 Using file text only ({len(file_text)} chars)")
+            elif message_content:
+                combined_message = message_content
+                print(f"✍️ Using manual text only ({len(message_content)} chars)")
+            else:
+                flash('Please provide either a message or upload a file to analyze.', 'warning')
+                return render_template('report_fraud.html', analysis=None)
+            
+            print(f"🤖 Analyzing message with AI agent...")
+            print(f"   Message preview: {combined_message[:200]}...")
             
             # Analyze with AI agent
-            analysis = run_async(analyze_with_fraud_agent(message_content, sender_info))
+            analysis = run_async(analyze_with_fraud_agent(combined_message, sender_info))
+            
+            print(f"✅ Analysis complete: {analysis.threat_level.value} threat, {len(analysis.risk_indicators)} indicators")
             
             # Store in database
             async def store_report():
@@ -259,14 +426,15 @@ def report_fraud():
                         "related_patterns": analysis.related_patterns
                     }
                     return await db.store_suspicious_message(
-                        message_content=message_content,
+                        message_content=combined_message,  # Store the combined message
                         sender_info=sender_info,
                         risk_indicators=analysis.risk_indicators,
                         ai_analysis=ai_data
                     )
             
             report_id = run_async(store_report())
-            flash(f'Report submitted successfully! ID: {report_id}', 'success')
+            # Don't flash message - analysis is displayed on page
+            print(f"✅ Report stored with ID: {report_id}")
             
         except Exception as e:
             flash(f'Error analyzing message: {str(e)}', 'danger')

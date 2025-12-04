@@ -5,15 +5,15 @@ Update these values once and they will be applied throughout the application
 """
 
 # Company Information
-COMPANY_NAME = "Contoso Logistics"
-COMPANY_NAME_SHORT = "Contoso"
+COMPANY_NAME = "DT Logistics"
+COMPANY_NAME_SHORT = "DT"
 COMPANY_TAGLINE = "Fast, Reliable, Trusted Delivery"
 
 # Contact Information
 COMPANY_PHONE = "1300 384 669"
-COMPANY_EMAIL = "support@contosologistics.com.au"
-COMPANY_SUPPORT_EMAIL = "help@contosologistics.com.au"
-COMPANY_FRAUD_EMAIL = "security@contosologistics.com.au"
+COMPANY_EMAIL = "support@dtlogistics.com.au"
+COMPANY_SUPPORT_EMAIL = "help@dtlogistics.com.au"
+COMPANY_FRAUD_EMAIL = "security@dtlogistics.com.au"
 
 # Address
 COMPANY_ADDRESS_LINE1 = "123 Logistics Drive"
@@ -21,10 +21,10 @@ COMPANY_ADDRESS_LINE2 = "Melbourne VIC 3000"
 COMPANY_ADDRESS_FULL = f"{COMPANY_ADDRESS_LINE1}, {COMPANY_ADDRESS_LINE2}"
 
 # Web & Social
-COMPANY_WEBSITE = "https://www.contosologistics.com.au"
-COMPANY_FACEBOOK = "https://facebook.com/contosologistics"
-COMPANY_TWITTER = "https://twitter.com/contosologistics"
-COMPANY_LINKEDIN = "https://linkedin.com/company/contosologistics"
+COMPANY_WEBSITE = "https://www.dtlogistics.com.au"
+COMPANY_FACEBOOK = "https://facebook.com/dtlogistics"
+COMPANY_TWITTER = "https://x.com/dtlogistics"
+COMPANY_LINKEDIN = "https://linkedin.com/company/dtlogistics"
 
 # Business Hours
 BUSINESS_HOURS = "Monday - Friday: 8:00 AM - 6:00 PM"

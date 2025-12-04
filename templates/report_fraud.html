@@ -17,32 +17,56 @@
                         Our AI-powered fraud detection system analyzes suspicious messages to identify scams and phishing attempts.
                     </div>
 
-                    <form method="POST" action="{{ url_for('report_fraud') }}">
+                    <form method="POST" action="{{ url_for('report_fraud') }}" enctype="multipart/form-data" id="fraudForm">
                         <div class="mb-4">
                             <label for="message_content" class="form-label">
-                                <strong>Suspicious Message Content *</strong>
+                                <strong>Suspicious Message Content (Optional if uploading file)</strong>
                             </label>
                             <textarea class="form-control" id="message_content" name="message_content" 
-                                      rows="6" required 
-                                      placeholder="Paste the full text of the suspicious message here..."></textarea>
+                                      rows="6" 
+                                      placeholder="Paste the text here OR upload a file below - either one is fine!">{{ request.form.get('message_content', '') }}</textarea>
                             <small class="text-muted">
-                                Include the entire message, links, and any other details
+                                You can paste text here, upload a file below, or do both for more complete analysis
                             </small>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="fraud_file" class="form-label">
+                                <strong><i class="bi bi-file-earmark-arrow-up"></i> Upload Screenshot or Email File</strong>
+                            </label>
+                            <input type="file" class="form-control" id="fraud_file" name="fraud_file" 
+                                   accept="image/*,.eml,.msg,.txt">
+                            <small class="text-muted d-block mt-2">
+                                <strong>Supported formats:</strong><br>
+                                📸 <strong>Screenshots:</strong> PNG, JPG, JPEG, GIF, BMP (text auto-extracted with OCR)<br>
+                                📧 <strong>Email files:</strong> .EML (standard email), .MSG (Outlook), .TXT<br>
+                                📏 <strong>Max size:</strong> 16MB
+                            </small>
+                            <div class="alert alert-light border mt-2">
+                                <small>
+                                    <i class="bi bi-lightbulb"></i> <strong>Tips:</strong><br>
+                                    • Just upload the file - no need to paste text separately!<br>
+                                    • For emails: save as .EML (most email clients) or .MSG (Outlook)<br>
+                                    • For screenshots: text will be automatically extracted using OCR<br>
+                                    • You can upload a file alone, paste text alone, or both for best results
+                                </small>
+                            </div>
                         </div>
 
                         <div class="mb-4">
                             <label for="sender_info" class="form-label">
-                                <strong>Sender Information *</strong>
+                                <strong>Sender Information</strong>
                             </label>
-                            <input type="text" class="form-control" id="sender_info" name="sender_info" required
+                            <input type="text" class="form-control" id="sender_info" name="sender_info"
+                                   value="{{ request.form.get('sender_info', '') }}"
                                    placeholder="Phone number, email, or 'unknown'">
                             <small class="text-muted">
-                                Who sent this message? Include phone number or email address
+                                Who sent this message? Include phone number or email address (auto-extracted from email files)
                             </small>
                         </div>
 
                         <div class="d-grid">
-                            <button type="submit" class="btn btn-danger btn-lg">
+                            <button type="submit" class="btn btn-danger btn-lg" id="analyzeBtn">
                                 <i class="bi bi-shield-check"></i> Analyze & Report Message
                             </button>
                         </div>
@@ -51,8 +75,9 @@
                     {% if analysis %}
                     <hr class="my-4">
                     
+                    <div id="analysisResults">
                     <!-- AI Analysis Results -->
-                    <div class="alert alert-{{ 'danger' if analysis.threat_level.value in ['high', 'critical'] else 'warning' if analysis.threat_level.value == 'medium' else 'success' }}">
+                    <div class="alert alert-permanent alert-{{ 'danger' if analysis.threat_level.value in ['high', 'critical'] else 'warning' if analysis.threat_level.value == 'medium' else 'success' }}">
                         <h5 class="alert-heading">
                             <i class="bi bi-robot"></i> AI Fraud Analysis Complete
                         </h5>
@@ -135,10 +160,38 @@
                             </ul>
                         </div>
                     </div>
+                    </div>
                     {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+// Add loading state to analyze button and redirect to results
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('fraudForm');
+    const btn = document.getElementById('analyzeBtn');
+    
+    if (form && btn) {
+        form.addEventListener('submit', function() {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Analyzing...';
+            
+            // Add anchor to URL so page scrolls to results after reload
+            form.action = '/fraud/report#analysisResults';
+        });
+    }
+    
+    // If we have results, ensure we're scrolled to them
+    const results = document.getElementById('analysisResults');
+    if (results && window.location.hash === '#analysisResults') {
+        setTimeout(() => {
+            results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+    }
+});
+</script>
+
 {% endblock %}

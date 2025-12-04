@@ -39,6 +39,9 @@ The web interface will be available at: **http://127.0.0.1:5000**
 
 **🛡️ Fraud Detection**
 - AI-powered fraud analysis using Azure AI Foundry
+- **Microsoft Security Copilot integration** (optional) for enterprise-grade threat intelligence
+- **Upload screenshots** - OCR automatically extracts text from images
+- **Email file analysis** - Upload .EML or .MSG files for instant scanning
 - Report suspicious messages with instant threat assessment
 - Educational security guidance based on detected threat types
 - Threat level classification (Low/Medium/High/Critical)
