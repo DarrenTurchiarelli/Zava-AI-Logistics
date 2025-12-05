@@ -1525,10 +1525,21 @@ class ParcelTrackingDB:
         priorities = ["low", "medium", "high", "critical"]
         
         # Get some existing parcels
-        parcels = await self.get_all_parcels()
-        if not parcels:
+        all_parcels = await self.get_all_parcels()
+        if not all_parcels:
             # Create some test parcels first
-            parcels = await self.add_random_test_parcels(5)
+            all_parcels = await self.add_random_test_parcels(5)
+        
+        # Filter out parcels with invalid DCs (only use parcels actively in DC system)
+        parcels = [
+            p for p in all_parcels
+            if p.get('origin_location') and 
+            p.get('origin_location') not in ['Unknown DC', 'To Be Advised', 'Completed']
+        ]
+        
+        if not parcels:
+            print("⚠️  No parcels with valid DCs found for approval requests")
+            return []
         
         for _ in range(count):
             parcel = random.choice(parcels)
