@@ -299,3 +299,44 @@ a:focus, button:focus, input:focus, select:focus, textarea:focus {
         font-size: 0.95rem;
     }
 }
+
+/* Dropdown z-index fixes for approvals page */
+/* Ensure dropdown menu always appears above approval cards and other content */
+
+/* Filter card needs higher stacking context when dropdown is open */
+.card.border-info {
+    position: relative;
+    z-index: 1050;
+}
+
+/* Dropdown container gets even higher z-index when open */
+.dropdown {
+    position: relative;
+}
+
+.dropdown.show {
+    z-index: 1060;
+}
+
+/* Dropdown menu appears on top of everything */
+.dropdown-menu {
+    z-index: 1070 !important;
+    position: absolute !important;
+}
+
+/* Ensure approval cards and other cards stay below */
+.approval-card {
+    position: relative;
+    z-index: 1;
+}
+
+.card.border-primary {
+    position: relative;
+    z-index: 1;
+}
+
+/* Ensure rows containing approval cards have lower z-index */
+#approvalsContainer {
+    position: relative;
+    z-index: 1;
+}

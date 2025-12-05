@@ -1392,6 +1392,29 @@ class ParcelTrackingDB:
         parcels = []
         service_types = ["standard", "express", "overnight", "registered"]
         
+        # Distribution centers (matching the 40 from approvals page)
+        distribution_centers = [
+            'DC-SYD-001', 'DC-SYD-002', 'DC-SYD-003', 'DC-MEL-001', 'DC-MEL-002', 
+            'DC-MEL-003', 'DC-BNE-001', 'DC-BNE-002', 'DC-BNE-003', 'DC-PER-001',
+            'DC-PER-002', 'DC-ADL-001', 'DC-ADL-002', 'DC-CAN-001', 'DC-HOB-001',
+            'DC-DAR-001', 'DC-NEW-001', 'DC-WOL-001', 'DC-GEE-001', 'DC-BAL-001',
+            'DC-GLD-001', 'DC-TWD-001', 'DC-CAI-001', 'DC-TOW-001', 'DC-LAU-001',
+            'DC-BEN-001', 'DC-ALB-001', 'DC-WAG-001', 'DC-TRA-001', 'DC-SHP-001',
+            'DC-BUN-001', 'DC-GER-001', 'DC-KAL-001', 'DC-MOU-001', 'DC-WHY-001',
+            'DC-POR-001', 'DC-DUB-001', 'DC-TAM-001', 'DC-ARM-001', 'DC-ROC-001'
+        ]
+        
+        # Parcel statuses with realistic progression
+        status_options = [
+            {'status': 'registered', 'location': 'Store'},
+            {'status': 'collected', 'location': 'In Transit'},
+            {'status': 'at_depot', 'location': 'Distribution Center'},
+            {'status': 'sorting', 'location': 'Sorting Facility'},
+            {'status': 'in_transit', 'location': 'On Route'},
+            {'status': 'out_for_delivery', 'location': 'Delivery Vehicle'},
+            {'status': 'delivered', 'location': 'Recipient Address'}
+        ]
+        
         # Australian postcodes and states mapping (expanded VIC range)
         postcode_state_mapping = {
             "2000": "NSW", "2007": "NSW", "2010": "NSW",
@@ -1411,6 +1434,8 @@ class ParcelTrackingDB:
             postcode = random.choice(postcodes)
             state = postcode_state_mapping[postcode]
             store = random.choice(store_locations)
+            dc = random.choice(distribution_centers)
+            status_info = random.choice(status_options)
             
             parcel = await self.register_parcel(
                 barcode=fake.ean13(),
@@ -1428,6 +1453,44 @@ class ParcelTrackingDB:
                 declared_value=round(random.uniform(10, 500), 2),
                 store_location=store
             )
+            
+            # Update parcel with distribution center and realistic status
+            try:
+                parcel_doc = await self.parcels_container.read_item(
+                    item=parcel['id'],
+                    partition_key=parcel['store_location']
+                )
+                
+                # Set distribution center as origin
+                parcel_doc['origin_location'] = dc
+                
+                # Update current status and location based on progression
+                parcel_doc['current_status'] = status_info['status']
+                if status_info['status'] == 'at_depot' or status_info['status'] == 'sorting':
+                    parcel_doc['current_location'] = dc
+                elif status_info['status'] == 'in_transit' or status_info['status'] == 'out_for_delivery':
+                    parcel_doc['current_location'] = f"{dc} - {status_info['location']}"
+                else:
+                    parcel_doc['current_location'] = status_info['location']
+                
+                # Add fraud risk score for agent processing
+                parcel_doc['fraud_risk_score'] = random.randint(0, 100)
+                
+                await self.parcels_container.replace_item(
+                    item=parcel_doc['id'],
+                    body=parcel_doc
+                )
+                
+                parcel.update({
+                    'origin_location': dc,
+                    'current_status': status_info['status'],
+                    'current_location': parcel_doc['current_location'],
+                    'fraud_risk_score': parcel_doc['fraud_risk_score']
+                })
+                
+            except Exception as e:
+                print(f"Warning: Could not update parcel {parcel['barcode']} with DC info: {e}")
+            
             parcels.append(parcel)
         
         return parcels
@@ -1435,24 +1498,34 @@ class ParcelTrackingDB:
     async def add_random_approval_requests(self, count: int = 3) -> List[str]:
         """Add random approval requests for logistics operations"""
         request_ids = []
-        request_types = ["exception_handling", "return_to_sender", "delivery_redirect", "damage_claim", "lost_package"]
+        request_types = ["exception_handling", "return_to_sender", "delivery_redirect", "damage_claim", "lost_package", "delivery_confirmation"]
         priorities = ["low", "medium", "high", "critical"]
         
         # Get some existing parcels
         parcels = await self.get_all_parcels()
         if not parcels:
             # Create some test parcels first
-            parcels = await self.add_random_test_parcels(3)
+            parcels = await self.add_random_test_parcels(5)
         
         for _ in range(count):
             parcel = random.choice(parcels)
             request_type = random.choice(request_types)
             priority = random.choice(priorities)
             
+            # Build description with DC info if available
+            dc_info = parcel.get('origin_location', 'Unknown DC')
+            status_info = parcel.get('current_status', 'unknown')
+            
+            description = f"{request_type.replace('_', ' ').title()} for parcel {parcel['barcode']} from {dc_info} (Status: {status_info})"
+            
+            # Add verification flags for testing auto-approval
+            if random.random() > 0.7:
+                description += " - Verified sender"
+            
             request_id = await self.request_approval(
                 parcel_barcode=parcel["barcode"],
                 request_type=request_type,
-                description=f"{request_type.replace('_', ' ').title()} for parcel {parcel['barcode']}",
+                description=description,
                 priority=priority,
                 requested_by=fake.name()
             )

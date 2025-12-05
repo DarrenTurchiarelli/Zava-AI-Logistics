@@ -503,11 +503,24 @@ def report_fraud():
 def approvals():
     """View pending approvals"""
     try:
-        async def get_approvals():
+        async def get_approvals_with_parcels():
             async with ParcelTrackingDB() as db:
-                return await db.get_all_pending_approvals()
+                pending = await db.get_all_pending_approvals()
+                
+                # Enrich approvals with parcel information
+                for approval in pending:
+                    parcel_id = approval.get('parcel_id')
+                    if parcel_id:
+                        parcel = await db.get_parcel_by_barcode(parcel_id)
+                        if parcel:
+                            approval['parcel_dc'] = parcel.get('origin_location', 'Unknown')
+                            approval['parcel_status'] = parcel.get('current_status', 'unknown')
+                            approval['parcel_location'] = parcel.get('current_location', 'Unknown')
+                            approval['fraud_risk'] = parcel.get('fraud_risk_score', 0)
+                
+                return pending
         
-        pending = run_async(get_approvals())
+        pending = run_async(get_approvals_with_parcels())
         return render_template('approvals.html', approvals=pending)
     except Exception as e:
         flash(f'Error loading approvals: {str(e)}', 'danger')
@@ -551,6 +564,30 @@ def run_approval_agent():
     try:
         approver = session.get('username', 'ai-agent')
         
+        # Get configuration from request
+        data = request.get_json() or {}
+        config = data.get('config', {})
+        selected_dcs = data.get('distributionCenters', [])
+        
+        # Validate that at least one DC is selected
+        if not selected_dcs:
+            return jsonify({
+                'success': False,
+                'error': 'No distribution centers selected. Please select at least one DC to enable the agent.'
+            }), 400
+        
+        # Extract thresholds from config with defaults
+        fraud_threshold_low = int(config.get('fraudThresholdLow', 30))
+        value_threshold = float(config.get('valueThreshold', 500))
+        fraud_threshold_high = int(config.get('fraudThresholdHigh', 70))
+        
+        # Extract checkbox settings
+        approve_verified = config.get('approveVerified', True)
+        approve_delivered = config.get('approveDelivered', True)
+        reject_blacklist = config.get('rejectBlacklist', True)
+        reject_duplicate = config.get('rejectDuplicate', True)
+        reject_missing_docs = config.get('rejectMissingDocs', False)
+        
         async def process_with_agent():
             async with ParcelTrackingDB() as db:
                 # Get all pending approvals
@@ -559,72 +596,92 @@ def run_approval_agent():
                 approved_count = 0
                 rejected_count = 0
                 skipped_count = 0
+                skipped_dc_count = 0
                 
                 for approval in pending:
                     parcel_id = approval.get('parcel_id')
                     approval_type = approval.get('approval_type', '')
                     reason = approval.get('reason', '')
                     
+                    # Get parcel details for decision making
+                    parcel = await db.get_parcel_by_barcode(parcel_id)
+                    
+                    if not parcel:
+                        skipped_count += 1
+                        continue
+                    
+                    # Check if parcel is from a selected distribution center
+                    parcel_dc = parcel.get('origin_location', parcel.get('current_location', 'UNKNOWN'))
+                    
+                    # Check if the parcel's DC matches any selected DC (flexible matching)
+                    dc_matched = False
+                    for selected_dc in selected_dcs:
+                        # Match if the selected DC ID appears in the parcel's location
+                        if selected_dc in parcel_dc or parcel_dc.startswith(selected_dc):
+                            dc_matched = True
+                            break
+                    
+                    if not dc_matched:
+                        skipped_dc_count += 1
+                        continue
+                    
                     # Auto-approval criteria
                     auto_approve = False
                     auto_reject = False
                     
-                    # Get parcel details for decision making
-                    parcel = await db.get_parcel_by_barcode(parcel_id)
+                    # Check fraud risk if available
+                    fraud_risk = parcel.get('fraud_risk_score', 0)
+                    value = parcel.get('declared_value', 0)
+                    status = parcel.get('status', '')
                     
-                    if parcel:
-                        # Check fraud risk if available
-                        fraud_risk = parcel.get('fraud_risk_score', 0)
-                        value = parcel.get('declared_value', 0)
-                        status = parcel.get('status', '')
-                        
-                        # Auto-rejection criteria
-                        if fraud_risk > 70:
-                            auto_reject = True
-                            reason_text = f"High fraud risk score: {fraud_risk}%"
-                        elif 'blacklist' in reason.lower():
-                            auto_reject = True
-                            reason_text = "Blacklisted address detected"
-                        elif 'duplicate' in reason.lower():
-                            auto_reject = True
-                            reason_text = "Duplicate request detected"
-                        
-                        # Auto-approval criteria (if not auto-rejected)
-                        elif fraud_risk < 30 and value < 500:
-                            auto_approve = True
-                            reason_text = f"Low risk ({fraud_risk}%), standard value (${value})"
-                        elif status == 'delivered' and approval_type == 'delivery_confirmation':
-                            auto_approve = True
-                            reason_text = "Standard delivery confirmation"
-                        elif 'verified' in reason.lower():
-                            auto_approve = True
-                            reason_text = "Verified sender/recipient"
-                        
-                        # Process decision
-                        if auto_approve:
-                            await db.approve_request(
-                                request_id=approval['id'],
-                                approved_by=approver,
-                                comments=f"AI Agent: {reason_text}"
-                            )
-                            approved_count += 1
-                        elif auto_reject:
-                            await db.reject_request(
-                                request_id=approval['id'],
-                                rejected_by=approver,
-                                comments=f"AI Agent: {reason_text}"
-                            )
-                            rejected_count += 1
-                        else:
-                            skipped_count += 1
+                    # Auto-rejection criteria (using configured thresholds)
+                    if fraud_risk > fraud_threshold_high:
+                        auto_reject = True
+                        reason_text = f"High fraud risk score: {fraud_risk}% (threshold: {fraud_threshold_high}%)"
+                    elif reject_blacklist and 'blacklist' in reason.lower():
+                        auto_reject = True
+                        reason_text = "Blacklisted address detected"
+                    elif reject_duplicate and 'duplicate' in reason.lower():
+                        auto_reject = True
+                        reason_text = "Duplicate request detected"
+                    elif reject_missing_docs and 'missing' in reason.lower():
+                        auto_reject = True
+                        reason_text = "Missing required documentation"
+                    
+                    # Auto-approval criteria (if not auto-rejected, using configured thresholds)
+                    elif fraud_risk < fraud_threshold_low and value < value_threshold:
+                        auto_approve = True
+                        reason_text = f"Low risk ({fraud_risk}% < {fraud_threshold_low}%), standard value (${value} < ${value_threshold}) from DC: {parcel_dc}"
+                    elif approve_delivered and status == 'delivered' and approval_type == 'delivery_confirmation':
+                        auto_approve = True
+                        reason_text = f"Standard delivery confirmation from DC: {parcel_dc}"
+                    elif approve_verified and 'verified' in reason.lower():
+                        auto_approve = True
+                        reason_text = f"Verified sender/recipient from DC: {parcel_dc}"
+                    
+                    # Process decision
+                    if auto_approve:
+                        await db.approve_request(
+                            request_id=approval['id'],
+                            approved_by=approver,
+                            comments=f"AI Agent: {reason_text}"
+                        )
+                        approved_count += 1
+                    elif auto_reject:
+                        await db.reject_request(
+                            request_id=approval['id'],
+                            rejected_by=approver,
+                            comments=f"AI Agent: {reason_text}"
+                        )
+                        rejected_count += 1
                     else:
-                        # Skip if parcel not found
                         skipped_count += 1
                 
                 return {
                     'approved': approved_count,
                     'rejected': rejected_count,
-                    'skipped': skipped_count
+                    'skipped': skipped_count,
+                    'skipped_dc': skipped_dc_count
                 }
         
         results = run_async(process_with_agent())
@@ -633,7 +690,8 @@ def run_approval_agent():
             'success': True,
             'approved': results['approved'],
             'rejected': results['rejected'],
-            'skipped': results['skipped']
+            'skipped': results['skipped'],
+            'skipped_dc': results.get('skipped_dc', 0)
         })
         
     except Exception as e:
