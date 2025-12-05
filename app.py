@@ -593,25 +593,34 @@ def run_approval_agent():
                 # Get all pending approvals
                 pending = await db.get_all_pending_approvals()
                 
+                print(f"\n🤖 Agent Mode Processing Started")
+                print(f"   Total pending approvals: {len(pending)}")
+                print(f"   Selected DCs: {selected_dcs}")
+                print(f"   Thresholds: Fraud Low={fraud_threshold_low}%, High={fraud_threshold_high}%, Value=${value_threshold}")
+                
                 approved_count = 0
                 rejected_count = 0
                 skipped_count = 0
                 skipped_dc_count = 0
                 
                 for approval in pending:
-                    parcel_id = approval.get('parcel_id')
-                    approval_type = approval.get('approval_type', '')
-                    reason = approval.get('reason', '')
+                    parcel_barcode = approval.get('parcel_barcode')
+                    request_type = approval.get('request_type', '')
+                    description = approval.get('description', '')
+                    
+                    print(f"\n   Processing: {parcel_barcode} - {request_type}")
                     
                     # Get parcel details for decision making
-                    parcel = await db.get_parcel_by_barcode(parcel_id)
+                    parcel = await db.get_parcel_by_barcode(parcel_barcode)
                     
                     if not parcel:
+                        print(f"   ⚠️  Parcel not found, skipping")
                         skipped_count += 1
                         continue
                     
-                    # Check if parcel is from a selected distribution center
-                    parcel_dc = parcel.get('origin_location', parcel.get('current_location', 'UNKNOWN'))
+                    # Use parcel_dc from approval record (already stored there)
+                    parcel_dc = approval.get('parcel_dc', 'UNKNOWN')
+                    print(f"   Parcel DC: {parcel_dc}")
                     
                     # Check if the parcel's DC matches any selected DC (flexible matching)
                     dc_matched = False
@@ -622,6 +631,7 @@ def run_approval_agent():
                             break
                     
                     if not dc_matched:
+                        print(f"   ⏭️  DC not matched, skipping")
                         skipped_dc_count += 1
                         continue
                     
@@ -632,19 +642,21 @@ def run_approval_agent():
                     # Check fraud risk if available
                     fraud_risk = parcel.get('fraud_risk_score', 0)
                     value = parcel.get('declared_value', 0)
-                    status = parcel.get('status', '')
+                    status = approval.get('parcel_status', parcel.get('current_status', ''))
+                    
+                    print(f"   Fraud Risk: {fraud_risk}%, Value: ${value}, Status: {status}")
                     
                     # Auto-rejection criteria (using configured thresholds)
                     if fraud_risk > fraud_threshold_high:
                         auto_reject = True
                         reason_text = f"High fraud risk score: {fraud_risk}% (threshold: {fraud_threshold_high}%)"
-                    elif reject_blacklist and 'blacklist' in reason.lower():
+                    elif reject_blacklist and 'blacklist' in description.lower():
                         auto_reject = True
                         reason_text = "Blacklisted address detected"
-                    elif reject_duplicate and 'duplicate' in reason.lower():
+                    elif reject_duplicate and 'duplicate' in description.lower():
                         auto_reject = True
                         reason_text = "Duplicate request detected"
-                    elif reject_missing_docs and 'missing' in reason.lower():
+                    elif reject_missing_docs and 'missing' in description.lower():
                         auto_reject = True
                         reason_text = "Missing required documentation"
                     
@@ -652,15 +664,16 @@ def run_approval_agent():
                     elif fraud_risk < fraud_threshold_low and value < value_threshold:
                         auto_approve = True
                         reason_text = f"Low risk ({fraud_risk}% < {fraud_threshold_low}%), standard value (${value} < ${value_threshold}) from DC: {parcel_dc}"
-                    elif approve_delivered and status == 'delivered' and approval_type == 'delivery_confirmation':
+                    elif approve_delivered and status == 'Delivered' and request_type == 'delivery_confirmation':
                         auto_approve = True
                         reason_text = f"Standard delivery confirmation from DC: {parcel_dc}"
-                    elif approve_verified and 'verified' in reason.lower():
+                    elif approve_verified and 'verified' in description.lower():
                         auto_approve = True
                         reason_text = f"Verified sender/recipient from DC: {parcel_dc}"
                     
                     # Process decision
                     if auto_approve:
+                        print(f"   ✅ APPROVING: {reason_text}")
                         await db.approve_request(
                             request_id=approval['id'],
                             approved_by=approver,
@@ -668,6 +681,7 @@ def run_approval_agent():
                         )
                         approved_count += 1
                     elif auto_reject:
+                        print(f"   ❌ REJECTING: {reason_text}")
                         await db.reject_request(
                             request_id=approval['id'],
                             rejected_by=approver,
@@ -675,7 +689,14 @@ def run_approval_agent():
                         )
                         rejected_count += 1
                     else:
+                        print(f"   ⏭️  SKIPPING: No matching criteria")
                         skipped_count += 1
+                
+                print(f"\n🤖 Agent Mode Processing Complete")
+                print(f"   ✅ Approved: {approved_count}")
+                print(f"   ❌ Rejected: {rejected_count}")
+                print(f"   ⏭️  Skipped: {skipped_count}")
+                print(f"   🏢 DC Filtered: {skipped_dc_count}\n")
                 
                 return {
                     'approved': approved_count,
@@ -1099,15 +1120,15 @@ def track_parcel_public():
                 # Get tracking events using barcode
                 events = await db.get_parcel_tracking_history(barcode)
                 
-                # Check if out for delivery - either status is out_for_delivery OR item is pending in an active manifest
+                # Check if out for delivery - either status is Out for Delivery OR item is pending in an active manifest
                 manifest = await db.get_manifest_for_parcel(barcode)
-                is_out_for_delivery = parcel.get('current_status') == 'out_for_delivery'
+                is_out_for_delivery = parcel.get('current_status') == 'Out for Delivery'
                 
                 # If in active manifest with pending status, consider it out for delivery
                 if manifest and manifest.get('status') == 'active':
                     # Find the item in manifest
                     for item in manifest.get('items', []):
-                        if item.get('barcode') == barcode and item.get('status') != 'delivered':
+                        if item.get('barcode') == barcode and item.get('status') != 'Delivered':
                             is_out_for_delivery = True
                             break
                 
@@ -1125,8 +1146,8 @@ def track_parcel_public():
                 
                 # Determine display status - override if in active manifest
                 display_status = parcel.get('current_status')
-                if is_out_for_delivery and display_status not in ['delivered', 'out_for_delivery']:
-                    display_status = 'out_for_delivery'
+                if is_out_for_delivery and display_status not in ['Delivered', 'Out for Delivery']:
+                    display_status = 'Out for Delivery'
                 
                 # Set last_updated to current time if None
                 last_updated = parcel.get('last_updated')

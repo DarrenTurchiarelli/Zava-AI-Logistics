@@ -44,7 +44,7 @@
             <!-- Loop through each tracking result -->
             {% for tracking_data in tracking_results %}
             <div class="card shadow-lg mb-4">
-                <div class="card-header {% if tracking_data.current_status == 'delivered' %}bg-success{% elif tracking_data.current_status == 'out_for_delivery' %}bg-info{% else %}bg-secondary{% endif %} text-white">
+                <div class="card-header {% if tracking_data.current_status == 'Delivered' %}bg-success{% elif tracking_data.current_status == 'Out for Delivery' %}bg-info{% else %}bg-secondary{% endif %} text-white">
                     <h4 class="mb-0">
                         <i class="bi bi-box-seam"></i> {{ tracking_data.barcode }}
                     </h4>
@@ -53,15 +53,15 @@
                     <!-- Current Status Badge -->
                     <div class="text-center mb-4">
                         <h3>
-                            {% if tracking_data.current_status == 'delivered' %}
+                            {% if tracking_data.current_status == 'Delivered' %}
                                 <span class="badge bg-success fs-4">
                                     <i class="bi bi-check-circle"></i> Delivered
                                 </span>
-                            {% elif tracking_data.current_status == 'out_for_delivery' %}
+                            {% elif tracking_data.current_status == 'Out for Delivery' %}
                                 <span class="badge bg-info fs-4">
                                     <i class="bi bi-truck"></i> Out for Delivery
                                 </span>
-                            {% elif tracking_data.current_status == 'in_transit' %}
+                            {% elif tracking_data.current_status == 'In Transit' %}
                                 <span class="badge bg-warning fs-4">
                                     <i class="bi bi-arrow-right-circle"></i> In Transit
                                 </span>
@@ -113,8 +113,8 @@
                         {% endfor %}
                     </div>
 
-                    <!-- Out for Delivery Map (only shown when status is out_for_delivery) -->
-                    {% if tracking_data.current_status == 'out_for_delivery' and tracking_data.delivery_map_url %}
+                    <!-- Out for Delivery Map (only shown when status is Out for Delivery) -->
+                    {% if tracking_data.current_status == 'Out for Delivery' and tracking_data.delivery_map_url %}
                     <hr class="my-4">
                     <div class="card border-info">
                         <div class="card-header bg-info text-white">

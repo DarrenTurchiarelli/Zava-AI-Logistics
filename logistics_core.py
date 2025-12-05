@@ -301,9 +301,9 @@ async def simulate_logistics_operations():
         selected_parcels = random.sample(parcels, operation_count)
         
         status_progressions = [
-            {'status': 'in_transit', 'location': 'Sorting_Facility_VIC', 'description': 'Parcel sorted and loaded onto transport'},
-            {'status': 'at_depot', 'location': 'Distribution_Center_NSW', 'description': 'Arrived at distribution center'},
-            {'status': 'out_for_delivery', 'location': 'Delivery_Vehicle_001', 'description': 'Out for delivery on vehicle'}
+            {'status': 'In Transit', 'location': 'Sorting_Facility_VIC', 'description': 'Parcel sorted and loaded onto transport'},
+            {'status': 'At Depot', 'location': 'Distribution_Center_NSW', 'description': 'Arrived at distribution center'},
+            {'status': 'Out for Delivery', 'location': 'Delivery_Vehicle_001', 'description': 'Out for delivery on vehicle'}
         ]
         
         for parcel in selected_parcels:

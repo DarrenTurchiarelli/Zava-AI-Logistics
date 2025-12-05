@@ -123,12 +123,15 @@ function formatTrackingNumber(trackingNumber) {
 // Status badge color helper
 function getStatusBadgeClass(status) {
     const statusMap = {
-        'registered': 'bg-secondary',
-        'in_transit': 'bg-primary',
-        'out_for_delivery': 'bg-info',
-        'delivered': 'bg-success',
-        'exception': 'bg-warning',
-        'returned': 'bg-danger'
+        'Registered': 'bg-secondary',
+        'Collected': 'bg-secondary',
+        'At Depot': 'bg-warning',
+        'Sorting': 'bg-warning',
+        'In Transit': 'bg-primary',
+        'Out for Delivery': 'bg-info',
+        'Delivered': 'bg-success',
+        'Exception': 'bg-warning',
+        'Returned': 'bg-danger'
     };
     return statusMap[status] || 'bg-secondary';
 }

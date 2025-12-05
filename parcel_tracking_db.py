@@ -394,7 +394,7 @@ class ParcelTrackingDB:
             parcel["current_location"] = location
             parcel["last_updated"] = datetime.now(timezone.utc).isoformat()
             
-            if status == "delivered":
+            if status == "Delivered":
                 parcel["is_delivered"] = True
                 parcel["delivery_timestamp"] = datetime.now(timezone.utc).isoformat()
             
@@ -464,7 +464,7 @@ class ParcelTrackingDB:
             parcel["last_scan_type"] = scan_type
             
             # Handle delivery completion
-            if new_status == "delivered":
+            if new_status == "Delivered":
                 parcel["is_delivered"] = True
                 parcel["delivery_timestamp"] = datetime.now(timezone.utc).isoformat()
                 parcel["delivery_attempts"] = parcel.get("delivery_attempts", 0) + 1
@@ -526,52 +526,52 @@ class ParcelTrackingDB:
         
         # Store scanning (initial registration or return)
         if "store" in scan_location_lower:
-            if current_status == "registered":
-                return "in_transit", f"Parcel collected from store and in transit to depot"
+            if current_status == "Registered":
+                return "In Transit", f"Parcel collected from store and in transit to depot"
             else:
-                return "at_store", f"Parcel scanned at {scan_location}"
+                return "At Store", f"Parcel scanned at {scan_location}"
         
         # Depot/Facility scanning
         elif any(keyword in scan_location_lower for keyword in ["depot", "facility", "warehouse", "sorting"]):
             if scan_type == "arrival":
-                return "at_depot", f"Parcel arrived at {scan_location} for sorting and processing"
+                return "At Depot", f"Parcel arrived at {scan_location} for sorting and processing"
             elif scan_type == "departure":
-                return "in_transit", f"Parcel departed {scan_location} for delivery route"
+                return "In Transit", f"Parcel departed {scan_location} for delivery route"
             elif scan_type == "processing":
-                return "at_depot", f"Parcel being processed at {scan_location}"
+                return "At Depot", f"Parcel being processed at {scan_location}"
             else:
-                return "at_depot", f"Parcel scanned at {scan_location}"
+                return "At Depot", f"Parcel scanned at {scan_location}"
         
         # Vehicle scanning (delivery truck, van, etc.)
         elif any(keyword in scan_location_lower for keyword in ["vehicle", "truck", "van", "delivery"]):
             if scan_type == "loading":
-                return "out_for_delivery", f"Parcel loaded onto {scan_location} for delivery"
+                return "Out for Delivery", f"Parcel loaded onto {scan_location} for delivery"
             elif scan_type == "arrival":
-                return "out_for_delivery", f"Parcel on {scan_location} approaching destination"
+                return "Out for Delivery", f"Parcel on {scan_location} approaching destination"
             else:
-                return "out_for_delivery", f"Parcel on {scan_location}"
+                return "Out for Delivery", f"Parcel on {scan_location}"
         
         # Customer location scanning (delivery completion)
         elif any(keyword in scan_location_lower for keyword in ["customer", "recipient", "address", "delivery"]):
-            return "delivered", f"Parcel delivered to customer at {scan_location}"
+            return "Delivered", f"Parcel delivered to customer at {scan_location}"
         
         # Hub scanning (major sorting/distribution centers)
         elif any(keyword in scan_location_lower for keyword in ["hub", "distribution", "center"]):
             if scan_type == "arrival":
-                return "at_depot", f"Parcel arrived at distribution hub {scan_location}"
+                return "At Depot", f"Parcel arrived at distribution hub {scan_location}"
             elif scan_type == "departure":
-                return "in_transit", f"Parcel departed distribution hub {scan_location}"
+                return "In Transit", f"Parcel departed distribution hub {scan_location}"
             else:
-                return "at_depot", f"Parcel at distribution hub {scan_location}"
+                return "At Depot", f"Parcel at distribution hub {scan_location}"
         
         # Default case - generic location
         else:
             if scan_type == "arrival":
-                return "in_transit", f"Parcel arrived at {scan_location}"
+                return "In Transit", f"Parcel arrived at {scan_location}"
             elif scan_type == "departure":
-                return "in_transit", f"Parcel departed {scan_location}"
+                return "In Transit", f"Parcel departed {scan_location}"
             else:
-                return "in_transit", f"Parcel scanned at {scan_location}"
+                return "In Transit", f"Parcel scanned at {scan_location}"
 
     # ==================== TRACKING EVENTS ====================
 
@@ -682,7 +682,7 @@ class ParcelTrackingDB:
         
         try:
             items = container.query_items(
-                query="SELECT * FROM c WHERE c.status = 'pending'"
+                query="SELECT * FROM c WHERE c.status = 'pending' AND IS_DEFINED(c.request_type)"
             )
             return [item async for item in items]
         except exceptions.CosmosHttpResponseError as e:
@@ -1411,12 +1411,12 @@ class ParcelTrackingDB:
         # Parcel statuses with realistic progression
         status_options = [
             {'status': 'Registered', 'location': 'Store'},
-            {'status': 'collected', 'location': 'In Transit'},
-            {'status': 'at_depot', 'location': 'Distribution Center'},
+            {'status': 'Collected', 'location': 'In Transit'},
+            {'status': 'At Depot', 'location': 'Distribution Center'},
             {'status': 'Sorting', 'location': 'Sorting Facility'},
             {'status': 'In Transit', 'location': 'On Route'},
-            {'status': 'out_for_delivery', 'location': 'Delivery Vehicle'},
-            {'status': 'delivered', 'location': 'Recipient Address'}
+            {'status': 'Out for Delivery', 'location': 'Delivery Vehicle'},
+            {'status': 'Delivered', 'location': 'Recipient Address'}
         ]
         
         # Australian postcodes and states mapping (expanded VIC range)
@@ -1442,15 +1442,15 @@ class ParcelTrackingDB:
             
             # Distribution center assignment based on parcel status:
             # - 'Registered': Just logged at post office, DC not yet assigned
-            # - 'collected': Picked up but not at DC yet
-            # - 'out_for_delivery': Has left DC system, now with local delivery
-            # - 'delivered': Delivery complete, DC processing finished
-            # - All other statuses (at_depot, Sorting, In Transit): Active in DC system
+            # - 'Collected': Picked up but not at DC yet
+            # - 'Out for Delivery': Has left DC system, now with local delivery
+            # - 'Delivered': Delivery complete, DC processing finished
+            # - All other statuses (At Depot, Sorting, In Transit): Active in DC system
             if status_info['status'] == 'Registered':
                 dc = 'To Be Advised'
-            elif status_info['status'] in ['out_for_delivery', 'delivered']:
+            elif status_info['status'] in ['Out for Delivery', 'Delivered']:
                 dc = 'Completed'
-            elif status_info['status'] == 'collected':
+            elif status_info['status'] == 'Collected':
                 dc = 'Unknown DC'
             else:
                 # Parcels at depot, sorting, or in transit get actual DC assignments
@@ -1486,11 +1486,11 @@ class ParcelTrackingDB:
                 
                 # Update current status and location based on progression
                 parcel_doc['current_status'] = status_info['status']
-                if status_info['status'] == 'at_depot' or status_info['status'] == 'sorting':
+                if status_info['status'] in ['At Depot', 'Sorting']:
                     parcel_doc['current_location'] = dc
-                elif status_info['status'] == 'in_transit':
+                elif status_info['status'] == 'In Transit':
                     parcel_doc['current_location'] = f"{dc} - {status_info['location']}"
-                elif status_info['status'] == 'out_for_delivery':
+                elif status_info['status'] == 'Out for Delivery':
                     # Out for delivery uses local delivery vehicle, not DC
                     parcel_doc['current_location'] = status_info['location']
                 else:

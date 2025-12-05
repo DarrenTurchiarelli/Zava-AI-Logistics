@@ -57,11 +57,11 @@ async def generate_test_data(num_parcels: int = 30, num_approvals: int = 10):
                 # Check for unexpected DC assignments
                 if status == 'Registered' and dc != 'To Be Advised':
                     parcels_with_issues.append(f"{p['barcode']}: Registered should have 'To Be Advised' but has '{dc}'")
-                elif status in ['out_for_delivery', 'delivered'] and dc != 'Completed':
+                elif status in ['Out for Delivery', 'Delivered'] and dc != 'Completed':
                     parcels_with_issues.append(f"{p['barcode']}: {status} should have 'Completed' but has '{dc}'")
-                elif status == 'collected' and dc != 'Unknown DC':
-                    parcels_with_issues.append(f"{p['barcode']}: collected should have 'Unknown DC' but has '{dc}'")
-                elif status in ['at_depot', 'Sorting', 'In Transit'] and dc in ['To Be Advised', 'Completed', 'Unknown DC']:
+                elif status == 'Collected' and dc != 'Unknown DC':
+                    parcels_with_issues.append(f"{p['barcode']}: Collected should have 'Unknown DC' but has '{dc}'")
+                elif status in ['At Depot', 'Sorting', 'In Transit'] and dc in ['To Be Advised', 'Completed', 'Unknown DC']:
                     parcels_with_issues.append(f"{p['barcode']}: {status} should have actual DC but has '{dc}'")
             
             if parcels_with_issues:
@@ -109,9 +109,9 @@ async def generate_test_data(num_parcels: int = 30, num_approvals: int = 10):
                         if special_dc == 'To Be Advised':
                             valid = "✓" if status == 'Registered' else "⚠️"
                         elif special_dc == 'Completed':
-                            valid = "✓" if status in ['out_for_delivery', 'delivered'] else "⚠️"
+                            valid = "✓" if status in ['Out for Delivery', 'Delivered'] else "⚠️"
                         elif special_dc == 'Unknown DC':
-                            valid = "✓" if status == 'collected' else "⚠️"
+                            valid = "✓" if status == 'Collected' else "⚠️"
                         else:
                             valid = "?"
                         print(f"      {valid} {status}: {count}")
@@ -150,7 +150,7 @@ async def generate_test_data(num_parcels: int = 30, num_approvals: int = 10):
             print(f"  • {len(test_parcels)} parcels created")
             print(f"  • {len(approval_requests)} approval requests created")
             print(f"  • Distribution centers: 40 locations across Australia")
-            print(f"  • Status types: Registered, collected, at_depot, Sorting, In Transit, out_for_delivery, delivered")
+            print(f"  • Status types: Registered, Collected, At Depot, Sorting, In Transit, Out for Delivery, Delivered")
             print(f"\nYou can now use these test parcels in the DT Logistics application.")
             
             return True
