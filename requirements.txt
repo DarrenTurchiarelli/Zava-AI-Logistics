@@ -26,6 +26,7 @@ requests>=2.31.0
 python-dateutil>=2.8.2
 uuid>=1.30
 aiohttp>=3.9.0  # For async HTTP requests (Security Copilot integration)
+faker>=20.0.0  # Generate realistic test data
 
 # Email and OCR Support for Fraud Detection
 pytesseract>=0.3.10  # OCR text extraction from screenshots
