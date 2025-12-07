@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+
+{% block title %}AI Agent Monitoring - DT Logistics{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="display-5">🤖 AI Agent Performance Dashboard</h1>
+            <p class="text-muted">Real-time monitoring of AI agent decisions and performance metrics</p>
+        </div>
+    </div>
+
+    <!-- Overall Metrics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card border-primary">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Total Decisions</h6>
+                    <h2 class="card-title text-primary">{{ dashboard.total_decisions }}</h2>
+                    <p class="card-text small">
+                        <i class="fas fa-robot"></i> All agents
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card border-success">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Average Confidence</h6>
+                    <h2 class="card-title text-success">
+                        {{ (dashboard.overall_avg_confidence * 100)|round(0)|int }}%
+                    </h2>
+                    <p class="card-text small">
+                        <i class="fas fa-check-circle"></i> Across all decisions
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card border-info">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Avg Response Time</h6>
+                    <h2 class="card-title text-info">
+                        {{ dashboard.overall_avg_execution_ms|round(0)|int }} ms
+                    </h2>
+                    <p class="card-text small">
+                        <i class="fas fa-tachometer-alt"></i> Decision speed
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card border-warning">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Active Agents</h6>
+                    <h2 class="card-title text-warning">{{ dashboard.agents|length }}</h2>
+                    <p class="card-text small">
+                        <i class="fas fa-brain"></i> Currently deployed
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Decision Types Breakdown -->
+    <div class="row mb-4">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-chart-pie"></i> Decision Types Distribution</h5>
+                </div>
+                <div class="card-body">
+                    {% if dashboard.decision_types %}
+                    <div class="list-group">
+                        {% for decision_type, count in dashboard.decision_types.items() %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <span class="text-capitalize">{{ decision_type.replace('_', ' ') }}</span>
+                            <span class="badge bg-primary rounded-pill">{{ count }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center">No decisions recorded yet</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-tasks"></i> Recent Decisions</h5>
+                </div>
+                <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                    {% if dashboard.recent_decisions %}
+                    <div class="list-group">
+                        {% for decision in dashboard.recent_decisions %}
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ decision.agent }}</h6>
+                                <small class="text-muted">{{ decision.timestamp[:19] }}</small>
+                            </div>
+                            <p class="mb-1">
+                                <span class="badge bg-info">{{ decision.type }}</span>
+                                {{ decision.action }}
+                            </p>
+                            <div class="progress" style="height: 5px;">
+                                <div class="progress-bar 
+                                    {% if decision.confidence > 0.8 %}bg-success
+                                    {% elif decision.confidence > 0.6 %}bg-warning
+                                    {% else %}bg-danger{% endif %}"
+                                    role="progressbar" 
+                                    style="width: {{ (decision.confidence * 100)|int }}%"
+                                    aria-valuenow="{{ (decision.confidence * 100)|int }}" 
+                                    aria-valuemin="0" 
+                                    aria-valuemax="100">
+                                </div>
+                            </div>
+                            <small class="text-muted">Confidence: {{ (decision.confidence * 100)|round(0)|int }}%</small>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center">No recent decisions</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Individual Agent Performance -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0"><i class="fas fa-robot"></i> Individual Agent Performance</h5>
+                </div>
+                <div class="card-body">
+                    {% if dashboard.agents %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Agent Name</th>
+                                    <th>Type</th>
+                                    <th>Total Decisions</th>
+                                    <th>Success Rate</th>
+                                    <th>Avg Confidence</th>
+                                    <th>Avg Response Time</th>
+                                    <th>Last Execution</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for agent in dashboard.agents %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ agent.name }}</strong>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ agent.type.replace('_', ' ').title() }}</span>
+                                    </td>
+                                    <td>{{ agent.total_decisions }}</td>
+                                    <td>
+                                        <div class="progress" style="height: 20px;">
+                                            <div class="progress-bar 
+                                                {% if agent.success_rate > 0.9 %}bg-success
+                                                {% elif agent.success_rate > 0.7 %}bg-warning
+                                                {% else %}bg-danger{% endif %}"
+                                                role="progressbar" 
+                                                style="width: {{ (agent.success_rate * 100)|int }}%">
+                                                {{ (agent.success_rate * 100)|round(0)|int }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if agent.avg_confidence > 0.8 %}bg-success
+                                            {% elif agent.avg_confidence > 0.6 %}bg-warning
+                                            {% else %}bg-danger{% endif %}">
+                                            {{ (agent.avg_confidence * 100)|round(0)|int }}%
+                                        </span>
+                                    </td>
+                                    <td>{{ agent.avg_execution_ms|round(0)|int }} ms</td>
+                                    <td>
+                                        {% if agent.last_execution %}
+                                        <small>{{ agent.last_execution[:19] }}</small>
+                                        {% else %}
+                                        <small class="text-muted">Never</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if agent.last_execution %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check-circle"></i> Active
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">
+                                            <i class="fas fa-pause-circle"></i> Idle
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info text-center">
+                        <i class="fas fa-info-circle"></i> No agent performance data available yet.
+                        <br><small>Agents will appear here after making their first decisions.</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Agent Capabilities Reference -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-info">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Deployed AI Agents</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-shield-alt text-danger"></i> Fraud Detection Agent
+                                    </h6>
+                                    <p class="card-text small">
+                                        Azure AI Foundry-powered fraud analysis with threat classification and confidence scoring.
+                                    </p>
+                                    <ul class="small">
+                                        <li>Real-time threat analysis</li>
+                                        <li>Educational content generation</li>
+                                        <li>Multi-category classification</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-check-double text-success"></i> Approval Automation Agent
+                                    </h6>
+                                    <p class="card-text small">
+                                        Rules-based auto-approval with fraud risk thresholds and DC filtering.
+                                    </p>
+                                    <ul class="small">
+                                        <li>Auto-approve/reject decisions</li>
+                                        <li>Value and risk thresholds</li>
+                                        <li>Comprehensive audit trail</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-route text-primary"></i> Route Optimization Agent
+                                    </h6>
+                                    <p class="card-text small">
+                                        Azure Maps-powered route optimization with real-time traffic analysis.
+                                    </p>
+                                    <ul class="small">
+                                        <li>Real-time route optimization</li>
+                                        <li>Fuel and time savings</li>
+                                        <li>CO₂ reduction tracking</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-exclamation-triangle text-warning"></i> Exception Resolution Agent
+                                    </h6>
+                                    <p class="card-text small">
+                                        Intelligent auto-resolution of common delivery exceptions.
+                                    </p>
+                                    <ul class="small">
+                                        <li>Auto-reschedule deliveries</li>
+                                        <li>Safe place recommendations</li>
+                                        <li>Customer preference learning</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-bell text-info"></i> Smart Notification Agent
+                                    </h6>
+                                    <p class="card-text small">
+                                        Proactive, context-aware customer notifications.
+                                    </p>
+                                    <ul class="small">
+                                        <li>Traffic delay predictions</li>
+                                        <li>Personalized messaging</li>
+                                        <li>Multi-channel delivery</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-clipboard-list text-secondary"></i> Manifest Generation Agent
+                                    </h6>
+                                    <p class="card-text small">
+                                        AI-powered manifest creation and driver assignment optimization.
+                                    </p>
+                                    <ul class="small">
+                                        <li>Geographic clustering</li>
+                                        <li>Workload balancing</li>
+                                        <li>Route efficiency scoring</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Back to Dashboard -->
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.progress {
+    background-color: #e9ecef;
+}
+
+.list-group-item {
+    border-left: 3px solid transparent;
+    transition: all 0.2s;
+}
+
+.list-group-item:hover {
+    border-left-color: #0d6efd;
+    background-color: #f8f9fa;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+.badge {
+    font-weight: 500;
+}
+</style>
+{% endblock %}

@@ -2,6 +2,8 @@
 """
 Generate sample driver manifests for demonstration
 Creates realistic delivery data with Sydney addresses
+
+:TODO When running use python and not py. Unsure why faker env is not picked up with py launcher
 """
 
 import asyncio
@@ -166,7 +168,7 @@ SAMPLE_DRIVERS = [
 async def create_sample_parcels(db: ParcelTrackingDB):
     """Create sample parcels in the database"""
     
-    print("📦 Creating sample parcels...")
+    print("Creating sample parcels...")
     barcodes = []
     
     for i, addr_info in enumerate(SAMPLE_ADDRESSES, 1):
@@ -262,9 +264,16 @@ async def main():
     print("=" * 70)
     print()
     
-    depot = os.getenv('DEPOT_ADDRESS', '123 Industrial Drive, Sydney NSW 2000')
-    print(f"📍 Depot Location: {depot}")
-    print(f"📅 Date: {datetime.now().strftime('%A, %B %d, %Y')}")
+    from depot_manager import get_depot_manager
+    depot_mgr = get_depot_manager()
+    
+    print("Configured Depots:")
+    for state, depot_address in depot_mgr.list_depots().items():
+        print(f"   {state}: {depot_address}")
+    
+    depot = depot_mgr.get_default_depot()
+    print(f"\nDefault Depot: {depot}")
+    print(f"Date: {datetime.now().strftime('%A, %B %d, %Y')}")
     print()
     
     async with ParcelTrackingDB() as db:

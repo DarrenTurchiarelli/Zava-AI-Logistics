@@ -32,6 +32,49 @@ class AgentContext:
     timestamp: datetime = field(default_factory=datetime.now)
 
 @dataclass
+class AgentDecision:
+    """Record of an AI agent decision for audit trail"""
+    decision_id: str
+    agent_name: str
+    agent_type: str  # fraud_detection, route_optimization, exception_resolution, etc.
+    tracking_number: Optional[str]
+    decision_type: str  # approve, reject, optimize, notify, resolve
+    decision_action: str  # Specific action taken
+    confidence_score: float  # 0-1
+    reasoning: str
+    input_data: Dict[str, Any]
+    output_data: Dict[str, Any]
+    timestamp: datetime = field(default_factory=datetime.now)
+    execution_time_ms: float = 0.0
+    
+@dataclass
+class AgentPerformanceMetrics:
+    """Performance metrics for an AI agent"""
+    agent_name: str
+    agent_type: str
+    total_decisions: int = 0
+    successful_decisions: int = 0
+    failed_decisions: int = 0
+    average_confidence: float = 0.0
+    average_execution_time_ms: float = 0.0
+    last_execution: Optional[datetime] = None
+    decisions_by_type: Dict[str, int] = field(default_factory=dict)
+    
+    @property
+    def success_rate(self) -> float:
+        """Calculate success rate"""
+        if self.total_decisions == 0:
+            return 0.0
+        return self.successful_decisions / self.total_decisions
+    
+    @property
+    def failure_rate(self) -> float:
+        """Calculate failure rate"""
+        if self.total_decisions == 0:
+            return 0.0
+        return self.failed_decisions / self.total_decisions
+
+@dataclass
 class ApprovalRequest:
     """Approval request for human-in-the-loop workflow"""
     request_id: str
@@ -57,6 +100,186 @@ class StateManager:
         self.agent_contexts: Dict[str, List[AgentContext]] = {}
         self.pending_approvals: Dict[str, ApprovalRequest] = {}
         self.state_history: Dict[str, List[tuple[WorkflowState, datetime]]] = {}
+        self.agent_decisions: List[AgentDecision] = []
+        self.agent_metrics: Dict[str, AgentPerformanceMetrics] = {}
+    
+    def record_agent_decision(
+        self,
+        decision: AgentDecision,
+        success: bool = True
+    ) -> None:
+        """
+        Record an agent decision for audit trail and performance tracking
+        
+        Args:
+            decision: AgentDecision object
+            success: Whether the decision execution was successful
+        """
+        # Add to decision log
+        self.agent_decisions.append(decision)
+        
+        # Update agent metrics
+        agent_key = f"{decision.agent_type}:{decision.agent_name}"
+        
+        if agent_key not in self.agent_metrics:
+            self.agent_metrics[agent_key] = AgentPerformanceMetrics(
+                agent_name=decision.agent_name,
+                agent_type=decision.agent_type
+            )
+        
+        metrics = self.agent_metrics[agent_key]
+        metrics.total_decisions += 1
+        
+        if success:
+            metrics.successful_decisions += 1
+        else:
+            metrics.failed_decisions += 1
+        
+        # Update average confidence
+        prev_avg = metrics.average_confidence
+        total = metrics.total_decisions
+        metrics.average_confidence = (prev_avg * (total - 1) + decision.confidence_score) / total
+        
+        # Update average execution time
+        prev_avg_time = metrics.average_execution_time_ms
+        metrics.average_execution_time_ms = (prev_avg_time * (total - 1) + decision.execution_time_ms) / total
+        
+        # Update decision type counts
+        if decision.decision_type not in metrics.decisions_by_type:
+            metrics.decisions_by_type[decision.decision_type] = 0
+        metrics.decisions_by_type[decision.decision_type] += 1
+        
+        metrics.last_execution = decision.timestamp
+    
+    def get_agent_decisions(
+        self,
+        agent_name: Optional[str] = None,
+        agent_type: Optional[str] = None,
+        tracking_number: Optional[str] = None,
+        limit: int = 100
+    ) -> List[AgentDecision]:
+        """
+        Get agent decisions with optional filtering
+        
+        Args:
+            agent_name: Filter by agent name
+            agent_type: Filter by agent type
+            tracking_number: Filter by tracking number
+            limit: Maximum number of results
+        
+        Returns:
+            List of AgentDecision objects
+        """
+        decisions = self.agent_decisions
+        
+        if agent_name:
+            decisions = [d for d in decisions if d.agent_name == agent_name]
+        
+        if agent_type:
+            decisions = [d for d in decisions if d.agent_type == agent_type]
+        
+        if tracking_number:
+            decisions = [d for d in decisions if d.tracking_number == tracking_number]
+        
+        # Sort by timestamp descending (most recent first)
+        decisions = sorted(decisions, key=lambda d: d.timestamp, reverse=True)
+        
+        return decisions[:limit]
+    
+    def get_agent_performance(
+        self,
+        agent_name: Optional[str] = None,
+        agent_type: Optional[str] = None
+    ) -> List[AgentPerformanceMetrics]:
+        """
+        Get performance metrics for agents
+        
+        Args:
+            agent_name: Filter by agent name
+            agent_type: Filter by agent type
+        
+        Returns:
+            List of AgentPerformanceMetrics objects
+        """
+        metrics = list(self.agent_metrics.values())
+        
+        if agent_name:
+            metrics = [m for m in metrics if m.agent_name == agent_name]
+        
+        if agent_type:
+            metrics = [m for m in metrics if m.agent_type == agent_type]
+        
+        return metrics
+    
+    def get_agent_dashboard_data(self) -> Dict[str, Any]:
+        """
+        Get comprehensive agent performance data for dashboard
+        
+        Returns:
+            Dictionary with agent performance summary
+        """
+        total_decisions = len(self.agent_decisions)
+        
+        if total_decisions == 0:
+            return {
+                "total_decisions": 0,
+                "agents": [],
+                "decision_types": {},
+                "recent_decisions": []
+            }
+        
+        # Calculate overall metrics
+        successful = sum(1 for d in self.agent_decisions if any(
+            m.successful_decisions > 0 and m.agent_name == d.agent_name
+            for m in self.agent_metrics.values()
+        ))
+        
+        avg_confidence = sum(d.confidence_score for d in self.agent_decisions) / total_decisions
+        avg_execution = sum(d.execution_time_ms for d in self.agent_decisions) / total_decisions
+        
+        # Decision types breakdown
+        decision_types = {}
+        for decision in self.agent_decisions:
+            dt = decision.decision_type
+            if dt not in decision_types:
+                decision_types[dt] = 0
+            decision_types[dt] += 1
+        
+        # Agent summaries
+        agents = []
+        for metrics in self.agent_metrics.values():
+            agents.append({
+                "name": metrics.agent_name,
+                "type": metrics.agent_type,
+                "total_decisions": metrics.total_decisions,
+                "success_rate": metrics.success_rate,
+                "avg_confidence": metrics.average_confidence,
+                "avg_execution_ms": metrics.average_execution_time_ms,
+                "last_execution": metrics.last_execution.isoformat() if metrics.last_execution else None
+            })
+        
+        # Recent decisions (last 10)
+        recent = self.get_agent_decisions(limit=10)
+        recent_decisions = [
+            {
+                "decision_id": d.decision_id,
+                "agent": d.agent_name,
+                "type": d.decision_type,
+                "action": d.decision_action,
+                "confidence": d.confidence_score,
+                "timestamp": d.timestamp.isoformat()
+            }
+            for d in recent
+        ]
+        
+        return {
+            "total_decisions": total_decisions,
+            "overall_avg_confidence": avg_confidence,
+            "overall_avg_execution_ms": avg_execution,
+            "agents": agents,
+            "decision_types": decision_types,
+            "recent_decisions": recent_decisions
+        }
     
     def register_parcel(self, tracking_number: str) -> None:
         """Register a new parcel in the system"""

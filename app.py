@@ -797,6 +797,76 @@ def ai_insights():
     insights = run_async(get_insights())
     return render_template('ai_insights.html', insights=insights)
 
+@app.route('/admin/agents')
+@login_required
+def agent_monitoring_dashboard():
+    """AI Agent Performance Monitoring Dashboard"""
+    # Get state manager instance
+    from logistics_state_manager import StateManager
+    
+    # For now, create a demo instance
+    # In production, this should be a singleton shared across the app
+    state_manager = StateManager()
+    
+    # Get comprehensive agent performance data
+    dashboard_data = state_manager.get_agent_dashboard_data()
+    
+    # Add some example decisions if none exist (for demo)
+    if dashboard_data['total_decisions'] == 0:
+        from logistics_state_manager import AgentDecision
+        import uuid
+        
+        # Sample decisions for demonstration
+        sample_decisions = [
+            AgentDecision(
+                decision_id=str(uuid.uuid4()),
+                agent_name="Fraud Detection Agent",
+                agent_type="fraud_detection",
+                tracking_number="DTVIC123",
+                decision_type="analyze",
+                decision_action="classified as LOW risk",
+                confidence_score=0.92,
+                reasoning="No suspicious patterns detected, sender verified",
+                input_data={"message": "Sample message"},
+                output_data={"threat_level": "LOW"},
+                execution_time_ms=245.5
+            ),
+            AgentDecision(
+                decision_id=str(uuid.uuid4()),
+                agent_name="Approval Auto-Agent",
+                agent_type="approval_automation",
+                tracking_number="DTVIC124",
+                decision_type="approve",
+                decision_action="auto-approved delivery exception",
+                confidence_score=0.88,
+                reasoning="Fraud risk < 30%, DC match confirmed",
+                input_data={"fraud_risk": 15, "dc": "DC-MEL-001"},
+                output_data={"approved": True},
+                execution_time_ms=156.2
+            ),
+            AgentDecision(
+                decision_id=str(uuid.uuid4()),
+                agent_name="Route Optimization Agent",
+                agent_type="route_optimization",
+                tracking_number=None,
+                decision_type="optimize",
+                decision_action="optimized route for DRV001",
+                confidence_score=0.95,
+                reasoning="Azure Maps optimization, 18 min time savings",
+                input_data={"driver": "DRV001", "parcels": 12},
+                output_data={"time_saved": 18, "fuel_saved": 2.3},
+                execution_time_ms=892.7
+            )
+        ]
+        
+        for decision in sample_decisions:
+            state_manager.record_agent_decision(decision, success=True)
+        
+        # Refresh dashboard data
+        dashboard_data = state_manager.get_agent_dashboard_data()
+    
+    return render_template('agent_dashboard.html', dashboard=dashboard_data)
+
 # API Endpoints
 
 @app.route('/api/parcels/search')
@@ -869,13 +939,16 @@ def driver_manifest():
         # If route not optimized yet, optimize it now
         if not manifest.get('route_optimized') and manifest.get('items'):
             from bing_maps_routes import BingMapsRouter
+            from depot_manager import get_depot_manager
+            
             router = BingMapsRouter()
+            depot_mgr = get_depot_manager()
             
             # Extract addresses from manifest items
             addresses = [item['recipient_address'] for item in manifest['items']]
             
-            # Get depot/starting location from env or use first address
-            start_location = os.getenv('DEPOT_ADDRESS', 'Sydney, NSW 2000, Australia')
+            # Get optimal depot based on delivery addresses
+            start_location = depot_mgr.get_depot_for_addresses(addresses)
             
             # Optimize route
             route_info = router.optimize_route(addresses, start_location)
@@ -1029,13 +1102,16 @@ def view_manifest_details(manifest_id):
         # If route not optimized yet, optimize it now
         if not manifest.get('route_optimized') and manifest.get('items'):
             from bing_maps_routes import BingMapsRouter
+            from depot_manager import get_depot_manager
+            
             router = BingMapsRouter()
+            depot_mgr = get_depot_manager()
             
             # Extract addresses from manifest items
             addresses = [item['recipient_address'] for item in manifest['items']]
             
-            # Get depot/starting location from env
-            start_location = os.getenv('DEPOT_ADDRESS', 'Sydney, NSW 2000, Australia')
+            # Get optimal depot based on delivery addresses
+            start_location = depot_mgr.get_depot_for_addresses(addresses)
             
             # Optimize route
             route_info = router.optimize_route(addresses, start_location)
