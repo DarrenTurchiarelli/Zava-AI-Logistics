@@ -37,9 +37,19 @@
                             <i class="bi bi-box-seam"></i> Parcels
                         </a>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{{ url_for('register_parcel') }}">Register Parcel</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('track_parcel_page') }}">Track Parcel</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('all_parcels') }}">View All Parcels</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('register_parcel') }}">
+                                <i class="bi bi-box-seam"></i> Register Parcel
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('camera_scanner') }}">
+                                <i class="bi bi-camera"></i> Camera Scanner
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('track_parcel_page') }}">
+                                <i class="bi bi-search"></i> Track Parcel
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('all_parcels') }}">
+                                <i class="bi bi-list-ul"></i> View All Parcels
+                            </a></li>
                         </ul>
                     </li>
                     <li class="nav-item dropdown">
