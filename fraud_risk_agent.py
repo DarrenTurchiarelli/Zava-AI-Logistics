@@ -28,8 +28,8 @@ from azure.ai.projects import AIProjectClient
 from dotenv import load_dotenv
 
 load_dotenv()
-# Configuration
-FRAUD_RISK_AGENT_ID = "asst_ARutauXhW2tWVWB0UVqALhFA"
+# Configuration - Using centralized agent ID from .env
+FRAUD_RISK_AGENT_ID = os.getenv("FRAUD_RISK_AGENT_ID", "asst_ARutauXhW2tWVWB0UVqALhFA")  # Fallback to old ID
 AZURE_AI_PROJECT_ENDPOINT = os.getenv("AZURE_AI_PROJECT_ENDPOINT")
 
 class ThreatLevel(Enum):

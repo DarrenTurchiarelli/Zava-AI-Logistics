@@ -424,18 +424,22 @@ class ParcelTrackingDB:
         scan_type: str = "arrival"
     ) -> Dict[str, Any]:
         """
-        Smart location-aware parcel scanning that updates status and location based on scan location
+        Smart location-aware parcel scanning with Azure AI Driver Agent integration
+        Updates status and location based on scan location
         
         Args:
             barcode: Parcel barcode
             scan_location: Where the parcel was scanned (e.g., "Depot_Melbourne", "Store_Sydney_CBD", "Vehicle_001")
             scanned_by: Who scanned it
-            scan_type: Type of scan - "arrival", "departure", "processing", "loading"
+            scan_type: Type of scan - "arrival", "departure", "processing", "loading", "delivered"
         
         Returns:
             Dictionary with scan result and updated parcel info
         """
         try:
+            # Call Azure AI Driver Agent for delivery execution intelligence
+            from azure_ai_agents import driver_agent
+            
             container = self.database.get_container_client(self.parcels_container)
             
             # Find the parcel
@@ -450,6 +454,25 @@ class ParcelTrackingDB:
             # Determine new status and location based on scan location and current status
             current_status = parcel.get("current_status", "registered")
             current_location = parcel.get("current_location", "unknown")
+            
+            # Prepare data for Azure AI Driver Agent
+            delivery_action = {
+                "action_type": "scan",
+                "tracking_number": parcel.get("tracking_number", barcode),
+                "location": scan_location,
+                "scan_type": scan_type,
+                "driver_id": scanned_by,
+                "current_status": current_status,
+                "recipient_address": parcel.get("recipient_address", "Unknown")
+            }
+            
+            # Call Azure AI Driver Agent (async, don't block on failure)
+            try:
+                agent_result = await driver_agent(delivery_action)
+                if agent_result.get('success'):
+                    print(f"   [AI] Driver Agent processed scan")
+            except Exception as ai_error:
+                print(f"   [WARN] AI Driver Agent unavailable: {ai_error}")
             
             # Smart status determination based on scan location
             new_status, description = self._determine_status_from_location(

@@ -247,19 +247,46 @@ def index():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """Login page with role-based authentication"""
+    """Login page with role-based authentication and Azure AI Identity Agent verification"""
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
         
         # Authenticate with UserManager
         async def auth_user():
+            from azure_ai_agents import identity_agent
+            
             async with ParcelTrackingDB() as db:
                 if not db.database:
                     await db.connect()
                 
                 user_mgr = UserManager(db)
-                return await user_mgr.authenticate(username, password)
+                user = await user_mgr.authenticate(username, password)
+                
+                # If user authenticated and is a driver, verify with Azure AI Identity Agent
+                if user and user.get('role') == UserManager.ROLE_DRIVER:
+                    verification_request = {
+                        'courier_id': user.get('username'),
+                        'name': user.get('full_name'),
+                        'role': user.get('role'),
+                        'employment_status': 'active',
+                        'authorized_zone': user.get('store_location', 'All'),
+                        'verification_method': 'credential_login'
+                    }
+                    
+                    try:
+                        # Call Azure AI Identity Agent for courier verification
+                        identity_result = await identity_agent(verification_request)
+                        if identity_result.get('success'):
+                            print(f"   [AI] Identity Agent verified courier")
+                            user['ai_verified'] = True
+                        else:
+                            user['ai_verified'] = False
+                    except Exception as ai_error:
+                        print(f"   [WARN] AI Identity Agent unavailable: {ai_error}")
+                        user['ai_verified'] = False
+                
+                return user
         
         try:
             user = run_async(auth_user())
@@ -269,7 +296,11 @@ def login():
                 session['logged_in'] = True  # Backward compatibility
                 session['username'] = user['username']  # Backward compatibility
                 
-                flash(f"Welcome back, {user['full_name']}!", 'success')
+                # Show AI verification badge for drivers
+                if user.get('ai_verified'):
+                    flash(f"Welcome back, {user['full_name']}! [AI Verified]", 'success')
+                else:
+                    flash(f"Welcome back, {user['full_name']}!", 'success')
                 
                 # Redirect based on role
                 if user['role'] == UserManager.ROLE_DRIVER:
@@ -317,10 +348,11 @@ def dashboard():
 @app.route('/parcels/register', methods=['GET', 'POST'])
 @login_required
 def register_parcel():
-    """Register new parcel"""
+    """Register new parcel with Azure AI Parcel Intake Agent validation"""
     if request.method == 'POST':
         try:
             from logistics_parcel import get_state_from_postcode
+            from azure_ai_agents import parcel_intake_agent
             import uuid
             
             # Get form data
@@ -340,11 +372,35 @@ def register_parcel():
             # Determine destination state from postcode
             destination_state = get_state_from_postcode(destination_postcode)
             
-            # Generate a barcode
+            # Generate a tracking number and barcode
+            tracking_number = f"DT{uuid.uuid4().hex[:10].upper()}"
             barcode = f"BC{uuid.uuid4().hex[:12].upper()}"
             
-            # Register parcel in database
-            async def register():
+            # Validate with Azure AI Parcel Intake Agent
+            parcel_data = {
+                'tracking_number': tracking_number,
+                'sender_name': sender_name,
+                'sender_address': sender_address,
+                'recipient_name': recipient_name,
+                'recipient_address': recipient_address,
+                'destination_postcode': destination_postcode,
+                'destination_state': destination_state,
+                'service_type': service_type,
+                'weight_kg': weight,
+                'dimensions': dimensions,
+                'declared_value': declared_value,
+                'special_instructions': special_instructions
+            }
+            
+            async def validate_and_register():
+                # Call Azure AI Parcel Intake Agent for validation
+                validation_result = await parcel_intake_agent(parcel_data)
+                
+                # Log AI validation result
+                if validation_result.get('success'):
+                    print(f"[AI] Parcel Intake validation completed")
+                
+                # Register parcel in database (proceed even if AI validation fails)
                 async with ParcelTrackingDB() as db:
                     result = await db.register_parcel(
                         barcode=barcode,
@@ -363,11 +419,16 @@ def register_parcel():
                         special_instructions=special_instructions,
                         store_location=session.get('store_location', 'WebPortal')
                     )
-                    return result['tracking_number']
+                    return result['tracking_number'], validation_result
             
-            tracking_number = run_async(register())
-            flash(f'Parcel registered successfully! Tracking: {tracking_number}', 'success')
-            return redirect(url_for('track_parcel_page', tracking_number=tracking_number))
+            final_tracking, validation = run_async(validate_and_register())
+            flash(f'Parcel registered successfully! Tracking: {final_tracking}', 'success')
+            
+            # Show AI validation message if available
+            if validation.get('success'):
+                flash('✓ AI validation completed', 'info')
+            
+            return redirect(url_for('track_parcel_page', tracking_number=final_tracking))
             
         except Exception as e:
             flash(f'Error registering parcel: {str(e)}', 'danger')
