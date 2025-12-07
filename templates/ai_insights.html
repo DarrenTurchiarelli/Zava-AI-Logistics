@@ -16,31 +16,40 @@
     <!-- Performance Metrics -->
     <div class="row g-4 mb-4">
         <div class="col-md-3">
-            <div class="card text-center border-primary">
-                <div class="card-body">
-                    <i class="bi bi-box-seam text-primary" style="font-size: 2rem;"></i>
-                    <h3 class="mt-2">{{ insights.total_processed }}</h3>
-                    <p class="text-muted mb-0">Processed Today</p>
+            <a href="{{ url_for('all_parcels') }}" class="text-decoration-none">
+                <div class="card text-center border-primary card-hover">
+                    <div class="card-body">
+                        <i class="bi bi-box-seam text-primary" style="font-size: 2rem;"></i>
+                        <h3 class="mt-2">{{ insights.total_parcels }}</h3>
+                        <p class="text-muted mb-0">Total Parcels</p>
+                        <small class="text-primary"><i class="bi bi-arrow-right-circle"></i> View All</small>
+                    </div>
                 </div>
-            </div>
+            </a>
         </div>
         <div class="col-md-3">
-            <div class="card text-center border-warning">
-                <div class="card-body">
-                    <i class="bi bi-truck text-warning" style="font-size: 2rem;"></i>
-                    <h3 class="mt-2">{{ insights.in_transit }}</h3>
-                    <p class="text-muted mb-0">In Transit</p>
+            <a href="{{ url_for('all_parcels') }}?status=In Transit" class="text-decoration-none">
+                <div class="card text-center border-warning card-hover">
+                    <div class="card-body">
+                        <i class="bi bi-truck text-warning" style="font-size: 2rem;"></i>
+                        <h3 class="mt-2">{{ insights.in_transit }}</h3>
+                        <p class="text-muted mb-0">In Transit</p>
+                        <small class="text-warning"><i class="bi bi-arrow-right-circle"></i> Track Now</small>
+                    </div>
                 </div>
-            </div>
+            </a>
         </div>
         <div class="col-md-3">
-            <div class="card text-center border-success">
-                <div class="card-body">
-                    <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
-                    <h3 class="mt-2">{{ insights.delivered }}</h3>
-                    <p class="text-muted mb-0">Delivered</p>
+            <a href="{{ url_for('all_parcels') }}?status=Delivered" class="text-decoration-none">
+                <div class="card text-center border-success card-hover">
+                    <div class="card-body">
+                        <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+                        <h3 class="mt-2">{{ insights.delivered }}</h3>
+                        <p class="text-muted mb-0">Delivered</p>
+                        <small class="text-success"><i class="bi bi-arrow-right-circle"></i> View History</small>
+                    </div>
                 </div>
-            </div>
+            </a>
         </div>
         <div class="col-md-3">
             <div class="card text-center border-info">
@@ -48,6 +57,7 @@
                     <i class="bi bi-speedometer text-info" style="font-size: 2rem;"></i>
                     <h3 class="mt-2">{{ insights.success_rate }}%</h3>
                     <p class="text-muted mb-0">Success Rate</p>
+                    <small class="text-muted">Delivered vs Exceptions</small>
                 </div>
             </div>
         </div>
@@ -58,22 +68,35 @@
         <div class="col-lg-6">
             <div class="card shadow-sm h-100">
                 <div class="card-header bg-white">
-                    <h5 class="mb-0"><i class="bi bi-person-badge"></i> Driver Efficiency</h5>
+                    <h5 class="mb-0"><i class="bi bi-clipboard-check"></i> Operations Status</h5>
                 </div>
                 <div class="card-body">
                     <div class="row text-center">
                         <div class="col-6 mb-3">
-                            <h3 class="text-primary">{{ insights.active_drivers }}</h3>
-                            <p class="text-muted mb-0">Active Drivers</p>
+                            <a href="{{ url_for('all_parcels') }}?status=At Depot" class="text-decoration-none">
+                                <h3 class="text-primary">{{ insights.at_depot }}</h3>
+                                <p class="text-muted mb-0">At Depot</p>
+                                <small class="text-primary"><i class="bi bi-arrow-right-circle"></i></small>
+                            </a>
                         </div>
                         <div class="col-6 mb-3">
-                            <h3 class="text-success">{{ insights.avg_delivery_time }} min</h3>
-                            <p class="text-muted mb-0">Avg Delivery Time</p>
+                            <a href="{{ url_for('all_parcels') }}?status=Sorting" class="text-decoration-none">
+                                <h3 class="text-warning">{{ insights.sorting }}</h3>
+                                <p class="text-muted mb-0">Sorting</p>
+                                <small class="text-warning"><i class="bi bi-arrow-right-circle"></i></small>
+                            </a>
+                        </div>
+                        <div class="col-12 mb-3">
+                            <a href="{{ url_for('all_parcels') }}?status=Out for Delivery" class="text-decoration-none">
+                                <h3 class="text-info">{{ insights.out_for_delivery }}</h3>
+                                <p class="text-muted mb-0">Out for Delivery</p>
+                                <small class="text-info"><i class="bi bi-arrow-right-circle"></i></small>
+                            </a>
                         </div>
                     </div>
                     <div class="progress" style="height: 30px;">
-                        <div class="progress-bar bg-success" style="width: 85%">
-                            Fleet Utilization: 85%
+                        <div class="progress-bar bg-success" style="width: {{ (insights.active_parcels / insights.total_parcels * 100) if insights.total_parcels > 0 else 0 }}%">
+                            Active Parcels: {{ insights.active_parcels }}
                         </div>
                     </div>
                 </div>
@@ -81,64 +104,94 @@
         </div>
 
         <div class="col-lg-6">
-            <div class="card shadow-sm h-100">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0"><i class="bi bi-star"></i> Service Levels</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row text-center">
-                        <div class="col-6 mb-3">
-                            <h3 class="text-success">{{ insights.on_time_rate }}%</h3>
-                            <p class="text-muted mb-0">On-Time Delivery</p>
+            <a href="{{ url_for('driver_manifest') }}" class="text-decoration-none">
+                <div class="card shadow-sm h-100 card-hover">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="bi bi-truck-front"></i> Driver Manifests</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-12 mb-3">
+                                <i class="bi bi-file-earmark-text text-primary" style="font-size: 3rem;"></i>
+                                <h3 class="text-primary mt-2">View Active Manifests</h3>
+                                <p class="text-muted mb-0">Check driver assignments and routes</p>
+                                <small class="text-primary mt-2"><i class="bi bi-arrow-right-circle"></i> Go to Manifests</small>
+                            </div>
                         </div>
-                        <div class="col-6 mb-3">
-                            <h3 class="text-info">{{ insights.nps_score }}</h3>
-                            <p class="text-muted mb-0">NPS Score</p>
+                        <div class="progress" style="height: 30px;">
+                            <div class="progress-bar bg-info" style="width: {{ (insights.out_for_delivery / insights.total_parcels * 100) if insights.total_parcels > 0 else 0 }}%">
+                                Delivery Progress
+                            </div>
                         </div>
                     </div>
-                    <div class="progress" style="height: 30px;">
-                        <div class="progress-bar bg-info" style="width: 92%">
-                            First Attempt Success: 92%
-                        </div>
-                    </div>
                 </div>
-            </div>
+            </a>
         </div>
     </div>
 
     <!-- AI Performance -->
     <div class="row">
         <div class="col-12">
-            <div class="card shadow-sm">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0"><i class="bi bi-robot"></i> AI Agent Performance</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row text-center">
-                        <div class="col-md-3">
-                            <i class="bi bi-lightning-charge text-warning" style="font-size: 2rem;"></i>
-                            <h4 class="mt-2">215</h4>
-                            <p class="text-muted">Agent Decisions</p>
+            <a href="{{ url_for('approvals') }}" class="text-decoration-none">
+                <div class="card shadow-sm card-hover">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="bi bi-robot"></i> AI Agent Performance</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-3">
+                                <i class="bi bi-lightning-charge text-warning" style="font-size: 2rem;"></i>
+                                <h4 class="mt-2">{{ insights.total_approvals }}</h4>
+                                <p class="text-muted">Total Requests</p>
+                            </div>
+                            <div class="col-md-3">
+                                <i class="bi bi-check-all text-success" style="font-size: 2rem;"></i>
+                                <h4 class="mt-2">{{ insights.valid_dc_approvals }}</h4>
+                                <p class="text-muted">Ready for Processing</p>
+                            </div>
+                            <div class="col-md-3">
+                                <i class="bi bi-hourglass-split text-info" style="font-size: 2rem;"></i>
+                                <h4 class="mt-2">{{ insights.pending_approvals }}</h4>
+                                <p class="text-muted">Pending Review</p>
+                            </div>
+                            <div class="col-md-3">
+                                <i class="bi bi-stopwatch text-danger" style="font-size: 2rem;"></i>
+                                <h4 class="mt-2">{{ insights.avg_decision_time }}</h4>
+                                <p class="text-muted">Avg Decision Time</p>
+                            </div>
                         </div>
-                        <div class="col-md-3">
-                            <i class="bi bi-check-all text-success" style="font-size: 2rem;"></i>
-                            <h4 class="mt-2">187</h4>
-                            <p class="text-muted">Auto Resolutions</p>
-                        </div>
-                        <div class="col-md-3">
-                            <i class="bi bi-person-check text-info" style="font-size: 2rem;"></i>
-                            <h4 class="mt-2">12</h4>
-                            <p class="text-muted">Human Approvals</p>
-                        </div>
-                        <div class="col-md-3">
-                            <i class="bi bi-stopwatch text-danger" style="font-size: 2rem;"></i>
-                            <h4 class="mt-2">0.6s</h4>
-                            <p class="text-muted">Avg Decision Time</p>
+                        <div class="mt-3 text-center">
+                            <small class="text-primary"><i class="bi bi-arrow-right-circle"></i> Click to manage approval requests</small>
                         </div>
                     </div>
                 </div>
-            </div>
+            </a>
         </div>
     </div>
 </div>
+
+<style>
+    .card-hover {
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    
+    .card-hover:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    
+    .card-hover:hover .card-body {
+        background-color: rgba(0, 123, 255, 0.02);
+    }
+    
+    a.text-decoration-none:hover h3,
+    a.text-decoration-none:hover small {
+        transition: all 0.2s ease;
+    }
+    
+    a.text-decoration-none:hover small {
+        font-weight: 600;
+    }
+</style>
 {% endblock %}

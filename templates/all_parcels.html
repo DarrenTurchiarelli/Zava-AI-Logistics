@@ -8,7 +8,16 @@
         <div class="col">
             <h1 class="display-6">
                 <i class="bi bi-box-seam"></i> All Parcels
+                {% if status_filter %}
+                <span class="badge bg-primary">{{ status_filter }}</span>
+                {% endif %}
             </h1>
+            {% if status_filter %}
+            <p class="text-muted">
+                Showing parcels with status: <strong>{{ status_filter }}</strong>
+                <a href="{{ url_for('all_parcels') }}" class="ms-2"><i class="bi bi-x-circle"></i> Clear filter</a>
+            </p>
+            {% endif %}
         </div>
         <div class="col-auto">
             <a href="{{ url_for('register_parcel') }}" class="btn btn-primary">
