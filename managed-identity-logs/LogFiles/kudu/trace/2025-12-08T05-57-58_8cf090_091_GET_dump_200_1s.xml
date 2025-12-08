@@ -1,6 +1,0 @@
-<step title="Incoming Request" date="2025-12-08T05:57:58.561" instance="8cf090" url="/dump" method="GET" type="request" pid="768,1,55" Host="dt-logistics-web-8759.scm.azurewebsites.net" User-Agent="AZURECLI/2.48.1 (MSI)" Accept-Encoding="identity" Authorization="Bea..." x-ms-client-request-id="d0f7eaec-d3fa-11f0-8b50-c403a8f40dc5" X-ARR-LOG-ID="d0f7eaec-d3fa-11f0-8b50-c403a8f40dc5" CLIENT-IP="121.200.4.253:44760" X-SITE-DEPLOYMENT-ID="dt-logistics-web-8759" WAS-DEFAULT-HOSTNAME="dt-logistics-web-8759.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/dump" X-Client-IP="121.200.4.253" X-Client-Port="44760" >
-  <step title="Cleanup Xml Logs" date="2025-12-08T05:57:58.566" >
-    <step title="Cleanup Infos" date="2025-12-08T05:57:58.578" totalFiles="387" totalCleanup="227" /><!-- duration: 7ms -->
-  </step><!-- duration: 23ms -->
-  <step title="Outgoing response" date="2025-12-08T05:57:59.799" type="response" statusCode="200" statusText="OK" /><!-- duration: 9ms -->
-</step><!-- duration: 1257ms -->

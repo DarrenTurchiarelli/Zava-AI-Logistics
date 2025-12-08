@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+
+{% block title %}AI Customer Service Assistant{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h2><i class="fas fa-robot"></i> AI Customer Service Assistant</h2>
+            <p class="text-muted">Ask questions about parcels, check fraud reports, and get AI-powered assistance</p>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <!-- Quick Actions Panel -->
+        <div class="col-md-3">
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <i class="fas fa-bolt"></i> Quick Actions
+                </div>
+                <div class="list-group list-group-flush">
+                    <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Track parcel')">
+                        <i class="fas fa-search"></i> Track Parcel
+                    </button>
+                    <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Show recent fraud reports')">
+                        <i class="fas fa-shield-alt"></i> Check Frauds
+                    </button>
+                    <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Show all parcels in transit')">
+                        <i class="fas fa-truck"></i> Parcels in Transit
+                    </button>
+                    <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Show parcels at distribution center')">
+                        <i class="fas fa-warehouse"></i> At Distribution Center
+                    </button>
+                    <button class="list-group-item list-group-item-action" onclick="clearChat()">
+                        <i class="fas fa-eraser"></i> Clear Chat
+                    </button>
+                </div>
+            </div>
+
+            <!-- Parcel Lookup Panel -->
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <i class="fas fa-box"></i> Parcel Lookup
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label for="trackingNumber">Tracking Number</label>
+                        <input type="text" class="form-control" id="trackingNumber" placeholder="Enter tracking #">
+                    </div>
+                    <button class="btn btn-info btn-block" onclick="trackParcel()">
+                        <i class="fas fa-search"></i> Track
+                    </button>
+                    <button class="btn btn-secondary btn-block mt-2" onclick="getParcelLocation()">
+                        <i class="fas fa-map-marker-alt"></i> Get Location
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Panel -->
+        <div class="col-md-6">
+            <div class="card" style="height: 700px;">
+                <div class="card-header bg-success text-white">
+                    <i class="fas fa-comments"></i> Chat with AI Assistant
+                </div>
+                <div class="card-body" id="chatMessages" style="overflow-y: auto; height: 550px;">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> <strong>Welcome!</strong> I'm your AI customer service assistant. Ask me anything about parcels, fraud reports, or delivery status.
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="chatInput" placeholder="Ask a question..." onkeypress="handleEnter(event)">
+                        <div class="input-group-append">
+                            <button class="btn btn-success" onclick="sendMessage()">
+                                <i class="fas fa-paper-plane"></i> Send
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Information Panel -->
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <i class="fas fa-info-circle"></i> Information
+                </div>
+                <div class="card-body" id="infoPanel">
+                    <p class="text-muted">Information will appear here when you track parcels or check fraud reports.</p>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header bg-secondary text-white">
+                    <i class="fas fa-lightbulb"></i> Sample Questions
+                </div>
+                <div class="card-body">
+                    <ul class="small">
+                        <li>Where is parcel DTVIC123?</li>
+                        <li>Is parcel XYZ in transit or at depot?</li>
+                        <li>Show me recent fraud reports</li>
+                        <li>How many parcels are out for delivery?</li>
+                        <li>What's the status of delivery to Sydney?</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function addMessage(message, isUser = false) {
+    const chatMessages = document.getElementById('chatMessages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `alert ${isUser ? 'alert-primary' : 'alert-success'} ${isUser ? 'text-right' : ''}`;
+    messageDiv.innerHTML = `<strong>${isUser ? 'You' : 'AI Assistant'}:</strong> ${message}`;
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function addError(message) {
+    const chatMessages = document.getElementById('chatMessages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'alert alert-danger';
+    messageDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> <strong>Error:</strong> ${message}`;
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function addLoading() {
+    const chatMessages = document.getElementById('chatMessages');
+    const loadingDiv = document.createElement('div');
+    loadingDiv.id = 'loadingMessage';
+    loadingDiv.className = 'alert alert-secondary';
+    loadingDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> AI is thinking...';
+    chatMessages.appendChild(loadingDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function removeLoading() {
+    const loading = document.getElementById('loadingMessage');
+    if (loading) {
+        loading.remove();
+    }
+}
+
+async function sendMessage() {
+    const input = document.getElementById('chatInput');
+    const query = input.value.trim();
+    const trackingNumber = document.getElementById('trackingNumber').value.trim();
+    
+    if (!query) return;
+    
+    addMessage(query, true);
+    input.value = '';
+    addLoading();
+    
+    try {
+        const response = await fetch('/api/chatbot/query', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                query: query,
+                tracking_number: trackingNumber || null
+            })
+        });
+        
+        const data = await response.json();
+        removeLoading();
+        
+        if (response.ok) {
+            const aiResponse = data.response || data.message || JSON.stringify(data, null, 2);
+            addMessage(aiResponse);
+        } else {
+            addError(data.error || 'Failed to get response');
+        }
+    } catch (error) {
+        removeLoading();
+        addError('Network error: ' + error.message);
+    }
+}
+
+async function trackParcel() {
+    const trackingNumber = document.getElementById('trackingNumber').value.trim();
+    
+    if (!trackingNumber) {
+        addError('Please enter a tracking number');
+        return;
+    }
+    
+    addLoading();
+    
+    try {
+        const response = await fetch(`/api/chatbot/track/${trackingNumber}`);
+        const data = await response.json();
+        removeLoading();
+        
+        if (response.ok && data.found) {
+            const info = `
+                <h6><i class="fas fa-box"></i> ${data.tracking_number}</h6>
+                <p><strong>Status:</strong> ${data.status}</p>
+                <p><strong>Location:</strong> ${data.current_location}</p>
+                <p><strong>Recipient:</strong> ${data.recipient}</p>
+                <p><strong>Destination:</strong> ${data.destination}</p>
+                ${data.estimated_delivery ? `<p><strong>ETA:</strong> ${data.estimated_delivery}</p>` : ''}
+            `;
+            document.getElementById('infoPanel').innerHTML = info;
+            
+            const message = `Found parcel ${data.tracking_number}. Status: ${data.status}, Location: ${data.current_location}`;
+            addMessage(message);
+        } else {
+            addError(data.message || 'Parcel not found');
+        }
+    } catch (error) {
+        removeLoading();
+        addError('Network error: ' + error.message);
+    }
+}
+
+async function getParcelLocation() {
+    const trackingNumber = document.getElementById('trackingNumber').value.trim();
+    
+    if (!trackingNumber) {
+        addError('Please enter a tracking number');
+        return;
+    }
+    
+    addLoading();
+    
+    try {
+        const response = await fetch(`/api/chatbot/location/${trackingNumber}`);
+        const data = await response.json();
+        removeLoading();
+        
+        if (response.ok && data.found) {
+            const locationClass = data.location_type === 'IN_TRANSIT' ? 'success' : 
+                                 data.location_type === 'AT_DISTRIBUTION_CENTER' ? 'warning' : 'info';
+            
+            const info = `
+                <div class="alert alert-${locationClass}">
+                    <h6><i class="fas fa-map-marker-alt"></i> Location Status</h6>
+                    <p><strong>Type:</strong> ${data.location_type.replace(/_/g, ' ')}</p>
+                    <p>${data.location_description}</p>
+                </div>
+                <p><strong>Tracking:</strong> ${data.tracking_number}</p>
+                <p><strong>Current:</strong> ${data.current_location}</p>
+                <p><strong>Status:</strong> ${data.status}</p>
+            `;
+            document.getElementById('infoPanel').innerHTML = info;
+            
+            addMessage(data.location_description);
+        } else {
+            addError(data.message || 'Parcel not found');
+        }
+    } catch (error) {
+        removeLoading();
+        addError('Network error: ' + error.message);
+    }
+}
+
+function askQuickQuestion(question) {
+    document.getElementById('chatInput').value = question;
+    sendMessage();
+}
+
+function clearChat() {
+    const chatMessages = document.getElementById('chatMessages');
+    chatMessages.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle"></i> <strong>Chat cleared.</strong> How can I help you?</div>';
+}
+
+function handleEnter(event) {
+    if (event.key === 'Enter') {
+        sendMessage();
+    }
+}
+
+// Load fraud reports on page load
+window.addEventListener('load', async function() {
+    try {
+        const response = await fetch('/api/chatbot/frauds?limit=5');
+        const data = await response.json();
+        
+        if (data.frauds && data.frauds.length > 0) {
+            const fraudInfo = `
+                <h6><i class="fas fa-shield-alt"></i> Recent Frauds (${data.frauds.length})</h6>
+                <div class="small">
+                    ${data.frauds.map(f => `
+                        <div class="border-bottom pb-2 mb-2">
+                            <strong>${f.risk_level || 'Unknown'}</strong><br>
+                            <small>${f.timestamp || 'No date'}</small>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            document.getElementById('infoPanel').innerHTML = fraudInfo;
+        }
+    } catch (error) {
+        console.error('Failed to load fraud reports:', error);
+    }
+});
+</script>
+
+<style>
+#chatMessages .alert {
+    margin-bottom: 10px;
+}
+
+.text-right {
+    text-align: right;
+}
+
+#infoPanel {
+    max-height: 600px;
+    overflow-y: auto;
+}
+</style>
+{% endblock %}

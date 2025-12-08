@@ -858,6 +858,121 @@ def ai_insights():
     insights = run_async(get_insights())
     return render_template('ai_insights.html', insights=insights)
 
+# Customer Service Chatbot Routes
+
+@app.route('/customer_service/chatbot')
+@login_required
+def customer_service_chatbot():
+    """Customer Service AI Chatbot Interface"""
+    # Check if user has customer service role
+    user = session.get('user')
+    if not user or user.get('role') not in [UserManager.ROLE_CUSTOMER_SERVICE, UserManager.ROLE_ADMIN]:
+        flash('Access denied. Customer service role required.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    return render_template('customer_service_chatbot.html')
+
+@app.route('/api/chatbot/query', methods=['POST'])
+@login_required
+def chatbot_query():
+    """Process chatbot query"""
+    from customer_service_chatbot import CustomerServiceChatbot
+    
+    user = session.get('user')
+    if not user or user.get('role') not in [UserManager.ROLE_CUSTOMER_SERVICE, UserManager.ROLE_ADMIN]:
+        return jsonify({'error': 'Access denied'}), 403
+    
+    data = request.get_json()
+    query = data.get('query', '')
+    tracking_number = data.get('tracking_number')
+    
+    if not query:
+        return jsonify({'error': 'Query is required'}), 400
+    
+    async def process():
+        async with ParcelTrackingDB() as db:
+            chatbot = CustomerServiceChatbot(db)
+            
+            # Build context
+            context = {}
+            if tracking_number:
+                context['tracking_number'] = tracking_number
+            
+            # Process query
+            response = await chatbot.process_query(query, context)
+            return response
+    
+    try:
+        result = run_async(process())
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/chatbot/track/<tracking_number>')
+@login_required
+def chatbot_track_parcel(tracking_number):
+    """Track parcel via chatbot API"""
+    from customer_service_chatbot import CustomerServiceChatbot
+    
+    user = session.get('user')
+    if not user or user.get('role') not in [UserManager.ROLE_CUSTOMER_SERVICE, UserManager.ROLE_ADMIN]:
+        return jsonify({'error': 'Access denied'}), 403
+    
+    async def track():
+        async with ParcelTrackingDB() as db:
+            chatbot = CustomerServiceChatbot(db)
+            return await chatbot.track_parcel(tracking_number)
+    
+    try:
+        result = run_async(track())
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/chatbot/frauds')
+@login_required
+def chatbot_check_frauds():
+    """Get fraud reports via chatbot API"""
+    from customer_service_chatbot import CustomerServiceChatbot
+    
+    user = session.get('user')
+    if not user or user.get('role') not in [UserManager.ROLE_CUSTOMER_SERVICE, UserManager.ROLE_ADMIN]:
+        return jsonify({'error': 'Access denied'}), 403
+    
+    limit = request.args.get('limit', 20, type=int)
+    
+    async def get_frauds():
+        async with ParcelTrackingDB() as db:
+            chatbot = CustomerServiceChatbot(db)
+            return await chatbot.check_frauds(limit)
+    
+    try:
+        result = run_async(get_frauds())
+        return jsonify({'frauds': result})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/chatbot/location/<tracking_number>')
+@login_required
+def chatbot_parcel_location(tracking_number):
+    """Get detailed parcel location status"""
+    from customer_service_chatbot import CustomerServiceChatbot
+    
+    user = session.get('user')
+    if not user or user.get('role') not in [UserManager.ROLE_CUSTOMER_SERVICE, UserManager.ROLE_ADMIN]:
+        return jsonify({'error': 'Access denied'}), 403
+    
+    async def get_location():
+        async with ParcelTrackingDB() as db:
+            chatbot = CustomerServiceChatbot(db)
+            return await chatbot.get_parcel_location_status(tracking_number)
+    
+    try:
+        result = run_async(get_location())
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/admin/agents')
 @login_required
 def agent_monitoring_dashboard():
