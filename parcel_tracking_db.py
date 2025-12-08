@@ -66,8 +66,20 @@ class ParcelTrackingDB:
     """Consolidated Parcel Tracking Database Interface"""
     
     def __init__(self):
+        # Try to get individual values first
         self.endpoint = os.getenv("COSMOS_DB_ENDPOINT")
         self.key = os.getenv("COSMOS_DB_KEY")
+        
+        # If not available, parse from connection string
+        if not self.endpoint or not self.key:
+            connection_string = os.getenv("COSMOS_CONNECTION_STRING")
+            if connection_string:
+                # Parse connection string
+                parts = dict(part.split('=', 1) for part in connection_string.split(';') if '=' in part)
+                self.endpoint = parts.get('AccountEndpoint', '').rstrip('/')
+                self.key = parts.get('AccountKey', '')
+                print(f"🔍 DEBUG: Parsed connection string - endpoint: {self.endpoint[:50] if self.endpoint else 'None'}, key length: {len(self.key) if self.key else 0}")
+        
         self.database_name = os.getenv("COSMOS_DB_DATABASE_NAME", "agent_workflow_db")
         
         # Container names
@@ -96,41 +108,50 @@ class ParcelTrackingDB:
         """Initialize connection to Cosmos DB"""
         try:
             if not self.endpoint:
-                raise ValueError("COSMOS_DB_ENDPOINT environment variable is required")
+                raise ValueError("COSMOS_DB_ENDPOINT or COSMOS_CONNECTION_STRING environment variable is required")
             
-            # Try key-based authentication first, fall back to Azure AD if it fails
-            auth_successful = False
-            
+            # Try key-based authentication first
             if self.key:
                 try:
                     # Use key-based authentication
                     self.client = CosmosClient(self.endpoint, self.key)
-                    # Silently test the connection
                     
                     # Test the connection by attempting to access the database
                     self.database = await self.client.create_database_if_not_exists(
                         id=self.database_name,
                         offer_throughput=400
                     )
-                    auth_successful = True
+                    print(f"✓ Connected to Cosmos DB using account key")
                     
                 except Exception as key_error:
-                    if "Local Authorization is disabled" in str(key_error) or "Unauthorized" in str(key_error):
-                        # Silently switch to Azure AD authentication
-                        auth_successful = False
+                    # If key auth fails, only try Azure AD if the error suggests it
+                    if "Local Authorization is disabled" in str(key_error):
+                        print(f"⚠️ Key-based auth disabled, trying Azure AD...")
+                        # Use Azure credential authentication
+                        self.credential = DefaultAzureCredential()
+                        self.client = CosmosClient(self.endpoint, self.credential)
+                        
+                        # Get or create database (serverless - no throughput)
+                        self.database = await self.client.create_database_if_not_exists(
+                            id=self.database_name
+                        )
+                        print(f"✓ Connected to Cosmos DB using Azure AD")
                     else:
+                        # For other errors, re-raise them
+                        print(f"❌ Cosmos DB connection failed: {key_error}")
                         raise key_error
-            
-            if not auth_successful:
-                # Use Azure credential authentication
+            else:
+                # No key provided - must use Azure AD
+                print(f"⚠️ No account key found, trying Azure AD authentication...")
                 self.credential = DefaultAzureCredential()
                 self.client = CosmosClient(self.endpoint, self.credential)
-                # Silently connect using Azure credentials
                 
                 # Get or create database (serverless - no throughput)
                 self.database = await self.client.create_database_if_not_exists(
                     id=self.database_name
                 )
+                print(f"✓ Connected to Cosmos DB using Azure AD")
+            
             # Create containers if they don't exist
             await self._create_containers()
             

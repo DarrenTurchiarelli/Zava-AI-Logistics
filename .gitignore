@@ -40,6 +40,10 @@ venv.bak/
 logs/
 *.log.*
 
+# Deployment logs and archives
+deployment-logs/
+deployment-logs.zip
+
 # Database files (local copies)
 *.db
 *.sqlite

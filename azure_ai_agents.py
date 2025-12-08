@@ -331,20 +331,31 @@ async def fraud_risk_agent(suspicious_activity: Dict[str, Any]) -> Dict[str, Any
     Returns:
         Risk assessment and recommended actions
     """
-    message = f"""
-    Analyze potential fraud or security risk:
+    # Build message content dynamically
+    message_parts = [
+        "Analyze potential fraud or security risk:",
+        "",
+        f"Activity Type: {suspicious_activity.get('activity_type', 'message')}",
+        f"Source: {suspicious_activity.get('source', 'Unknown')}",
+        ""
+    ]
     
-    Activity Type: {suspicious_activity.get('activity_type', 'message')}
-    Source: {suspicious_activity.get('source', 'Unknown')}
+    if suspicious_activity.get('message'):
+        message_parts.append("Message Content:")
+        message_parts.append(suspicious_activity.get('message', ''))
+        message_parts.append("")
     
-    {"Message Content:\n" + suspicious_activity.get('message', '') if suspicious_activity.get('message') else ""}
-    {"Activity Pattern:\n" + suspicious_activity.get('pattern', '') if suspicious_activity.get('pattern') else ""}
+    if suspicious_activity.get('pattern'):
+        message_parts.append("Activity Pattern:")
+        message_parts.append(suspicious_activity.get('pattern', ''))
+        message_parts.append("")
     
-    Sender Information:
-    {json.dumps(suspicious_activity.get('sender_info', {}), indent=2)}
+    message_parts.append("Sender Information:")
+    message_parts.append(json.dumps(suspicious_activity.get('sender_info', {}), indent=2))
+    message_parts.append("")
+    message_parts.append("Assess risk level and provide recommended actions.")
     
-    Assess risk level and provide recommended actions.
-    """
+    message = "\n".join(message_parts)
     
     return await call_azure_agent(FRAUD_RISK_AGENT_ID, message, suspicious_activity)
 

@@ -1041,12 +1041,9 @@ def driver_manifest():
         
         # Always regenerate embed URL to ensure latest map features
         if manifest.get('route_optimized') and manifest.get('optimized_route'):
-            from bing_maps_routes import BingMapsRouter
-            router = BingMapsRouter()
-            print(f"🗺️  [DRIVER] Generating embed URL for {len(manifest['optimized_route'])} addresses")
-            print(f"🗺️  [DRIVER] First address: {manifest['optimized_route'][0] if manifest['optimized_route'] else 'None'}")
-            manifest['embed_url'] = router.generate_embed_url(manifest['optimized_route'])
-            print(f"🗺️  [DRIVER] Embed URL length: {len(manifest.get('embed_url', ''))} chars")
+            # Use Flask route instead of data URL
+            manifest['embed_url'] = url_for('render_map', manifest_id=manifest_id, _external=False)
+            print(f"🗺️  [DRIVER] Map URL: {manifest['embed_url']}")
         
         return render_template('driver_manifest.html', manifest=manifest)
         
@@ -1204,12 +1201,9 @@ def view_manifest_details(manifest_id):
         
         # Always regenerate embed URL to ensure latest map features
         if manifest.get('route_optimized') and manifest.get('optimized_route'):
-            from bing_maps_routes import BingMapsRouter
-            router = BingMapsRouter()
-            print(f"🗺️  [ADMIN] Generating embed URL for {len(manifest['optimized_route'])} addresses")
-            print(f"🗺️  [ADMIN] First address: {manifest['optimized_route'][0] if manifest['optimized_route'] else 'None'}")
-            manifest['embed_url'] = router.generate_embed_url(manifest['optimized_route'])
-            print(f"🗺️  [ADMIN] Embed URL length: {len(manifest.get('embed_url', ''))} chars")
+            # Use Flask route instead of data URL
+            manifest['embed_url'] = url_for('render_map', manifest_id=manifest_id, _external=False)
+            print(f"🗺️  [ADMIN] Map URL: {manifest['embed_url']}")
         
         # Reorder items according to optimized route if available
         if manifest.get('route_optimized') and manifest.get('optimized_route') and manifest.get('items'):
@@ -1600,6 +1594,194 @@ def internal_error(error):
 def health():
     """Health check endpoint"""
     return jsonify({'status': 'healthy', 'timestamp': datetime.now().isoformat()})
+
+@app.route('/map/<manifest_id>')
+def render_map(manifest_id):
+    """Render Azure Maps for a manifest"""
+    try:
+        # Get manifest data
+        async def get_manifest_data():
+            async with ParcelTrackingDB() as db:
+                return await db.get_manifest_by_id(manifest_id)
+        
+        manifest = run_async(get_manifest_data())
+        
+        if not manifest or not manifest.get('optimized_route'):
+            return "No route data available", 404
+        
+        # Generate map HTML with route geometry
+        from bing_maps_routes import BingMapsRouter
+        router = BingMapsRouter()
+        
+        addresses = manifest.get('optimized_route', [])
+        if not addresses:
+            return "No addresses to display", 404
+        
+        # Geocode addresses
+        coordinates = []
+        for addr in addresses:
+            coords = router.geocode_address(addr)
+            if coords:
+                coordinates.append(coords)
+        
+        if not coordinates:
+            return "Failed to geocode addresses", 500
+        
+        # Get subscription key
+        subscription_key = router.subscription_key
+        if not subscription_key:
+            return "Azure Maps not configured", 500
+        
+        # Fetch the actual route with geometry from Azure Maps API
+        import requests
+        query_coords = ":".join([f"{lat},{lon}" for lat, lon in coordinates])
+        route_url = f"https://atlas.microsoft.com/route/directions/json"
+        
+        params = {
+            'api-version': '1.0',
+            'subscription-key': subscription_key,
+            'query': query_coords,
+            'traffic': 'true',
+            'travelMode': 'car',
+            'routeType': 'fastest'
+        }
+        
+        route_coordinates = []
+        try:
+            response = requests.get(route_url, params=params, timeout=10)
+            response.raise_for_status()
+            route_data = response.json()
+            
+            if route_data.get('routes') and len(route_data['routes']) > 0:
+                route = route_data['routes'][0]
+                # Extract route geometry from legs
+                for leg in route.get('legs', []):
+                    for point in leg.get('points', []):
+                        route_coordinates.append([point['longitude'], point['latitude']])
+                
+                print(f"✓ Fetched route with {len(route_coordinates)} geometry points")
+        except Exception as e:
+            print(f"⚠️ Route API error: {e}")
+            # Fallback to direct lines if route fetch fails
+            route_coordinates = [[lon, lat] for lat, lon in coordinates]
+        
+        # If no route coordinates, use direct lines
+        if not route_coordinates:
+            route_coordinates = [[lon, lat] for lat, lon in coordinates]
+            print(f"⚠️ Using direct lines between {len(route_coordinates)} waypoints")
+        
+        center_lat, center_lon = coordinates[0]
+        pins_js = ', '.join([f"[{lon}, {lat}]" for lat, lon in coordinates])
+        route_coords_js = ', '.join([f"[{lon}, {lat}]" for lon, lat in route_coordinates])
+        
+        # Return rendered HTML directly
+        return f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.css" />
+    <script src="https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.js"></script>
+    <style>
+        body {{ margin: 0; padding: 0; }}
+        #map {{ width: 100%; height: 100vh; }}
+        #debug {{ position: absolute; top: 10px; left: 10px; background: rgba(255,255,255,0.95); 
+                 padding: 10px; border: 2px solid #2196F3; z-index: 1000; font-family: monospace; 
+                 font-size: 11px; max-width: 300px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }}
+    </style>
+</head>
+<body>
+    <div id="debug">Initializing map...</div>
+    <div id="map"></div>
+    <script>
+        var debugEl = document.getElementById('debug');
+        function log(msg) {{
+            console.log(msg);
+            debugEl.innerHTML += '<br>' + msg;
+        }}
+        
+        var centerLon = {center_lon};
+        var centerLat = {center_lat};
+        var pins = [{pins_js}];
+        var routeCoords = [{route_coords_js}];
+        
+        log('Map center: [' + centerLon.toFixed(4) + ', ' + centerLat.toFixed(4) + ']');
+        log('Waypoints: ' + pins.length);
+        log('Route points: ' + routeCoords.length);
+        
+        var map = new atlas.Map('map', {{
+            center: [centerLon, centerLat],
+            zoom: 12,
+            language: 'en-US',
+            style: 'road',
+            authOptions: {{
+                authType: 'subscriptionKey',
+                subscriptionKey: '{subscription_key}'
+            }}
+        }});
+        
+        map.events.add('ready', function() {{
+            log('✓ Map ready');
+            var dataSource = new atlas.source.DataSource();
+            map.sources.add(dataSource);
+            
+            // Add route line FIRST (so it renders under markers)
+            if (routeCoords.length > 1) {{
+                var routeLine = new atlas.data.Feature(
+                    new atlas.data.LineString(routeCoords), 
+                    {{ isRoute: true }}
+                );
+                dataSource.add(routeLine);
+                
+                var lineLayer = new atlas.layer.LineLayer(dataSource, null, {{
+                    filter: ['==', ['get', 'isRoute'], true],
+                    strokeColor: '#2196F3',
+                    strokeWidth: 5,
+                    lineJoin: 'round',
+                    lineCap: 'round'
+                }});
+                map.layers.add(lineLayer);
+                log('✓ Route line added (' + routeCoords.length + ' points)');
+            }}
+            
+            // Add pins on top
+            pins.forEach(function(pin, index) {{
+                dataSource.add(new atlas.data.Feature(new atlas.data.Point(pin), {{
+                    title: 'Stop ' + (index + 1),
+                    isWaypoint: true
+                }}));
+            }});
+            
+            // Add marker layer
+            var markerLayer = new atlas.layer.SymbolLayer(dataSource, null, {{
+                filter: ['==', ['get', 'isWaypoint'], true],
+                iconOptions: {{
+                    image: 'marker-blue',
+                    size: 0.8
+                }},
+                textOptions: {{
+                    textField: ['get', 'title'],
+                    offset: [0, -2.5],
+                    color: '#ffffff',
+                    size: 12
+                }}
+            }});
+            map.layers.add(markerLayer);
+            log('✓ ' + pins.length + ' markers displayed');
+            
+            setTimeout(function() {{ debugEl.style.display = 'none'; }}, 4000);
+        }});
+        
+        map.events.add('error', function(e) {{
+            log('ERROR: ' + e.error.message);
+        }});
+    </script>
+</body>
+</html>"""
+    
+    except Exception as e:
+        import traceback
+        return f"<pre>Error: {str(e)}\n\n{traceback.format_exc()}</pre>", 500
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))

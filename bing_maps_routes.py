@@ -50,6 +50,8 @@ class BingMapsRouter:
             print("⚠️ AZURE_MAPS_SUBSCRIPTION_KEY not configured. Using mock route optimization.")
             return self._mock_optimization(addresses, start_location)
         
+        print(f"✓ Azure Maps key configured: {self.subscription_key[:10]}...")
+        
         if not addresses or len(addresses) == 0:
             return None
             
@@ -62,12 +64,15 @@ class BingMapsRouter:
             waypoints = [start_location] + addresses if start_location else addresses
             coordinates = []
             
+            print(f"🗺️  Geocoding {len(waypoints)} addresses for route optimization...")
             for addr in waypoints:
                 coords = self.geocode_address(addr)
                 if coords:
                     coordinates.append(coords)
+                    print(f"  ✓ {addr} -> {coords}")
                 else:
-                    print(f"⚠️ Could not geocode address: {addr}")
+                    print(f"  ❌ Could not geocode address: {addr}")
+                    print(f"⚠️ Falling back to mock optimization due to geocoding failure")
                     return self._mock_optimization(addresses, start_location)
             
             # Use Azure Maps Route Directions API
@@ -75,6 +80,8 @@ class BingMapsRouter:
             
             # Build query string with coordinates
             query_coords = ":".join([f"{lat},{lon}" for lat, lon in coordinates])
+            
+            print(f"🗺️  Calling Azure Maps Route API with {len(coordinates)} waypoints...")
             
             params = {
                 'api-version': self.api_version,
@@ -92,9 +99,12 @@ class BingMapsRouter:
             response.raise_for_status()
             data = response.json()
             
+            print(f"✓ Route API response received (status {response.status_code})")
+            
             # Extract route information
             if 'routes' not in data or len(data['routes']) == 0:
                 print(f"❌ Azure Maps API returned no routes")
+                print(f"   Response: {data}")
                 return self._mock_optimization(addresses, start_location)
             
             route = data['routes'][0]
@@ -181,6 +191,9 @@ class BingMapsRouter:
         print(f"🗺️  Map center: lat={center_lat}, lon={center_lon}")
         print(f"🗺️  Total stops: {len(coordinates)}")
         
+        # Create JavaScript array of coordinates
+        pins_js = ', '.join([f"[{lon}, {lat}]" for lat, lon in coordinates])
+        
         # Generate inline HTML with Azure Maps
         html_content = f"""
 <!DOCTYPE html>
@@ -192,18 +205,28 @@ class BingMapsRouter:
     <script src="https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.js"></script>
     <style>
         body {{ margin: 0; padding: 0; }}
-        #map {{ width: 100%; height: {height}px; opacity: 0; transition: opacity 0.3s; }}
-        #map.ready {{ opacity: 1; }}
+        #map {{ width: 100%; height: {height}px; }}
+        #debug {{ position: absolute; top: 10px; left: 10px; background: white; padding: 10px; 
+                 border: 2px solid #333; z-index: 1000; font-family: monospace; font-size: 12px; }}
     </style>
 </head>
 <body>
+    <div id="debug">Loading map...</div>
     <div id="map"></div>
     <script>
+        var debugEl = document.getElementById('debug');
+        function log(msg) {{
+            console.log(msg);
+            debugEl.innerHTML += '<br>' + msg;
+        }}
+        
         // Define center coordinates
         var centerLon = {center_lon};
         var centerLat = {center_lat};
+        var pins = [{pins_js}];
         
-        console.log('Map initialization - Center: [' + centerLon + ', ' + centerLat + '], Zoom: 11');
+        log('Initializing map at [' + centerLon + ', ' + centerLat + ']');
+        log('Number of waypoints: ' + pins.length);
         
         var map = new atlas.Map('map', {{
             center: [centerLon, centerLat],
@@ -217,26 +240,27 @@ class BingMapsRouter:
             }}
         }});
         
-        console.log('Map object created, waiting for ready event...');
-        
         map.events.add('ready', function() {{
-            console.log('Map ready event fired');
+            log('Map ready!');
             var dataSource = new atlas.source.DataSource();
             map.sources.add(dataSource);
             
             // Add markers for each delivery
-            var pins = [{', '.join([f"[{lon}, {lat}]" for lat, lon in coordinates])}];
             
             // Add all pins to data source
             pins.forEach(function(pin, index) {{
-                dataSource.add(new atlas.data.Feature(new atlas.data.Point(pin), {{
+                var point = new atlas.data.Feature(new atlas.data.Point(pin), {{
                     title: 'Stop ' + (index + 1),
                     isWaypoint: true
-                }}));
+                }});
+                dataSource.add(point);
+                log('Added pin ' + (index + 1) + ' at ' + pin);
             }});
             
-            // Add numbered markers
-            map.layers.add(new atlas.layer.SymbolLayer(dataSource, null, {{
+            log('Added ' + pins.length + ' pins to data source');
+            
+            // Add numbered markers layer FIRST
+            var markerLayer = new atlas.layer.SymbolLayer(dataSource, null, {{
                 filter: ['==', ['get', 'isWaypoint'], true],
                 iconOptions: {{
                     image: 'marker-blue',
@@ -248,48 +272,99 @@ class BingMapsRouter:
                     color: '#ffffff',
                     size: 12
                 }}
-            }}));
+            }});
+            map.layers.add(markerLayer);
+            log('Marker layer added');
             
-            // Fetch and draw the route between waypoints
-            var coordinates = [{', '.join([f"'{lat},{lon}'" for lat, lon in coordinates])}];
-            var routeUrl = 'https://atlas.microsoft.com/route/directions/json?api-version=1.0&subscription-key={self.subscription_key}&query=' + coordinates.join(':');
-            
-            fetch(routeUrl)
-                .then(response => response.json())
-                .then(data => {{
-                    if (data.routes && data.routes.length > 0) {{
-                        var route = data.routes[0];
-                        var routeCoordinates = [];
-                        
-                        // Extract coordinates from route legs
-                        route.legs.forEach(function(leg) {{
-                            leg.points.forEach(function(point) {{
-                                routeCoordinates.push([point.longitude, point.latitude]);
-                            }});
-                        }});
-                        
-                        // Add route line to map
-                        dataSource.add(new atlas.data.Feature(new atlas.data.LineString(routeCoordinates)));
-                        
-                        // Add line layer for the route
-                        map.layers.add(new atlas.layer.LineLayer(dataSource, null, {{
-                            strokeColor: '#2196F3',
-                            strokeWidth: 4,
-                            lineJoin: 'round',
-                            lineCap: 'round'
-                        }}), 'labels');
-                        
-                        // Don't change camera - keep initial zoom level focused on first delivery
-                    }}
-                    
-                    // Show map once everything is loaded
-                    document.getElementById('map').classList.add('ready');
-                }})
-                .catch(function(err) {{ 
-                    console.error('Route fetch error:', err);
-                    // Show map even if route fails
-                    document.getElementById('map').classList.add('ready');
+            // Draw simple line connecting all waypoints
+            if (pins.length > 1) {{
+                var routeLine = new atlas.data.Feature(
+                    new atlas.data.LineString(pins), 
+                    {{ isRoute: true }}
+                );
+                dataSource.add(routeLine);
+                
+                var lineLayer = new atlas.layer.LineLayer(dataSource, null, {{
+                    filter: ['==', ['get', 'isRoute'], true],
+                    strokeColor: '#2196F3',
+                    strokeWidth: 5,
+                    lineJoin: 'round',
+                    lineCap: 'round'
                 }});
+                map.layers.add(lineLayer, markerLayer.getId());
+                log('Route line added (simple waypoint connection)');
+            }}
+            
+            // Now try to fetch optimized route from Azure Maps
+            if (pins.length > 1) {{
+                var coordinates = [{', '.join([f"'{lat},{lon}'" for lat, lon in coordinates])}];
+                var routeUrl = 'https://atlas.microsoft.com/route/directions/json?api-version=1.0&subscription-key={self.subscription_key}&query=' + coordinates.join(':') + '&routeRepresentation=polyline';
+                
+                log('Fetching optimized route...');
+                
+                fetch(routeUrl)
+                    .then(response => {{
+                        if (!response.ok) {{
+                            throw new Error('HTTP ' + response.status);
+                        }}
+                        return response.json();
+                    }})
+                    .then(data => {{
+                        if (data.routes && data.routes.length > 0) {{
+                            var route = data.routes[0];
+                            var routeCoordinates = [];
+                            
+                            // Extract coordinates from guidance instructions
+                            route.legs.forEach(function(leg) {{
+                                if (leg.guidance && leg.guidance.instructions) {{
+                                    leg.guidance.instructions.forEach(function(instruction) {{
+                                        if (instruction.point && instruction.point.latitude && instruction.point.longitude) {{
+                                            routeCoordinates.push([instruction.point.longitude, instruction.point.latitude]);
+                                        }}
+                                    }});
+                                }}
+                            }});
+                            
+                            if (routeCoordinates.length > 1) {{
+                                // Remove old simple line
+                                map.layers.remove(lineLayer);
+                                
+                                // Add optimized route line
+                                var optimizedLine = new atlas.data.Feature(
+                                    new atlas.data.LineString(routeCoordinates), 
+                                    {{ isRoute: true }}
+                                );
+                                dataSource.add(optimizedLine);
+                                
+                                lineLayer = new atlas.layer.LineLayer(dataSource, null, {{
+                                    filter: ['==', ['get', 'isRoute'], true],
+                                    strokeColor: '#2196F3',
+                                    strokeWidth: 5,
+                                    lineJoin: 'round',
+                                    lineCap: 'round'
+                                }});
+                                map.layers.add(lineLayer, markerLayer.getId());
+                                
+                                log('✓ Optimized route loaded (' + routeCoordinates.length + ' points)');
+                            }} else {{
+                                log('Using simple route (no detailed path available)');
+                            }}
+                        }}
+                    }})
+                    .catch(function(err) {{
+                        log('Route API error: ' + err.message);
+                    }});
+            }}
+            
+            // Hide debug after 3 seconds
+            setTimeout(function() {{
+                debugEl.style.display = 'none';
+            }}, 3000);
+        }});
+        
+        map.events.add('error', function(e) {{
+            log('Map error: ' + e.error.message);
+        }});
         }});
     </script>
 </body>
@@ -343,7 +418,9 @@ class BingMapsRouter:
                 'api-version': self.api_version,
                 'subscription-key': self.subscription_key,
                 'query': address,
-                'limit': 1
+                'limit': 1,
+                'countrySet': 'AU',  # Bias to Australia
+                'view': 'Auto'
             }
             
             response = requests.get(search_url, params=params, timeout=5)
@@ -352,7 +429,26 @@ class BingMapsRouter:
             
             if 'results' in data and len(data['results']) > 0:
                 position = data['results'][0]['position']
-                return (position['lat'], position['lon'])
+                lat, lon = position['lat'], position['lon']
+                
+                # Validate coordinates are in Australia/Oceania range
+                # Australia: lat -44 to -10, lon 113 to 154
+                if -45 <= lat <= -9 and 110 <= lon <= 160:
+                    return (lat, lon)
+                else:
+                    print(f"⚠️ Geocoded to non-Australian location: {address} -> ({lat}, {lon})")
+                    # Try adding "Australia" to the query
+                    if "australia" not in address.lower() and "au" not in address.lower():
+                        params['query'] = address + ", Australia"
+                        response = requests.get(search_url, params=params, timeout=5)
+                        response.raise_for_status()
+                        data = response.json()
+                        
+                        if 'results' in data and len(data['results']) > 0:
+                            position = data['results'][0]['position']
+                            lat, lon = position['lat'], position['lon']
+                            print(f"✓ Retry with 'Australia': {address} -> ({lat}, {lon})")
+                            return (lat, lon)
             
             return None
             
