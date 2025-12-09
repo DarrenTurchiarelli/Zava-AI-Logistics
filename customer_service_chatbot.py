@@ -7,6 +7,7 @@ import os
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from azure_ai_agents import customer_service_agent
+import company_config as config
 
 class CustomerServiceChatbot:
     """AI Chatbot for customer service operations"""
@@ -27,24 +28,49 @@ class CustomerServiceChatbot:
         Returns:
             AI response with relevant information and actions
         """
-        # Build enhanced query with context
-        enhanced_query = self._build_enhanced_query(query, context)
+        # Check if this is public mode (regular user, not customer service)
+        is_public = context.get('public_mode', False) if context else False
+        
+        # Retrieve relevant parcel data if tracking number mentioned or for context
+        parcel_data = None
+        if context and context.get('tracking_number'):
+            parcel_data = await self._get_parcel_data(context.get('tracking_number'))
+        else:
+            # Try to extract tracking number from query
+            import re
+            tracking_pattern = r'\b(DTVIC\d+|DT\d+)\b'
+            matches = re.findall(tracking_pattern, query, re.IGNORECASE)
+            if matches:
+                print(f"📦 Extracted tracking number from query: {matches[0]}")
+                parcel_data = await self._get_parcel_data(matches[0].upper())
+            else:
+                print(f"🔍 No tracking number found in query: {query}")
+        
+        # Build enhanced query with context and parcel data
+        enhanced_query = self._build_enhanced_query(query, context, is_public, parcel_data)
         
         # Add to conversation history
         self.conversation_history.append({
             'timestamp': datetime.utcnow().isoformat(),
             'query': query,
-            'context': context
+            'context': context,
+            'parcel_data_included': parcel_data is not None
         })
         
-        # Call AI agent
-        response = await customer_service_agent({
+        # Prepare agent request
+        agent_request = {
             'customer_name': context.get('customer_name', 'Customer') if context else 'Customer',
             'issue_type': 'inquiry',
-            'tracking_number': context.get('tracking_number') if context else None,
             'details': enhanced_query,
-            'preferred_resolution': context.get('preferred_resolution') if context else None
-        })
+        }
+        
+        # Only include tracking number and internal data for non-public requests
+        if not is_public:
+            agent_request['tracking_number'] = context.get('tracking_number') if context else None
+            agent_request['preferred_resolution'] = context.get('preferred_resolution') if context else None
+        
+        # Call AI agent
+        response = await customer_service_agent(agent_request)
         
         # Add response to history
         self.conversation_history.append({
@@ -54,12 +80,140 @@ class CustomerServiceChatbot:
         
         return response
     
-    def _build_enhanced_query(self, query: str, context: Dict[str, Any] = None) -> str:
-        """Build enhanced query with context"""
-        parts = [query]
+    async def _get_parcel_data(self, tracking_number: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve parcel data from CosmosDB for AI reasoning
         
-        if context:
-            if context.get('tracking_number'):
+        Args:
+            tracking_number: The parcel tracking number
+            
+        Returns:
+            Parcel data with tracking events or None if not found
+        """
+        print(f"🔎 Looking up parcel data for: {tracking_number}")
+        try:
+            # Get parcel from database
+            parcels_container = await self.db.get_container("parcels")
+            
+            query = "SELECT * FROM c WHERE c.tracking_number = @tracking_number"
+            parameters = [{"name": "@tracking_number", "value": tracking_number}]
+            
+            items = []
+            async for item in parcels_container.query_items(
+                query=query,
+                parameters=parameters,
+                enable_cross_partition_query=True
+            ):
+                items.append(item)
+            
+            if not items:
+                print(f"❌ No parcel found for tracking number: {tracking_number}")
+                return None
+            
+            print(f"✅ Found parcel: {tracking_number}")
+            parcel = items[0]
+            
+            # Get tracking events
+            events_container = await self.db.get_container("tracking_events")
+            
+            events_query = "SELECT * FROM c WHERE c.tracking_number = @tracking_number ORDER BY c.timestamp DESC"
+            events = []
+            async for event in events_container.query_items(
+                query=events_query,
+                parameters=parameters,
+                enable_cross_partition_query=True
+            ):
+                events.append(event)
+            
+            # Build comprehensive parcel data for AI
+            parcel_data = {
+                'tracking_number': parcel.get('tracking_number'),
+                'status': parcel.get('status'),
+                'sender': parcel.get('sender', {}),
+                'recipient': parcel.get('recipient', {}),
+                'current_location': parcel.get('current_location'),
+                'destination': parcel.get('destination'),
+                'estimated_delivery': parcel.get('estimated_delivery'),
+                'created_at': parcel.get('created_at'),
+                'weight': parcel.get('weight'),
+                'dimensions': parcel.get('dimensions'),
+                'service_type': parcel.get('service_type'),
+                'recent_events': events[:10] if events else [],  # Last 10 events
+                'total_events': len(events)
+            }
+            
+            return parcel_data
+            
+        except Exception as e:
+            print(f"Error retrieving parcel data: {str(e)}")
+            return None
+    
+    def _build_enhanced_query(self, query: str, context: Dict[str, Any] = None, is_public: bool = False, parcel_data: Optional[Dict[str, Any]] = None) -> str:
+        """Build enhanced query with context and parcel data"""
+        parts = []
+        
+        # Add company information context for AI
+        parts.append(f"=== {config.COMPANY_NAME} COMPANY INFORMATION ===")
+        parts.append(f"Company: {config.COMPANY_NAME} - {config.COMPANY_TAGLINE}")
+        parts.append(f"ABN: {config.COMPANY_ABN}")
+        parts.append(f"Phone: {config.COMPANY_PHONE}")
+        parts.append(f"Email: {config.COMPANY_EMAIL}")
+        parts.append(f"Address: {config.COMPANY_ADDRESS_FULL}")
+        parts.append(f"Website: {config.COMPANY_WEBSITE}")
+        parts.append(f"Support: {config.SUPPORT_HOURS}")
+        parts.append(f"Business Hours: {config.BUSINESS_HOURS}")
+        parts.append(f"Weekend Hours: {config.BUSINESS_HOURS_WEEKEND}")
+        parts.append("Service Areas: NSW, VIC, QLD, SA, WA, TAS, NT, ACT (All Australian states)")
+        parts.append("=== END COMPANY INFO ===\n")
+        
+        # Add public mode instruction for AI
+        if is_public:
+            parts.append("IMPORTANT: This is a public customer inquiry via chat widget. Provide helpful, friendly, conversational responses about DT Logistics services, tracking, delivery times, and general questions. Use the company information above to answer questions. If the customer provides a tracking number or asks to track a parcel, use the parcel data provided below to give them detailed tracking information including current status, location, and estimated delivery. Be concise and natural - respond like a helpful customer service agent. Focus on what matters to the customer: where their parcel is, when it will arrive, and its current status.")
+            parts.append("")
+        else:
+            parts.append("IMPORTANT: This is an internal customer service representative inquiry. Provide detailed information including access to parcel tracking data and internal systems. Be professional and comprehensive. Respond in natural conversational language, not structured formats.")
+            parts.append("")
+        
+        parts.append(f"Customer Question: {query}")
+        
+        # Add parcel data for AI reasoning - INCLUDE FOR PUBLIC USERS when tracking
+        if parcel_data:
+            parts.append("\n=== PARCEL DATA FROM DATABASE ===")
+            parts.append(f"Tracking Number: {parcel_data.get('tracking_number')}")
+            parts.append(f"Status: {parcel_data.get('status')}")
+            parts.append(f"Current Location: {parcel_data.get('current_location')}")
+            parts.append(f"Destination: {parcel_data.get('destination')}")
+            parts.append(f"Estimated Delivery: {parcel_data.get('estimated_delivery')}")
+            parts.append(f"Service Type: {parcel_data.get('service_type')}")
+            
+            # Only include sender/recipient details for internal users
+            if not is_public:
+                if parcel_data.get('sender'):
+                    sender = parcel_data['sender']
+                    parts.append(f"Sender: {sender.get('name', 'N/A')} - {sender.get('address', 'N/A')}")
+                
+                if parcel_data.get('recipient'):
+                    recipient = parcel_data['recipient']
+                    parts.append(f"Recipient: {recipient.get('name', 'N/A')} - {recipient.get('address', 'N/A')}")
+                
+                if parcel_data.get('weight'):
+                    parts.append(f"Weight: {parcel_data.get('weight')} kg")
+                
+                if parcel_data.get('dimensions'):
+                    dims = parcel_data['dimensions']
+                    parts.append(f"Dimensions: {dims.get('length')}x{dims.get('width')}x{dims.get('height')} cm")
+            
+            # Add recent tracking events
+            if parcel_data.get('recent_events'):
+                parts.append(f"\nRecent Tracking Events (showing {len(parcel_data['recent_events'])} of {parcel_data.get('total_events', 0)}):")
+                for idx, event in enumerate(parcel_data['recent_events'][:5], 1):
+                    parts.append(f"{idx}. [{event.get('timestamp')}] {event.get('status')} - {event.get('location')} - {event.get('description', 'N/A')}")
+            
+            parts.append("=== END PARCEL DATA ===\n")
+        
+        if context and not is_public:
+            # Only add internal context for customer service users
+            if context.get('tracking_number') and not parcel_data:
                 parts.append(f"\nTracking Number: {context['tracking_number']}")
             if context.get('customer_name'):
                 parts.append(f"Customer: {context['customer_name']}")

@@ -96,4 +96,74 @@
         </div>
     </div>
 </div>
+
+<script>
+// Check if there's scanned data from camera scanner
+document.addEventListener('DOMContentLoaded', function() {
+    const scannedData = sessionStorage.getItem('scannedData');
+    
+    if (scannedData) {
+        try {
+            const data = JSON.parse(scannedData);
+            
+            // Show notification that data is being pre-filled
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-success alert-dismissible fade show';
+            alert.innerHTML = `
+                <i class="bi bi-check-circle"></i> 
+                <strong>Data from camera scanner loaded!</strong> Please verify and complete the remaining fields.
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.querySelector('.card-body').insertBefore(alert, document.querySelector('form'));
+            
+            // Pre-fill recipient name if detected
+            if (data.recipient_name) {
+                document.getElementById('recipient_name').value = data.recipient_name;
+            }
+            
+            // Pre-fill recipient address if detected
+            if (data.address) {
+                document.getElementById('recipient_address').value = data.address;
+            }
+            
+            // Pre-fill postcode - prioritize the dedicated postcode field from bottom-right detection
+            if (data.postcode) {
+                document.getElementById('destination_postcode').value = data.postcode;
+                console.log('Postcode pre-filled from scanner:', data.postcode);
+            } else if (data.address) {
+                // Fallback: try to extract postcode from address (Australian 4-digit postcodes)
+                const postcodeMatch = data.address.match(/\b(\d{4})\b/);
+                if (postcodeMatch) {
+                    document.getElementById('destination_postcode').value = postcodeMatch[1];
+                    console.log('Postcode extracted from address:', postcodeMatch[1]);
+                }
+            }
+            
+            // If barcode was detected, you might use it for special handling
+            if (data.barcode) {
+                // Could be used to auto-fill special instructions or reference number
+                const specialInstructions = document.getElementById('special_instructions');
+                if (specialInstructions.value === '') {
+                    specialInstructions.value = `Scanned Barcode: ${data.barcode}`;
+                }
+            }
+            
+            // Parse additional fields from detected text if available
+            if (data.full_text) {
+                // Try to extract phone numbers (Australian format)
+                const phoneMatch = data.full_text.match(/(?:\+61|0)\s?[2-478]\s?\d{4}\s?\d{4}/);
+                if (phoneMatch && !document.getElementById('recipient_phone').value) {
+                    document.getElementById('recipient_phone').value = phoneMatch[0].replace(/\s/g, '');
+                }
+            }
+            
+            // Clear the session storage after using the data
+            sessionStorage.removeItem('scannedData');
+            
+        } catch (error) {
+            console.error('Error loading scanned data:', error);
+        }
+    }
+});
+</script>
 {% endblock %}

@@ -8,6 +8,7 @@ Update these values once and they will be applied throughout the application
 COMPANY_NAME = "DT Logistics"
 COMPANY_NAME_SHORT = "DT"
 COMPANY_TAGLINE = "Fast, Reliable, Trusted Delivery"
+COMPANY_ABN = "12 345 678 901"
 
 # Contact Information
 COMPANY_PHONE = "1300 384 669"

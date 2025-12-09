@@ -486,9 +486,8 @@ def all_parcels():
 # Fraud Detection
 
 @app.route('/fraud/report', methods=['GET', 'POST'])
-@login_required
 def report_fraud():
-    """Report suspicious message"""
+    """Report suspicious message - publicly accessible"""
     print(f"\n{'='*60}")
     print(f"📋 Fraud report route accessed - Method: {request.method}")
     print(f"{'='*60}")
@@ -863,8 +862,8 @@ def ai_insights():
 @app.route('/customer_service/chatbot')
 @login_required
 def customer_service_chatbot():
-    """Customer Service AI Chatbot Interface"""
-    # Check if user has customer service role
+    """Customer Service AI Chatbot Interface - Internal Use Only"""
+    # Restrict to customer service and admin roles only
     user = session.get('user')
     if not user or user.get('role') not in [UserManager.ROLE_CUSTOMER_SERVICE, UserManager.ROLE_ADMIN]:
         flash('Access denied. Customer service role required.', 'danger')
@@ -875,7 +874,7 @@ def customer_service_chatbot():
 @app.route('/api/chatbot/query', methods=['POST'])
 @login_required
 def chatbot_query():
-    """Process chatbot query"""
+    """Process chatbot query - Internal customer service use"""
     from customer_service_chatbot import CustomerServiceChatbot
     
     user = session.get('user')
@@ -906,6 +905,126 @@ def chatbot_query():
         result = run_async(process())
         return jsonify(result)
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/public/chatbot', methods=['POST'])
+@login_required
+def public_chatbot():
+    """Public chatbot for general users - Limited access, no internal data"""
+    from customer_service_chatbot import CustomerServiceChatbot
+    
+    print("\n" + "="*60)
+    print("🤖 Public Chatbot API Called")
+    print("="*60)
+    
+    user = session.get('user')
+    if not user:
+        return jsonify({'error': 'Authentication required'}), 401
+    
+    data = request.get_json()
+    query = data.get('query', '')
+    
+    print(f"📝 Query: {query}")
+    print(f"👤 User: {user.get('username')} (Role: {user.get('role')})")
+    
+    if not query:
+        return jsonify({'error': 'Query is required'}), 400
+    
+    async def process():
+        async with ParcelTrackingDB() as db:
+            chatbot = CustomerServiceChatbot(db)
+            
+            # Limited context - only user info, no access to internal operations
+            context = {
+                'customer_name': user.get('username'),
+                'user_role': user.get('role'),
+                'public_mode': True  # Flag to limit responses
+            }
+            
+            # Process query with restricted access
+            response = await chatbot.process_query(query, context)
+            print(f"\n📦 Raw response from chatbot: {response}")
+            print(f"📦 Response type: {type(response)}")
+            if isinstance(response, dict):
+                print(f"📦 Response keys: {response.keys()}")
+                print(f"📦 Success: {response.get('success')}")
+                print(f"📦 Response field: {response.get('response')}")
+            return response
+    
+    try:
+        result = run_async(process())
+        
+        # Handle Azure AI agent response format
+        if isinstance(result, dict):
+            # Check if agent call was successful
+            if not result.get('success', True):
+                error_msg = result.get('error', 'Unknown error occurred')
+                print(f"❌ Agent error: {error_msg}")
+                return jsonify({'error': error_msg}), 500
+            
+            # Extract response text from nested structure
+            response_text = None
+            
+            # Try: {success: True, response: "text"}
+            if result.get('response'):
+                response_obj = result['response']
+                if isinstance(response_obj, str):
+                    response_text = response_obj
+                elif isinstance(response_obj, dict):
+                    # Try: {type: 'text', text: {value: '...'}}
+                    if response_obj.get('type') == 'text' and response_obj.get('text'):
+                        if isinstance(response_obj['text'], dict):
+                            response_text = response_obj['text'].get('value', str(response_obj))
+                        else:
+                            response_text = str(response_obj['text'])
+                    # Try: {value: '...'}
+                    elif response_obj.get('value'):
+                        response_text = response_obj['value']
+                    else:
+                        response_text = str(response_obj)
+            
+            # Try: {type: 'text', text: {value: '...'}}
+            elif result.get('type') == 'text' and result.get('text'):
+                if isinstance(result['text'], dict):
+                    response_text = result['text'].get('value', str(result))
+                else:
+                    response_text = str(result['text'])
+            
+            if response_text:
+                # For public mode, extract just the customer communication part if structured format is returned
+                # Agent returns structured format like:
+                # **Resolution Option:** ...
+                # **Customer Communication:** <actual message>
+                # **Follow-up Required:** ...
+                if 'Customer Communication:' in response_text:
+                    # Extract the customer communication section
+                    import re
+                    match = re.search(r'\*\*Customer Communication:\*\*\s*(.+?)(?:\n\n\*\*|$)', response_text, re.DOTALL)
+                    if match:
+                        customer_message = match.group(1).strip()
+                        return jsonify({'response': customer_message})
+                
+                # Clean up any residual structured markers
+                import re
+                # Remove patterns like [Issue Type: ...], [Resolution Option: ...], etc.
+                # Also remove trailing markers at the end of sentences
+                cleaned_text = re.sub(r'\s*,?\s*\[(?:Issue Type|Resolution Option|Customer Communication|Follow-up Required|Satisfaction Score):[^\]]*\]', '', response_text)
+                # Remove any standalone brackets with these markers
+                cleaned_text = re.sub(r'\[(?:Issue Type|Resolution Option|Customer Communication|Follow-up Required|Satisfaction Score):[^\]]*\],?\s*', '', cleaned_text)
+                cleaned_text = cleaned_text.strip(', ').strip()
+                
+                # If we cleaned something and it's not empty, use the cleaned version
+                if cleaned_text and cleaned_text != response_text:
+                    return jsonify({'response': cleaned_text})
+                
+                return jsonify({'response': response_text})
+        
+        # Fallback - return as-is
+        return jsonify({'response': str(result)})
+    except Exception as e:
+        print(f"❌ Chatbot exception: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/chatbot/track/<tracking_number>')
@@ -1549,20 +1668,37 @@ def analyze_image():
             visual_features=[VisualFeatures.READ]
         )
         
-        # Extract all text
+        # Extract all text with position information
         full_text = ""
         text_lines = []
+        text_with_positions = []  # Store text with bounding box info
         
         if result.read and result.read.blocks:
             for block in result.read.blocks:
                 for line in block.lines:
                     text_lines.append(line.text)
                     full_text += line.text + "\n"
+                    
+                    # Store position info - bounding_polygon has points with x, y coordinates
+                    if hasattr(line, 'bounding_polygon') and line.bounding_polygon:
+                        # Get the bounding box coordinates
+                        points = line.bounding_polygon
+                        # Calculate center position
+                        if len(points) >= 4:
+                            avg_x = sum(p.x for p in points) / len(points)
+                            avg_y = sum(p.y for p in points) / len(points)
+                            text_with_positions.append({
+                                'text': line.text,
+                                'x': avg_x,
+                                'y': avg_y,
+                                'points': [(p.x, p.y) for p in points]
+                            })
         
         # Parse extracted data
         barcode = extract_barcode(text_lines)
-        address = extract_address(text_lines)
+        address = extract_address(text_lines, text_with_positions)
         recipient_name = extract_recipient_name(text_lines)
+        postcode = extract_postcode_bottom_right(text_with_positions)
         
         return jsonify({
             'success': True,
@@ -1570,7 +1706,8 @@ def analyze_image():
             'text_lines': text_lines,
             'barcode': barcode,
             'address': address,
-            'recipient_name': recipient_name
+            'recipient_name': recipient_name,
+            'postcode': postcode
         })
         
     except ImportError:
@@ -1594,16 +1731,60 @@ def extract_barcode(text_lines):
             return line.strip()
     return ""
 
-def extract_address(text_lines):
+def extract_postcode_bottom_right(text_with_positions):
+    """
+    Extract Australian postcode from bottom-right corner of image
+    Postcodes are typically 4 digits and located in the bottom-right area
+    """
+    if not text_with_positions:
+        return ""
+    
+    # Find the maximum x and y coordinates to determine bottom-right
+    max_x = max(item['x'] for item in text_with_positions)
+    max_y = max(item['y'] for item in text_with_positions)
+    
+    # Define bottom-right region (last 40% of width, last 30% of height)
+    bottom_right_items = [
+        item for item in text_with_positions
+        if item['x'] > max_x * 0.6 and item['y'] > max_y * 0.7
+    ]
+    
+    # Look for 4-digit Australian postcodes in bottom-right region first
+    for item in bottom_right_items:
+        # Match exactly 4 digits (Australian postcode format)
+        match = re.search(r'\b(\d{4})\b', item['text'])
+        if match:
+            postcode = match.group(1)
+            # Validate it's a reasonable Australian postcode (0200-9999)
+            if 200 <= int(postcode) <= 9999:
+                print(f"📍 Found postcode in bottom-right: {postcode} at position ({item['x']:.0f}, {item['y']:.0f})")
+                return postcode
+    
+    # Fallback: search all text for postcodes if not found in bottom-right
+    for item in text_with_positions:
+        match = re.search(r'\b(\d{4})\b', item['text'])
+        if match:
+            postcode = match.group(1)
+            if 200 <= int(postcode) <= 9999:
+                print(f"📍 Found postcode (fallback): {postcode} at position ({item['x']:.0f}, {item['y']:.0f})")
+                return postcode
+    
+    return ""
+
+def extract_address(text_lines, text_with_positions=None):
     """Extract address from text lines"""
     address_parts = []
     for i, line in enumerate(text_lines):
         # Look for lines with numbers (street numbers) and common address words
-        if any(word in line.lower() for word in ['street', 'st', 'road', 'rd', 'avenue', 'ave', 'nsw', 'vic', 'qld']):
+        if any(word in line.lower() for word in ['street', 'st', 'road', 'rd', 'avenue', 'ave', 'lane', 'drive', 'nsw', 'vic', 'qld', 'sa', 'wa', 'tas', 'nt', 'act']):
             # Include this line and potentially the next few lines
             address_parts.append(line)
             if i + 1 < len(text_lines):
-                address_parts.append(text_lines[i + 1])
+                next_line = text_lines[i + 1]
+                address_parts.append(next_line)
+                # Also check for suburb and state in next line
+                if i + 2 < len(text_lines) and re.search(r'\d{4}', text_lines[i + 2]):
+                    address_parts.append(text_lines[i + 2])
             break
     
     return ', '.join(address_parts) if address_parts else ""

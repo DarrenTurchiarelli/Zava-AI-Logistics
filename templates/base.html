@@ -66,11 +66,6 @@
                         </ul>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('report_fraud') }}">
-                            <i class="bi bi-shield-exclamation"></i> Report Fraud
-                        </a>
-                    </li>
-                    <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('approvals') }}">
                             <i class="bi bi-clipboard-check"></i> Approvals
                             {% if session.get('pending_count', 0) > 0 %}
@@ -88,7 +83,7 @@
                             <i class="bi bi-robot"></i> AI Agents
                         </a>
                     </li>
-                    {% if session.user and session.user.role in ['customer_service', 'admin'] %}
+                    {% if session.user and session.user.role == 'customer_service' %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('customer_service_chatbot') }}">
                             <i class="bi bi-chat-dots"></i> AI Assistant
@@ -96,6 +91,12 @@
                     </li>
                     {% endif %}
                     {% endif %}
+                    <!-- Public fraud reporting link -->
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('report_fraud') }}">
+                            <i class="bi bi-shield-exclamation"></i> Report Fraud
+                        </a>
+                    </li>
                 </ul>
                 <ul class="navbar-nav">
                     <!-- Accessibility Settings -->
@@ -493,7 +494,360 @@
             animation-iteration-count: 1 !important;
             transition-duration: 0.01ms !important;
         }
+
+        /* Chat Widget Styles */
+        .chat-widget {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        
+        .chat-widget-button {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+            border: none;
+            box-shadow: 0 4px 12px rgba(13, 110, 253, 0.4);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            color: white;
+            font-size: 24px;
+        }
+        
+        .chat-widget-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 16px rgba(13, 110, 253, 0.6);
+        }
+        
+        .chat-widget-button.active {
+            background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+        }
+        
+        .chat-widget-window {
+            display: none;
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            width: 380px;
+            height: 550px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .chat-widget-window.open {
+            display: flex;
+        }
+        
+        .chat-widget-header {
+            background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .chat-widget-header h5 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .chat-widget-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .chat-widget-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            background: #f8f9fa;
+        }
+        
+        .chat-widget-message {
+            margin-bottom: 12px;
+            display: flex;
+            align-items: flex-start;
+        }
+        
+        .chat-widget-message.user {
+            justify-content: flex-end;
+        }
+        
+        .chat-widget-message-bubble {
+            max-width: 75%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .chat-widget-message.user .chat-widget-message-bubble {
+            background: #0d6efd;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .chat-widget-message.assistant .chat-widget-message-bubble {
+            background: white;
+            border: 1px solid #dee2e6;
+            color: #333;
+            border-bottom-left-radius: 4px;
+        }
+        
+        .chat-widget-footer {
+            padding: 15px;
+            background: white;
+            border-top: 1px solid #dee2e6;
+        }
+        
+        .chat-widget-input-group {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .chat-widget-input {
+            flex: 1;
+            border: 1px solid #ced4da;
+            border-radius: 20px;
+            padding: 8px 16px;
+            font-size: 14px;
+            outline: none;
+        }
+        
+        .chat-widget-input:focus {
+            border-color: #0d6efd;
+            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+        }
+        
+        .chat-widget-send {
+            background: #0d6efd;
+            border: none;
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+        
+        .chat-widget-send:hover {
+            background: #0a58ca;
+        }
+        
+        .chat-widget-send:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .chat-widget-typing {
+            padding: 10px 14px;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 12px;
+            max-width: 75%;
+            font-size: 14px;
+            color: #6c757d;
+        }
+        
+        .chat-widget-welcome {
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+            font-size: 14px;
+        }
     </style>
+    
+    <!-- Chat Widget for Logged-In Users -->
+    {% if session.logged_in %}
+    <div class="chat-widget">
+        <button class="chat-widget-button" id="chatWidgetToggle" title="Chat with AI Copilot">
+            <img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot" style="width: 28px; height: 28px;">
+        </button>
+        
+        <div class="chat-widget-window" id="chatWidgetWindow">
+            <div class="chat-widget-header">
+                <h5><img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot" style="width: 20px; height: 20px; margin-right: 8px;"> AI Copilot</h5>
+                <button class="chat-widget-close" id="chatWidgetClose">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+            
+            <div class="chat-widget-body" id="chatWidgetMessages">
+                <div class="chat-widget-welcome">
+                    <img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot" style="width: 64px; height: 64px; margin-bottom: 10px;">
+                    <p><strong>Welcome to DT Logistics AI Copilot!</strong></p>
+                    <p>Ask me about deliveries, tracking, or general inquiries.</p>
+                </div>
+            </div>
+            
+            <div class="chat-widget-footer">
+                <div class="chat-widget-input-group">
+                    <input type="text" class="chat-widget-input" id="chatWidgetInput" placeholder="Type your message..." />
+                    <button class="chat-widget-send" id="chatWidgetSend">
+                        <i class="bi bi-send-fill"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Chat Widget JavaScript
+        (function() {
+            const toggleBtn = document.getElementById('chatWidgetToggle');
+            const closeBtn = document.getElementById('chatWidgetClose');
+            const chatWindow = document.getElementById('chatWidgetWindow');
+            const messagesContainer = document.getElementById('chatWidgetMessages');
+            const input = document.getElementById('chatWidgetInput');
+            const sendBtn = document.getElementById('chatWidgetSend');
+            
+            let isOpen = false;
+            
+            // Toggle chat window
+            toggleBtn.addEventListener('click', function() {
+                isOpen = !isOpen;
+                chatWindow.classList.toggle('open', isOpen);
+                toggleBtn.classList.toggle('active', isOpen);
+                
+                if (isOpen) {
+                    input.focus();
+                }
+            });
+            
+            // Close chat window
+            closeBtn.addEventListener('click', function() {
+                isOpen = false;
+                chatWindow.classList.remove('open');
+                toggleBtn.classList.remove('active');
+            });
+            
+            // Send message
+            async function sendMessage() {
+                const message = input.value.trim();
+                if (!message) return;
+                
+                // Add user message
+                addMessage(message, 'user');
+                input.value = '';
+                sendBtn.disabled = true;
+                
+                // Show typing indicator
+                const typingId = 'typing-' + Date.now();
+                messagesContainer.insertAdjacentHTML('beforeend', 
+                    `<div class="chat-widget-message assistant" id="${typingId}">
+                        <div class="chat-widget-typing">
+                            <i class="bi bi-three-dots"></i> Typing...
+                        </div>
+                    </div>`
+                );
+                scrollToBottom();
+                
+                try {
+                    // Call public chatbot API
+                    const response = await fetch('/api/public/chatbot', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ query: message })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    // Remove typing indicator
+                    document.getElementById(typingId).remove();
+                    
+                    if (response.ok) {
+                        // Extract response text from AI agent response
+                        let responseText = '';
+                        
+                        // Handle different response formats
+                        if (typeof data === 'string') {
+                            responseText = data;
+                        } else if (data.type === 'text' && data.text && data.text.value) {
+                            // Azure AI agent format: {type: 'text', text: {value: '...'}}
+                            responseText = data.text.value;
+                        } else if (data.response) {
+                            // Simple response format
+                            if (typeof data.response === 'string') {
+                                responseText = data.response;
+                            } else if (data.response.type === 'text' && data.response.text && data.response.text.value) {
+                                responseText = data.response.text.value;
+                            } else {
+                                responseText = JSON.stringify(data.response);
+                            }
+                        } else if (data.messages && data.messages.length > 0) {
+                            responseText = data.messages[data.messages.length - 1].content;
+                        } else if (data.text) {
+                            responseText = typeof data.text === 'string' ? data.text : data.text.value;
+                        } else {
+                            responseText = JSON.stringify(data);
+                        }
+                        
+                        addMessage(responseText, 'assistant');
+                    } else {
+                        addMessage('Sorry, I encountered an error. Please try again.', 'assistant');
+                    }
+                } catch (error) {
+                    document.getElementById(typingId)?.remove();
+                    addMessage('Sorry, I could not connect to support. Please try again later.', 'assistant');
+                } finally {
+                    sendBtn.disabled = false;
+                }
+            }
+            
+            // Add message to chat
+            function addMessage(text, type) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `chat-widget-message ${type}`;
+                
+                const bubbleDiv = document.createElement('div');
+                bubbleDiv.className = 'chat-widget-message-bubble';
+                bubbleDiv.textContent = text;
+                
+                messageDiv.appendChild(bubbleDiv);
+                messagesContainer.appendChild(messageDiv);
+                
+                scrollToBottom();
+            }
+            
+            // Scroll to bottom
+            function scrollToBottom() {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+            
+            // Event listeners
+            sendBtn.addEventListener('click', sendMessage);
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+        })();
+    </script>
+    {% endif %}
     
     {% block extra_js %}{% endblock %}
 </body>

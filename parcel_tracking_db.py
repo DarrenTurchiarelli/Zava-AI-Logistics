@@ -61,6 +61,17 @@ load_dotenv()
 # Initialize Faker for generating test data with Australian locale
 fake = Faker('en_AU')
 
+# Global credential cache to avoid re-authentication in ThreadPoolExecutor
+_cached_credential = None
+
+def get_cached_credential():
+    """Get or create a cached Azure credential to avoid timeout in threads"""
+    global _cached_credential
+    if _cached_credential is None:
+        # Use AzureCliCredential with short timeout
+        _cached_credential = AzureCliCredential(process_timeout=5)
+    return _cached_credential
+
 
 class ParcelTrackingDB:
     """Consolidated Parcel Tracking Database Interface"""
@@ -94,6 +105,7 @@ class ParcelTrackingDB:
         self.client = None
         self.database = None
         self.credential = None
+        self.using_azure_ad = False  # Track if we're using Azure AD (to skip operations requiring elevated permissions)
 
     async def __aenter__(self):
         """Async context manager entry"""
@@ -127,15 +139,14 @@ class ParcelTrackingDB:
                     # If key auth fails, only try Azure AD if the error suggests it
                     if "Local Authorization is disabled" in str(key_error):
                         print(f"⚠️ Key-based auth disabled, trying Azure AD...")
-                        # Use Azure credential authentication
-                        self.credential = DefaultAzureCredential()
+                        # Use cached credential to avoid re-authentication timeout
+                        self.credential = get_cached_credential()
                         self.client = CosmosClient(self.endpoint, self.credential)
+                        self.using_azure_ad = True  # Mark that we're using Azure AD
                         
-                        # Get or create database (serverless - no throughput)
-                        self.database = await self.client.create_database_if_not_exists(
-                            id=self.database_name
-                        )
-                        print(f"✓ Connected to Cosmos DB using Azure AD")
+                        # Just get the database client (don't try to create - requires readMetadata permission)
+                        self.database = self.client.get_database_client(self.database_name)
+                        print(f"✓ Connected to Cosmos DB using Azure AD (AzureCliCredential)")
                     else:
                         # For other errors, re-raise them
                         print(f"❌ Cosmos DB connection failed: {key_error}")
@@ -143,17 +154,22 @@ class ParcelTrackingDB:
             else:
                 # No key provided - must use Azure AD
                 print(f"⚠️ No account key found, trying Azure AD authentication...")
-                self.credential = DefaultAzureCredential()
+                # Use cached credential to avoid re-authentication timeout
+                self.credential = get_cached_credential()
                 self.client = CosmosClient(self.endpoint, self.credential)
+                self.using_azure_ad = True  # Mark that we're using Azure AD
                 
-                # Get or create database (serverless - no throughput)
-                self.database = await self.client.create_database_if_not_exists(
-                    id=self.database_name
-                )
-                print(f"✓ Connected to Cosmos DB using Azure AD")
+                # Just get the database client (don't try to create - requires readMetadata permission)
+                self.database = self.client.get_database_client(self.database_name)
+                print(f"✓ Connected to Cosmos DB using Azure AD (AzureCliCredential)")
             
-            # Create containers if they don't exist
-            await self._create_containers()
+            # Create containers if they don't exist (skip if using Azure AD without elevated permissions)
+            if not self.using_azure_ad:
+                try:
+                    await self._create_containers()
+                except Exception as container_error:
+                    # If container creation fails, assume they already exist (common with Azure AD limited permissions)
+                    print(f"⚠️ Skipping container creation: {str(container_error)[:100]}")
             
             # Database connection successful - ready for operations
             
@@ -385,13 +401,17 @@ class ParcelTrackingDB:
             return None
 
     async def get_parcel_by_tracking_number(self, tracking_number: str) -> Optional[Dict[str, Any]]:
-        """Get a specific parcel by tracking number"""
+        """Get a specific parcel by tracking number, barcode, or id"""
         container = self.database.get_container_client(self.parcels_container)
         
         try:
+            # Search by tracking_number, barcode, or id
             items = container.query_items(
-                query="SELECT * FROM c WHERE c.tracking_number = @tracking",
-                parameters=[{"name": "@tracking", "value": tracking_number}]
+                query="""SELECT * FROM c 
+                         WHERE c.tracking_number = @identifier 
+                         OR c.barcode = @identifier 
+                         OR c.id = @identifier""",
+                parameters=[{"name": "@identifier", "value": tracking_number}]
             )
             parcels = [item async for item in items]
             return parcels[0] if parcels else None
@@ -650,14 +670,18 @@ class ParcelTrackingDB:
             raise
 
     async def get_parcel_tracking_history(self, barcode: str) -> List[Dict[str, Any]]:
-        """Get all tracking events for a parcel"""
+        """Get all tracking events for a parcel (searches by barcode, tracking_number, or id)"""
         container = self.database.get_container_client(self.tracking_events_container)
         
         try:
+            # Search across multiple identifier fields
             items = container.query_items(
-                query="SELECT * FROM c WHERE c.barcode = @barcode ORDER BY c.timestamp",
-                parameters=[{"name": "@barcode", "value": barcode}],
-                partition_key=barcode
+                query="""SELECT * FROM c 
+                         WHERE c.barcode = @identifier 
+                         OR c.tracking_number = @identifier 
+                         OR c.id = @identifier 
+                         ORDER BY c.timestamp DESC""",
+                parameters=[{"name": "@identifier", "value": barcode}]
             )
             return [item async for item in items]
         except exceptions.CosmosHttpResponseError as e:

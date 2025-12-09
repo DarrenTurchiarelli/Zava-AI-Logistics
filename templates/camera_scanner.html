@@ -87,6 +87,11 @@
                                             <input type="text" id="extractedName" class="form-control" readonly>
                                         </div>
 
+                                        <div class="mb-3">
+                                            <label class="form-label"><strong>Postcode:</strong></label>
+                                            <input type="text" id="extractedPostcode" class="form-control" readonly>
+                                        </div>
+
                                         <div class="d-grid gap-2">
                                             <a href="{{ url_for('register_parcel') }}" id="useDataButton" class="btn btn-success btn-lg" style="display: none;">
                                                 <i class="bi bi-box-seam"></i> Use This Data to Register Parcel
@@ -171,9 +176,10 @@ document.getElementById('captureImage').addEventListener('click', async () => {
             document.getElementById('extractedBarcode').value = result.barcode || '';
             document.getElementById('extractedAddress').value = result.address || '';
             document.getElementById('extractedName').value = result.recipient_name || '';
+            document.getElementById('extractedPostcode').value = result.postcode || '';
             
             // Store data in sessionStorage for pre-filling registration form
-            if (result.barcode || result.address) {
+            if (result.barcode || result.address || result.postcode) {
                 sessionStorage.setItem('scannedData', JSON.stringify(result));
                 document.getElementById('useDataButton').style.display = 'block';
             }

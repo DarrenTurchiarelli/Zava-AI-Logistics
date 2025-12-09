@@ -43,7 +43,8 @@ class AzureAIAgentClient:
     def get_client(self) -> AIProjectClient:
         """Get or create Azure AI Project client"""
         if self._client is None:
-            credential = DefaultAzureCredential()
+            # Exclude AzdCliCredential to avoid 10 second timeout
+            credential = DefaultAzureCredential(exclude_developer_cli_credential=True)
             self._client = AIProjectClient(
                 endpoint=AZURE_AI_PROJECT_ENDPOINT,
                 credential=credential
@@ -63,8 +64,33 @@ async def call_azure_agent(agent_id: str, message: str, context: Optional[Dict[s
     Returns:
         Dictionary with agent response and metadata
     """
+    print(f"\n🤖 Calling Azure AI Agent: {agent_id}")
+    print(f"📍 Endpoint: {AZURE_AI_PROJECT_ENDPOINT}")
+    print(f"📝 Message length: {len(message)} chars")
+    
+    if not AZURE_AI_PROJECT_ENDPOINT:
+        error_msg = "AZURE_AI_PROJECT_ENDPOINT not configured in environment variables"
+        print(f"❌ {error_msg}")
+        return {
+            "success": False,
+            "agent_id": agent_id,
+            "error": error_msg,
+            "response": None
+        }
+    
+    if not agent_id:
+        error_msg = "Agent ID not provided or not configured"
+        print(f"❌ {error_msg}")
+        return {
+            "success": False,
+            "agent_id": agent_id,
+            "error": error_msg,
+            "response": None
+        }
+    
     try:
         client = AzureAIAgentClient().get_client()
+        print("✅ Azure AI client initialized")
         
         # Add context to message if provided
         if context:
@@ -73,38 +99,190 @@ async def call_azure_agent(agent_id: str, message: str, context: Optional[Dict[s
         else:
             full_message = message
         
-        # Create thread and run agent
-        run_result = client.agents.create_thread_and_process_run(
-            agent_id=agent_id,
-            thread={
-                "messages": [{"role": "user", "content": full_message}]
-            }
+        # Create thread and run agent with tool support
+        print(f"🔄 Creating thread and processing run...")
+        
+        # Import tool handlers if available
+        try:
+            from agent_tools import TOOL_FUNCTIONS
+            has_tools = True
+            print(f"✅ Agent tools loaded: {list(TOOL_FUNCTIONS.keys())}")
+        except ImportError:
+            has_tools = False
+            print("⚠️ Agent tools not available")
+        
+        # Create and run with explicit parameters - DON'T use create_thread_and_process_run
+        # because it tries to auto-execute tools. We need manual control.
+        print(f"🧵 Creating thread...")
+        thread = client.agents.threads.create()
+        print(f"   Thread ID: {thread.id}")
+        
+        print(f"📝 Adding message to thread...")
+        client.agents.messages.create(
+            thread_id=thread.id,
+            role="user",
+            content=full_message
         )
+        
+        print(f"▶️ Creating run...")
+        run = client.agents.runs.create(
+            thread_id=thread.id,
+            agent_id=agent_id
+        )
+        
+        print(f"⏳ Polling run status...")
+        import time
+        max_iterations = 30
+        iteration = 0
+        
+        while iteration < max_iterations:
+            run = client.agents.runs.get(thread_id=thread.id, run_id=run.id)
+            print(f"   Status: {run.status} (iteration {iteration + 1}/{max_iterations})")
+            
+            if run.status == "requires_action":
+                print(f"🔧 Agent requested tool calls!")
+                
+                # Process tool calls
+                tool_outputs = []
+                if has_tools and hasattr(run, 'required_action') and run.required_action:
+                    submit_tool_outputs = run.required_action.submit_tool_outputs
+                    
+                    for tool_call in submit_tool_outputs.tool_calls:
+                        function_name = tool_call.function.name
+                        function_args = json.loads(tool_call.function.arguments)
+                        
+                        print(f"   🔨 Calling tool: {function_name}")
+                        print(f"      Arguments: {function_args}")
+                        
+                        # Execute the tool function
+                        if function_name in TOOL_FUNCTIONS:
+                            tool_function = TOOL_FUNCTIONS[function_name]
+                            print(f"      🚀 Executing async tool in separate thread...")
+                            # Run the async function in a way that works with existing event loops
+                            import concurrent.futures
+                            
+                            def run_async_in_thread():
+                                # Create new event loop in this thread
+                                new_loop = asyncio.new_event_loop()
+                                asyncio.set_event_loop(new_loop)
+                                try:
+                                    result = new_loop.run_until_complete(tool_function(**function_args))
+                                    return result
+                                finally:
+                                    new_loop.close()
+                            
+                            # Run in thread to avoid event loop conflicts
+                            with concurrent.futures.ThreadPoolExecutor() as executor:
+                                future = executor.submit(run_async_in_thread)
+                                output = future.result(timeout=30)  # 30 second timeout
+                            
+                            tool_outputs.append({
+                                "tool_call_id": tool_call.id,
+                                "output": output
+                            })
+                            print(f"      ✅ Tool output: {output[:200]}...")
+                        else:
+                            print(f"      ❌ Tool function not found: {function_name}")
+                            tool_outputs.append({
+                                "tool_call_id": tool_call.id,
+                                "output": json.dumps({"error": f"Tool {function_name} not implemented"})
+                            })
+                    
+                    # Submit tool outputs
+                    if tool_outputs:
+                        print(f"   📤 Submitting {len(tool_outputs)} tool outputs...")
+                        run = client.agents.runs.submit_tool_outputs(
+                            thread_id=thread.id,
+                            run_id=run.id,
+                            tool_outputs=tool_outputs
+                        )
+                        print(f"   ✅ Tool outputs submitted, continuing run...")
+                
+            elif run.status == "completed":
+                print(f"✅ Run completed successfully!")
+                break
+            elif run.status in ["failed", "cancelled", "expired"]:
+                print(f"❌ Run ended with status: {run.status}")
+                break
+            
+            iteration += 1
+            time.sleep(1)
+        
+        if iteration >= max_iterations:
+            print(f"⚠️ Max iterations reached, run may still be processing")
+        
+        run_result = run
+        
+        print(f"✅ Run completed - Thread ID: {thread.id}, Run ID: {run_result.id}, Status: {run_result.status}")
+        print(f"🔍 Run status type: {type(run_result.status)}")
+        print(f"🔍 Run status value: {run_result.status}")
+        
+        # DEBUG: List all messages in thread
+        print(f"🔍 Listing all messages in thread...")
+        all_messages = client.agents.messages.list(thread_id=thread.id)
+        print(f"🔍 Total messages in thread: {len(all_messages.data) if hasattr(all_messages, 'data') else 'unknown'}")
+        for idx, msg in enumerate(all_messages.data[:5] if hasattr(all_messages, 'data') else []):
+            print(f"   Message {idx}: Role={msg.role}, Content type={type(msg.content)}")
+            if hasattr(msg.content, '__iter__'):
+                for content in msg.content:
+                    print(f"      Content: {type(content)} - {str(content)[:100]}")
         
         # Get agent response
         response_obj = client.agents.messages.get_last_message_text_by_role(
-            thread_id=run_result.thread_id,
+            thread_id=thread.id,
             role="assistant"
         )
         
+        print(f"📨 Response object type: {type(response_obj)}")
+        print(f"📨 Response object: {response_obj}")
+        
         # Extract text from MessageTextContent object (nested structure)
-        if isinstance(response_obj, dict):
-            # Handle {'type': 'text', 'text': {'value': '...'}} structure
-            if 'text' in response_obj and isinstance(response_obj['text'], dict):
-                response_text = response_obj['text'].get('value', str(response_obj))
-            else:
-                response_text = response_obj.get('value', str(response_obj))
-        elif hasattr(response_obj, 'value'):
+        response_text = None
+        
+        # Try to access as dict-like object (Azure SDK models often behave like dicts)
+        try:
+            if hasattr(response_obj, '__getitem__'):
+                # Object supports dictionary-style access
+                if 'text' in response_obj and isinstance(response_obj['text'], dict):
+                    response_text = response_obj['text'].get('value', '')
+                elif 'value' in response_obj:
+                    response_text = response_obj['value']
+        except (KeyError, TypeError):
+            pass
+        
+        # Try as object with attributes
+        if not response_text and hasattr(response_obj, 'text'):
+            text_obj = response_obj.text
+            if hasattr(text_obj, 'value'):
+                response_text = text_obj.value
+            elif isinstance(text_obj, dict):
+                response_text = text_obj.get('value', '')
+        
+        # Try direct value attribute
+        if not response_text and hasattr(response_obj, 'value'):
             response_text = response_obj.value
-        elif isinstance(response_obj, str):
+        
+        # Try as plain dict
+        if not response_text and isinstance(response_obj, dict):
+            if 'text' in response_obj and isinstance(response_obj['text'], dict):
+                response_text = response_obj['text'].get('value', '')
+            elif 'value' in response_obj:
+                response_text = response_obj['value']
+        
+        # Try as string
+        if not response_text and isinstance(response_obj, str):
             response_text = response_obj
-        else:
+        
+        # Last resort - convert to string (but this shouldn't happen)
+        if not response_text:
             response_text = str(response_obj)
+        
+        print(f"✅ Extracted response text ({len(response_text)} chars): {response_text[:200]}...")
         
         return {
             "success": True,
             "agent_id": agent_id,
-            "thread_id": run_result.thread_id,
+            "thread_id": thread.id,
             "response": response_text,
             "metadata": {
                 "run_id": run_result.id,
@@ -113,6 +291,9 @@ async def call_azure_agent(agent_id: str, message: str, context: Optional[Dict[s
         }
         
     except Exception as e:
+        print(f"❌ Error calling Azure AI agent: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return {
             "success": False,
             "agent_id": agent_id,
@@ -303,20 +484,37 @@ async def customer_service_agent(customer_request: Dict[str, Any]) -> Dict[str, 
     Returns:
         Resolution options and customer communication
     """
-    message = f"""
-    Handle customer request:
+    # Check if this is a public chat request (from chat widget)
+    is_chat_request = 'public_mode' in customer_request.get('details', '')
     
-    Customer: {customer_request.get('customer_name', 'Unknown')}
-    Issue Type: {customer_request.get('issue_type', 'inquiry')}
-    Tracking Number: {customer_request.get('tracking_number', 'N/A')}
-    
-    Request Details:
-    {customer_request.get('details', 'No details provided')}
-    
-    {"Preferred Resolution: " + customer_request.get('preferred_resolution', '') if customer_request.get('preferred_resolution') else ""}
-    
-    Provide resolution options and customer communication message.
-    """
+    if is_chat_request:
+        # Simpler, more conversational prompt for chat widget
+        message = f"""
+        You are a friendly customer service agent for DT Logistics chatting with a customer.
+        
+        Customer Question:
+        {customer_request.get('details', 'No details provided')}
+        
+        Respond naturally and conversationally, like you're having a friendly chat. Be helpful, concise, and warm.
+        Do NOT use structured formats like "Resolution Option:" or "Customer Communication:".
+        Just provide a direct, friendly response to their question.
+        """
+    else:
+        # Structured format for internal customer service representatives
+        message = f"""
+        Handle customer request:
+        
+        Customer: {customer_request.get('customer_name', 'Unknown')}
+        Issue Type: {customer_request.get('issue_type', 'inquiry')}
+        Tracking Number: {customer_request.get('tracking_number', 'N/A')}
+        
+        Request Details:
+        {customer_request.get('details', 'No details provided')}
+        
+        {"Preferred Resolution: " + customer_request.get('preferred_resolution', '') if customer_request.get('preferred_resolution') else ""}
+        
+        Provide resolution options and customer communication message.
+        """
     
     return await call_azure_agent(CUSTOMER_SERVICE_AGENT_ID, message, customer_request)
 
