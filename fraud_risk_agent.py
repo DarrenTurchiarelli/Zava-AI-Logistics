@@ -23,7 +23,7 @@ from typing import Dict, List, Any, Tuple, Optional
 from dataclasses import dataclass
 from enum import Enum
 
-from azure.identity import DefaultAzureCredential
+from azure.identity import DefaultAzureCredential, ManagedIdentityCredential
 from azure.ai.projects import AIProjectClient
 from dotenv import load_dotenv
 
@@ -185,7 +185,12 @@ class FraudRiskAgent:
         """Synchronous Azure AI agent analysis"""
         try:
             # Connect to Azure AI using sync client
-            credential = DefaultAzureCredential()
+            # Use Managed Identity in Azure, DefaultAzureCredential locally
+            if os.getenv('WEBSITE_INSTANCE_ID'):
+                credential = ManagedIdentityCredential()
+            else:
+                credential = DefaultAzureCredential(exclude_developer_cli_credential=True)
+            
             project_client = AIProjectClient(
                 endpoint=AZURE_AI_PROJECT_ENDPOINT, 
                 credential=credential

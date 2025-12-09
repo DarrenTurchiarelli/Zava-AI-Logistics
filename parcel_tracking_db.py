@@ -50,7 +50,7 @@ warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed")
 # Azure imports
 from azure.cosmos.aio import CosmosClient
 from azure.cosmos import exceptions, PartitionKey
-from azure.identity.aio import DefaultAzureCredential, AzureCliCredential
+from azure.identity.aio import DefaultAzureCredential, AzureCliCredential, ManagedIdentityCredential
 
 # Test data generation
 from faker import Faker
@@ -68,8 +68,13 @@ def get_cached_credential():
     """Get or create a cached Azure credential to avoid timeout in threads"""
     global _cached_credential
     if _cached_credential is None:
-        # Use AzureCliCredential with short timeout
-        _cached_credential = AzureCliCredential(process_timeout=5)
+        # Check if running in Azure (WEBSITE_INSTANCE_ID is set in App Service)
+        if os.getenv('WEBSITE_INSTANCE_ID'):
+            # Running in Azure App Service - use ManagedIdentityCredential
+            _cached_credential = ManagedIdentityCredential()
+        else:
+            # Running locally - use AzureCliCredential with short timeout
+            _cached_credential = AzureCliCredential(process_timeout=5)
     return _cached_credential
 
 

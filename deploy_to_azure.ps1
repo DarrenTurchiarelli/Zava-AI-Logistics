@@ -55,8 +55,17 @@ az webapp create `
 Write-Host "✓ Web App created" -ForegroundColor Green
 Write-Host ""
 
+# Enable system-assigned managed identity
+Write-Host "[5/9] Enabling managed identity..." -ForegroundColor Yellow
+az webapp identity assign `
+    --name $WebAppName `
+    --resource-group $ResourceGroup `
+    --output none
+Write-Host "✓ Managed identity enabled" -ForegroundColor Green
+Write-Host ""
+
 # Configure startup command
-Write-Host "[5/8] Configuring startup command..." -ForegroundColor Yellow
+Write-Host "[6/9] Configuring startup command..." -ForegroundColor Yellow
 az webapp config set `
     --name $WebAppName `
     --resource-group $ResourceGroup `
@@ -66,7 +75,7 @@ Write-Host "✓ Startup command configured" -ForegroundColor Green
 Write-Host ""
 
 # Set environment variables
-Write-Host "[6/8] Setting environment variables..." -ForegroundColor Yellow
+Write-Host "[7/9] Setting environment variables..." -ForegroundColor Yellow
 
 # Generate Flask secret key
 $FlaskSecret = -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 32 | ForEach-Object {[char]$_})
@@ -138,7 +147,7 @@ Write-Host "✓ Environment variables configured" -ForegroundColor Green
 Write-Host ""
 
 # Deploy application
-Write-Host "[7/8] Deploying application code..." -ForegroundColor Yellow
+Write-Host "[8/9] Deploying application code..." -ForegroundColor Yellow
 Write-Host "  This may take 3-5 minutes..." -ForegroundColor Gray
 
 # Create a deployment ZIP (excluding unnecessary files)
@@ -175,7 +184,7 @@ Write-Host "✓ Application deployed" -ForegroundColor Green
 Write-Host ""
 
 # Configure additional settings
-Write-Host "[8/8] Configuring additional settings..." -ForegroundColor Yellow
+Write-Host "[9/9] Configuring additional settings..." -ForegroundColor Yellow
 
 # Enable Always On (requires Basic or higher SKU)
 if ($Sku -ne "F1" -and $Sku -ne "D1") {

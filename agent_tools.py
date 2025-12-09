@@ -7,6 +7,7 @@ import os
 import json
 from typing import Dict, Any, List
 from dotenv import load_dotenv
+from azure.identity import DefaultAzureCredential, ManagedIdentityCredential
 
 # Import existing ParcelTrackingDB for consistent access
 from parcel_tracking_db import ParcelTrackingDB
@@ -105,7 +106,11 @@ async def search_parcels_by_recipient_tool(recipient_name: str = None, postcode:
         if USE_COSMOS_KEY and COSMOS_KEY:
             client = CosmosClient(COSMOS_ENDPOINT, credential=COSMOS_KEY)
         else:
-            credential = DefaultAzureCredential()
+            # Use Managed Identity in Azure, DefaultAzureCredential locally
+            if os.getenv('WEBSITE_INSTANCE_ID'):
+                credential = ManagedIdentityCredential()
+            else:
+                credential = DefaultAzureCredential(exclude_developer_cli_credential=True)
             client = CosmosClient(COSMOS_ENDPOINT, credential=credential)
         
         database = client.get_database_client(COSMOS_DATABASE)
@@ -192,7 +197,11 @@ async def get_delivery_statistics_tool(date_from: str = None, date_to: str = Non
         if USE_COSMOS_KEY and COSMOS_KEY:
             client = CosmosClient(COSMOS_ENDPOINT, credential=COSMOS_KEY)
         else:
-            credential = DefaultAzureCredential()
+            # Use Managed Identity in Azure, DefaultAzureCredential locally
+            if os.getenv('WEBSITE_INSTANCE_ID'):
+                credential = ManagedIdentityCredential()
+            else:
+                credential = DefaultAzureCredential(exclude_developer_cli_credential=True)
             client = CosmosClient(COSMOS_ENDPOINT, credential=credential)
         
         database = client.get_database_client(COSMOS_DATABASE)

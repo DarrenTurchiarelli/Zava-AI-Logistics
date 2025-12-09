@@ -6,7 +6,7 @@ This script adds function calling capabilities to the agent for real-time data a
 import os
 import asyncio
 from azure.ai.projects import AIProjectClient
-from azure.identity import DefaultAzureCredential
+from azure.identity import DefaultAzureCredential, ManagedIdentityCredential
 from dotenv import load_dotenv
 from agent_tools import AGENT_TOOLS
 
@@ -32,7 +32,12 @@ async def register_tools():
     
     try:
         # Initialize Azure AI client
-        credential = DefaultAzureCredential()
+        # Use Managed Identity in Azure, DefaultAzureCredential locally
+        if os.getenv('WEBSITE_INSTANCE_ID'):
+            credential = ManagedIdentityCredential()
+        else:
+            credential = DefaultAzureCredential(exclude_developer_cli_credential=True)
+        
         client = AIProjectClient(
             endpoint=AZURE_AI_PROJECT_ENDPOINT,
             credential=credential

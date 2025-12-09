@@ -10,6 +10,10 @@ pip install -r requirements.txt
 # Run database migrations if needed
 echo "Checking database connection..."
 
+# Setup users (will skip if already exist)
+echo "Setting up default users..."
+python setup_users.py || echo "Warning: User setup failed or skipped"
+
 # Start Gunicorn server
 echo "Starting Gunicorn server..."
 gunicorn --bind=0.0.0.0:8000 --timeout 600 --workers=4 --threads=2 --worker-class=gthread app:app

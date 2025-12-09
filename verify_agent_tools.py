@@ -4,7 +4,7 @@ Verify that Cosmos DB tools are registered with the Azure AI Agent
 import asyncio
 import os
 from azure.ai.projects import AIProjectClient
-from azure.identity import DefaultAzureCredential
+from azure.identity import DefaultAzureCredential, ManagedIdentityCredential
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -24,7 +24,11 @@ async def verify_tools():
     
     try:
         # Initialize Azure AI client
-        credential = DefaultAzureCredential()
+        # Use Managed Identity in Azure, DefaultAzureCredential locally
+        if os.getenv('WEBSITE_INSTANCE_ID'):
+            credential = ManagedIdentityCredential()
+        else:
+            credential = DefaultAzureCredential(exclude_developer_cli_credential=True)
         client = AIProjectClient(
             endpoint=AZURE_AI_PROJECT_ENDPOINT,
             credential=credential

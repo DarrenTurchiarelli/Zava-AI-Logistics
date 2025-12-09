@@ -226,51 +226,112 @@
         <div class="col-12">
             <div class="card border-info">
                 <div class="card-header bg-info text-white">
-                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Deployed AI Agents</h5>
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Deployed AI Agents (Azure AI Foundry)</h5>
                 </div>
                 <div class="card-body">
                     <div class="row">
+                        <!-- Row 1 -->
                         <div class="col-md-4 mb-3">
-                            <div class="card h-100">
+                            <div class="card h-100 border-primary">
                                 <div class="card-body">
                                     <h6 class="card-title">
-                                        <i class="fas fa-shield-alt text-danger"></i> Fraud Detection Agent
+                                        <i class="fas fa-box text-primary"></i> Parcel Intake Agent
                                     </h6>
                                     <p class="card-text small">
-                                        Azure AI Foundry-powered fraud analysis with threat classification and confidence scoring.
+                                        Validates and processes incoming parcels with automated data verification.
                                     </p>
                                     <ul class="small">
-                                        <li>Real-time threat analysis</li>
-                                        <li>Educational content generation</li>
-                                        <li>Multi-category classification</li>
+                                        <li>Address validation</li>
+                                        <li>Dimension/weight verification</li>
+                                        <li>Fraud detection screening</li>
                                     </ul>
+                                    <span class="badge bg-primary">Azure AI Foundry</span>
                                 </div>
                             </div>
                         </div>
                         
                         <div class="col-md-4 mb-3">
-                            <div class="card h-100">
+                            <div class="card h-100 border-success">
                                 <div class="card-body">
                                     <h6 class="card-title">
-                                        <i class="fas fa-check-double text-success"></i> Approval Automation Agent
+                                        <i class="fas fa-warehouse text-success"></i> Sorting Facility Agent
                                     </h6>
                                     <p class="card-text small">
-                                        Rules-based auto-approval with fraud risk thresholds and DC filtering.
+                                        Optimizes sorting operations and depot routing decisions.
                                     </p>
                                     <ul class="small">
-                                        <li>Auto-approve/reject decisions</li>
-                                        <li>Value and risk thresholds</li>
-                                        <li>Comprehensive audit trail</li>
+                                        <li>Geographic zone assignment</li>
+                                        <li>Depot capacity management</li>
+                                        <li>Priority parcel identification</li>
                                     </ul>
+                                    <span class="badge bg-success">Azure AI Foundry</span>
                                 </div>
                             </div>
                         </div>
                         
                         <div class="col-md-4 mb-3">
-                            <div class="card h-100">
+                            <div class="card h-100 border-info">
                                 <div class="card-body">
                                     <h6 class="card-title">
-                                        <i class="fas fa-route text-primary"></i> Route Optimization Agent
+                                        <i class="fas fa-route text-info"></i> Delivery Coordination Agent
+                                    </h6>
+                                    <p class="card-text small">
+                                        Coordinates delivery schedules and route assignments.
+                                    </p>
+                                    <ul class="small">
+                                        <li>Route clustering</li>
+                                        <li>Time window optimization</li>
+                                        <li>Driver workload balancing</li>
+                                    </ul>
+                                    <span class="badge bg-info">Azure AI Foundry</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Row 2 -->
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 border-warning">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-tasks text-warning"></i> Dispatcher Agent
+                                    </h6>
+                                    <p class="card-text small">
+                                        Assigns parcels to drivers based on capacity and route efficiency.
+                                    </p>
+                                    <ul class="small">
+                                        <li>Dynamic manifest generation</li>
+                                        <li>Real-time reassignment</li>
+                                        <li>Capacity optimization</li>
+                                    </ul>
+                                    <span class="badge bg-warning text-dark">Azure AI Foundry</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 border-secondary">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-truck text-secondary"></i> Driver Agent
+                                    </h6>
+                                    <p class="card-text small">
+                                        Assists drivers with delivery decisions and exception handling.
+                                    </p>
+                                    <ul class="small">
+                                        <li>Safe place recommendations</li>
+                                        <li>Delivery attempt guidance</li>
+                                        <li>Customer contact suggestions</li>
+                                    </ul>
+                                    <span class="badge bg-secondary">Azure AI Foundry</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 border-primary">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-chart-line text-primary"></i> Optimization Agent
                                     </h6>
                                     <p class="card-text small">
                                         Azure Maps-powered route optimization with real-time traffic analysis.
@@ -280,63 +341,73 @@
                                         <li>Fuel and time savings</li>
                                         <li>CO₂ reduction tracking</li>
                                     </ul>
+                                    <span class="badge bg-primary">Azure AI Foundry + Maps</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Row 3 -->
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 border-success">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-headset text-success"></i> Customer Service Agent
+                                    </h6>
+                                    <p class="card-text small">
+                                        AI-powered customer support with Cosmos DB function calling.
+                                    </p>
+                                    <ul class="small">
+                                        <li>Real-time parcel tracking</li>
+                                        <li>Delivery status updates</li>
+                                        <li>Multi-format tracking support (DT, DTVIC, OV)</li>
+                                    </ul>
+                                    <span class="badge bg-success">Azure AI Foundry + Tools</span>
                                 </div>
                             </div>
                         </div>
                         
                         <div class="col-md-4 mb-3">
-                            <div class="card h-100">
+                            <div class="card h-100 border-danger">
                                 <div class="card-body">
                                     <h6 class="card-title">
-                                        <i class="fas fa-exclamation-triangle text-warning"></i> Exception Resolution Agent
+                                        <i class="fas fa-shield-alt text-danger"></i> Fraud Risk Agent
                                     </h6>
                                     <p class="card-text small">
-                                        Intelligent auto-resolution of common delivery exceptions.
+                                        Azure AI Foundry-powered fraud analysis with threat classification.
                                     </p>
                                     <ul class="small">
-                                        <li>Auto-reschedule deliveries</li>
-                                        <li>Safe place recommendations</li>
-                                        <li>Customer preference learning</li>
+                                        <li>Real-time threat analysis</li>
+                                        <li>Educational content generation</li>
+                                        <li>Multi-category classification</li>
                                     </ul>
+                                    <span class="badge bg-danger">Azure AI Foundry</span>
                                 </div>
                             </div>
                         </div>
                         
                         <div class="col-md-4 mb-3">
-                            <div class="card h-100">
+                            <div class="card h-100 border-info">
                                 <div class="card-body">
                                     <h6 class="card-title">
-                                        <i class="fas fa-bell text-info"></i> Smart Notification Agent
+                                        <i class="fas fa-id-card text-info"></i> Identity Verification Agent
                                     </h6>
                                     <p class="card-text small">
-                                        Proactive, context-aware customer notifications.
+                                        Verifies driver and courier identities with multi-factor validation.
                                     </p>
                                     <ul class="small">
-                                        <li>Traffic delay predictions</li>
-                                        <li>Personalized messaging</li>
-                                        <li>Multi-channel delivery</li>
+                                        <li>Credential verification</li>
+                                        <li>Employment status checks</li>
+                                        <li>Zone authorization validation</li>
                                     </ul>
+                                    <span class="badge bg-info">Azure AI Foundry</span>
                                 </div>
                             </div>
                         </div>
-                        
-                        <div class="col-md-4 mb-3">
-                            <div class="card h-100">
-                                <div class="card-body">
-                                    <h6 class="card-title">
-                                        <i class="fas fa-clipboard-list text-secondary"></i> Manifest Generation Agent
-                                    </h6>
-                                    <p class="card-text small">
-                                        AI-powered manifest creation and driver assignment optimization.
-                                    </p>
-                                    <ul class="small">
-                                        <li>Geographic clustering</li>
-                                        <li>Workload balancing</li>
-                                        <li>Route efficiency scoring</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
+                    </div>
+                    
+                    <!-- Agent Architecture Note -->
+                    <div class="alert alert-info mt-3 mb-0">
+                        <i class="fas fa-info-circle"></i> <strong>Architecture:</strong> All 9 agents are deployed as persistent Azure AI Foundry agents with dedicated agent IDs. The Customer Service Agent includes Cosmos DB function calling tools for real-time parcel tracking across multiple identifier formats.
                     </div>
                 </div>
             </div>

@@ -9,7 +9,7 @@ import json
 import asyncio
 from typing import Dict, Any, Optional, List
 from azure.ai.projects import AIProjectClient
-from azure.identity import DefaultAzureCredential
+from azure.identity import DefaultAzureCredential, AzureCliCredential, ManagedIdentityCredential
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -43,8 +43,14 @@ class AzureAIAgentClient:
     def get_client(self) -> AIProjectClient:
         """Get or create Azure AI Project client"""
         if self._client is None:
-            # Exclude AzdCliCredential to avoid 10 second timeout
-            credential = DefaultAzureCredential(exclude_developer_cli_credential=True)
+            # Check if running in Azure App Service
+            if os.getenv('WEBSITE_INSTANCE_ID'):
+                # Running in Azure - use ManagedIdentityCredential
+                credential = ManagedIdentityCredential()
+            else:
+                # Running locally - use DefaultAzureCredential excluding slow credentials
+                credential = DefaultAzureCredential(exclude_developer_cli_credential=True)
+            
             self._client = AIProjectClient(
                 endpoint=AZURE_AI_PROJECT_ENDPOINT,
                 credential=credential
@@ -583,7 +589,29 @@ async def identity_agent(verification_request: Dict[str, Any]) -> Dict[str, Any]
     Verify identity and provide authentication status.
     """
     
-    return await call_azure_agent(IDENTITY_AGENT_ID, message, verification_request)
+    try:
+        # Add timeout for agent call - don't block login if agent is slow
+        result = await asyncio.wait_for(
+            call_azure_agent(IDENTITY_AGENT_ID, message, verification_request),
+            timeout=10.0  # 10 second timeout
+        )
+        return result
+    except asyncio.TimeoutError:
+        print(f"⚠️ Identity Agent timeout - proceeding with login")
+        return {
+            "success": False,
+            "error": "Agent call timeout",
+            "agent_id": IDENTITY_AGENT_ID,
+            "response": None
+        }
+    except Exception as e:
+        print(f"⚠️ Identity Agent error: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "agent_id": IDENTITY_AGENT_ID,
+            "response": None
+        }
 
 
 # ============================================================================
