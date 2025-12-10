@@ -2,11 +2,16 @@
 
 {% block title %}AI Customer Service Assistant{% endblock %}
 
+{% block extra_css %}
+<!-- Azure Speech SDK -->
+<script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid mt-4">
     <div class="row">
         <div class="col-12">
-            <h2><i class="fas fa-robot"></i> AI Customer Service Assistant</h2>
+            <h2><i class="bi bi-robot"></i> AI Customer Service Assistant</h2>
             <p class="text-muted">Ask questions about parcels, check fraud reports, and get AI-powered assistance</p>
         </div>
     </div>
@@ -16,23 +21,23 @@
         <div class="col-md-3">
             <div class="card mb-3">
                 <div class="card-header bg-primary text-white">
-                    <i class="fas fa-bolt"></i> Quick Actions
+                    <i class="bi bi-lightning-charge-fill"></i> Quick Actions
                 </div>
                 <div class="list-group list-group-flush">
                     <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Track parcel')">
-                        <i class="fas fa-search"></i> Track Parcel
+                        <i class="bi bi-search"></i> Track Parcel
                     </button>
                     <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Show recent fraud reports')">
-                        <i class="fas fa-shield-alt"></i> Check Frauds
+                        <i class="bi bi-shield-fill-exclamation"></i> Check Frauds
                     </button>
                     <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Show all parcels in transit')">
-                        <i class="fas fa-truck"></i> Parcels in Transit
+                        <i class="bi bi-truck"></i> Parcels in Transit
                     </button>
                     <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Show parcels at distribution center')">
-                        <i class="fas fa-warehouse"></i> At Distribution Center
+                        <i class="bi bi-building"></i> At Distribution Center
                     </button>
                     <button class="list-group-item list-group-item-action" onclick="clearChat()">
-                        <i class="fas fa-eraser"></i> Clear Chat
+                        <i class="bi bi-eraser-fill"></i> Clear Chat
                     </button>
                 </div>
             </div>
@@ -40,7 +45,7 @@
             <!-- Parcel Lookup Panel -->
             <div class="card">
                 <div class="card-header bg-info text-white">
-                    <i class="fas fa-box"></i> Parcel Lookup
+                    <i class="bi bi-box-seam"></i> Parcel Lookup
                 </div>
                 <div class="card-body">
                     <div class="form-group">
@@ -48,10 +53,10 @@
                         <input type="text" class="form-control" id="trackingNumber" placeholder="Enter tracking #">
                     </div>
                     <button class="btn btn-info btn-block" onclick="trackParcel()">
-                        <i class="fas fa-search"></i> Track
+                        <i class="bi bi-search"></i> Track
                     </button>
                     <button class="btn btn-secondary btn-block mt-2" onclick="getParcelLocation()">
-                        <i class="fas fa-map-marker-alt"></i> Get Location
+                        <i class="bi bi-geo-alt-fill"></i> Get Location
                     </button>
                 </div>
             </div>
@@ -60,22 +65,35 @@
         <!-- Chat Panel -->
         <div class="col-md-6">
             <div class="card" style="height: 700px;">
-                <div class="card-header bg-success text-white">
-                    <i class="fas fa-comments"></i> Chat with AI Assistant
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-chat-dots-fill"></i> Chat with AI Assistant</span>
+                    <span id="voiceStatus" class="badge badge-light text-dark" style="display:none;">
+                        <i class="bi bi-mic-fill"></i> Listening...
+                    </span>
                 </div>
                 <div class="card-body" id="chatMessages" style="overflow-y: auto; height: 550px;">
                     <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i> <strong>Welcome!</strong> I'm your AI customer service assistant. Ask me anything about parcels, fraud reports, or delivery status.
+                        <i class="bi bi-info-circle-fill"></i> <strong>Welcome!</strong> I'm your AI customer service assistant. 
+                        <br><small>💬 Type your questions or 🎤 use voice input. I'll speak my responses back to you!</small>
                     </div>
                 </div>
                 <div class="card-footer">
                     <div class="input-group">
-                        <input type="text" class="form-control" id="chatInput" placeholder="Ask a question..." onkeypress="handleEnter(event)">
-                        <div class="input-group-append">
-                            <button class="btn btn-success" onclick="sendMessage()">
-                                <i class="fas fa-paper-plane"></i> Send
+                        <input type="text" class="form-control" id="chatInput" placeholder="Ask a question or use voice..." onkeypress="handleEnter(event)">
+                        <button class="btn btn-primary" id="voiceBtn" onclick="toggleVoiceInput()" title="Voice Input">
+                            <i class="bi bi-mic-fill" id="micIcon"></i>
+                        </button>
+                        <button class="btn btn-success" onclick="sendMessage()">
+                            <i class="bi bi-send-fill"></i> Send
+                        </button>
+                    </div>
+                    <div class="mt-2">
+                        <small class="text-muted">
+                            <input type="checkbox" id="autoSpeak" checked> Auto-speak responses
+                            <button class="btn btn-sm btn-outline-secondary ms-2" onclick="stopSpeaking()" title="Stop Speaking">
+                                <i class="bi bi-volume-mute-fill"></i>
                             </button>
-                        </div>
+                        </small>
                     </div>
                 </div>
             </div>
@@ -85,7 +103,7 @@
         <div class="col-md-3">
             <div class="card">
                 <div class="card-header bg-warning text-dark">
-                    <i class="fas fa-info-circle"></i> Information
+                    <i class="bi bi-info-circle-fill"></i> Information
                 </div>
                 <div class="card-body" id="infoPanel">
                     <p class="text-muted">Information will appear here when you track parcels or check fraud reports.</p>
@@ -94,16 +112,20 @@
 
             <div class="card mt-3">
                 <div class="card-header bg-secondary text-white">
-                    <i class="fas fa-lightbulb"></i> Sample Questions
+                    <i class="bi bi-lightbulb-fill"></i> Voice & Text Examples
                 </div>
                 <div class="card-body">
+                    <p class="small mb-2"><strong>🎤 Try saying:</strong></p>
                     <ul class="small">
-                        <li>Where is parcel DTVIC123?</li>
-                        <li>Is parcel XYZ in transit or at depot?</li>
-                        <li>Show me recent fraud reports</li>
-                        <li>How many parcels are out for delivery?</li>
-                        <li>What's the status of delivery to Sydney?</li>
+                        <li>"Where is parcel DTVIC123?"</li>
+                        <li>"Show me recent fraud reports"</li>
+                        <li>"Track parcel"</li>
+                        <li>"How many parcels are in transit?"</li>
+                        <li>"What's the status of delivery to Sydney?"</li>
                     </ul>
+                    <p class="small text-muted mt-2">
+                        <i class="bi bi-info-circle-fill"></i> Click the microphone button and speak naturally.
+                    </p>
                 </div>
             </div>
         </div>
@@ -111,6 +133,128 @@
 </div>
 
 <script>
+// Voice recognition setup
+let recognition = null;
+let isListening = false;
+let speechSynthesis = window.speechSynthesis;
+let currentUtterance = null;
+
+// Initialize speech recognition
+if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+    
+    recognition.onstart = function() {
+        isListening = true;
+        document.getElementById('voiceBtn').classList.remove('btn-primary');
+        document.getElementById('voiceBtn').classList.add('btn-danger');
+        document.getElementById('micIcon').classList.add('bi-pulse');
+        document.getElementById('voiceStatus').style.display = 'inline-block';
+        console.log('🎤 Voice recognition started');
+    };
+    
+    recognition.onend = function() {
+        isListening = false;
+        document.getElementById('voiceBtn').classList.remove('btn-danger');
+        document.getElementById('voiceBtn').classList.add('btn-primary');
+        document.getElementById('micIcon').classList.remove('bi-pulse');
+        document.getElementById('voiceStatus').style.display = 'none';
+        console.log('🎤 Voice recognition ended');
+    };
+    
+    recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        console.log('🎤 Heard:', transcript);
+        document.getElementById('chatInput').value = transcript;
+        sendMessage();
+    };
+    
+    recognition.onerror = function(event) {
+        console.error('🎤 Speech recognition error:', event.error);
+        isListening = false;
+        document.getElementById('voiceBtn').classList.remove('btn-danger');
+        document.getElementById('voiceBtn').classList.add('btn-primary');
+        document.getElementById('micIcon').classList.remove('bi-pulse');
+        
+        if (event.error === 'no-speech') {
+            addMessage('No speech detected. Please try again.', 'warning');
+        } else if (event.error === 'not-allowed') {
+            addMessage('Microphone access denied. Please enable it in browser settings.', 'danger');
+        }
+    };
+}
+
+function toggleVoiceInput() {
+    if (!recognition) {
+        addMessage('Voice input is not supported in your browser. Please use Chrome, Edge, or Safari.', 'warning');
+        return;
+    }
+    
+    if (isListening) {
+        recognition.stop();
+    } else {
+        recognition.start();
+    }
+}
+
+function speak(text) {
+    // Stop any current speech
+    stopSpeaking();
+    
+    // Check if auto-speak is enabled
+    if (!document.getElementById('autoSpeak').checked) {
+        return;
+    }
+    
+    if (!speechSynthesis) {
+        console.warn('Speech synthesis not supported');
+        return;
+    }
+    
+    // Clean text for better speech (remove markdown, special chars)
+    let cleanText = text
+        .replace(/\*\*/g, '') // Remove bold markdown
+        .replace(/#{1,6}\s/g, '') // Remove headers
+        .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // Remove links, keep text
+        .replace(/<[^>]+>/g, '') // Remove HTML tags
+        .replace(/`/g, '') // Remove code backticks
+        .trim();
+    
+    currentUtterance = new SpeechSynthesisUtterance(cleanText);
+    currentUtterance.rate = 1.0;
+    currentUtterance.pitch = 1.0;
+    currentUtterance.volume = 1.0;
+    
+    // Use a more natural voice if available
+    const voices = speechSynthesis.getVoices();
+    const preferredVoice = voices.find(v => v.name.includes('Natural') || v.name.includes('Premium')) 
+                          || voices.find(v => v.lang.startsWith('en'));
+    if (preferredVoice) {
+        currentUtterance.voice = preferredVoice;
+    }
+    
+    currentUtterance.onend = function() {
+        console.log('🔊 Speech ended');
+    };
+    
+    currentUtterance.onerror = function(event) {
+        console.error('🔊 Speech error:', event.error);
+    };
+    
+    console.log('🔊 Speaking:', cleanText.substring(0, 50) + '...');
+    speechSynthesis.speak(currentUtterance);
+}
+
+function stopSpeaking() {
+    if (speechSynthesis && speechSynthesis.speaking) {
+        speechSynthesis.cancel();
+        console.log('🔊 Speech stopped');
+    }
+}
+
 function addMessage(message, isUser = false) {
     const chatMessages = document.getElementById('chatMessages');
     const messageDiv = document.createElement('div');
@@ -118,13 +262,18 @@ function addMessage(message, isUser = false) {
     messageDiv.innerHTML = `<strong>${isUser ? 'You' : 'AI Assistant'}:</strong> ${message}`;
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+    
+    // Speak AI responses if auto-speak is enabled
+    if (!isUser) {
+        speak(message);
+    }
 }
 
 function addError(message) {
     const chatMessages = document.getElementById('chatMessages');
     const messageDiv = document.createElement('div');
     messageDiv.className = 'alert alert-danger';
-    messageDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> <strong>Error:</strong> ${message}`;
+    messageDiv.innerHTML = `<i class="bi bi-exclamation-circle-fill"></i> <strong>Error:</strong> ${message}`;
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
@@ -134,7 +283,7 @@ function addLoading() {
     const loadingDiv = document.createElement('div');
     loadingDiv.id = 'loadingMessage';
     loadingDiv.className = 'alert alert-secondary';
-    loadingDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> AI is thinking...';
+    loadingDiv.innerHTML = '<i class="bi bi-hourglass-split"></i> AI is thinking...';
     chatMessages.appendChild(loadingDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
@@ -316,6 +465,82 @@ window.addEventListener('load', async function() {
 #infoPanel {
     max-height: 600px;
     overflow-y: auto;
+}
+
+/* Voice input button animations */
+#voiceBtn {
+    transition: all 0.3s ease;
+}
+
+#voiceBtn.btn-danger {
+    animation: pulse-red 1.5s infinite;
+}
+
+/* Bootstrap Icons pulse animation */
+.bi-pulse {
+    animation: icon-pulse 1s ease-in-out infinite;
+}
+
+@keyframes icon-pulse {
+    0% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.6;
+        transform: scale(1.1);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes pulse-red {
+    0% {
+        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
+    }
+    50% {
+        box-shadow: 0 0 0 10px rgba(220, 53, 69, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
+    }
+}
+
+#voiceStatus {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Speaking indicator */
+.speaking-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background-color: #28a745;
+    border-radius: 50%;
+    margin-left: 5px;
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.3;
+    }
 }
 </style>
 {% endblock %}

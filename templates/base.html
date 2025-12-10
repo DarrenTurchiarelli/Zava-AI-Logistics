@@ -9,6 +9,8 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- Azure Speech SDK -->
+    <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     
@@ -638,6 +640,25 @@
             box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
         }
         
+        .chat-widget-voice {
+            background: #0d6efd;
+            border: none;
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            flex-shrink: 0;
+        }
+        
+        .chat-widget-voice:hover {
+            background: #0a58ca;
+        }
+        
         .chat-widget-send {
             background: #0d6efd;
             border: none;
@@ -650,6 +671,7 @@
             align-items: center;
             justify-content: center;
             transition: background 0.2s;
+            flex-shrink: 0;
         }
         
         .chat-widget-send:hover {
@@ -659,6 +681,22 @@
         .chat-widget-send:disabled {
             background: #6c757d;
             cursor: not-allowed;
+        }
+        
+        .chat-widget-controls {
+            margin-top: 8px;
+            text-align: center;
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.7;
+                transform: scale(1.1);
+            }
         }
         
         .chat-widget-typing {
@@ -679,8 +717,7 @@
         }
     </style>
     
-    <!-- Chat Widget for Logged-In Users -->
-    {% if session.logged_in %}
+    <!-- Chat Widget for All Users -->
     <div class="chat-widget">
         <button class="chat-widget-button" id="chatWidgetToggle" title="Chat with AI Copilot">
             <img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot" style="width: 28px; height: 28px;">
@@ -704,10 +741,19 @@
             
             <div class="chat-widget-footer">
                 <div class="chat-widget-input-group">
-                    <input type="text" class="chat-widget-input" id="chatWidgetInput" placeholder="Type your message..." />
+                    <input type="text" class="chat-widget-input" id="chatWidgetInput" placeholder="Type or speak..." />
+                    <button class="chat-widget-voice" id="chatWidgetVoice" title="Voice Input">
+                        <i class="bi bi-mic-fill" id="chatWidgetMicIcon"></i>
+                    </button>
                     <button class="chat-widget-send" id="chatWidgetSend">
                         <i class="bi bi-send-fill"></i>
                     </button>
+                </div>
+                <div class="chat-widget-controls">
+                    <label style="font-size: 11px; color: #666; margin: 0;">
+                        <input type="checkbox" id="chatWidgetAutoSpeak" checked style="margin-right: 4px;">
+                        Auto-speak responses
+                    </label>
                 </div>
             </div>
         </div>
@@ -722,8 +768,37 @@
             const messagesContainer = document.getElementById('chatWidgetMessages');
             const input = document.getElementById('chatWidgetInput');
             const sendBtn = document.getElementById('chatWidgetSend');
+            const voiceBtn = document.getElementById('chatWidgetVoice');
+            const micIcon = document.getElementById('chatWidgetMicIcon');
+            const autoSpeakCheckbox = document.getElementById('chatWidgetAutoSpeak');
+            
+            let widgetSpeechConfig = null;
+            let widgetRecognizer = null;
+            let widgetSynthesizer = null;
+            let isWidgetListening = false;
+            let useWidgetAzureSpeech = false;
             
             let isOpen = false;
+            
+            // Initialize Azure Speech for widget
+            async function initWidgetSpeech() {
+                try {
+                    const response = await fetch('/api/speech/token');
+                    const data = await response.json();
+                    
+                    if (data.token && data.region && window.SpeechSDK) {
+                        widgetSpeechConfig = window.SpeechSDK.SpeechConfig.fromAuthorizationToken(data.token, data.region);
+                        widgetSpeechConfig.speechRecognitionLanguage = data.language || 'en-AU';
+                        widgetSpeechConfig.speechSynthesisVoiceName = data.voice || 'en-AU-NatashaNeural';
+                        useWidgetAzureSpeech = true;
+                        console.log('🎤 Widget Azure Speech initialized');
+                    }
+                } catch (error) {
+                    console.log('⚠️ Widget using Web Speech API fallback');
+                }
+            }
+            
+            initWidgetSpeech();
             
             // Toggle chat window
             toggleBtn.addEventListener('click', function() {
@@ -742,6 +817,96 @@
                 chatWindow.classList.remove('open');
                 toggleBtn.classList.remove('active');
             });
+            
+            // Voice input
+            voiceBtn.addEventListener('click', function() {
+                if (isWidgetListening) {
+                    stopWidgetListening();
+                } else {
+                    startWidgetListening();
+                }
+            });
+            
+            function startWidgetListening() {
+                if (useWidgetAzureSpeech && widgetSpeechConfig) {
+                    const audioConfig = window.SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+                    widgetRecognizer = new window.SpeechSDK.SpeechRecognizer(widgetSpeechConfig, audioConfig);
+                    
+                    isWidgetListening = true;
+                    voiceBtn.style.backgroundColor = '#dc3545';
+                    micIcon.style.animation = 'pulse 1s infinite';
+                    
+                    widgetRecognizer.recognizeOnceAsync(
+                        function (result) {
+                            input.value = result.text;
+                            stopWidgetListening();
+                            sendMessage();
+                        },
+                        function (error) {
+                            console.error('Voice error:', error);
+                            stopWidgetListening();
+                        }
+                    );
+                } else if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    const recognition = new SpeechRecognition();
+                    recognition.lang = 'en-AU';
+                    
+                    isWidgetListening = true;
+                    voiceBtn.style.backgroundColor = '#dc3545';
+                    micIcon.style.animation = 'pulse 1s infinite';
+                    
+                    recognition.onresult = function(event) {
+                        input.value = event.results[0][0].transcript;
+                        sendMessage();
+                    };
+                    
+                    recognition.onend = function() {
+                        stopWidgetListening();
+                    };
+                    
+                    recognition.start();
+                }
+            }
+            
+            function stopWidgetListening() {
+                isWidgetListening = false;
+                voiceBtn.style.backgroundColor = '';
+                micIcon.style.animation = '';
+                if (widgetRecognizer) {
+                    widgetRecognizer.close();
+                    widgetRecognizer = null;
+                }
+            }
+            
+            function speakWidgetMessage(text) {
+                if (!autoSpeakCheckbox.checked) return;
+                
+                const cleanText = text.replace(/\*\*/g, '').replace(/<[^>]+>/g, '').trim();
+                
+                if (useWidgetAzureSpeech && widgetSpeechConfig) {
+                    const player = new window.SpeechSDK.SpeakerAudioDestination();
+                    const audioConfig = window.SpeechSDK.AudioConfig.fromSpeakerOutput(player);
+                    widgetSynthesizer = new window.SpeechSDK.SpeechSynthesizer(widgetSpeechConfig, audioConfig);
+                    
+                    widgetSynthesizer.speakTextAsync(
+                        cleanText,
+                        function (result) {
+                            widgetSynthesizer.close();
+                            widgetSynthesizer = null;
+                        },
+                        function (error) {
+                            console.error('Speech error:', error);
+                            widgetSynthesizer.close();
+                            widgetSynthesizer = null;
+                        }
+                    );
+                } else if (window.speechSynthesis) {
+                    const utterance = new SpeechSynthesisUtterance(cleanText);
+                    utterance.lang = 'en-AU';
+                    window.speechSynthesis.speak(utterance);
+                }
+            }
             
             // Send message
             async function sendMessage() {
@@ -807,12 +972,17 @@
                         }
                         
                         addMessage(responseText, 'assistant');
+                        speakWidgetMessage(responseText);
                     } else {
-                        addMessage('Sorry, I encountered an error. Please try again.', 'assistant');
+                        const errorMsg = 'Sorry, I encountered an error. Please try again.';
+                        addMessage(errorMsg, 'assistant');
+                        speakWidgetMessage(errorMsg);
                     }
                 } catch (error) {
                     document.getElementById(typingId)?.remove();
-                    addMessage('Sorry, I could not connect to support. Please try again later.', 'assistant');
+                    const errorMsg = 'Sorry, I could not connect to support. Please try again later.';
+                    addMessage(errorMsg, 'assistant');
+                    speakWidgetMessage(errorMsg);
                 } finally {
                     sendBtn.disabled = false;
                 }
@@ -847,7 +1017,6 @@
             });
         })();
     </script>
-    {% endif %}
     
     {% block extra_js %}{% endblock %}
 </body>

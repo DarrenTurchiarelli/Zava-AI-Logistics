@@ -293,37 +293,6 @@
                                                 data-bs-target="#notesModal{{ loop.index }}">
                                             <i class="bi bi-sticky"></i> {{ item.address_notes|length }} note(s)
                                         </button>
-                                        
-                                        <!-- Notes Modal -->
-                                        <div class="modal fade" id="notesModal{{ loop.index }}" tabindex="-1">
-                                            <div class="modal-dialog modal-dialog-scrollable">
-                                                <div class="modal-content">
-                                                    <div class="modal-header bg-info text-white">
-                                                        <h5 class="modal-title">
-                                                            <i class="bi bi-sticky"></i> Address Notes
-                                                        </h5>
-                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                                    </div>
-                                                    <div class="modal-body">
-                                                        <p class="text-muted"><strong>Address:</strong> {{ item.recipient_address }}</p>
-                                                        <hr>
-                                                        <h6>Previous Driver Notes:</h6>
-                                                        {% for note in item.address_notes %}
-                                                        <div class="alert alert-secondary">
-                                                            <p class="mb-1">{{ note.note }}</p>
-                                                            <small class="text-muted">
-                                                                <i class="bi bi-person"></i> {{ note.driver_name }} - 
-                                                                {{ note.timestamp[:10] }}
-                                                            </small>
-                                                        </div>
-                                                        {% endfor %}
-                                                    </div>
-                                                    <div class="modal-footer">
-                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
                                         {% else %}
                                         <span class="text-muted">No notes</span>
                                         {% endif %}
@@ -346,60 +315,6 @@
                                                 data-bs-target="#completeModal{{ loop.index }}">
                                             <i class="bi bi-check-circle"></i> Complete
                                         </button>
-                                        
-                                        <!-- Complete Delivery Modal -->
-                                        <div class="modal fade" id="completeModal{{ loop.index }}" tabindex="-1">
-                                            <div class="modal-dialog">
-                                                <div class="modal-content">
-                                                    <div class="modal-header bg-success text-white">
-                                                        <h5 class="modal-title">
-                                                            <i class="bi bi-check-circle"></i> Complete Delivery
-                                                        </h5>
-                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                                    </div>
-                                                    <form method="POST" action="{{ url_for('mark_delivery_complete', manifest_id=manifest.id, barcode=item.barcode) }}">
-                                                        <div class="modal-body">
-                                                            <p><strong>Barcode:</strong> <code>{{ item.barcode }}</code></p>
-                                                            <p><strong>Recipient:</strong> {{ item.recipient_name }}</p>
-                                                            <p><strong>Address:</strong> {{ item.recipient_address }}</p>
-                                                            
-                                                            {% if item.get('address_notes') %}
-                                                            <div class="alert alert-info">
-                                                                <strong><i class="bi bi-info-circle"></i> Previous Notes:</strong>
-                                                                {% for note in item.address_notes[-2:] %}
-                                                                <div class="mt-2">
-                                                                    <small>• {{ note.note }}</small>
-                                                                </div>
-                                                                {% endfor %}
-                                                            </div>
-                                                            {% endif %}
-                                                            
-                                                            <hr>
-                                                            <div class="mb-3">
-                                                                <label for="driverNote{{ loop.index }}" class="form-label">
-                                                                    <i class="bi bi-sticky"></i> Add Note About This Address (Optional)
-                                                                </label>
-                                                                <textarea 
-                                                                    class="form-control" 
-                                                                    id="driverNote{{ loop.index }}" 
-                                                                    name="driver_note" 
-                                                                    rows="3" 
-                                                                    placeholder="e.g., Large dog in yard, Use side gate, Apartment buzzer broken"></textarea>
-                                                                <small class="text-muted">
-                                                                    This note will help future drivers delivering to this address.
-                                                                </small>
-                                                            </div>
-                                                        </div>
-                                                        <div class="modal-footer">
-                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                            <button type="submit" class="btn btn-success">
-                                                                <i class="bi bi-check-circle"></i> Mark as Delivered
-                                                            </button>
-                                                        </div>
-                                                    </form>
-                                                </div>
-                                            </div>
-                                        </div>
                                         {% else %}
                                         <small class="text-muted">
                                             <i class="bi bi-check"></i> Done
@@ -427,6 +342,95 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Modals (moved outside table to prevent flickering) -->
+            {% for item in manifest['items'] %}
+                <!-- Notes Modal -->
+                <div class="modal fade" id="notesModal{{ loop.index }}" tabindex="-1" aria-labelledby="notesModalLabel{{ loop.index }}" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header bg-info text-white">
+                                <h5 class="modal-title" id="notesModalLabel{{ loop.index }}">
+                                    <i class="bi bi-sticky"></i> Address Notes
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p><strong>Address:</strong> {{ item.recipient_address }}</p>
+                                {% if item.get('address_notes') %}
+                                    <hr>
+                                    <h6>Previous Driver Notes:</h6>
+                                    {% for note in item.address_notes %}
+                                    <div class="alert alert-secondary mb-2">
+                                        <small class="text-muted">{{ note.timestamp }}</small><br>
+                                        {{ note.note }}
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <p class="text-muted">No notes for this address yet.</p>
+                                {% endif %}
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Complete Delivery Modal -->
+                <div class="modal fade" id="completeModal{{ loop.index }}" tabindex="-1" aria-labelledby="completeModalLabel{{ loop.index }}" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header bg-success text-white">
+                                <h5 class="modal-title" id="completeModalLabel{{ loop.index }}">
+                                    <i class="bi bi-check-circle"></i> Complete Delivery
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <form method="POST" action="{{ url_for('mark_delivery_complete', manifest_id=manifest.id, barcode=item.barcode) }}">
+                                <div class="modal-body">
+                                    <p><strong>Barcode:</strong> <code>{{ item.barcode }}</code></p>
+                                    <p><strong>Recipient:</strong> {{ item.recipient_name }}</p>
+                                    <p><strong>Address:</strong> {{ item.recipient_address }}</p>
+                                    
+                                    {% if item.get('address_notes') %}
+                                    <div class="alert alert-info">
+                                        <strong><i class="bi bi-info-circle"></i> Previous Notes:</strong>
+                                        {% for note in item.address_notes[-2:] %}
+                                        <div class="mt-2">
+                                            <small>• {{ note.note }}</small>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                    
+                                    <hr>
+                                    <div class="mb-3">
+                                        <label for="driverNote{{ loop.index }}" class="form-label">
+                                            <i class="bi bi-sticky"></i> Add Note About This Address (Optional)
+                                        </label>
+                                        <textarea 
+                                            class="form-control" 
+                                            id="driverNote{{ loop.index }}" 
+                                            name="driver_note" 
+                                            rows="3" 
+                                            placeholder="e.g., Large dog in yard, Use side gate, Apartment buzzer broken"></textarea>
+                                        <small class="text-muted">
+                                            This note will help future drivers delivering to this address.
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="bi bi-check-circle"></i> Mark as Delivered
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
 
             {% else %}
             <!-- No Manifest -->

@@ -970,9 +970,8 @@ def chatbot_query():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/public/chatbot', methods=['POST'])
-@login_required
 def public_chatbot():
-    """Public chatbot for general users - Limited access, no internal data"""
+    """Public chatbot for all users - Limited access, no internal data"""
     from customer_service_chatbot import CustomerServiceChatbot
     
     print("\n" + "="*60)
@@ -980,14 +979,16 @@ def public_chatbot():
     print("="*60)
     
     user = session.get('user')
-    if not user:
-        return jsonify({'error': 'Authentication required'}), 401
+    is_logged_in = user is not None
     
     data = request.get_json()
     query = data.get('query', '')
     
     print(f"📝 Query: {query}")
-    print(f"👤 User: {user.get('username')} (Role: {user.get('role')})")
+    if is_logged_in:
+        print(f"👤 User: {user.get('username')} (Role: {user.get('role')})")
+    else:
+        print(f"👤 User: Anonymous (Public)")
     
     if not query:
         return jsonify({'error': 'Query is required'}), 400
@@ -996,11 +997,12 @@ def public_chatbot():
         async with ParcelTrackingDB() as db:
             chatbot = CustomerServiceChatbot(db)
             
-            # Limited context - only user info, no access to internal operations
+            # Limited context - available to all users
             context = {
-                'customer_name': user.get('username'),
-                'user_role': user.get('role'),
-                'public_mode': True  # Flag to limit responses
+                'customer_name': user.get('username') if is_logged_in else 'Guest',
+                'user_role': user.get('role') if is_logged_in else 'public',
+                'public_mode': True,  # Flag to limit responses
+                'is_authenticated': is_logged_in
             }
             
             # Process query with restricted access
@@ -1153,6 +1155,51 @@ def chatbot_parcel_location(tracking_number):
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# Azure Speech Services API Routes
+
+@app.route('/api/speech/token', methods=['GET'])
+def get_speech_token():
+    """Get Azure Speech Services token for client-side use - Available to all users"""
+    from azure_speech_service import get_speech_service
+    
+    speech_service = get_speech_service()
+    token_data = speech_service.get_speech_token()
+    
+    if token_data:
+        return jsonify(token_data)
+    else:
+        return jsonify({
+            'error': 'Speech services not configured',
+            'fallback': True
+        }), 200  # Return 200 to allow fallback to Web Speech API
+
+@app.route('/api/speech/synthesize', methods=['POST'])
+@login_required
+def synthesize_speech():
+    """Convert text to speech using Azure Speech Services"""
+    from azure_speech_service import get_speech_service
+    
+    data = request.get_json()
+    text = data.get('text', '')
+    
+    if not text:
+        return jsonify({'error': 'Text is required'}), 400
+    
+    speech_service = get_speech_service()
+    audio_data = speech_service.synthesize_speech(text)
+    
+    if audio_data:
+        from flask import send_file
+        import io
+        return send_file(
+            io.BytesIO(audio_data),
+            mimetype='audio/wav',
+            as_attachment=False
+        )
+    else:
+        return jsonify({'error': 'Speech synthesis failed'}), 500
+
 
 @app.route('/admin/agents')
 @login_required
