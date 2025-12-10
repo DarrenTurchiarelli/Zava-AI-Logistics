@@ -77,13 +77,143 @@
                         <i class="bi bi-map"></i> Optimized Route Map
                         {% if manifest.get('route_url') %}
                         <a href="{{ manifest.route_url }}" target="_blank" class="btn btn-sm btn-light float-end">
-                            <i class="bi bi-box-arrow-up-right"></i> Open in Bing Maps
+                            <i class="bi bi-box-arrow-up-right"></i> Open in Azure Maps
                         </a>
                         {% endif %}
                     </h5>
                 </div>
+                
+                <!-- Route Selection Options -->
+                {% if manifest.get('multi_route_enabled') and manifest.get('route_options') %}
+                <div class="card-body bg-light border-bottom">
+                    <h6 class="mb-3"><i class="bi bi-signpost-split"></i> Choose Your Route Preference</h6>
+                    <div class="row">
+                        {% set route_options = manifest.route_options %}
+                        {% set selected_type = manifest.get('selected_route_type', 'fastest') %}
+                        
+                        {% if 'fastest' in route_options %}
+                        <div class="col-md-4 mb-3">
+                            <div class="card route-option-card {% if selected_type == 'fastest' %}border-primary{% endif %}" 
+                                 onclick="switchRoute('{{ manifest.id }}', 'fastest')"
+                                 style="cursor: pointer;">
+                                <div class="card-body text-center">
+                                    <h2 class="mb-2">{{ route_options.fastest.icon }}</h2>
+                                    <h5 class="card-title">
+                                        Fastest Route
+                                        {% if selected_type == 'fastest' %}
+                                        <span class="badge bg-primary">Current</span>
+                                        {% endif %}
+                                    </h5>
+                                    <p class="card-text small text-muted">
+                                        {{ route_options.fastest.description }}
+                                    </p>
+                                    <hr>
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <strong>⏱️ {{ route_options.fastest.total_duration_minutes|round(0) }}</strong><br>
+                                            <small class="text-muted">minutes</small>
+                                        </div>
+                                        <div class="col-6">
+                                            <strong>📏 {{ route_options.fastest.total_distance_km|round(1) }}</strong><br>
+                                            <small class="text-muted">km</small>
+                                        </div>
+                                    </div>
+                                    {% if route_options.fastest.get('traffic_considered') %}
+                                    <small class="text-success mt-2 d-block">
+                                        <i class="bi bi-check-circle"></i> Traffic-aware
+                                    </small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if 'shortest' in route_options %}
+                        <div class="col-md-4 mb-3">
+                            <div class="card route-option-card {% if selected_type == 'shortest' %}border-primary{% endif %}" 
+                                 onclick="switchRoute('{{ manifest.id }}', 'shortest')"
+                                 style="cursor: pointer;">
+                                <div class="card-body text-center">
+                                    <h2 class="mb-2">{{ route_options.shortest.icon }}</h2>
+                                    <h5 class="card-title">
+                                        Shortest Route
+                                        {% if selected_type == 'shortest' %}
+                                        <span class="badge bg-primary">Current</span>
+                                        {% endif %}
+                                    </h5>
+                                    <p class="card-text small text-muted">
+                                        {{ route_options.shortest.description }}
+                                    </p>
+                                    <hr>
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <strong>⏱️ {{ route_options.shortest.total_duration_minutes|round(0) }}</strong><br>
+                                            <small class="text-muted">minutes</small>
+                                        </div>
+                                        <div class="col-6">
+                                            <strong>📏 {{ route_options.shortest.total_distance_km|round(1) }}</strong><br>
+                                            <small class="text-muted">km</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if 'safest' in route_options %}
+                        <div class="col-md-4 mb-3">
+                            <div class="card route-option-card {% if selected_type == 'safest' %}border-primary{% endif %}" 
+                                 onclick="switchRoute('{{ manifest.id }}', 'safest')"
+                                 style="cursor: pointer;">
+                                <div class="card-body text-center">
+                                    <h2 class="mb-2">{{ route_options.safest.icon }}</h2>
+                                    <h5 class="card-title">
+                                        Safest Route
+                                        {% if selected_type == 'safest' %}
+                                        <span class="badge bg-primary">Current</span>
+                                        {% endif %}
+                                    </h5>
+                                    <p class="card-text small text-muted">
+                                        {{ route_options.safest.description }}
+                                    </p>
+                                    <hr>
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <strong>⏱️ {{ route_options.safest.total_duration_minutes|round(0) }}</strong><br>
+                                            <small class="text-muted">minutes</small>
+                                        </div>
+                                        <div class="col-6">
+                                            <strong>📏 {{ route_options.safest.total_distance_km|round(1) }}</strong><br>
+                                            <small class="text-muted">km</small>
+                                        </div>
+                                    </div>
+                                    {% if route_options.safest.get('crossing_warnings') is defined %}
+                                    <small class="{% if route_options.safest.crossing_warnings == 0 %}text-success{% else %}text-warning{% endif %} mt-2 d-block">
+                                        <i class="bi bi-shield-check"></i> 
+                                        {% if route_options.safest.crossing_warnings == 0 %}
+                                        Minimal road crossings
+                                        {% else %}
+                                        {{ route_options.safest.crossing_warnings }} crossing warnings
+                                        {% endif %}
+                                    </small>
+                                    <small class="text-info d-block">
+                                        Safety Score: {{ route_options.safest.get('safety_score', 100) }}/100
+                                    </small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="alert alert-info mb-0">
+                        <i class="bi bi-lightbulb"></i> <strong>Tip:</strong> Click on any route option to switch. The map will update automatically with your selected route.
+                    </div>
+                </div>
+                {% endif %}
+                
                 <div class="card-body p-0">
                     <iframe 
+                        id="route-map-iframe"
                         src="{{ manifest.embed_url }}" 
                         width="100%" 
                         height="500" 
@@ -94,7 +224,16 @@
                 </div>
                 <div class="card-footer">
                     <small class="text-muted">
-                        <i class="bi bi-info-circle"></i> Route optimized for current traffic conditions
+                        <i class="bi bi-info-circle"></i> 
+                        {% if manifest.get('selected_route_type') == 'fastest' %}
+                        Route optimized for speed with current traffic conditions
+                        {% elif manifest.get('selected_route_type') == 'shortest' %}
+                        Route optimized for minimum distance
+                        {% elif manifest.get('selected_route_type') == 'safest' %}
+                        Route optimized for driver safety with minimal road crossings
+                        {% else %}
+                        Route optimized for current traffic conditions
+                        {% endif %}
                     </small>
                 </div>
             </div>
@@ -116,7 +255,7 @@
                                     <th>Address</th>
                                     <th>Phone</th>
                                     <th>Priority</th>
-                                    <th>Notes</th>
+                                    <th>Address Notes</th>
                                     <th>Status</th>
                                     <th>Action</th>
                                 </tr>
@@ -148,10 +287,45 @@
                                         </span>
                                     </td>
                                     <td>
-                                        {% if item.delivery_notes %}
-                                        <small class="text-info">{{ item.delivery_notes }}</small>
+                                        {% if item.get('address_notes') %}
+                                        <button type="button" class="btn btn-sm btn-info" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#notesModal{{ loop.index }}">
+                                            <i class="bi bi-sticky"></i> {{ item.address_notes|length }} note(s)
+                                        </button>
+                                        
+                                        <!-- Notes Modal -->
+                                        <div class="modal fade" id="notesModal{{ loop.index }}" tabindex="-1">
+                                            <div class="modal-dialog modal-dialog-scrollable">
+                                                <div class="modal-content">
+                                                    <div class="modal-header bg-info text-white">
+                                                        <h5 class="modal-title">
+                                                            <i class="bi bi-sticky"></i> Address Notes
+                                                        </h5>
+                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <p class="text-muted"><strong>Address:</strong> {{ item.recipient_address }}</p>
+                                                        <hr>
+                                                        <h6>Previous Driver Notes:</h6>
+                                                        {% for note in item.address_notes %}
+                                                        <div class="alert alert-secondary">
+                                                            <p class="mb-1">{{ note.note }}</p>
+                                                            <small class="text-muted">
+                                                                <i class="bi bi-person"></i> {{ note.driver_name }} - 
+                                                                {{ note.timestamp[:10] }}
+                                                            </small>
+                                                        </div>
+                                                        {% endfor %}
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                         {% else %}
-                                        <span class="text-muted">-</span>
+                                        <span class="text-muted">No notes</span>
                                         {% endif %}
                                     </td>
                                     <td>
@@ -167,12 +341,65 @@
                                     </td>
                                     <td>
                                         {% if item.status != 'delivered' %}
-                                        <form method="POST" action="{{ url_for('mark_delivery_complete', manifest_id=manifest.id, barcode=item.barcode) }}" style="display:inline;">
-                                            <button type="submit" class="btn btn-sm btn-success" 
-                                                    onclick="return confirm('Mark {{ item.barcode }} as delivered?');">
-                                                <i class="bi bi-check-circle"></i> Complete
-                                            </button>
-                                        </form>
+                                        <button type="button" class="btn btn-sm btn-success" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#completeModal{{ loop.index }}">
+                                            <i class="bi bi-check-circle"></i> Complete
+                                        </button>
+                                        
+                                        <!-- Complete Delivery Modal -->
+                                        <div class="modal fade" id="completeModal{{ loop.index }}" tabindex="-1">
+                                            <div class="modal-dialog">
+                                                <div class="modal-content">
+                                                    <div class="modal-header bg-success text-white">
+                                                        <h5 class="modal-title">
+                                                            <i class="bi bi-check-circle"></i> Complete Delivery
+                                                        </h5>
+                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <form method="POST" action="{{ url_for('mark_delivery_complete', manifest_id=manifest.id, barcode=item.barcode) }}">
+                                                        <div class="modal-body">
+                                                            <p><strong>Barcode:</strong> <code>{{ item.barcode }}</code></p>
+                                                            <p><strong>Recipient:</strong> {{ item.recipient_name }}</p>
+                                                            <p><strong>Address:</strong> {{ item.recipient_address }}</p>
+                                                            
+                                                            {% if item.get('address_notes') %}
+                                                            <div class="alert alert-info">
+                                                                <strong><i class="bi bi-info-circle"></i> Previous Notes:</strong>
+                                                                {% for note in item.address_notes[-2:] %}
+                                                                <div class="mt-2">
+                                                                    <small>• {{ note.note }}</small>
+                                                                </div>
+                                                                {% endfor %}
+                                                            </div>
+                                                            {% endif %}
+                                                            
+                                                            <hr>
+                                                            <div class="mb-3">
+                                                                <label for="driverNote{{ loop.index }}" class="form-label">
+                                                                    <i class="bi bi-sticky"></i> Add Note About This Address (Optional)
+                                                                </label>
+                                                                <textarea 
+                                                                    class="form-control" 
+                                                                    id="driverNote{{ loop.index }}" 
+                                                                    name="driver_note" 
+                                                                    rows="3" 
+                                                                    placeholder="e.g., Large dog in yard, Use side gate, Apartment buzzer broken"></textarea>
+                                                                <small class="text-muted">
+                                                                    This note will help future drivers delivering to this address.
+                                                                </small>
+                                                            </div>
+                                                        </div>
+                                                        <div class="modal-footer">
+                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                            <button type="submit" class="btn btn-success">
+                                                                <i class="bi bi-check-circle"></i> Mark as Delivered
+                                                            </button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
                                         {% else %}
                                         <small class="text-muted">
                                             <i class="bi bi-check"></i> Done
@@ -220,5 +447,95 @@
         display: none !important;
     }
 }
+
+.route-option-card {
+    transition: all 0.3s ease;
+}
+
+.route-option-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.route-option-card.border-primary {
+    border-width: 3px !important;
+}
 </style>
+
+<script>
+function switchRoute(manifestId, routeType) {
+    // Show loading indicator
+    const iframe = document.getElementById('route-map-iframe');
+    const originalSrc = iframe.src;
+    
+    // Disable route cards during switch
+    const routeCards = document.querySelectorAll('.route-option-card');
+    routeCards.forEach(card => card.style.pointerEvents = 'none');
+    
+    fetch(`/driver/manifest/${manifestId}/switch-route`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ route_type: routeType })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update the map
+            iframe.src = data.map_url;
+            
+            // Show success message
+            showToast(`Switched to ${routeType} route - ${data.duration} min, ${data.distance} km`, 'success');
+            
+            // Reload the page to update UI
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        } else {
+            showToast(`Error: ${data.error}`, 'danger');
+            routeCards.forEach(card => card.style.pointerEvents = 'auto');
+        }
+    })
+    .catch(error => {
+        console.error('Error switching route:', error);
+        showToast('Failed to switch route. Please try again.', 'danger');
+        iframe.src = originalSrc;
+        routeCards.forEach(card => card.style.pointerEvents = 'auto');
+    });
+}
+
+function showToast(message, type) {
+    const toastContainer = document.getElementById('toast-container') || createToastContainer();
+    
+    const toast = document.createElement('div');
+    toast.className = `toast align-items-center text-white bg-${type} border-0`;
+    toast.setAttribute('role', 'alert');
+    toast.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    `;
+    
+    toastContainer.appendChild(toast);
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+    
+    toast.addEventListener('hidden.bs.toast', () => {
+        toast.remove();
+    });
+}
+
+function createToastContainer() {
+    const container = document.createElement('div');
+    container.id = 'toast-container';
+    container.className = 'position-fixed top-0 end-0 p-3';
+    container.style.zIndex = '11';
+    document.body.appendChild(container);
+    return container;
+}
+</script>
 {% endblock %}

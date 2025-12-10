@@ -8,7 +8,8 @@ intelligent depot selection for route optimization based on delivery addresses.
 
 import os
 import re
-from typing import List, Dict, Optional
+import requests
+from typing import List, Dict, Optional, Tuple
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -78,6 +79,9 @@ class DepotManager:
     def get_depot_for_addresses(self, addresses: List[str]) -> str:
         """Determine best depot for a list of delivery addresses
         
+        DEPRECATED: Use get_closest_depot_to_address(addresses[0]) instead.
+        This method selects based on most common state, not closest depot.
+        
         Selects depot based on the most common state in the address list.
         If addresses span multiple states, returns depot for the state 
         with the most deliveries.
@@ -109,6 +113,134 @@ class DepotManager:
         # Fallback
         return next(iter(self.depots.values()), 
                    os.getenv('DEPOT_ADDRESS', '123 Industrial Drive, Sydney NSW 2000'))
+    
+    def get_closest_depot_to_address(self, address: str) -> str:
+        """Find the depot closest to the given address using Azure Maps distance calculation
+        
+        Args:
+            address: The delivery address (typically first parcel in manifest)
+            
+        Returns:
+            Address of the closest depot
+        """
+        if not address:
+            # No address provided, return first depot
+            return next(iter(self.depots.values()), '123 Industrial Drive, Sydney NSW 2000')
+        
+        if not self.depots:
+            # No depots configured
+            return '123 Industrial Drive, Sydney NSW 2000'
+        
+        # Try to use Azure Maps to calculate distances
+        azure_maps_key = os.getenv('AZURE_MAPS_SUBSCRIPTION_KEY', '')
+        
+        if not azure_maps_key:
+            print("⚠️ AZURE_MAPS_SUBSCRIPTION_KEY not found. Falling back to state-based depot selection.")
+            return self.get_depot_for_address(address)
+        
+        try:
+            # Geocode the target address
+            target_coords = self._geocode_address(address, azure_maps_key)
+            if not target_coords:
+                print(f"⚠️ Could not geocode address: {address}. Using state-based selection.")
+                return self.get_depot_for_address(address)
+            
+            print(f"📍 Finding closest depot to: {address}")
+            print(f"   Target coordinates: {target_coords}")
+            
+            # Calculate distance from target to each depot
+            closest_depot = None
+            min_distance = float('inf')
+            
+            for state, depot_addr in self.depots.items():
+                depot_coords = self._geocode_address(depot_addr, azure_maps_key)
+                if not depot_coords:
+                    print(f"   ⚠️ Could not geocode depot: {depot_addr}")
+                    continue
+                
+                # Calculate straight-line distance (haversine)
+                distance_km = self._calculate_distance(target_coords, depot_coords)
+                print(f"   {state} depot: {distance_km:.1f} km away")
+                
+                if distance_km < min_distance:
+                    min_distance = distance_km
+                    closest_depot = depot_addr
+            
+            if closest_depot:
+                print(f"   ✅ Closest depot: {closest_depot} ({min_distance:.1f} km)")
+                return closest_depot
+            else:
+                # Fallback if no depot could be geocoded
+                print("   ⚠️ No depots could be geocoded. Using state-based selection.")
+                return self.get_depot_for_address(address)
+                
+        except Exception as e:
+            print(f"❌ Error calculating closest depot: {e}")
+            return self.get_depot_for_address(address)
+    
+    def _geocode_address(self, address: str, azure_maps_key: str) -> Optional[Tuple[float, float]]:
+        """Geocode an address using Azure Maps
+        
+        Args:
+            address: Address to geocode
+            azure_maps_key: Azure Maps subscription key
+            
+        Returns:
+            Tuple of (latitude, longitude) or None
+        """
+        try:
+            search_url = "https://atlas.microsoft.com/search/address/json"
+            params = {
+                'api-version': '1.0',
+                'subscription-key': azure_maps_key,
+                'query': address,
+                'limit': 1,
+                'countrySet': 'AU'
+            }
+            
+            response = requests.get(search_url, params=params, timeout=5)
+            response.raise_for_status()
+            data = response.json()
+            
+            if 'results' in data and len(data['results']) > 0:
+                position = data['results'][0]['position']
+                return (position['lat'], position['lon'])
+            
+            return None
+            
+        except Exception as e:
+            print(f"   Geocoding error for '{address}': {e}")
+            return None
+    
+    def _calculate_distance(self, coords1: Tuple[float, float], coords2: Tuple[float, float]) -> float:
+        """Calculate distance between two coordinates using Haversine formula
+        
+        Args:
+            coords1: Tuple of (latitude, longitude)
+            coords2: Tuple of (latitude, longitude)
+            
+        Returns:
+            Distance in kilometers
+        """
+        import math
+        
+        lat1, lon1 = coords1
+        lat2, lon2 = coords2
+        
+        # Convert to radians
+        lat1_rad = math.radians(lat1)
+        lat2_rad = math.radians(lat2)
+        delta_lat = math.radians(lat2 - lat1)
+        delta_lon = math.radians(lon2 - lon1)
+        
+        # Haversine formula
+        a = math.sin(delta_lat/2)**2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lon/2)**2
+        c = 2 * math.asin(math.sqrt(a))
+        
+        # Earth radius in km
+        radius = 6371
+        
+        return radius * c
     
     @staticmethod
     def extract_state_from_address(address: str) -> Optional[str]:

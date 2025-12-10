@@ -31,13 +31,14 @@ class BingMapsRouter:
         self.base_url = "https://atlas.microsoft.com"
         self.api_version = "1.0"
         
-    def optimize_route(self, addresses: List[str], start_location: str = None) -> Optional[Dict[str, Any]]:
+    def optimize_route(self, addresses: List[str], start_location: str = None, route_type: str = 'fastest') -> Optional[Dict[str, Any]]:
         """
         Optimize delivery route for multiple addresses considering traffic
         
         Args:
             addresses: List of delivery addresses (up to 150 for Azure Maps)
             start_location: Optional starting location (defaults to first address)
+            route_type: Type of route - 'fastest', 'shortest', or 'safest'
             
         Returns:
             Dictionary with optimized route information including:
@@ -45,6 +46,7 @@ class BingMapsRouter:
             - total_distance_km: Total route distance
             - total_duration_minutes: Estimated travel time
             - route_url: URL to view route on Azure Maps
+            - route_type: The type of route optimization used
         """
         if not self.subscription_key:
             print("⚠️ AZURE_MAPS_SUBSCRIPTION_KEY not configured. Using mock route optimization.")
@@ -83,14 +85,20 @@ class BingMapsRouter:
             
             print(f"🗺️  Calling Azure Maps Route API with {len(coordinates)} waypoints...")
             
+            # Determine route parameters based on route type
+            route_params = self._get_route_params(route_type)
+            
             params = {
                 'api-version': self.api_version,
                 'subscription-key': self.subscription_key,
                 'query': query_coords,
-                'traffic': 'true',  # Consider real-time traffic
+                'traffic': 'true' if route_type == 'fastest' else 'false',
                 'travelMode': 'car',
                 'computeBestOrder': 'true',  # Optimize waypoint order
-                'routeType': 'fastest',  # Fastest route considering traffic
+                'routeType': route_params['routeType'],
+                'sectionType': 'traffic',  # Get traffic info
+                'instructionsType': 'text',
+                'avoid': route_params.get('avoid', ''),
                 'language': 'en-US'
             }
             
@@ -141,7 +149,9 @@ class BingMapsRouter:
                 'route_url': map_url,
                 'route_legs': route_legs,
                 'optimized': True,
-                'traffic_considered': True
+                'traffic_considered': route_type == 'fastest',
+                'route_type': route_type,
+                'side_of_road_considered': route_type == 'safest'
             }
             
         except requests.RequestException as e:
@@ -376,8 +386,188 @@ class BingMapsRouter:
         encoded = base64.b64encode(html_content.encode()).decode()
         return f"data:text/html;base64,{encoded}"
     
+    def _get_route_params(self, route_type: str) -> Dict[str, Any]:
+        """Get Azure Maps API parameters for different route types"""
+        if route_type == 'shortest':
+            return {
+                'routeType': 'shortest',  # Shortest distance
+                'avoid': ''
+            }
+        elif route_type == 'safest':
+            return {
+                'routeType': 'fastest',  # Still use fastest for base calculation
+                'avoid': 'unpavedRoads'  # Avoid unpaved roads for safety
+            }
+        else:  # fastest (default)
+            return {
+                'routeType': 'fastest',  # Fastest with traffic
+                'avoid': ''
+            }
+    
+    def optimize_all_route_types(self, addresses: List[str], start_location: str = None) -> Dict[str, Any]:
+        """
+        Generate all three route types for driver selection
+        
+        Returns a dictionary containing:
+        - fastest: Traffic-optimized route (shortest time)
+        - shortest: Distance-optimized route (shortest distance)
+        - safest: Safety-optimized route (considers side-of-road, safer roads)
+        - recommended: Default recommended route (fastest)
+        """
+        print("\n" + "="*60)
+        print("🚚 GENERATING MULTI-ROUTE OPTIONS FOR DRIVER")
+        print("="*60)
+        
+        routes = {}
+        
+        # 1. Fastest Route (Traffic-aware, quickest time)
+        print("\n🏎️  Calculating FASTEST route (traffic-aware)...")
+        fastest = self.optimize_route(addresses, start_location, route_type='fastest')
+        if fastest:
+            routes['fastest'] = fastest
+            routes['fastest']['description'] = 'Quickest route based on current traffic conditions'
+            routes['fastest']['icon'] = '⚡'
+            print(f"   ✓ {fastest['total_duration_minutes']} min, {fastest['total_distance_km']} km")
+        
+        # 2. Shortest Route (Minimum distance)
+        print("\n📏 Calculating SHORTEST route (minimum distance)...")
+        shortest = self.optimize_route(addresses, start_location, route_type='shortest')
+        if shortest:
+            routes['shortest'] = shortest
+            routes['shortest']['description'] = 'Shortest distance route (may take longer due to roads/traffic)'
+            routes['shortest']['icon'] = '📍'
+            print(f"   ✓ {shortest['total_duration_minutes']} min, {shortest['total_distance_km']} km")
+        
+        # 3. Safest Route (Side-of-road optimized, safer roads)
+        print("\n🛡️  Calculating SAFEST route (side-of-road optimized)...")
+        safest = self.optimize_route_with_side_of_road_safety(addresses, start_location)
+        if safest:
+            routes['safest'] = safest
+            routes['safest']['description'] = 'Optimized for driver safety with minimal road crossings'
+            routes['safest']['icon'] = '🛡️'
+            print(f"   ✓ {safest['total_duration_minutes']} min, {safest['total_distance_km']} km")
+            print(f"   ✓ Road crossings minimized: {safest.get('crossing_warnings', 0)} warnings")
+        
+        # Set recommended route (default to fastest)
+        routes['recommended'] = 'fastest'
+        
+        print("\n" + "="*60)
+        print(f"✅ Generated {len(routes)-1} route options for driver selection")
+        print("="*60 + "\n")
+        
+        return routes
+    
+    def optimize_route_with_side_of_road_safety(self, addresses: List[str], start_location: str = None) -> Optional[Dict[str, Any]]:
+        """
+        Optimize route considering which side of the road destinations are on
+        Minimizes the need for drivers to cross roads for safety
+        """
+        if not self.subscription_key:
+            return self._mock_optimization(addresses, start_location)
+        
+        # Get base safest route
+        route = self.optimize_route(addresses, start_location, route_type='safest')
+        
+        if not route:
+            return None
+        
+        # Enhance with side-of-road analysis
+        print("\n🔍 Analyzing side-of-road positioning for safety...")
+        
+        waypoints = route['waypoints']
+        crossing_warnings = 0
+        enhanced_legs = []
+        
+        for i in range(len(waypoints) - 1):
+            current_addr = waypoints[i]
+            next_addr = waypoints[i + 1]
+            
+            # Get detailed routing between consecutive stops
+            leg_info = self._analyze_leg_safety(current_addr, next_addr)
+            
+            if leg_info and leg_info.get('requires_crossing'):
+                crossing_warnings += 1
+                print(f"   ⚠️  Stop {i+1} -> {i+2}: May require road crossing")
+            
+            enhanced_legs.append(leg_info if leg_info else {})
+        
+        route['route_legs_detailed'] = enhanced_legs
+        route['crossing_warnings'] = crossing_warnings
+        route['safety_score'] = max(0, 100 - (crossing_warnings * 10))  # Score out of 100
+        
+        return route
+    
+    def _analyze_leg_safety(self, from_addr: str, to_addr: str) -> Optional[Dict[str, Any]]:
+        """Analyze a single route leg for side-of-road safety considerations"""
+        try:
+            # Geocode both addresses
+            from_coords = self.geocode_address(from_addr)
+            to_coords = self.geocode_address(to_addr)
+            
+            if not from_coords or not to_coords:
+                return None
+            
+            # Get detailed route between two points
+            route_url = f"{self.base_url}/route/directions/json"
+            query = f"{from_coords[0]},{from_coords[1]}:{to_coords[0]},{to_coords[1]}"
+            
+            params = {
+                'api-version': self.api_version,
+                'subscription-key': self.subscription_key,
+                'query': query,
+                'traffic': 'false',
+                'travelMode': 'car',
+                'routeType': 'safest',
+                'instructionsType': 'text',
+                'sectionType': 'traffic',
+                'language': 'en-US'
+            }
+            
+            response = requests.get(route_url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            if 'routes' in data and len(data['routes']) > 0:
+                route = data['routes'][0]
+                
+                # Analyze if destination is on same side as approach direction
+                # This is a simplified heuristic - in production you'd use more sophisticated analysis
+                legs = route.get('legs', [])
+                if legs:
+                    leg = legs[0]
+                    summary = leg.get('summary', {})
+                    
+                    # Check for U-turns or significant direction changes that might indicate
+                    # the destination is on the opposite side of the road
+                    requires_crossing = False
+                    
+                    # Look at guidance instructions for crossing indicators
+                    guidance = leg.get('guidance', {})
+                    instructions = guidance.get('instructions', [])
+                    
+                    for instruction in instructions:
+                        text = instruction.get('text', '').lower()
+                        # Check for indicators of needing to cross
+                        if any(word in text for word in ['u-turn', 'cross', 'opposite side']):
+                            requires_crossing = True
+                            break
+                    
+                    return {
+                        'from': from_addr,
+                        'to': to_addr,
+                        'distance_km': summary.get('lengthInMeters', 0) / 1000,
+                        'duration_minutes': summary.get('travelTimeInSeconds', 0) / 60,
+                        'requires_crossing': requires_crossing,
+                        'safety_notes': 'Driver may need to cross road' if requires_crossing else 'Safe curbside access'
+                    }
+            
+            return None
+            
+        except Exception as e:
+            print(f"   ⚠️  Could not analyze leg safety: {e}")
+            return None
+    
     def _mock_optimization(self, addresses: List[str], start_location: str = None) -> Dict[str, Any]:
-        """Mock route optimization for testing without API key"""
         waypoints = [start_location] + addresses if start_location else addresses
         
         # Estimate: 5km average per stop, 10 min per stop

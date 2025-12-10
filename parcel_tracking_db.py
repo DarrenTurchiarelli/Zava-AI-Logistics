@@ -1273,8 +1273,20 @@ class ParcelTrackingDB:
 
     async def update_manifest_route(self, manifest_id: str, optimized_route: List[Dict[str, Any]], 
                                    estimated_duration: int, estimated_distance: float,
-                                   is_optimized: bool = True, traffic_considered: bool = True) -> bool:
-        """Update manifest with optimized route information"""
+                                   is_optimized: bool = True, traffic_considered: bool = True,
+                                   route_type: str = 'fastest', all_routes: Dict[str, Any] = None) -> bool:
+        """Update manifest with optimized route information
+        
+        Args:
+            manifest_id: The manifest ID to update
+            optimized_route: The waypoints for the selected route
+            estimated_duration: Duration in minutes
+            estimated_distance: Distance in km
+            is_optimized: Whether route is optimized
+            traffic_considered: Whether traffic was considered
+            route_type: Type of route selected ('fastest', 'shortest', 'safest')
+            all_routes: Dictionary containing all route options for driver selection
+        """
         try:
             container = self.database.get_container_client("driver_manifests")
             
@@ -1290,9 +1302,17 @@ class ParcelTrackingDB:
                 manifest["route_updated_timestamp"] = datetime.now(timezone.utc).isoformat()
                 manifest["optimized"] = is_optimized
                 manifest["traffic_considered"] = traffic_considered
+                manifest["selected_route_type"] = route_type
+                
+                # Store all route options if provided
+                if all_routes:
+                    manifest["route_options"] = all_routes
+                    manifest["multi_route_enabled"] = True
                 
                 await container.replace_item(item=manifest_id, body=manifest)
-                print(f"✅ Updated manifest {manifest_id} with optimized route")
+                print(f"✅ Updated manifest {manifest_id} with {route_type} route")
+                if all_routes:
+                    print(f"   📊 Stored {len([k for k in all_routes.keys() if k != 'recommended'])} route options")
                 return True
             
             print(f"⚠️ Manifest {manifest_id} not found")
@@ -1301,9 +1321,60 @@ class ParcelTrackingDB:
         except Exception as e:
             print(f"❌ Error updating manifest route: {e}")
             return False
+    
+    async def update_driver_route_preference(self, manifest_id: str, route_type: str) -> bool:
+        """Update the driver's selected route preference
+        
+        Args:
+            manifest_id: The manifest ID
+            route_type: The route type to switch to ('fastest', 'shortest', 'safest')
+        """
+        try:
+            container = self.database.get_container_client("driver_manifests")
+            
+            # Get existing manifest
+            query = "SELECT * FROM c WHERE c.id = @manifest_id"
+            parameters = [{"name": "@manifest_id", "value": manifest_id}]
+            
+            async for manifest in container.query_items(query=query, parameters=parameters):
+                # Check if multi-route is enabled
+                if not manifest.get("multi_route_enabled") or not manifest.get("route_options"):
+                    print(f"⚠️ Multi-route not available for manifest {manifest_id}")
+                    return False
+                
+                route_options = manifest["route_options"]
+                
+                if route_type not in route_options:
+                    print(f"❌ Route type '{route_type}' not available")
+                    return False
+                
+                selected_route = route_options[route_type]
+                
+                # Update manifest with selected route
+                manifest["selected_route_type"] = route_type
+                manifest["optimized_route"] = selected_route.get('waypoints', [])
+                manifest["estimated_duration_minutes"] = selected_route.get('total_duration_minutes', 0)
+                manifest["estimated_distance_km"] = selected_route.get('total_distance_km', 0)
+                manifest["route_preference_updated"] = datetime.now(timezone.utc).isoformat()
+                
+                await container.replace_item(item=manifest_id, body=manifest)
+                print(f"✅ Updated manifest {manifest_id} to use {route_type} route")
+                return True
+            
+            return False
+            
+        except Exception as e:
+            print(f"❌ Error updating route preference: {e}")
+            return False
 
-    async def mark_delivery_complete(self, manifest_id: str, barcode: str) -> bool:
-        """Mark a delivery as complete in the manifest"""
+    async def mark_delivery_complete(self, manifest_id: str, barcode: str, driver_note: str = None) -> bool:
+        """Mark a delivery as complete in the manifest
+        
+        Args:
+            manifest_id: The manifest ID
+            barcode: The parcel barcode
+            driver_note: Optional note from driver about this delivery/address
+        """
         try:
             container = self.database.get_container_client("driver_manifests")
             
@@ -1313,10 +1384,18 @@ class ParcelTrackingDB:
             
             async for manifest in container.query_items(query=query, parameters=parameters):
                 # Update item status
+                delivery_address = None
                 for item in manifest["items"]:
                     if item["barcode"] == barcode:
                         item["status"] = "delivered"
                         item["delivered_timestamp"] = datetime.now(timezone.utc).isoformat()
+                        if driver_note:
+                            item["driver_note"] = driver_note
+                        delivery_address = item.get("recipient_address")
+                
+                # Save address note for future deliveries if provided
+                if driver_note and delivery_address:
+                    await self.save_address_note(delivery_address, driver_note, manifest.get("driver_name", "Unknown"))
                 
                 # Update counters
                 manifest["completed_items"] = sum(1 for item in manifest["items"] if item.get("status") == "delivered")
@@ -1334,6 +1413,94 @@ class ParcelTrackingDB:
         except Exception as e:
             print(f"❌ Error marking delivery complete: {e}")
             return False
+    
+    async def save_address_note(self, address: str, note: str, driver_name: str) -> bool:
+        """Save or append a note about a delivery address for future reference
+        
+        Args:
+            address: The delivery address
+            note: The note to save
+            driver_name: Name of the driver who added the note
+        """
+        try:
+            container = self.database.get_container_client("address_notes")
+            
+            # Normalize address for consistent lookups
+            normalized_address = address.strip().lower()
+            note_id = f"note_{normalized_address.replace(' ', '_').replace(',', '')}"
+            
+            # Check if note already exists for this address
+            query = "SELECT * FROM c WHERE c.normalized_address = @address"
+            parameters = [{"name": "@address", "value": normalized_address}]
+            
+            existing_note = None
+            async for doc in container.query_items(query=query, parameters=parameters):
+                existing_note = doc
+                break
+            
+            if existing_note:
+                # Append to existing notes
+                new_entry = {
+                    "note": note,
+                    "driver_name": driver_name,
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+                existing_note["notes"].append(new_entry)
+                existing_note["last_updated"] = datetime.now(timezone.utc).isoformat()
+                await container.replace_item(item=existing_note["id"], body=existing_note)
+                print(f"✅ Updated address note for {address}")
+            else:
+                # Create new address note document
+                note_doc = {
+                    "id": note_id,
+                    "address": address,
+                    "normalized_address": normalized_address,
+                    "notes": [
+                        {
+                            "note": note,
+                            "driver_name": driver_name,
+                            "timestamp": datetime.now(timezone.utc).isoformat()
+                        }
+                    ],
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "last_updated": datetime.now(timezone.utc).isoformat()
+                }
+                await container.create_item(body=note_doc)
+                print(f"✅ Created new address note for {address}")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error saving address note: {e}")
+            # Don't fail the delivery if note saving fails
+            return False
+    
+    async def get_address_notes(self, address: str) -> List[Dict[str, Any]]:
+        """Get all notes for a specific delivery address
+        
+        Args:
+            address: The delivery address to look up
+            
+        Returns:
+            List of notes with driver name and timestamp
+        """
+        try:
+            container = self.database.get_container_client("address_notes")
+            
+            # Normalize address for lookup
+            normalized_address = address.strip().lower()
+            
+            query = "SELECT * FROM c WHERE c.normalized_address = @address"
+            parameters = [{"name": "@address", "value": normalized_address}]
+            
+            async for doc in container.query_items(query=query, parameters=parameters):
+                return doc.get("notes", [])
+            
+            return []
+            
+        except Exception as e:
+            print(f"❌ Error retrieving address notes: {e}")
+            return []
 
     async def get_all_active_manifests(self) -> List[Dict[str, Any]]:
         """Get all active manifests for admin overview"""

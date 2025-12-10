@@ -1293,7 +1293,7 @@ def driver_manifest():
             flash(f'No active manifest for driver {driver_id}. Contact dispatch for assignment.', 'info')
             return render_template('driver_manifest.html', manifest=None)
         
-        # If route not optimized yet, optimize it now
+        # If route not optimized yet, optimize it now with ALL route options
         if not manifest.get('route_optimized') and manifest.get('items'):
             from bing_maps_routes import BingMapsRouter
             from depot_manager import get_depot_manager
@@ -1304,36 +1304,45 @@ def driver_manifest():
             # Extract addresses from manifest items
             addresses = [item['recipient_address'] for item in manifest['items']]
             
-            # Get optimal depot based on delivery addresses
-            start_location = depot_mgr.get_depot_for_addresses(addresses)
+            # Get depot closest to the first parcel (starting point)
+            start_location = depot_mgr.get_closest_depot_to_address(addresses[0])
             
-            # Optimize route
-            route_info = router.optimize_route(addresses, start_location)
+            # Generate ALL route options for driver selection
+            all_routes = router.optimize_all_route_types(addresses, start_location)
             
-            if route_info:
-                # Update manifest with optimized route
+            if all_routes:
+                # Use the recommended route as default
+                recommended_type = all_routes.get('recommended', 'fastest')
+                default_route = all_routes.get(recommended_type, {})
+                
+                # Update manifest with all route options
                 async def update_route():
                     async with ParcelTrackingDB() as db:
                         await db.update_manifest_route(
                             manifest['id'],
-                            route_info['waypoints'],
-                            route_info['total_duration_minutes'],
-                            route_info['total_distance_km'],
-                            route_info.get('optimized', False),
-                            route_info.get('traffic_considered', False)
+                            default_route.get('waypoints', []),
+                            default_route.get('total_duration_minutes', 0),
+                            default_route.get('total_distance_km', 0),
+                            default_route.get('optimized', False),
+                            default_route.get('traffic_considered', False),
+                            route_type=recommended_type,
+                            all_routes=all_routes
                         )
                 
                 run_async(update_route())
                 
                 # Update local manifest object
                 manifest['route_optimized'] = True
-                manifest['optimized_route'] = route_info['waypoints']
-                manifest['estimated_duration_minutes'] = route_info['total_duration_minutes']
-                manifest['estimated_distance_km'] = route_info['total_distance_km']
-                manifest['route_url'] = route_info['route_url']
-                manifest['embed_url'] = router.generate_embed_url(route_info['waypoints'])
-                manifest['optimized'] = route_info.get('optimized', False)
-                manifest['traffic_considered'] = route_info.get('traffic_considered', False)
+                manifest['multi_route_enabled'] = True
+                manifest['route_options'] = all_routes
+                manifest['selected_route_type'] = recommended_type
+                manifest['optimized_route'] = default_route.get('waypoints', [])
+                manifest['estimated_duration_minutes'] = default_route.get('total_duration_minutes', 0)
+                manifest['estimated_distance_km'] = default_route.get('total_distance_km', 0)
+                manifest['route_url'] = default_route.get('route_url', '')
+                manifest['embed_url'] = router.generate_embed_url(default_route.get('waypoints', []))
+                manifest['optimized'] = default_route.get('optimized', False)
+                manifest['traffic_considered'] = default_route.get('traffic_considered', False)
         
         # Always regenerate embed URL to ensure latest map features
         if manifest.get('route_optimized') and manifest.get('optimized_route'):
@@ -1341,11 +1350,93 @@ def driver_manifest():
             manifest['embed_url'] = url_for('render_map', manifest_id=manifest['id'], _external=False)
             print(f"🗺️  [DRIVER] Map URL: {manifest['embed_url']}")
         
+        # Fetch address notes for each delivery location
+        async def fetch_address_notes():
+            async with ParcelTrackingDB() as db:
+                for item in manifest.get('items', []):
+                    address = item.get('recipient_address')
+                    if address:
+                        notes = await db.get_address_notes(address)
+                        if notes:
+                            item['address_notes'] = notes
+                            # Add summary for quick display
+                            item['address_notes_summary'] = f"{len(notes)} note(s) from previous deliveries"
+        
+        run_async(fetch_address_notes())
+        
         return render_template('driver_manifest.html', manifest=manifest)
         
     except Exception as e:
         flash(f'Error loading manifest: {str(e)}', 'danger')
         return render_template('driver_manifest.html', manifest=None)
+
+@app.route('/driver/manifest/<manifest_id>/switch-route', methods=['POST'])
+@login_required
+def switch_route(manifest_id):
+    """Allow driver to switch between route options"""
+    user = session.get('user', {})
+    
+    try:
+        route_type = request.json.get('route_type')
+        
+        if not route_type or route_type not in ['fastest', 'shortest', 'safest']:
+            return jsonify({'success': False, 'error': 'Invalid route type'}), 400
+        
+        # Verify driver can only modify their own manifest
+        if user.get('role') == UserManager.ROLE_DRIVER:
+            async def verify_and_switch():
+                async with ParcelTrackingDB() as db:
+                    manifest = await db.get_manifest_by_id(manifest_id)
+                    if not manifest or manifest.get('driver_id') != user.get('driver_id'):
+                        return False, "You can only modify your own manifest"
+                    
+                    # Switch the route
+                    success = await db.update_driver_route_preference(manifest_id, route_type)
+                    if success:
+                        # Get updated manifest
+                        updated_manifest = await db.get_manifest_by_id(manifest_id)
+                        return True, updated_manifest
+                    return False, "Failed to switch route"
+            
+            success, result = run_async(verify_and_switch())
+            
+            if success:
+                manifest = result
+                return jsonify({
+                    'success': True,
+                    'route_type': route_type,
+                    'duration': manifest.get('estimated_duration_minutes', 0),
+                    'distance': manifest.get('estimated_distance_km', 0),
+                    'map_url': url_for('render_map', manifest_id=manifest_id, _external=False)
+                })
+            else:
+                return jsonify({'success': False, 'error': result}), 403
+        
+        # Admin/Depot Manager can switch any manifest
+        async def switch():
+            async with ParcelTrackingDB() as db:
+                success = await db.update_driver_route_preference(manifest_id, route_type)
+                if success:
+                    updated_manifest = await db.get_manifest_by_id(manifest_id)
+                    return True, updated_manifest
+                return False, "Failed to switch route"
+        
+        success, result = run_async(switch())
+        
+        if success:
+            manifest = result
+            return jsonify({
+                'success': True,
+                'route_type': route_type,
+                'duration': manifest.get('estimated_duration_minutes', 0),
+                'distance': manifest.get('estimated_distance_km', 0),
+                'map_url': url_for('render_map', manifest_id=manifest_id, _external=False)
+            })
+        else:
+            return jsonify({'success': False, 'error': result}), 500
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/driver/manifest/<manifest_id>/complete/<barcode>', methods=['POST'])
 @login_required
@@ -1354,6 +1445,9 @@ def mark_delivery_complete(manifest_id, barcode):
     user = session.get('user', {})
     
     try:
+        # Get optional driver note from request
+        driver_note = request.form.get('driver_note', '').strip()
+        
         # Verify driver can only complete their own deliveries
         if user.get('role') == UserManager.ROLE_DRIVER:
             # Check manifest belongs to this driver
@@ -1370,7 +1464,7 @@ def mark_delivery_complete(manifest_id, barcode):
                             delivery_address = item.get('recipient_address', 'Unknown')
                             break
                     
-                    success = await db.mark_delivery_complete(manifest_id, barcode)
+                    success = await db.mark_delivery_complete(manifest_id, barcode, driver_note if driver_note else None)
                     if success and delivery_address:
                         await db.update_parcel_status(barcode, "delivered", delivery_address, user.get('username', 'driver'))
                     return success, None
@@ -1394,7 +1488,7 @@ def mark_delivery_complete(manifest_id, barcode):
                             delivery_address = item.get('recipient_address', 'Unknown')
                             break
                     
-                    success = await db.mark_delivery_complete(manifest_id, barcode)
+                    success = await db.mark_delivery_complete(manifest_id, barcode, driver_note if driver_note else None)
                     if success and delivery_address:
                         await db.update_parcel_status(barcode, "delivered", delivery_address, user.get('username', 'admin'))
                     return success
@@ -1464,8 +1558,8 @@ def view_manifest_details(manifest_id):
             # Extract addresses from manifest items
             addresses = [item['recipient_address'] for item in manifest['items']]
             
-            # Get optimal depot based on delivery addresses
-            start_location = depot_mgr.get_depot_for_addresses(addresses)
+            # Get depot closest to the first parcel (starting point)
+            start_location = depot_mgr.get_closest_depot_to_address(addresses[0])
             
             # Optimize route
             route_info = router.optimize_route(addresses, start_location)
