@@ -1338,7 +1338,7 @@ def driver_manifest():
         # Always regenerate embed URL to ensure latest map features
         if manifest.get('route_optimized') and manifest.get('optimized_route'):
             # Use Flask route instead of data URL
-            manifest['embed_url'] = url_for('render_map', manifest_id=manifest_id, _external=False)
+            manifest['embed_url'] = url_for('render_map', manifest_id=manifest['id'], _external=False)
             print(f"🗺️  [DRIVER] Map URL: {manifest['embed_url']}")
         
         return render_template('driver_manifest.html', manifest=manifest)
