@@ -300,8 +300,13 @@ Create a `.env` file in the project root:
 AZURE_AI_PROJECT_CONNECTION_STRING = "your-azure-ai-project-connection-string"
 AZURE_AI_MODEL_DEPLOYMENT_NAME = "gpt-4o"
 
-# Azure Cosmos DB Configuration
+# Azure Cosmos DB Configuration (Local Development)
 COSMOS_CONNECTION_STRING = "AccountEndpoint=https://your-account.documents.azure.com:443/;AccountKey=your-key-here;"
+
+# Azure Cosmos DB Configuration (Production - Managed Identity)
+# USE_MANAGED_IDENTITY = "true"
+# COSMOS_DB_ENDPOINT = "https://your-account.documents.azure.com:443/"
+# COSMOS_DB_DATABASE_NAME = "logisticstracking"
 
 # Azure Maps (Route Optimization)
 AZURE_MAPS_SUBSCRIPTION_KEY = "your-azure-maps-key"
@@ -315,6 +320,8 @@ FLASK_SECRET_KEY = "your-secret-key-for-sessions"
 FLASK_ENV = "development"
 PORT = 5000
 ```
+
+**Production Note**: For Azure App Service deployment, use managed identity authentication instead of connection strings. See [DEPLOYMENT.md](Guides/DEPLOYMENT.md#rbac-permissions-required-for-managed-identity) for RBAC setup.
 
 ### 5. Install Dependencies
 

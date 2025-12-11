@@ -79,7 +79,20 @@ def get_cached_credential():
 
 
 class ParcelTrackingDB:
-    """Consolidated Parcel Tracking Database Interface"""
+    """
+    Consolidated Parcel Tracking Database Interface
+    
+    Authentication Methods:
+    1. Key-based (Local Development):
+       - Set COSMOS_CONNECTION_STRING or COSMOS_DB_ENDPOINT + COSMOS_DB_KEY
+    
+    2. Managed Identity (Azure Production):
+       - Set USE_MANAGED_IDENTITY=true
+       - Set COSMOS_DB_ENDPOINT and COSMOS_DB_DATABASE_NAME
+       - Required RBAC: Cosmos DB Built-in Data Contributor (00000000-0000-0000-0000-000000000002)
+       - See Scripts/setup_rbac_permissions.ps1 for setup
+       - See Guides/DEPLOYMENT.md#rbac-permissions for details
+    """
     
     def __init__(self):
         # Try to get individual values first

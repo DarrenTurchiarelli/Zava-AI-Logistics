@@ -2,6 +2,15 @@
 Azure AI Foundry Agent Integration Layer
 Provides unified interface to call all 9 Azure AI Foundry persistent agents
 This module replaces local Python agent implementations with real Azure AI agents
+
+Required Azure RBAC Permissions for Managed Identity:
+- Cognitive Services OpenAI Contributor (for OpenAI operations)
+- Azure AI Developer (for agents/write permissions)
+
+Setup Instructions:
+1. Enable managed identity on App Service
+2. Run Scripts/setup_rbac_permissions.ps1 to grant roles
+3. See Guides/DEPLOYMENT.md#rbac-permissions for details
 """
 
 import os

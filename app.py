@@ -607,8 +607,8 @@ def report_fraud():
             print(f"✅ Analysis complete: {analysis.threat_level.value} threat, {len(analysis.risk_indicators)} indicators")
             
             # 🔥 NEW: Trigger Fraud → Customer Service Workflow if high risk
-            if analysis.risk_score >= 0.7 and reporter_email:
-                print(f"\n🚀 Triggering Fraud → Customer Service Workflow (Risk: {analysis.risk_score:.0%})")
+            if analysis.confidence_score >= 0.7 and reporter_email:
+                print(f"\n🚀 Triggering Fraud → Customer Service Workflow (Risk: {analysis.confidence_score:.0%})")
                 
                 from workflows.fraud_to_customer_service import fraud_detection_to_customer_service_workflow
                 

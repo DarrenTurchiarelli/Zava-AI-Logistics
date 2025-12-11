@@ -53,15 +53,24 @@ az webapp config set \
   --resource-group dt-logistics-rg \
   --startup-file "gunicorn --bind=0.0.0.0:8000 --timeout 600 --workers=4 app:app"
 
+# Enable managed identity (recommended for production)
+az webapp identity assign \
+  --name dt-logistics-web \
+  --resource-group dt-logistics-rg
+
 # Set environment variables
 az webapp config appsettings set \
   --name dt-logistics-web \
   --resource-group dt-logistics-rg \
   --settings \
-    COSMOS_CONNECTION_STRING="<your_cosmos_connection>" \
+    COSMOS_DB_ENDPOINT="<your_cosmos_endpoint>" \
+    COSMOS_DB_DATABASE_NAME="<your_database_name>" \
     AZURE_AI_PROJECT_CONNECTION_STRING="<your_ai_connection>" \
+    AZURE_SPEECH_KEY="<your_speech_key>" \
+    AZURE_SPEECH_REGION="<your_region>" \
     FLASK_SECRET_KEY="<generate_secure_key>" \
-    FLASK_ENV="production"
+    FLASK_ENV="production" \
+    USE_MANAGED_IDENTITY="true"
 
 # Deploy code
 az webapp up \
@@ -84,12 +93,83 @@ az webapp up \
 Set these in Azure Portal → App Service → Configuration → Application Settings:
 
 | Variable | Description | Example |
-|----------|-------------|---------|
-| `COSMOS_CONNECTION_STRING` | Azure Cosmos DB connection | `AccountEndpoint=https://...` |
-| `AZURE_AI_PROJECT_CONNECTION_STRING` | Azure AI Foundry endpoint | `https://...` |
+|----------|-------------|---------|------|
+| `COSMOS_DB_ENDPOINT` | Azure Cosmos DB endpoint URL | `https://your-cosmos.documents.azure.com:443/` |
+| `COSMOS_DB_DATABASE_NAME` | Cosmos DB database name | `logisticstracking` |
+| `AZURE_AI_PROJECT_CONNECTION_STRING` | Azure AI Foundry endpoint | `https://your-hub.services.ai.azure.com/api/projects/your-project` |
+| `AZURE_SPEECH_KEY` | Azure Speech Services key | `your-speech-key` |
+| `AZURE_SPEECH_REGION` | Azure Speech Services region | `australiaeast` |
 | `FLASK_SECRET_KEY` | Flask session secret | Generate with `python -c "import secrets; print(secrets.token_hex(32))"` |
 | `FLASK_ENV` | Environment mode | `production` |
+| `USE_MANAGED_IDENTITY` | Enable managed identity auth | `true` |
 | `PORT` | Port number (auto-set) | `8000` |
+
+**Note**: Do NOT set `COSMOS_CONNECTION_STRING` or `COSMOS_DB_KEY` when using managed identity authentication.
+
+## RBAC Permissions (Required for Managed Identity)
+
+After enabling managed identity, grant the following Azure RBAC roles to the App Service's managed identity:
+
+### 1. Cosmos DB Access
+```bash
+# Get the managed identity principal ID
+PRINCIPAL_ID=$(az webapp identity show \
+  --name dt-logistics-web \
+  --resource-group dt-logistics-rg \
+  --query principalId -o tsv)
+
+# Assign Cosmos DB Built-in Data Contributor role
+az cosmosdb sql role assignment create \
+  --account-name your-cosmos-account \
+  --resource-group dt-logistics-rg \
+  --role-definition-id 00000000-0000-0000-0000-000000000002 \
+  --principal-id $PRINCIPAL_ID \
+  --scope "/"
+```
+
+### 2. Azure AI Foundry Access
+```bash
+# Get subscription ID
+SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+
+# Assign Cognitive Services OpenAI Contributor role
+az role assignment create \
+  --assignee-object-id $PRINCIPAL_ID \
+  --assignee-principal-type ServicePrincipal \
+  --role "Cognitive Services OpenAI Contributor" \
+  --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/dt-logistics-rg"
+
+# Assign Azure AI Developer role (for agents/write operations)
+az role assignment create \
+  --assignee-object-id $PRINCIPAL_ID \
+  --assignee-principal-type ServicePrincipal \
+  --role "Azure AI Developer" \
+  --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/dt-logistics-rg"
+```
+
+### 3. Verify Role Assignments
+```bash
+# List all role assignments for the managed identity
+az role assignment list \
+  --assignee $PRINCIPAL_ID \
+  --all \
+  --query "[].{Role:roleDefinitionName, Scope:scope}" \
+  --output table
+```
+
+### Required Roles Summary
+
+| Service | Role | Purpose |
+|---------|------|---------|------|
+| **Cosmos DB** | `Cosmos DB Built-in Data Contributor` | Full data plane access (CRUD operations) |
+| **Azure AI Foundry** | `Cognitive Services OpenAI Contributor` | OpenAI model and agent operations |
+| **Azure AI Foundry** | `Azure AI Developer` | Agents create/write/execute permissions |
+| **Azure Speech** | Configured via API key | Speech synthesis and recognition |
+
+**Important**: Role assignments can take up to 5 minutes to propagate. Restart the App Service after granting permissions:
+```bash
+az webapp restart --name dt-logistics-web --resource-group dt-logistics-rg
+```
 
 ## Post-Deployment Configuration
 
@@ -191,12 +271,15 @@ az webapp restart --name dt-logistics-web --resource-group dt-logistics-rg
 ## Security Checklist
 
 - ✅ HTTPS enabled
-- ✅ Managed Identity configured
+- ✅ Managed Identity enabled and assigned
+- ✅ RBAC roles granted (Cosmos DB, Azure AI, Speech Services)
 - ✅ Environment variables set in Azure (not in code)
+- ✅ Connection strings removed (using managed identity)
 - ✅ .gitignore includes .env file
 - ✅ Authentication configured (for production)
 - ✅ IP restrictions enabled (optional)
 - ✅ Application Insights monitoring enabled
+- ✅ Cosmos DB key-based auth disabled (`DisableLocalAuth=true`)
 
 ## Cost Optimization
 
