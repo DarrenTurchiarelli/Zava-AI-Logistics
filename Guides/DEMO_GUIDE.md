@@ -22,6 +22,7 @@ This creates:
 | `driver-001` | John Smith | 6 |
 | `driver-002` | Maria Garcia | 6 |
 | `driver-003` | David Wong | 8 |
+| `driver-004` | Mandy Musk | 16 |
 
 ### Demo Workflow
 

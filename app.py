@@ -24,7 +24,7 @@ except ImportError:
     OCR_AVAILABLE = False
 
 # Import company configuration
-from company_config import get_company_info, COMPANY_NAME, COMPANY_PHONE, COMPANY_EMAIL
+from config.company import get_company_info, COMPANY_NAME, COMPANY_PHONE, COMPANY_EMAIL
 
 # Import all logistics modules
 from logistics_common import setup_warning_suppression
@@ -52,7 +52,7 @@ from logistics_admin import (
     synthetic_scenario_builder, view_pending_approvals
 )
 from parcel_tracking_db import ParcelTrackingDB
-from fraud_risk_agent import analyze_with_fraud_agent, fraud_risk_agent
+from agents.fraud import analyze_with_fraud_agent, fraud_risk_agent
 from user_manager import UserManager, has_role, is_admin, is_driver, can_view_all_manifests, can_create_manifest, can_approve_requests
 
 # Initialize Flask app
@@ -311,7 +311,7 @@ def login():
         
         # Authenticate with UserManager
         async def auth_user():
-            from azure_ai_agents import identity_agent
+            from agents.base import identity_agent
             
             async with ParcelTrackingDB() as db:
                 if not db.database:
@@ -414,7 +414,7 @@ def register_parcel():
     if request.method == 'POST':
         try:
             from logistics_parcel import get_state_from_postcode
-            from azure_ai_agents import parcel_intake_agent
+            from agents.base import parcel_intake_agent
             import uuid
             
             # Get form data
@@ -1161,7 +1161,7 @@ def chatbot_parcel_location(tracking_number):
 @app.route('/api/speech/token', methods=['GET'])
 def get_speech_token():
     """Get Azure Speech Services token for client-side use - Available to all users"""
-    from azure_speech_service import get_speech_service
+    from services.speech import get_speech_service
     
     speech_service = get_speech_service()
     token_data = speech_service.get_speech_token()
@@ -1178,7 +1178,7 @@ def get_speech_token():
 @login_required
 def synthesize_speech():
     """Convert text to speech using Azure Speech Services"""
-    from azure_speech_service import get_speech_service
+    from services.speech import get_speech_service
     
     data = request.get_json()
     text = data.get('text', '')
@@ -1342,8 +1342,8 @@ def driver_manifest():
         
         # If route not optimized yet, optimize it now with ALL route options
         if not manifest.get('route_optimized') and manifest.get('items'):
-            from bing_maps_routes import BingMapsRouter
-            from depot_manager import get_depot_manager
+            from services.maps import BingMapsRouter
+            from config.depots import get_depot_manager
             
             router = BingMapsRouter()
             depot_mgr = get_depot_manager()
@@ -1596,8 +1596,8 @@ def view_manifest_details(manifest_id):
         
         # If route not optimized yet, optimize it now
         if not manifest.get('route_optimized') and manifest.get('items'):
-            from bing_maps_routes import BingMapsRouter
-            from depot_manager import get_depot_manager
+            from services.maps import BingMapsRouter
+            from config.depots import get_depot_manager
             
             router = BingMapsRouter()
             depot_mgr = get_depot_manager()
@@ -2007,7 +2007,7 @@ def extract_recipient_name(text_lines):
 async def generate_customer_delivery_map(parcel, manifest):
     """Generate approximate delivery map for customer (privacy-protected)"""
     try:
-        from bing_maps_routes import BingMapsRouter
+        from services.maps import BingMapsRouter
         import random
         
         print(f"🗺️ Starting map generation for barcode: {parcel.get('barcode')}")
@@ -2109,7 +2109,7 @@ def render_map(manifest_id):
             return "No route data available", 404
         
         # Generate map HTML with route geometry
-        from bing_maps_routes import BingMapsRouter
+        from services.maps import BingMapsRouter
         router = BingMapsRouter()
         
         addresses = manifest.get('optimized_route', [])

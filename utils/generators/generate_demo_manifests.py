@@ -264,7 +264,7 @@ async def main():
     print("=" * 70)
     print()
     
-    from depot_manager import get_depot_manager
+    from config.depots import get_depot_manager
     depot_mgr = get_depot_manager()
     
     print("Configured Depots:")

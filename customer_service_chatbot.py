@@ -6,8 +6,8 @@ Provides AI-powered assistance for customer service representatives
 import os
 from typing import Dict, Any, List, Optional
 from datetime import datetime
-from azure_ai_agents import customer_service_agent
-import company_config as config
+from agents.base import customer_service_agent
+import config.company as config
 
 class CustomerServiceChatbot:
     """AI Chatbot for customer service operations"""

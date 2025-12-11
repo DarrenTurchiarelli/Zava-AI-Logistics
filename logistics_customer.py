@@ -170,12 +170,12 @@ async def report_suspicious_message():
     print("\n🔍 Analyzing message for fraud indicators...")
     
     # Use the Fraud & Risk Agent for intelligent analysis
-    from fraud_risk_agent import analyze_with_fraud_agent
+    from agents.fraud import analyze_with_fraud_agent
     try:
         ai_analysis = await analyze_with_fraud_agent(message_content, sender_info)
         
         # Display AI analysis
-        from fraud_risk_agent import fraud_risk_agent
+        from agents.fraud import fraud_risk_agent
         print(fraud_risk_agent.format_analysis_report(ai_analysis))
         
         # Store the report with AI analysis in database

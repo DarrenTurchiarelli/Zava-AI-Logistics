@@ -315,6 +315,32 @@ def get_depot_manager() -> DepotManager:
     return _depot_manager
 
 
+def get_closest_depot_to_address(address: str) -> str:
+    """Quick helper to get closest depot for an address
+    
+    Args:
+        address: Delivery address
+        
+    Returns:
+        Closest depot address
+    """
+    manager = get_depot_manager()
+    return manager.get_closest_depot_to_address(address)
+
+
+def get_depot_by_name(depot_name: str) -> Optional[str]:
+    """Get depot address by depot name/state
+    
+    Args:
+        depot_name: State code or depot name
+        
+    Returns:
+        Depot address or None
+    """
+    manager = get_depot_manager()
+    return manager.get_depot(depot_name)
+
+
 if __name__ == "__main__":
     # Test the depot manager
     print("=" * 70)

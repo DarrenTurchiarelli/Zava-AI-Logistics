@@ -193,8 +193,8 @@ async def simulate_route_optimization_agent():
     
     start_time = time.time()
     
-    from bing_maps_routes import BingMapsRouter
-    from depot_manager import get_depot_manager
+    from services.maps import BingMapsRouter
+    from config.depots import get_depot_manager
     
     router = BingMapsRouter()
     depot_mgr = get_depot_manager()
@@ -394,7 +394,7 @@ async def simulate_manifest_generation_agent():
     
     start_time = time.time()
     
-    from manifest_generation_agent import ManifestGenerationAgent, Driver, ManifestParcel
+    from agents.manifest import ManifestGenerationAgent, Driver, ManifestParcel
     
     agent = ManifestGenerationAgent()
     

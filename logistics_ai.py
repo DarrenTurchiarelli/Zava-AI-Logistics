@@ -11,8 +11,8 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
-from bing_maps_routes import BingMapsRouter
-from azure_ai_agents import optimization_agent, customer_service_agent, sorting_facility_agent, call_agent_sync
+from services.maps import BingMapsRouter
+from agents.base import optimization_agent, customer_service_agent, sorting_facility_agent, call_agent_sync
 
 # ============================================================================
 # DATA CLASSES

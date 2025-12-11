@@ -9,9 +9,9 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
-from bing_maps_routes import BingMapsRouter
-from depot_manager import get_depot_manager
-from azure_ai_agents import dispatcher_agent
+from services.maps import BingMapsRouter
+from config.depots import get_depot_manager
+from agents.base import dispatcher_agent
 
 # ============================================================================
 # DATA CLASSES
