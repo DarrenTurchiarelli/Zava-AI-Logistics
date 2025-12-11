@@ -65,6 +65,36 @@
                             </small>
                         </div>
 
+                        <hr class="my-4">
+                        
+                        <h6 class="mb-3"><i class="bi bi-person-badge"></i> Your Contact Information (Optional - for automated protection)</h6>
+                        <div class="alert alert-light border">
+                            <small>
+                                <i class="bi bi-shield-check"></i> <strong>Automated Protection:</strong> If we detect high-risk fraud, we can automatically send you a personalized warning message with protection tips. Your info is only used for your security.
+                            </small>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="reporter_name" class="form-label">Your Name</label>
+                                <input type="text" class="form-control" id="reporter_name" name="reporter_name"
+                                       value="{{ request.form.get('reporter_name', '') }}"
+                                       placeholder="Your name">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="reporter_email" class="form-label">Your Email</label>
+                                <input type="email" class="form-control" id="reporter_email" name="reporter_email"
+                                       value="{{ request.form.get('reporter_email', '') }}"
+                                       placeholder="your.email@example.com">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="reporter_phone" class="form-label">Your Phone</label>
+                                <input type="tel" class="form-control" id="reporter_phone" name="reporter_phone"
+                                       value="{{ request.form.get('reporter_phone', '') }}"
+                                       placeholder="+61 4XX XXX XXX">
+                            </div>
+                        </div>
+
                         <div class="d-grid">
                             <button type="submit" class="btn btn-danger btn-lg" id="analyzeBtn">
                                 <i class="bi bi-shield-check"></i> Analyze & Report Message
@@ -134,6 +164,52 @@
                     <div class="alert alert-permanent alert-danger">
                         <i class="bi bi-bell"></i> <strong>Security Team Alerted:</strong>
                         This high-risk threat has been escalated to our security team for investigation.
+                    </div>
+                    {% endif %}
+
+                    <!-- Workflow Results -->
+                    {% if workflow_result %}
+                    <div class="card mb-3 border-warning">
+                        <div class="card-header bg-warning text-dark">
+                            <strong><i class="bi bi-gear-fill"></i> Automated Protection Workflow Activated</strong>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="text-center">
+                                        <i class="bi bi-shield-check fs-1 text-success"></i>
+                                        <p class="mb-0"><strong>Risk Score</strong></p>
+                                        <h3 class="text-danger">{{ (workflow_result.fraud_detection.risk_score * 100)|int }}%</h3>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center">
+                                        <i class="bi bi-envelope-check fs-1 text-primary"></i>
+                                        <p class="mb-0"><strong>Notification</strong></p>
+                                        <h5>{% if workflow_result.customer_engagement.notification_sent %}<span class="text-success">✓ Sent</span>{% else %}<span class="text-muted">Not Sent</span>{% endif %}</h5>
+                                        <small class="text-muted">{{ workflow_result.customer_engagement.notification_method }}</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center">
+                                        <i class="bi bi-box-seam fs-1 text-warning"></i>
+                                        <p class="mb-0"><strong>Parcels Held</strong></p>
+                                        <h3>{{ workflow_result.outcome.parcels_held }}</h3>
+                                    </div>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="alert alert-success mb-0">
+                                <i class="bi bi-check-circle-fill"></i> <strong>Protection Active:</strong>
+                                {% if workflow_result.customer_engagement.notification_sent %}
+                                We've sent you a personalized fraud warning message with protection tips.
+                                {% endif %}
+                                {% if workflow_result.outcome.case_escalated %}
+                                This case has been escalated for security review.
+                                {% endif %}
+                                <br><small class="text-muted">Workflow ID: {{ workflow_result.workflow_id }}</small>
+                            </div>
+                        </div>
                     </div>
                     {% endif %}
 

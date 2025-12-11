@@ -549,18 +549,24 @@ def all_parcels():
 
 @app.route('/fraud/report', methods=['GET', 'POST'])
 def report_fraud():
-    """Report suspicious message - publicly accessible"""
+    """Report suspicious message - publicly accessible with automated workflow"""
     print(f"\n{'='*60}")
     print(f"📋 Fraud report route accessed - Method: {request.method}")
     print(f"{'='*60}")
     
     analysis = None
+    workflow_result = None
     
     if request.method == 'POST':
         print("📬 Processing POST request...")
         try:
             message_content = request.form.get('message_content', '').strip()
             sender_info = request.form.get('sender_info', 'unknown').strip()
+            
+            # Optional: Customer contact info for workflow
+            reporter_name = request.form.get('reporter_name', '').strip()
+            reporter_email = request.form.get('reporter_email', '').strip()
+            reporter_phone = request.form.get('reporter_phone', '').strip()
             
             # Check if file was uploaded
             file_text = ""
@@ -600,6 +606,30 @@ def report_fraud():
             
             print(f"✅ Analysis complete: {analysis.threat_level.value} threat, {len(analysis.risk_indicators)} indicators")
             
+            # 🔥 NEW: Trigger Fraud → Customer Service Workflow if high risk
+            if analysis.risk_score >= 0.7 and reporter_email:
+                print(f"\n🚀 Triggering Fraud → Customer Service Workflow (Risk: {analysis.risk_score:.0%})")
+                
+                from workflows.fraud_to_customer_service import fraud_detection_to_customer_service_workflow
+                
+                workflow_result = run_async(fraud_detection_to_customer_service_workflow(
+                    message_content=combined_message,
+                    sender_info={
+                        "sender": sender_info,
+                        "message_type": "email" if "@" in sender_info else "sms",
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    },
+                    customer_info={
+                        "name": reporter_name or "Customer",
+                        "email": reporter_email,
+                        "phone": reporter_phone
+                    },
+                    trigger_type="customer_report"
+                ))
+                
+                print(f"✅ Workflow completed: {workflow_result['status']}")
+                flash('High-risk fraud detected! Customer protection workflow activated.', 'warning')
+            
             # Store in database
             async def store_report():
                 async with ParcelTrackingDB() as db:
@@ -624,8 +654,10 @@ def report_fraud():
             
         except Exception as e:
             flash(f'Error analyzing message: {str(e)}', 'danger')
+            import traceback
+            traceback.print_exc()
     
-    return render_template('report_fraud.html', analysis=analysis)
+    return render_template('report_fraud.html', analysis=analysis, workflow_result=workflow_result)
 
 # Approvals
 

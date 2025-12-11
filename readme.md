@@ -1,772 +1,237 @@
-# 📦 Last Mile Logistics Parcel Tracking System
+# 📦 DT Logistics - Last Mile Parcel Tracking System
 
-A comprehensive parcel tracking system for last-mile logistics operations using **Azure AI Foundry**, **Microsoft Agent Framework** and **Azure Cosmos DB**. This system manages the complete logistics journey from store intake through customer delivery with real-time tracking and **9 specialized AI agents** providing intelligent automation across all workflows.
+A modern, AI-powered parcel tracking system for last-mile logistics operations built with **Azure AI Foundry**, **Microsoft Agent Framework**, and **Azure Cosmos DB**. Features intelligent workflow automation, voice-enabled customer service, Azure Maps route optimization, and proactive fraud detection with agent-to-agent communication.
 
-## ⭐ **STATUS: ALL 9 AZURE AI AGENTS FULLY INTEGRATED** ⭐
+## ⭐ **Latest Updates** ⭐
 
-**Integration Date:** December 8, 2025  
-**Test Results:** 9/9 agents working successfully (100%)  
-**Azure AI Foundry:** Full telemetry coverage across all workflows
+**December 11, 2025**
+- ✅ **Agent Workflows**: Fraud → Customer Service automated escalation
+- ✅ **Voice Features**: Azure Speech Services integration for chatbot
+- ✅ **Modular Architecture**: Organized into agents/, services/, config/, workflows/ packages
+- ✅ **9 AI Agents**: Full integration with Azure AI Foundry telemetry
+- ✅ **Azure Maps**: Real-time route optimization with traffic analysis
 
-## 🌐 **NEW: Web-Based Operations Center**
+## 🚀 Quick Start
 
-### **Modern Flask Web Application**
-Professional web interface for complete logistics operations management with responsive Bootstrap 5 design.
-
-#### **🚀 Quick Start - Web Interface**
+### **Web Application (Recommended)**
 
 ```powershell
-# Start the web application (development mode)
-cd c:\dt_item_scanner
+cd c:\Workbench\dt_item_scanner
 $env:FLASK_ENV='development'; py app.py
 ```
 
-The web interface will be available at: **http://127.0.0.1:5000**
+Access at: **http://127.0.0.1:5000**
 
-**Default Login Credentials:**
+**Default Login:**
 - Username: `admin`
 - Password: `admin123`
 
-#### **✨ Web Features**
+### **Command-Line Interface**
 
-**📊 Dashboard**
+```powershell
+python main.py
+```
+
+---
+
+## 🌐 Web Application Features
+
+### **📊 Dashboard**
 - Real-time parcel statistics and metrics
 - Pending approval counts
-- Recent parcel activity feed
-- Quick action buttons for common operations
+- Recent activity feed
 - System status monitoring
 - Auto-refresh every 30 seconds
 
-**📦 Parcel Management**
-- **Register New Parcels**: Multi-section form with sender, recipient, and parcel details
-- **Track Parcels**: Search by tracking number with detailed status display
-- **View All Parcels**: Comprehensive listing with sorting and filtering
-- **Real-time Status Updates**: Live tracking information
+### **📦 Parcel Management**
+- **Register New Parcels**: Multi-section form with complete details
+- **Track Parcels**: Search by tracking number with full history
+- **View All Parcels**: Comprehensive listing with sorting/filtering
+- **Real-time Updates**: Live tracking information
 
-**🚗 Driver Manifest System**
-- **Automated Route Optimization**: Azure Maps integration with real-time traffic analysis
-- **Daily Manifest Generation**: Assign up to 20 parcels per driver with optimized delivery sequence
-- **Interactive Route Maps**: Embedded Azure Maps with route polylines and numbered stops
-- **Proof of Delivery**: Mobile-friendly interface for drivers to mark deliveries complete
+### **🚗 Driver Manifest System**
+- **Azure Maps Route Optimization**: Real-time traffic analysis
+- **Automated Route Planning**: Up to 20 parcels per driver with optimized sequence
+- **Interactive Maps**: Embedded Azure Maps with route visualization
+- **Proof of Delivery**: Mobile-friendly interface for drivers
 - **Admin Dashboard**: View all active manifests with progress tracking
-- **Route Analytics**: Distance, duration, and traffic-aware routing
 
-**🗺️ Azure Maps Integration**
-- Real-time geocoding of delivery addresses
-- Traffic-aware route optimization with `computeBestOrder=true`
-- Interactive map visualization with route polylines
-- Automatic route reordering for efficiency
-- Distance and duration calculations
-- Mobile-responsive map interface
+### **🎙️ Voice-Enabled Customer Service**
+- **Azure Speech Services Integration**: Voice input and output
+- **AI-Powered Chatbot**: Customer service agent assistance
+- **Public Chat Widget**: Available on all pages for visitors
+- **Multi-modal Input**: Type or speak your questions
 
-**🛡️ Fraud Detection**
-- AI-powered fraud analysis using Azure AI Foundry
-- **Microsoft Security Copilot integration** (optional) for enterprise-grade threat intelligence
-- **Upload screenshots** - OCR automatically extracts text from images
-- **Email file analysis** - Upload .EML or .MSG files for instant scanning
-- Report suspicious messages with instant threat assessment
-- Educational security guidance based on detected threat types
-- Threat level classification (Low/Medium/High/Critical)
-- Automatic security team alerts for high-risk threats (≥95% confidence + HIGH/CRITICAL severity)
+### **🛡️ Intelligent Fraud Detection**
+- **AI Risk Analysis**: Azure AI Foundry fraud detection
+- **Automated Workflows**: High-risk fraud → Customer Service escalation
+- **Multi-Channel Notifications**: Email, SMS, phone warnings
+- **OCR Support**: Extract text from screenshots
+- **Email Analysis**: Upload .EML or .MSG files for scanning
+- **Identity Verification**: For very high-risk cases (≥85% risk score)
+- **Automatic Parcel Holds**: Critical fraud cases (≥90% risk score)
 
-**✅ Approval Workflows**
-- View all pending approval requests
-- Approve or reject with comments
-- Priority-based sorting
-- Complete audit trail
-
-**📈 AI Insights Dashboard**
-- Performance metrics and KPIs
-- Delivery success rates
-- Driver efficiency statistics
-- On-time delivery analytics
-- NPS scores and customer satisfaction
-
-**👤 User Management**
-- Secure session-based authentication
-- Role-based access control
-- User activity tracking
-
-#### **🎨 Web Technologies**
-
-- **Backend**: Flask 3.0.0 with async support
-- **Frontend**: Bootstrap 5 responsive design
-- **Database**: Azure Cosmos DB integration
-- **AI**: Azure AI Foundry fraud detection agent
-- **Production**: Gunicorn WSGI server ready
-- **Deployment**: Azure App Service compatible
-
-#### **📱 Responsive Design**
+### **📱 Responsive Design**
 - Mobile-friendly interface
 - Touch-optimized controls
 - Works on tablets and smartphones
 - Progressive web app capabilities
 
-#### **🔧 Web Configuration**
+---
 
-The web application uses centralized company branding via `company_config.py`:
+## 🏗️ Architecture & Project Structure
 
-```python
-# company_config.py - Update once, apply everywhere
-COMPANY_NAME = "DT Logistics"
-COMPANY_PHONE = "1300 384 669"
-COMPANY_EMAIL = "support@dtlogistics.com.au"
-# ... and more
+### **Modern Package Organization**
+
+```
+dt_item_scanner/
+├── agents/               # AI agent implementations
+│   ├── base.py          # Core AI agents (Customer Service, Identity)
+│   ├── fraud.py         # Fraud detection agent
+│   └── manifest.py      # Manifest generation agent
+│
+├── workflows/           # Agent-to-agent communication workflows
+│   └── fraud_to_customer_service.py  # Automated fraud escalation
+│
+├── services/            # External service integrations
+│   ├── maps.py         # Azure Maps route optimization
+│   └── speech.py       # Azure Speech Services (voice I/O)
+│
+├── config/              # Configuration management
+│   ├── company.py      # Centralized company branding
+│   └── depots.py       # Depot configuration
+│
+├── utils/               # Shared utilities
+│
+├── templates/           # Jinja2 HTML templates
+├── static/              # CSS, JavaScript, images
+│
+├── app.py              # Flask web application (main entry)
+├── main.py             # CLI interface
+├── parcel_tracking_db.py  # Cosmos DB operations
+└── requirements.txt    # Python dependencies
 ```
 
-All templates automatically use these values - no hardcoded company information!
+### **Core Application Modules**
 
-#### **🚀 Production Deployment**
+**Entry Points:**
+- `app.py` - Flask web application with all routes
+- `main.py` - Command-line interface with menu system
 
-Deploy to Azure App Service using the included configuration:
+**Logistics Operations:**
+- `logistics_core.py` - Parcel registration, tracking, scanning
+- `logistics_customer.py` - Customer experience features
+- `logistics_driver.py` - Driver operations and proof of delivery
+- `logistics_depot.py` - Depot management and manifests
+- `logistics_ai.py` - AI insights and route optimization
+- `logistics_admin.py` - Administration and approvals
+- `logistics_common.py` - Shared utilities and helpers
 
-```powershell
-# Deploy using Azure Developer CLI
-azd up
-
-# Or use Azure CLI
-az webapp up --runtime PYTHON:3.11 --sku B1 --name dt-logistics-web
-```
-
-See `DEPLOYMENT.md` for complete deployment instructions including:
-- Azure App Service deployment
-- Environment configuration
-- Scaling options
-- Monitoring setup
-- CI/CD with GitHub Actions
+### **Key Benefits**
+- **Modular Design**: Clear separation of concerns
+- **Easy Maintenance**: Changes isolated to specific packages
+- **Scalable**: Add new agents/workflows without affecting existing code
+- **Testable**: Each package can be tested independently
+- **Reusable**: Components shared across web and CLI interfaces
 
 ---
 
-## 🏗️ **Modular Architecture**
+## 🤖 AI-Powered Intelligent Logistics
 
-The system is built with a **modular architecture** designed for maintainability, reduced complexity, and improved organization.
+### **9 Specialized Azure AI Agents**
 
-### 🚀 **Entry Point & Module Structure**
+All agents integrated with **Azure AI Foundry** providing full telemetry and monitoring.
 
-#### **Entry Point**
-- **`main.py`** - Main application entry point with menu routing and orchestration
+#### **Core Workflow Agents**
+1. **Parcel Intake Agent** - Data validation and quality control
+2. **Sorting Facility Agent** - Route optimization and exception management
+3. **Delivery Coordination Agent** - Resource management and approvals
 
-#### **Core Modules**
+#### **Enhanced Operations Agents**
+4. **Dispatcher Agent** - Capacity optimization and SLA management
+5. **Driver Agent** - Real-time execution and proof validation
+6. **Optimization Agent** - Predictive analytics and continuous improvement
+7. **Customer Service Agent** - Omnichannel communication
+8. **Fraud & Risk Agent** - Security and scam detection
+9. **Identity Agent** - Authentication and verification
 
-**`logistics_common.py`** - Shared Utilities
-- ✅ Warning suppression and environment setup
-- 📍 Australian postcode to state mapping (fixed for 3004 → VIC)
-- 📦 Sample data generators
-- 🛡️ Output filtering for clean console experience
+### **🔄 Agent Workflows (NEW)**
 
-**`logistics_core.py`** - Core Parcel Operations (8 features)
-- 📝 Manual parcel registration
-- 📋 Sample parcel registration
-- 👀 View all parcels
-- 🔍 Parcel tracking
-- 📍 Location-aware scanning
-- 📊 Test data generation
-- 🤖 AI agent workflow integration
+**Fraud → Customer Service Escalation**
+- Automatic detection of high-risk fraud (score ≥ 70%)
+- Personalized customer warnings via Customer Service Agent
+- Multi-channel notifications (email, SMS, phone)
+- Identity verification for very high risk (≥ 85%)
+- Automatic parcel holds for critical cases (≥ 90%)
+- Complete audit trail with workflow logging
 
-**`logistics_customer.py`** - Customer Experience (4 features)
-- ✉️ Delivery preferences management
-- 🔔 Notification subscriptions
-- 🛡️ Suspicious message reporting
-- 📝 Post-delivery feedback collection
+**Future Workflows** (Planned)
+- Exception Resolution → Multi-Agent Coordination
+- Delivery Failure → Smart Retry Workflow
+- Route → Driver → Customer Pipeline
 
-**`logistics_driver.py`** - Driver Operations (3 features)
-- 🪪 Courier identity verification
-- 🖋️ Proof of delivery completion
-- 📵 Offline mode operations
-
-**`logistics_depot.py`** - Depot & Operations (3 features)
-- 🧾 Manifest building and closing
-- 🚦 Exception resolution
-- 🧩 System integrations (TMS, CRM, Weather, Traffic)
-
-**`logistics_ai.py`** - AI & Intelligence (4 features)
-- 🗺️ Route and ETA optimization
-- ⚠️ Chaos simulation (disruption testing)
-- 📈 Operational insights dashboard
-
-**`logistics_admin.py`** - Administration (5 features)
-- 📥 Bulk import functionality
-- 📤 Export and reporting
-- 🔑 RBAC and audit management
-- 🧪 Synthetic scenario builder
-- 👁️ Pending approvals viewer
-
-**`logistics_menu.py`** - Menu System
-- 📋 Menu display and organization
-- ⚙️ Environment validation
-- 🎨 Application header and styling
-
-### 🔥 **Modular Benefits**
-- **Single Responsibility**: Each module focuses on one domain
-- **Easy Maintenance**: Changes isolated to specific functional areas  
-- **Reduced Complexity**: Individual files are now 89-328 lines vs 1,700+
-- **Clear Dependencies**: Import relationships are explicit and minimal
-- **Parallel Development**: Multiple developers can work on different modules
-- **Code Reuse**: Common utilities centralized
-
-**Total: 25 operational features** across 9 focused modules
+### **View Telemetry**
+1. Visit: https://ai.azure.com
+2. Select your Azure AI Foundry project
+3. Navigate to: Tracing / Monitoring
+4. View: Agent invocations, thread IDs, and performance metrics
 
 ---
 
-## 🤖 **Azure AI Foundry Integration - Complete**
 
-### **✅ ALL 9 AGENTS SUCCESSFULLY INTEGRATED**
 
-**Integration completed:** December 8, 2025  
-**Success rate:** 9/9 agents (100%)  
-**Azure AI Foundry telemetry:** Full coverage across all workflows
 
-### **Quick Test - Verify All Agents**
 
-```powershell
-python test_all_azure_agents.py
+
+
+## 📦 Logistics Workflow
+
+1. **Store Intake** → Parcels registered at collection points
+2. **AI Validation** → Parcel Intake Agent validates data quality
+3. **Sorting** → Sorting Facility Agent optimizes routing
+4. **Assignment** → Dispatcher Agent creates optimized manifests
+5. **Delivery** → Driver Agent tracks real-time execution
+6. **Confirmation** → Proof of delivery with photo verification
+7. **Feedback** → Customer satisfaction tracking
+
+## 💻 Usage Examples
+
+### **Web Interface**
+
+1. **Register a Parcel**: Navigate to Parcels → Register New Parcel
+2. **Track Parcel**: Use tracking number in Track Parcel page
+3. **Report Fraud**: Submit suspicious messages for AI analysis
+4. **Create Manifest**: Admin → Generate Manifest with route optimization
+5. **Voice Chat**: Use microphone icon in chatbot for voice input
+
+### **Command-Line Interface**
+
+```bash
+python main.py
 ```
 
-**Expected Output:**
-```
-[1/9] Parcel Intake Agent       [OK]
-[2/9] Sorting Facility Agent    [OK]
-[3/9] Delivery Coordination      [OK]
-[4/9] Dispatcher Agent           [OK]
-[5/9] Driver Agent               [OK]
-[6/9] Optimization Agent         [OK]
-[7/9] Customer Service Agent     [OK]
-[8/9] Fraud & Risk Agent         [OK]
-[9/9] Identity Agent             [OK]
-
-SUCCESS: 9/9 agents working
-```
-
-### **View Telemetry in Azure**
-
-1. **Portal:** https://ai.azure.com
-2. **Project:** dtaihub0018140454363-project
-3. **Navigate to:** Tracing / Monitoring
-4. **Observe:** All 9 agent invocations with thread IDs
+Menu-driven interface for:
+- Parcel registration and tracking
+- Location-aware scanning
+- AI agent workflows
+- Test data generation
+- Administrative functions
 
 ---
-
-### **Agent Integration Summary**
-
-| # | Agent Name | Trigger | Integration Point | Agent ID |
-|---|------------|---------|-------------------|----------|
-| 1 | **Parcel Intake** | Register new parcel | `app.py` line 395 | asst_lVQbLolTxyq7myO8ch4QxbdD |
-| 2 | **Sorting Facility** | Exception handling | `logistics_ai.py` | asst_I5fugtu3tYexxOhByY3Govu9 |
-| 3 | **Delivery Coordination** | Delivery assignment | Via sorting agent | asst_OnBiPkcP3OqO35dWXhY3e0g5 |
-| 4 | **Dispatcher** | Create manifest | `manifest_generation_agent.py` | asst_1RSqysT3bhvcRMwnOiYzjPV7 |
-| 5 | **Driver** | Scan parcel | `parcel_tracking_db.py` line 445 | asst_7J2rc8mJ6waEk0jgyvEkGwsm |
-| 6 | **Optimization** | Route calculation | `logistics_ai.py` | asst_lxfDBqKYyRgXbcB1dM7fM8mB |
-| 7 | **Customer Service** | Send notification | `logistics_ai.py` | asst_3dGx7xSWiodRk88lFtLWDwvD |
-| 8 | **Fraud & Risk** | Report fraud | `fraud_risk_agent.py` | asst_ZQaGPhdXffw3ruOD84ysSdh9 |
-| 9 | **Identity** | Driver login | `app.py` line 278 | asst_3ZHumaCmA6kNFHMovWAMv7Qp |
-
----
-
-### **How to Demonstrate Each Agent**
-
-#### **1. Parcel Intake Agent** (Registration Validation)
-```
-1. Open: http://localhost:5000/parcels/register
-2. Fill form with test data
-3. Submit registration
-4. Observe: Terminal shows "[AI] Parcel Intake validation completed"
-5. Azure: Check thread for validation analysis
-```
-
-#### **2. Identity Agent** (Courier Verification)
-```
-1. Logout current user
-2. Login as driver: driver1@dtlogistics.com / Driver123!
-3. Observe: "[AI] Identity Agent verified courier" in terminal
-4. Success message: "Welcome back... [AI Verified]"
-5. Azure: Check thread for verification logic
-```
-
-#### **3. Dispatcher Agent** (Manifest Optimization)
-```
-1. Login as admin
-2. Navigate: Admin → Create Manifest
-3. Select depot + driver + date
-4. Generate manifest
-5. Observe: Route optimization recommendations in manifest
-6. Azure: Check dispatcher thread for assignment logic
-```
-
-#### **4. Driver Agent** (Delivery Execution)
-```
-1. Login as driver
-2. Go to: My Manifest
-3. Scan any parcel (select scan type)
-4. Observe: "[AI] Driver Agent processed scan"
-5. Azure: Check thread for delivery insights
-```
-
-#### **5. Fraud & Risk Agent** (Security Analysis)
-```
-1. Navigate: Report Fraud
-2. Fill in suspicious message details
-3. Submit report
-4. Observe: Risk score + threat analysis
-5. Azure: Check thread for security assessment
-```
-
-#### **6. Optimization Agent** (Route Intelligence)
-```
-1. Navigate: AI Insights
-2. Calculate route optimization
-3. Select depot + date range
-4. Observe: ETA calculations and route suggestions
-5. Azure: Check thread for optimization logic
-```
-
-#### **7. Sorting Facility Agent** (Routing Decisions)
-```
-Test automatically or via script:
-python -c "from azure_ai_agents import sorting_facility_agent; import asyncio; asyncio.run(sorting_facility_agent({'tracking': 'TEST-001', 'destination': 'Sydney'}))"
-
-Azure: Check thread for routing analysis
-```
-
-#### **8. Customer Service Agent** (Smart Notifications)
-```
-Test via script:
-python -c "from azure_ai_agents import customer_service_agent; import asyncio; asyncio.run(customer_service_agent({'inquiry': 'Where is my parcel?', 'tracking': 'TEST-001'}))"
-
-Azure: Check thread for personalized response
-```
-
-#### **9. Delivery Coordination Agent** (Assignment Logic)
-```
-Test via script:
-python -c "from azure_ai_agents import delivery_coordination_agent; import asyncio; asyncio.run(delivery_coordination_agent({'route_id': 'R-001', 'parcels': []}))"
-
-Azure: Check thread for coordination strategy
-```
-
----
-
-### **Key Files for AI Integration**
-
-**Core Integration:**
-- `azure_ai_agents.py` (476 lines) - Centralized wrapper for all 9 agents
-- `test_all_azure_agents.py` (232 lines) - Comprehensive test script
-- `.env` - All 9 agent IDs configured
-
-**Modified for AI:**
-- `app.py` - Parcel Intake + Identity agents
-- `logistics_ai.py` - Optimization + Customer Service + Sorting agents
-- `manifest_generation_agent.py` - Dispatcher agent
-- `parcel_tracking_db.py` - Driver agent
-- `fraud_risk_agent.py` - Fraud & Risk agent (existing)
-
----
-
-### **Troubleshooting AI Integration**
-
-**Problem:** Agent not responding
-```powershell
-# Check Azure credentials
-az login
-
-# Verify agent IDs in .env
-cat .env | Select-String "AGENT_ID"
-
-# Test single agent
-python -c "import asyncio; from azure_ai_agents import parcel_intake_agent; print(asyncio.run(parcel_intake_agent({'test': 'data'})))"
-```
-
-**Problem:** No telemetry in Azure portal
-- Wait 1-2 minutes (telemetry has slight delay)
-- Refresh Azure AI Foundry page
-- Check correct project selected
-
-**Problem:** Syntax errors
-```powershell
-# Verify all files have correct syntax
-python -c "import app; print('Syntax OK')"
-```
-
-All syntax errors from escaped quotes and emojis have been fixed.
-
----
-
-### **Agent Benefits & ROI**
-
-**Operational Efficiency:**
-- 94.3% On-Time Delivery Rate (↑2.1% vs manual)
-- ±8 Minutes ETA Accuracy (was ±25 minutes)
-- 87% Fleet Utilization (was 68%)
-
-**Cost Reduction:**
-- 40% Faster Parcel Processing
-- 25% Fuel Savings (route optimization)
-- 60% Faster Exception Resolution
-
-**Quality & Satisfaction:**
-- Net Promoter Score: 73 (↑5 points)
-- 99.3% Fraud Detection Accuracy
-- 67% Fewer Customer Complaints
-
----
-
-##  🚀 System Overview
-
-### Logistics Journey
-1. **Store Intake** - Parcels registered when received at stores
-2. **Sorting Facility** - Parcels sorted and routed to appropriate facilities
-3. **Driver Assignment** - Parcels assigned to delivery drivers
-4. **Delivery Attempts** - Multiple delivery attempts with status tracking
-5. **Customer Handoff** - Final delivery confirmation and receipt
-
-### Key Features
-
-#### 🏗️ Architecture
-- **Azure Cosmos DB**: Scalable NoSQL database for parcel and tracking data
-- **Microsoft Agent Framework**: AI-powered workflow automation
-- **Real-time Tracking**: GPS-based location updates and status tracking
-- **Interactive Demo**: Barcode scanner simulation with Australian localization
-
-#### 📦 Logistics Management
-- Comprehensive parcel registration with sender/recipient details
-- Support for multiple service types (standard, express, overnight, registered)
-- Weight support for both grams and kilograms with automatic conversion
-- Australian address format and AUD currency support
-- Special handling requirements tracking
-
-#### 🤖 AI Agent Framework - Intelligent Logistics Automation
-
-### **AI-Powered Logistics Revolution**
-
-This system leverages **Microsoft Agent Framework** with **Azure AI Foundry** to create an intelligent logistics network that transforms traditional manual processes into automated, intelligent workflows. Each agent brings specialized AI capabilities that deliver measurable benefits:
-
-### 🔍 **The AI Advantage**
-- **Reduced Human Error**: AI agents follow consistent protocols without fatigue or oversight
-- **24/7 Operations**: Continuous processing without shift changes or breaks
-- **Intelligent Decision Making**: Pattern recognition and predictive analysis beyond human capability
-- **Scalable Processing**: Handle thousands of parcels simultaneously
-- **Cost Efficiency**: Reduce labor costs while improving service quality
-- **Data-Driven Insights**: Real-time analytics and optimization recommendations
-
----
-
-## 🎯 **Complete Agent Roster (9 Specialized AI Agents)**
-
-### **📥 WORKFLOW FOUNDATION AGENTS (3 Core Agents)**
-
-#### **1. Parcel Intake Agent** 
-**Agent ID**: `asst_XXXXX` | **Intelligence Focus**: Data Validation & Quality Control
-
-**🧠 AI Capabilities:**
-- **Pattern Recognition**: Automatically detects anomalies in parcel data (duplicate tracking numbers, invalid addresses, inconsistent package dimensions)
-- **Smart Validation**: Cross-references sender/recipient information against delivery route databases
-- **Predictive Analysis**: Identifies potential delivery issues before parcels enter the sorting pipeline
-
-**💡 Business Benefits:**
-- **99.8% Data Accuracy**: Eliminates manual data entry errors that cause delivery failures
-- **40% Faster Processing**: Instant validation vs. manual verification procedures
-- **Proactive Issue Detection**: Catches problems at intake rather than during delivery attempts
-
-**🔄 Real-World Example:**
-When a parcel is registered with postcode "3004", the AI agent:
-1. Validates it maps to VIC (not NSW as incorrectly assumed before)
-2. Cross-checks address format against Australian postal standards
-3. Flags if sender phone format doesn't match Australian mobile/landline patterns
-4. Automatically suggests corrections before parcel enters sorting
-
----
-
-#### **2. Sorting Facility Agent**
-**Agent ID**: `asst_XXXXX` | **Intelligence Focus**: Route Optimization & Exception Management
-
-**🧠 AI Capabilities:**
-- **Dynamic Route Planning**: Analyzes real-time traffic, weather, and delivery volumes to optimize sorting decisions
-- **Exception Prediction**: Uses historical data to predict which parcels may encounter delivery issues
-- **Automated Categorization**: Intelligently sorts parcels by priority, special handling requirements, and optimal delivery routes
-
-**💡 Business Benefits:**
-- **25% Reduction in Delivery Time**: Optimized routing reduces transit time and fuel consumption
-- **60% Faster Exception Resolution**: AI identifies and resolves issues before they impact delivery schedules
-- **Automated Compliance**: Ensures dangerous goods, fragile items, and high-value parcels follow proper protocols
-
-**🔄 Real-World Example:**
-When processing 500 parcels for Melbourne delivery:
-1. AI analyzes delivery addresses and automatically groups parcels by suburb optimization
-2. Identifies that 12 parcels require special handling (fragile electronics)
-3. Flags 3 parcels for manual review (high declared value requiring insurance verification)
-4. Requests supervisor approval for returning 2 parcels with invalid addresses
-
----
-
-#### **3. Delivery Coordination Agent**
-**Agent ID**: `asst_XXXXX` | **Intelligence Focus**: Resource Management & Human Approval Integration
-
-**🧠 AI Capabilities:**
-- **Driver Workload Balancing**: Optimally assigns parcels based on driver capacity, location, and skill specialization
-- **Approval Workflow Management**: Intelligently escalates critical decisions to human supervisors with complete context
-- **Delivery Success Prediction**: Uses historical data to predict delivery success rates and optimize assignment strategies
-
-**💡 Business Benefits:**
-- **95% First-Attempt Success Rate**: Intelligent assignment increases successful first deliveries
-- **30% Improved Driver Efficiency**: Balanced workloads reduce overtime and improve driver satisfaction
-- **Streamlined Approvals**: Critical decisions reach supervisors with all relevant context for faster resolution
-
-**🔄 Real-World Example:**
-For a critical business delivery requiring special handling:
-1. AI identifies this requires experienced driver DRV001 (specialist in commercial deliveries)
-2. Automatically requests supervisor approval for weekend delivery (outside standard hours)
-3. Provides supervisor with complete context: customer importance, package value, delivery history
-4. Once approved, coordinates with Customer Service Agent to notify recipient of special delivery
-
----
-
-### **🚚 ENHANCED OPERATIONS AGENTS (6 Specialized Agents)**
-
-#### **4. Dispatcher Agent**
-**Agent ID**: `asst_XXXXX` | **Intelligence Focus**: Capacity Optimization & SLA Management
-
-**🧠 AI Capabilities:**
-- **Multi-Variable Optimization**: Simultaneously optimizes for delivery time, fuel efficiency, driver satisfaction, and customer preferences
-- **Predictive Capacity Planning**: Forecasts delivery volumes and proactively adjusts resource allocation
-- **SLA Risk Assessment**: Continuously monitors delivery commitments and alerts when SLA breaches are likely
-
-**💡 Business Benefits:**
-- **99.2% SLA Compliance**: Proactive monitoring prevents service level agreement violations
-- **22% Fuel Cost Reduction**: Optimized routing reduces unnecessary mileage and environmental impact
-- **Peak Load Management**: Dynamically redistributes workload during high-volume periods (holidays, sales events)
-
-**🔄 Real-World Example:**
-On a busy Friday with 200% normal volume:
-1. AI predicts potential SLA breaches for 45 express deliveries
-2. Automatically redistributes 23 parcels to available drivers in adjacent territories
-3. Flags 8 parcels for next-day delivery with customer notification
-4. Requests additional temporary driver resources for peak period management
-
----
-
-#### **5. Driver Agent**
-**Agent ID**: `asst_XXXXX` | **Intelligence Focus**: Real-Time Execution & Proof Validation
-
-**🧠 AI Capabilities:**
-- **Intelligent Scanning**: Validates proof-of-delivery photos using computer vision (correct address, package condition)
-- **Route Adaptation**: Real-time route adjustments for traffic, road closures, and delivery preferences
-- **Fraud Detection**: Identifies suspicious delivery requests and validates recipient identity
-
-**💡 Business Benefits:**
-- **99.7% Delivery Accuracy**: Computer vision validation ensures deliveries reach correct recipients
-- **35% Reduction in Delivery Disputes**: Comprehensive proof-of-delivery eliminates customer complaints
-- **Real-Time Problem Solving**: Instant route optimization saves 45 minutes per driver per day
-
-**🔄 Real-World Example:**
-Driver attempts delivery to commercial address after hours:
-1. AI recognizes business is closed and suggests alternative actions
-2. Checks customer delivery preferences and identifies authorized pickup location
-3. Automatically updates recipient with SMS notification and new pickup details
-4. Validates photo proof-of-delivery showing package secured at authorized location
-
----
-
-#### **6. Optimization Agent**
-**Agent ID**: `asst_XXXXX` | **Intelligence Focus**: Predictive Analytics & Continuous Improvement
-
-**🧠 AI Capabilities:**
-- **Multi-Factor ETA Prediction**: Combines traffic, weather, driver patterns, and historical data for accurate delivery estimates
-- **Disruption Response**: Automatically adapts to unexpected events (vehicle breakdown, weather, road closure)
-- **Performance Analytics**: Identifies optimization opportunities and tracks improvement metrics
-
-**💡 Business Benefits:**
-- **±8 Minute ETA Accuracy**: Customers receive reliable delivery time estimates
-- **50% Faster Disruption Recovery**: Automated contingency planning minimizes service impact
-- **15% CO₂ Reduction**: Environmental optimization algorithms reduce carbon footprint per delivery
-
-**🔄 Real-World Example:**
-Major highway closure affecting 67 deliveries:
-1. AI immediately recalculates routes for all affected drivers
-2. Identifies 12 deliveries that can be rerouted through alternate paths
-3. Recommends diverting 8 parcels to nearby pickup locations
-4. Updates all customer ETAs and sends proactive notifications about delays
-
----
-
-#### **7. Customer Service Agent**
-**Agent ID**: `asst_XXXXX` | **Intelligence Focus**: Omnichannel Communication & Exception Resolution
-
-**🧠 AI Capabilities:**
-- **Natural Language Processing**: Understands customer intent across email, SMS, and chat channels
-- **Predictive Issue Resolution**: Anticipates customer concerns and proactively offers solutions
-- **Sentiment Analysis**: Monitors customer satisfaction and escalates dissatisfied customers to human agents
-
-**💡 Business Benefits:**
-- **87% First-Contact Resolution**: AI resolves most customer inquiries without human intervention
-- **60% Reduction in Support Costs**: Automated responses handle routine inquiries effectively
-- **94% Customer Satisfaction**: Proactive communication and quick resolution improve customer experience
-
-**🔄 Real-World Example:**
-Customer package appears delayed:
-1. AI detects customer checking tracking frequently (anxiety indicator)
-2. Proactively sends update explaining weather delay with new estimated delivery time
-3. Offers alternative delivery options (pickup location, weekend delivery)
-4. Automatically applies service credit for inconvenience without customer request
-
----
-
-#### **8. Fraud & Risk Agent** 🛡️
-**Agent ID**: `asst_ARutauXhW2tWVWB0UVqALhFA` | **Intelligence Focus**: Security & Scam Detection
-
-**🧠 AI Capabilities:**
-- **Advanced Pattern Recognition**: Detects sophisticated fraud patterns across payment requests, phishing attempts, and impersonation schemes
-- **Real-Time Threat Assessment**: Instantly analyzes suspicious messages and provides threat level classification (Low/Medium/High/Critical)
-- **Behavioral Analysis**: Identifies coordinated fraud campaigns and emerging scam tactics
-- **Personalized Education**: Delivers targeted security guidance based on specific threat types detected
-
-**💡 Business Benefits:**
-- **99.3% Fraud Detection Accuracy**: Advanced AI algorithms identify threats with minimal false positives
-- **85% Reduction in Successful Scams**: Proactive education and real-time warnings protect customers
-- **Automated Security Response**: High-risk threats automatically trigger security team alerts
-- **Customer Trust Protection**: Comprehensive fraud prevention maintains brand reputation and customer confidence
-
-**🔄 Real-World Example:**
-Customer receives suspicious SMS: *"Your DT Logistics package is delayed! Pay urgent delivery fee of $15 via this link or package returns today!"*
-
-1. **AI Analysis**: Agent analyzes message and detects:
-   - Payment scam indicators (urgent fee request)
-   - Impersonation attempts (fake DT Logistics branding)
-   - Social engineering tactics (false urgency, threat of package return)
-   
-2. **Threat Classification**: 
-   - **Threat Level**: HIGH
-   - **Category**: Delivery Fee Scam
-   - **Confidence**: 94%
-   
-3. **Automated Response**:
-   - Stores report in Cosmos DB with ID `suspicious_8ccab292`
-   - Sends personalized education about delivery fee scams
-   - Alerts security team for pattern analysis
-   - Provides specific protective actions
-
-4. **Customer Protection**:
-   - "DT Logistics will never request payment via text message"
-   - "Check your official DT Logistics account for real delivery status"
-   - "Contact customer service directly if you have delivery concerns"
-
-**📊 Fraud Prevention Impact:**
-- **3,247 suspicious messages** analyzed and stored in last 30 days
-- **156 high-risk threats** automatically escalated to security team
-- **89% customer education effectiveness** - users who received AI education did not fall victim to subsequent scam attempts
-- **$2.3M fraud prevention value** - estimated customer losses prevented through AI intervention
-
----
-
-#### **9. Identity Agent**
-**Agent ID**: `asst_XXXXX` | **Intelligence Focus**: Authentication & Security Verification
-
-**🧠 AI Capabilities:**
-- **Biometric Verification**: Advanced facial recognition and liveness detection for courier authentication
-- **Behavioral Analysis**: Monitors courier behavior patterns and flags anomalies
-- **Credential Validation**: Real-time verification of employment status and delivery authorizations
-
-**💡 Business Benefits:**
-- **100% Verified Deliveries**: Only authenticated couriers can access delivery vehicles and packages
-- **Zero Identity Fraud**: Comprehensive verification prevents courier impersonation
-- **Regulatory Compliance**: Automated audit trail meets transportation security requirements
-
-**🔄 Real-World Example:**
-High-value package ($10,000 electronics) ready for delivery:
-1. AI requires courier biometric verification before vehicle access
-2. Validates courier identity against employment database
-3. Confirms courier authorized for high-value deliveries in this territory
-4. Creates tamper-evident audit trail for entire custody chain
-5. Requires recipient identity verification before package release
-
----
-
-## 🔄 **Agent Collaboration & Workflow Intelligence**
-
-### **Intelligent Handoffs**
-Agents seamlessly pass context and decision-making authority:
-- **Parcel Intake** → **Sorting Facility**: Validated parcel data with quality scores
-- **Sorting Facility** → **Delivery Coordination**: Route recommendations with priority flags
-- **Dispatcher** ↔ **Driver**: Real-time coordination and status updates
-- **Customer Service** ↔ **Fraud & Risk**: Security incident escalation and customer protection
-
-### **Human-AI Collaboration**
-Critical decisions require human approval with full AI context:
-- **Supervisor Approvals**: AI provides complete analysis and recommendations
-- **Exception Handling**: Human expertise combined with AI data analysis
-- **Security Escalation**: Fraud & Risk Agent alerts human security experts with threat details
-
-### **Continuous Learning**
-All agents improve through shared learning:
-- **Pattern Recognition**: Fraud detection improves from delivery attempt patterns
-- **Optimization Feedback**: Route efficiency data improves future dispatcher decisions
-- **Customer Insights**: Service interactions enhance delivery coordination strategies
-
----
-
-## 📊 **Measurable AI Impact & ROI**
-
-### **Operational Efficiency Gains**
-- **94.3% On-Time Delivery Rate** (↑2.1% vs manual processes)
-- **±8 Minutes Average ETA Accuracy** (was ±25 minutes)
-- **87% Fleet Utilization** (was 68%)
-- **89% First Delivery Attempt Success** (was 72%)
-
-### **Cost Reduction Benefits**
-- **40% Reduction in Processing Time** (Parcel Intake automation)
-- **25% Fuel Savings** (Optimization Agent route planning)
-- **60% Exception Resolution Speed** (automated problem detection)
-- **30% Lower Customer Service Costs** (AI handles routine inquiries)
-
-### **Quality & Customer Satisfaction**
-- **Net Promoter Score: 73** (↑5 points)
-- **Customer Satisfaction: 4.6/5.0** (delivery rating)
-- **Error Rate: 0.3%** (down from 2.1%)
-- **Customer Complaints: -67%** (proactive issue resolution)
-
-### **Security & Risk Mitigation**
-- **99.3% Fraud Detection Accuracy** (Fraud & Risk Agent)
-- **$2.3M Fraud Prevention Value** (estimated customer losses prevented)
-- **Zero Security Breaches** (Identity Agent verification)
-- **100% Audit Compliance** (automated security trail)
-
-### **Environmental Impact**
-- **15% CO₂ Reduction per Delivery** (route optimization)
-- **22% Fuel Efficiency Improvement** (smart route planning)
-- **87% Packaging Sustainability Score** (waste reduction recommendations)
-
----
-
-## 🎯 **Why AI Agents Transform Logistics**
-
-### **Traditional Challenges AI Solves:**
-1. **Human Error**: Manual data entry, route planning, and decision-making errors
-2. **Inconsistent Service**: Variable performance based on staff experience and fatigue
-3. **Reactive Problem Solving**: Issues discovered after delivery failures occur
-4. **Limited Scale**: Human-dependent processes can't efficiently handle volume spikes
-5. **Security Vulnerabilities**: Manual verification processes susceptible to fraud
-
-### **AI Agent Advantages:**
-1. **Consistent Excellence**: Every decision follows optimized protocols without variation
-2. **Proactive Intelligence**: Problems identified and resolved before they impact customers
-3. **Infinite Scalability**: Handle thousands of simultaneous operations with consistent quality
-4. **Continuous Improvement**: Learning algorithms improve performance over time
-5. **24/7 Availability**: No downtime, shift changes, or vacation coverage needed
-
-### **Business Transformation Results:**
-- **Revenue Growth**: Improved service quality drives customer retention and referrals
-- **Cost Optimization**: Reduced labor costs while improving service delivery
-- **Competitive Advantage**: AI-powered efficiency creates market differentiation
-- **Risk Mitigation**: Comprehensive fraud detection and security verification
-- **Sustainability Goals**: Environmental optimization algorithms support green initiatives
-
-This AI-powered logistics system represents the **future of last-mile delivery** - where intelligent automation enhances human capability rather than replacing it, creating a symbiotic relationship that delivers superior results for customers, drivers, and business operations.
 
 ## 📊 Database Architecture
 
 **Database**: `agent_workflow_db`
 
-### Containers & Data Models
+### Containers & Partition Strategy
 
-#### 1. Parcels Container (Partition Key: `/store_location`)
+#### 1. Parcels Container (Partition Key: `/store_location`) 
+- Comprehensive parcel data with sender/recipient details
+- Tracking numbers, barcodes, and status information
+- Service types (standard, express, overnight, registered)
+- Special handling requirements
+
+#### 2. Tracking Events Container (Partition Key: `/barcode`)
 ```json
 {
   "id": "abc123-def456",
@@ -795,40 +260,15 @@ This AI-powered logistics system represents the **future of last-mile delivery**
 }
 ```
 
-#### 2. Tracking Events Container (Partition Key: `/barcode`)
-```json
-{
-  "id": "event789-xyz012",
-  "barcode": "LP654321",
-  "event_type": "in_transit",
-  "location": "Sorting_Facility_NSW",
-  "description": "Parcel sorted and loaded for delivery route",
-  "scanned_by": "logistics_staff_001",
-  "timestamp": "2024-11-14T14:25:00Z",
-  "additional_info": {
-    "route": "Route_A",
-    "driver": "DRV001"
-  }
-}
-```
+- Complete event history for each parcel
+- Location updates and status changes
+- Scanner operations and timestamps
 
-#### 3. Delivery Attempts Container (Partition Key: `/barcode`)
-```json
-{
-  "id": "attempt456-qwe789",
-  "parcel_barcode": "LP654321",
-  "request_type": "delivery_redirect",
-  "description": "Customer requested address change",
-  "priority": "medium",
-  "requested_by": "customer_service_001",
-  "status": "pending",
-  "request_timestamp": "2024-11-14T16:45:00Z",
-  "approved_by": null,
-  "approval_timestamp": null,
-  "comments": null,
-  "barcode": "LP654321"
-}
-```
+#### 3. Approvals Container (Partition Key: `/barcode`)
+- Human approval workflows
+- Exception handling requests
+- Priority-based processing
+- Audit trail with comments
 
 ## 🛠️ Setup Instructions
 
@@ -856,14 +296,21 @@ This AI-powered logistics system represents the **future of last-mile delivery**
 Create a `.env` file in the project root:
 
 ```env
-# Azure AI Foundry Configuration (for fraud detection agent)
+# Azure AI Foundry Configuration
 AZURE_AI_PROJECT_CONNECTION_STRING = "your-azure-ai-project-connection-string"
 AZURE_AI_MODEL_DEPLOYMENT_NAME = "gpt-4o"
 
 # Azure Cosmos DB Configuration
 COSMOS_CONNECTION_STRING = "AccountEndpoint=https://your-account.documents.azure.com:443/;AccountKey=your-key-here;"
 
-# Flask Configuration (optional)
+# Azure Maps (Route Optimization)
+AZURE_MAPS_SUBSCRIPTION_KEY = "your-azure-maps-key"
+
+# Azure Speech Services (Voice Features)
+AZURE_SPEECH_KEY = "your-speech-key"
+AZURE_SPEECH_REGION = "your-region"  # e.g., australiaeast
+
+# Flask Configuration
 FLASK_SECRET_KEY = "your-secret-key-for-sessions"
 FLASK_ENV = "development"
 PORT = 5000
@@ -876,11 +323,15 @@ pip install -r requirements.txt
 ```
 
 **Key Dependencies:**
-- `flask` - Web framework
-- `gunicorn` - Production WSGI server
-- `azure-cosmos` - Cosmos DB client
-- `azure-ai-projects` - Azure AI Foundry SDK
-- `python-dotenv` - Environment variable management
+- `flask>=3.0.0` - Web framework
+- `gunicorn>=21.2.0` - Production WSGI server
+- `azure-cosmos>=4.5.0` - Cosmos DB client
+- `azure-ai-projects>=1.0.0` - Azure AI Foundry SDK
+- `azure-cognitiveservices-speech>=1.35.0` - Azure Speech Services (voice)
+- `azure-ai-vision-imageanalysis>=1.0.0` - OCR and image analysis
+- `python-dotenv>=1.0.0` - Environment variable management
+- `pytesseract>=0.3.10` - Text extraction from images
+- `Pillow>=10.0.0` - Image processing
 
 ### 6. Database Initialization
 
@@ -897,16 +348,17 @@ This will:
 
 ### 7. Company Branding Configuration
 
-Edit `company_config.py` to customize branding:
+Edit `config/company.py` to customize branding:
 
 ```python
 COMPANY_NAME = "Your Company Name"
 COMPANY_PHONE = "1300 XXX XXX"
 COMPANY_EMAIL = "support@yourcompany.com"
+COMPANY_WEBSITE = "https://yourcompany.com"
 # ... and more
 ```
 
-See `COMPANY_CONFIG_README.md` for complete configuration guide.
+All templates automatically use these centralized values.
 
 ### 8. Start the Application
 
@@ -932,103 +384,30 @@ az cosmosdb sql role assignment create \
     --role-definition-name "Cosmos DB Built-in Data Contributor"
 ```
 
-## 🏃‍♂️ **Quick Start**
 
-### **🌐 Web Interface (Recommended)**
-```powershell
-cd c:\Workbench\dt_item_tracker
-$env:FLASK_ENV='development'; py app.py
-```
-Access at: http://127.0.0.1:5000 (Login: admin/admin123)
 
-### **💻 Command-Line Interface**
+## 💻 Usage Examples
+
+### **Web Interface**
+
+1. **Register a Parcel**: Navigate to Parcels → Register New Parcel
+2. **Track Parcel**: Use tracking number in Track Parcel page
+3. **Report Fraud**: Submit suspicious messages for AI analysis
+4. **Create Manifest**: Admin → Generate Manifest with route optimization
+5. **Voice Chat**: Use microphone icon in chatbot for voice input
+
+### **Command-Line Interface**
+
 ```bash
-cd c:\Workbench\dt_item_tracker
 python main.py
 ```
 
-### **Import Individual Modules**
-```python
-# Use specific features in your own code
-from logistics_core import register_parcel_manually
-from logistics_customer import manage_delivery_preferences
-from logistics_ai import insights_dashboard
-```
-
-### **Test Specific Module**
-```python
-# Test core operations
-python -c "
-import asyncio
-from logistics_core import view_all_parcels
-asyncio.run(view_all_parcels())
-"
-```
-
-## 🖥️ Usage
-
-### Web Interface (Recommended)
-
-```powershell
-# Start the Flask development server
-cd c:\Workbench\dt_item_tracker
-$env:FLASK_ENV='development'; py app.py
-```
-
-**Access the Application:**
-- URL: http://127.0.0.1:5000
-- Username: `admin`
-- Password: `admin123`
-
-**Web Features:**
-- ✅ **Dashboard** - Real-time operations center with statistics and metrics
-- ✅ **Register Parcels** - Multi-section form with sender/recipient/parcel details
-- ✅ **Track Parcels** - Search by tracking number with detailed status history
-- ✅ **View All Parcels** - Comprehensive listing with sorting and filtering
-- ✅ **Fraud Detection** - AI-powered analysis of suspicious messages
-- ✅ **Approvals** - Workflow management with approve/reject functionality
-- ✅ **AI Insights** - Performance analytics and operational metrics
-
-### Interactive Parcel Scanner Demo (CLI)
-
-```bash
-# Legacy monolithic version (still available)
-python Parcel_scanner_cosmosdb_demo.py
-
-# NEW: Modular version (recommended for CLI)
-python main.py
-```
-
-**CLI Features:**
-- ✅ **Register parcels** with manual input or sample data
-- ✅ **View and track parcels** with detailed information
-- ✅ **Location-aware scanning** for depot/facility tracking
-- ✅ **AI agent workflow** integration for intelligent processing
-- ✅ **Generate test data** for system demonstration
-- ✅ **Australian localization** with realistic addresses and phone numbers
-- ✅ **Clean output** with comprehensive warning suppression
-
-### AI Agent Workflows
-
-#### Create Persistent Agents
-
-```bash
-# Create multiple logistics agents (9 total: 3 workflow + 6 enhanced)
-python Scripts/A01_Create_Multiple_Foundry_Agent_Persistent.py
-```
-
-#### Run Sequential Workflow with Human Approval
-
-```bash
-# Main workflow with approval checkpoints
-python Scripts/W01_Sequential_Workflow_Human_Approval.py
-```
-
-**Workflow Features:**
-- **Parcel Intake Agent**: Processes new parcels and validates information
-- **Sorting Facility Agent**: Handles routing decisions and exceptions
-- **Delivery Coordination Agent**: Manages driver assignments and delivery attempts
-- **Human Approval**: Critical operations require supervisor approval
+Menu-driven interface for:
+- Parcel registration and tracking
+- Location-aware scanning
+- AI agent workflows
+- Test data generation
+- Administrative functions
 
 ## 📋 Service Types & Status Tracking
 
@@ -1325,259 +704,156 @@ The system now uses a single consolidated database interface (`parcel_tracking_d
 - Bulk upload APIs for batch operations
 - Integration with store POS systems and driver mobile apps
 
-## 🚀 Future Enhancements
+## 📊 Service Types & Status Tracking
 
-### Advanced Features
-- Machine learning delivery prediction
-- Route optimization algorithms
-- Predictive exception handling
-- Customer preference learning
-- Real-time GPS tracking integration
+### **Service Types**
+- **Standard** - 5 business day delivery
+- **Express** - 2 business day delivery
+- **Overnight** - Next business day delivery
+- **Registered** - 3 business day delivery with signature required
 
-### Scalability Improvements
-- Multi-region deployment
-- Automated scaling policies
-- Disaster recovery procedures
-- Advanced analytics and reporting
+### **Parcel Statuses**
+- `registered` - Initial registration at store
+- `in_transit` - Moving between facilities
+- `at_depot` - At sorting/distribution facility
+- `out_for_delivery` - Assigned to driver
+- `delivered` - Successfully delivered
+- `exception` - Issue requiring attention
+
+---
+
+## 🔧 API & Integration
+
+### **Cosmos DB Operations**
+
+```python
+from parcel_tracking_db import ParcelTrackingDB
+
+async with ParcelTrackingDB() as db:
+    # Register parcel
+    parcel = await db.register_parcel(
+        barcode="LP123456",
+        recipient_name="Jane Doe",
+        recipient_address="123 Collins St, Melbourne VIC 3000",
+        destination_postcode="3000",
+        destination_state="VIC",
+        service_type="express",
+        weight=1.5,
+        store_location="Store_Melbourne_CBD"
+    )
+    
+    # Track parcel
+    tracking_history = await db.get_parcel_tracking_history("LP123456")
+    
+    # Update status
+    await db.update_parcel_status(
+        barcode="LP123456",
+        status="out_for_delivery",
+        location="Delivery_Vehicle_001"
+    )
+```
+
+### **Agent Integration**
+
+```python
+from agents.fraud import fraud_risk_agent
+from agents.base import customer_service_agent
+
+# Analyze fraud
+result = await fraud_risk_agent({
+    "message": "Suspicious delivery request",
+    "sender": "unknown@example.com"
+})
+
+# Get customer service response
+response = await customer_service_agent({
+    "query": "Where is my parcel?",
+    "tracking_number": "LP123456"
+})
+```
+
+### **Workflow Automation**
+
+```python
+from workflows.fraud_to_customer_service import fraud_detection_to_customer_service_workflow
+
+# Trigger fraud → customer service workflow
+workflow_result = await fraud_detection_to_customer_service_workflow(
+    message_content="Suspicious SMS about delivery fees",
+    customer_name="John Smith",
+    customer_email="john@example.com"
+)
+```
+
+---
+
+## 🚀 Deployment
+
+### **Azure App Service**
+
+```powershell
+# Deploy using Azure CLI
+az webapp up --runtime PYTHON:3.11 --sku B1 --name dt-logistics-web
+```
+
+See `Guides/DEPLOYMENT.md` for complete instructions including:
+- Environment variable configuration
+- CI/CD setup
+- Monitoring and logging
+- Scaling options
+
+---
+
+## 🔧 Troubleshooting
+
+### **Common Issues**
+
+**Database Connection Errors**
+```bash
+# Test Cosmos DB connectivity
+python parcel_tracking_db.py
+```
+
+**Agent Not Responding**
+```bash
+# Verify Azure credentials
+az login
+
+# Check .env configuration
+cat .env | Select-String "AZURE"
+```
+
+**Speech/Voice Features Not Working**
+- Verify `AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION` in `.env`
+- Check microphone permissions in browser
+- Test with `services/speech.py`
+
+**Azure Maps Not Optimizing Routes**
+- Validate `AZURE_MAPS_SUBSCRIPTION_KEY`
+- Run `Test Scripts/test_azure_maps.py`
+- Check API quota limits
+
+---
 
 ## 📚 Additional Resources
 
-- [Microsoft Agent Framework Documentation](https://learn.microsoft.com/en-us/agent-framework/overview/agent-framework-overview)
-- [Azure Cosmos DB Documentation](https://docs.microsoft.com/en-us/azure/cosmos-db/)
 - [Azure AI Foundry Documentation](https://learn.microsoft.com/en-us/azure/ai-studio/)
+- [Azure Cosmos DB Documentation](https://docs.microsoft.com/en-us/azure/cosmos-db/)
+- [Azure Maps Documentation](https://docs.microsoft.com/en-us/azure/azure-maps/)
+- [Azure Speech Services Documentation](https://docs.microsoft.com/en-us/azure/cognitive-services/speech-service/)
+
+---
 
 ## 📄 License
 
-This project follows the Microsoft Agent Framework licensing terms.
+This project uses Azure AI services and follows Microsoft licensing terms.
 
 ---
 
-**Getting Started**: 
-1. Configure `.env` with your Azure credentials (Cosmos DB, AI Foundry, Vision API, Azure Maps)
-2. Run `python parcel_tracking_db.py` to initialize the database
-3. **Run `$env:FLASK_ENV='development'; py app.py` to start the web interface** 🌐
+**🚀 Get Started Now:**
+1. Configure `.env` with Azure credentials
+2. Run `python parcel_tracking_db.py` to initialize database
+3. Start web app: `$env:FLASK_ENV='development'; py app.py`
 4. Access http://127.0.0.1:5000 (Login: admin/admin123)
-5. Or run `python main.py` for the CLI interface 💻
 
-## 🗺️ Driver Manifest System (Azure Maps Integration)
-
-### Overview
-The driver manifest system provides automated route optimization for delivery drivers using Azure Maps API with real-time traffic analysis. Each driver can be assigned up to 20 parcels with an optimized delivery sequence.
-
-### Setup Azure Maps
-
-1. **Create Azure Maps Account**:
-   ```bash
-   az maps account create --name dt-logistics-maps --resource-group your-rg --sku S0
-   ```
-
-2. **Configure Environment**:
-   ```bash
-   # Add to .env file
-   AZURE_MAPS_SUBSCRIPTION_KEY="your-primary-key"
-   DEPOT_ADDRESS="123 Collins St, Melbourne VIC 3000"
-   ```
-
-3. **Verify Configuration**:
-   ```bash
-   python test_azure_maps.py
-   ```
-   Expected output: ✅ Geocoding and Route API tests passing
-
-### Features
-
-**🚗 Route Optimization**
-- Real-time traffic analysis with `traffic=true`
-- Automatic waypoint reordering with `computeBestOrder=true`
-- Fastest route calculation considering current conditions
-- Distance and duration estimates
-
-**🗺️ Interactive Maps**
-- Embedded Azure Maps with Web SDK
-- Blue numbered markers for each delivery stop
-- Blue polyline showing optimized driving route
-- Auto-zoom to fit entire route with padding
-
-**📊 Admin Dashboard**
-- View all active manifests
-- Click manifest ID to view detailed route information
-- Progress tracking (completed vs total deliveries)
-- Route statistics (distance, duration, optimization status)
-
-**📱 Driver Interface**
-- Mobile-friendly manifest view
-- Deliveries listed in optimized sequence
-- Mark deliveries complete by barcode
-- Real-time progress updates
-
-### Creating Manifests
-
-**Option 1: Web Interface**
-1. Login as admin at http://127.0.0.1:5000
-2. Navigate to Admin Dashboard → Driver Manifests
-3. Click "Create New Manifest"
-4. Select driver and assign parcels (up to 20)
-5. System automatically optimizes route using Azure Maps
-
-**Option 2: Generate Demo Data**
-```bash
-python generate_demo_manifests.py
-```
-Creates:
-- 20 sample parcels with Sydney addresses
-- 3 driver manifests (driver-001, driver-002, driver-003)
-- Automatic route optimization for each manifest
-
-### Viewing Manifest Details
-
-**Admin View**: `/admin/manifests/view/<manifest_id>`
-
-Components:
-- **Header Card**: Driver info, status, progress bar
-- **Route Statistics**: 
-  - Total distance (km)
-  - Estimated duration (minutes)
-  - Optimization status ("Route optimized considering real-time traffic conditions")
-- **Interactive Map**: 
-  - Embedded Azure Maps iframe
-  - Numbered stops (Stop 1, Stop 2, etc.)
-  - Blue route polyline
-  - Auto-zoom to route bounds
-- **Delivery Details Table**: 
-  - Sorted by optimized route order
-  - Barcode, recipient, address, priority, status
-  - Each row numbered as stop sequence
-- **Route Sequence**: List view of optimized waypoint order
-
-**Driver View**: `/driver/manifest`
-- Current active manifest
-- List of deliveries in optimized order
-- Complete deliveries with barcode scan
-- Route map with current progress
-
-### Database Schema
-
-**Container**: `driver_manifests` (partition key: `/driver_id`)
-
-```json
-{
-  "id": "manifest_driver-001_17e682f2",
-  "driver_id": "driver-001",
-  "driver_name": "John Smith",
-  "created_timestamp": "2025-12-04T10:00:00Z",
-  "route_optimized": true,
-  "route_updated_timestamp": "2025-12-04T10:01:00Z",
-  "optimized": true,
-  "traffic_considered": true,
-  "estimated_distance_km": 45.3,
-  "estimated_duration_minutes": 87.2,
-  "items": [
-    {
-      "barcode": "LP123456",
-      "recipient_name": "Jane Doe",
-      "recipient_address": "123 Collins St, Melbourne VIC 3000",
-      "recipient_phone": "0412345678",
-      "priority": "express",
-      "status": "out_for_delivery",
-      "delivered": false
-    }
-  ],
-  "optimized_route": [
-    "123 Collins St, Melbourne VIC 3000",
-    "456 George St, Sydney NSW 2000"
-  ],
-  "completed_deliveries": 0,
-  "total_deliveries": 6
-}
-```
-
-### API Integration
-
-**Azure Maps Route Directions API**
-```
-GET https://atlas.microsoft.com/route/directions/json
-Parameters:
-  - api-version: 1.0
-  - subscription-key: <key>
-  - query: lat1,lon1:lat2,lon2:lat3,lon3
-  - traffic: true
-  - computeBestOrder: true
-  - routeType: fastest
-  - travelMode: car
-```
-
-**Response Processing**:
-- Extract optimized waypoint order
-- Calculate total distance and duration
-- Generate route polyline for map visualization
-- Store optimized sequence in database
-
-### Troubleshooting
-
-**Map not showing markers/route**:
-- Check browser console for errors
-- Verify `AZURE_MAPS_SUBSCRIPTION_KEY` in `.env`
-- Refresh page to regenerate embed URL with latest code
-- Run `python test_azure_maps.py` to validate API key
-
-**Mock optimization message appearing**:
-- Indicates Azure Maps API not being used
-- Check subscription key is valid
-- Verify no API request errors in Flask logs
-- Database field `optimized: true` should be set
-
-**Route not optimizing**:
-- Maximum 20 waypoints supported
-- Check all addresses can be geocoded
-- Verify API quota not exceeded
-- Review Flask terminal for error messages
-
----
-
-**For Production Deployment:**
-- See `DEPLOYMENT.md` for Azure App Service deployment
-- Configure environment variables in Azure
-- Use `gunicorn` for production WSGI server
-- Set up monitoring and logging
-
-**For Company Rebranding:**
-- Edit `company_config.py` with your company details
-- See `COMPANY_CONFIG_README.md` for complete guide
-- Restart Flask application to apply changes
-
-### **Module Dependencies**
-```
-🌐 Web Application (app.py)
-├── company_config.py (branding)
-├── parcel_tracking_db.py (database)
-├── fraud_risk_agent.py (AI fraud detection)
-└── All logistics modules
-
-💻 CLI Application (main.py)
-├── logistics_menu.py (menu system)
-├── logistics_common.py (shared utilities) 
-├── logistics_core.py
-├── logistics_customer.py
-├── logistics_driver.py
-├── logistics_depot.py
-├── logistics_ai.py
-└── logistics_admin.py
-```
-
-### **Add New Features**
-```python
-# Example: Add new customer feature to logistics_customer.py
-async def new_customer_feature():
-    print('New customer feature!')
-    
-# Import in main.py and add menu option
-from logistics_customer import new_customer_feature
-
-# Or add new web route in app.py
-@app.route('/new-feature')
-@login_required
-def new_feature():
-    return render_template('new_feature.html')
-```
-
-Experience the complete last-mile logistics system with **modern web interface** and **improved modular architecture**! 
+Experience the complete AI-powered logistics system with voice features, fraud detection workflows, and real-time route optimization! 
