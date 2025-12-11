@@ -6,14 +6,62 @@ param(
     [string]$ResourceGroup = "dt-logistics-rg",
     [string]$Location = "australiaeast",
     [string]$AppServicePlan = "dt-logistics-plan",
-    [string]$WebAppName = "dt-logistics-web-$(Get-Random -Minimum 1000 -Maximum 9999)",
-    [string]$Sku = "B2" #P1v2 is also good for production
+    [string]$WebAppName = "",
+    [string]$Sku = "B2", #P1v2 is also good for production
+    [switch]$Force
 )
+
+$deploymentConfigFile = ".azure-deployment.json"
 
 Write-Host "======================================================================" -ForegroundColor Cyan
 Write-Host " DT Logistics - Azure App Service Deployment" -ForegroundColor Cyan
 Write-Host "======================================================================" -ForegroundColor Cyan
 Write-Host ""
+
+# Check for existing deployment
+$existingDeployment = $null
+$isRedeployment = $false
+
+if (Test-Path $deploymentConfigFile) {
+    Write-Host "[0/11] Found existing deployment configuration..." -ForegroundColor Yellow
+    try {
+        $existingDeployment = Get-Content $deploymentConfigFile -Raw | ConvertFrom-Json
+        
+        # Use existing configuration if not overridden by parameters
+        if (-not $WebAppName) {
+            $WebAppName = $existingDeployment.WebAppName
+            $isRedeployment = $true
+        }
+        if (-not $PSBoundParameters.ContainsKey('ResourceGroup')) {
+            $ResourceGroup = $existingDeployment.ResourceGroup
+        }
+        if (-not $PSBoundParameters.ContainsKey('AppServicePlan')) {
+            $AppServicePlan = $existingDeployment.AppServicePlan
+        }
+        if (-not $PSBoundParameters.ContainsKey('Location')) {
+            $Location = $existingDeployment.Location
+        }
+        
+        Write-Host "✓ Redeploying to existing App Service: $WebAppName" -ForegroundColor Green
+        Write-Host "  Resource Group: $ResourceGroup" -ForegroundColor Gray
+        Write-Host "  App Service Plan: $AppServicePlan" -ForegroundColor Gray
+        
+        if ($Force) {
+            Write-Host "  ⚠ Force flag detected - will recreate resources" -ForegroundColor Yellow
+            $isRedeployment = $false
+        }
+    } catch {
+        Write-Host "⚠ Could not read existing deployment config, creating new deployment" -ForegroundColor Yellow
+    }
+    Write-Host ""
+}
+
+# Generate new name if needed
+if (-not $WebAppName) {
+    $WebAppName = "dt-logistics-web-$(Get-Random -Minimum 1000 -Maximum 9999)"
+    Write-Host "Generated new Web App name: $WebAppName" -ForegroundColor Cyan
+    Write-Host ""
+}
 
 # Check if logged in
 Write-Host "[1/11] Checking Azure login status..." -ForegroundColor Yellow
@@ -27,32 +75,75 @@ Write-Host "✓ Logged in as: $($account.user.name)" -ForegroundColor Green
 Write-Host "✓ Subscription: $($account.name)" -ForegroundColor Green
 Write-Host ""
 
-# Create Resource Group
-Write-Host "[2/11] Creating Resource Group: $ResourceGroup..." -ForegroundColor Yellow
-az group create --name $ResourceGroup --location $Location --output none
-Write-Host "✓ Resource Group created" -ForegroundColor Green
+# Create or verify Resource Group
+Write-Host "[2/11] Ensuring Resource Group exists: $ResourceGroup..." -ForegroundColor Yellow
+if ($isRedeployment) {
+    $rgExists = az group exists --name $ResourceGroup
+    if ($rgExists -eq "true") {
+        Write-Host "✓ Resource Group exists (reusing)" -ForegroundColor Green
+    } else {
+        Write-Host "⚠ Resource Group not found, creating new one" -ForegroundColor Yellow
+        az group create --name $ResourceGroup --location $Location --output none
+        Write-Host "✓ Resource Group created" -ForegroundColor Green
+    }
+} else {
+    az group create --name $ResourceGroup --location $Location --output none
+    Write-Host "✓ Resource Group created" -ForegroundColor Green
+}
 Write-Host ""
 
-# Create App Service Plan
-Write-Host "[3/11] Creating App Service Plan: $AppServicePlan..." -ForegroundColor Yellow
-az appservice plan create `
-    --name $AppServicePlan `
-    --resource-group $ResourceGroup `
-    --sku $Sku `
-    --is-linux `
-    --output none
-Write-Host "✓ App Service Plan created (SKU: $Sku)" -ForegroundColor Green
+# Create or verify App Service Plan
+Write-Host "[3/11] Ensuring App Service Plan exists: $AppServicePlan..." -ForegroundColor Yellow
+if ($isRedeployment) {
+    $planExists = az appservice plan show --name $AppServicePlan --resource-group $ResourceGroup 2>$null
+    if ($planExists) {
+        Write-Host "✓ App Service Plan exists (reusing)" -ForegroundColor Green
+    } else {
+        Write-Host "⚠ App Service Plan not found, creating new one" -ForegroundColor Yellow
+        az appservice plan create `
+            --name $AppServicePlan `
+            --resource-group $ResourceGroup `
+            --sku $Sku `
+            --is-linux `
+            --output none
+        Write-Host "✓ App Service Plan created (SKU: $Sku)" -ForegroundColor Green
+    }
+} else {
+    az appservice plan create `
+        --name $AppServicePlan `
+        --resource-group $ResourceGroup `
+        --sku $Sku `
+        --is-linux `
+        --output none
+    Write-Host "✓ App Service Plan created (SKU: $Sku)" -ForegroundColor Green
+}
 Write-Host ""
 
-# Create Web App
-Write-Host "[4/11] Creating Web App: $WebAppName..." -ForegroundColor Yellow
-az webapp create `
-    --name $WebAppName `
-    --resource-group $ResourceGroup `
-    --plan $AppServicePlan `
-    --runtime "PYTHON:3.11" `
-    --output none
-Write-Host "✓ Web App created" -ForegroundColor Green
+# Create or verify Web App
+Write-Host "[4/11] Ensuring Web App exists: $WebAppName..." -ForegroundColor Yellow
+if ($isRedeployment) {
+    $webAppExists = az webapp show --name $WebAppName --resource-group $ResourceGroup 2>$null
+    if ($webAppExists) {
+        Write-Host "✓ Web App exists (reusing for redeployment)" -ForegroundColor Green
+    } else {
+        Write-Host "⚠ Web App not found, creating new one" -ForegroundColor Yellow
+        az webapp create `
+            --name $WebAppName `
+            --resource-group $ResourceGroup `
+            --plan $AppServicePlan `
+            --runtime "PYTHON:3.11" `
+            --output none
+        Write-Host "✓ Web App created" -ForegroundColor Green
+    }
+} else {
+    az webapp create `
+        --name $WebAppName `
+        --resource-group $ResourceGroup `
+        --plan $AppServicePlan `
+        --runtime "PYTHON:3.11" `
+        --output none
+    Write-Host "✓ Web App created" -ForegroundColor Green
+}
 Write-Host ""
 
 # Enable system-assigned managed identity
@@ -376,11 +467,30 @@ if (Test-Path "init_azure_users.py") {
 }
 Write-Host ""
 
+# Save deployment configuration
+$deploymentInfo = @{
+    WebAppName = $WebAppName
+    ResourceGroup = $ResourceGroup
+    AppServicePlan = $AppServicePlan
+    Location = $Location
+    Sku = $Sku
+    DeploymentDate = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+    Url = "https://$WebAppName.azurewebsites.net"
+}
+
+$deploymentInfo | ConvertTo-Json | Set-Content $deploymentConfigFile
+Write-Host "✓ Deployment configuration saved to $deploymentConfigFile" -ForegroundColor Green
+Write-Host ""
+
 # Get URL
 $url = "https://$WebAppName.azurewebsites.net"
 
 Write-Host "======================================================================" -ForegroundColor Green
-Write-Host " DEPLOYMENT SUCCESSFUL!" -ForegroundColor Green
+if ($isRedeployment) {
+    Write-Host " REDEPLOYMENT SUCCESSFUL!" -ForegroundColor Green
+} else {
+    Write-Host " DEPLOYMENT SUCCESSFUL!" -ForegroundColor Green
+}
 Write-Host "======================================================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "Application URL: $url" -ForegroundColor Cyan
@@ -395,7 +505,8 @@ Write-Host "  3. View logs: az webapp log tail --name $WebAppName --resource-gro
 Write-Host "  4. Manage in portal: https://portal.azure.com" -ForegroundColor White
 Write-Host ""
 Write-Host "To update the application:" -ForegroundColor Yellow
-Write-Host "  Run this script again to redeploy" -ForegroundColor White
+Write-Host "  Run this script again to redeploy to the same instance" -ForegroundColor White
+Write-Host "  Use -Force to create a new deployment instead" -ForegroundColor White
 Write-Host ""
 Write-Host "======================================================================" -ForegroundColor Cyan
 
