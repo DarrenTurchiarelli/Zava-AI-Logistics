@@ -7,12 +7,9 @@ echo "Starting DT Logistics Web Application..."
 echo "Installing Python dependencies..."
 pip install -r requirements.txt
 
-# Run database migrations if needed
-echo "Checking database connection..."
-
-# Setup users (will skip if already exist)
-echo "Setting up default users..."
-python setup_users.py || echo "Warning: User setup failed or skipped"
+# Run post-deployment tasks (users setup + demo manifests)
+echo "Running post-deployment tasks..."
+python post_deploy.py || echo "Warning: Post-deployment tasks failed or skipped"
 
 # Start Gunicorn server
 echo "Starting Gunicorn server..."
