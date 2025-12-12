@@ -166,66 +166,123 @@ SAMPLE_ADDRESSES = [
     }
 ]
 
-# Sample drivers - expanded to 57 drivers
-SAMPLE_DRIVERS = [
-    {"id": "driver-001", "name": "John Smith"},
-    {"id": "driver-002", "name": "Maria Garcia"},
-    {"id": "driver-003", "name": "David Wong"},
-    {"id": "driver-004", "name": "Emily Thompson"},
-    {"id": "driver-005", "name": "Robert Kumar"},
-    {"id": "driver-006", "name": "Jessica O'Brien"},
-    {"id": "driver-007", "name": "Michael Nguyen"},
-    {"id": "driver-008", "name": "Sarah Mitchell"},
-    {"id": "driver-009", "name": "Christopher Lee"},
-    {"id": "driver-010", "name": "Amanda Roberts"},
-    {"id": "driver-011", "name": "Daniel Foster"},
-    {"id": "driver-012", "name": "Rachel Hughes"},
-    {"id": "driver-013", "name": "Matthew Singh"},
-    {"id": "driver-014", "name": "Lauren Edwards"},
-    {"id": "driver-015", "name": "Andrew Campbell"},
-    {"id": "driver-016", "name": "Nicole Zhang"},
-    {"id": "driver-017", "name": "Patrick Walsh"},
-    {"id": "driver-018", "name": "Victoria Chen"},
-    {"id": "driver-019", "name": "Thomas Anderson"},
-    {"id": "driver-020", "name": "Sophia Martinez"},
-    {"id": "driver-021", "name": "James Wilson"},
-    {"id": "driver-022", "name": "Isabella Taylor"},
-    {"id": "driver-023", "name": "Benjamin Moore"},
-    {"id": "driver-024", "name": "Mia Jackson"},
-    {"id": "driver-025", "name": "Lucas Martin"},
-    {"id": "driver-026", "name": "Charlotte Lee"},
-    {"id": "driver-027", "name": "Mason Harris"},
-    {"id": "driver-028", "name": "Amelia Clark"},
-    {"id": "driver-029", "name": "Ethan Lewis"},
-    {"id": "driver-030", "name": "Harper Walker"},
-    {"id": "driver-031", "name": "Alexander Young"},
-    {"id": "driver-032", "name": "Evelyn Hall"},
-    {"id": "driver-033", "name": "Daniel Allen"},
-    {"id": "driver-034", "name": "Abigail King"},
-    {"id": "driver-035", "name": "Matthew Wright"},
-    {"id": "driver-036", "name": "Emily Scott"},
-    {"id": "driver-037", "name": "Joseph Green"},
-    {"id": "driver-038", "name": "Elizabeth Adams"},
-    {"id": "driver-039", "name": "David Baker"},
-    {"id": "driver-040", "name": "Sofia Nelson"},
-    {"id": "driver-041", "name": "Samuel Carter"},
-    {"id": "driver-042", "name": "Avery Mitchell"},
-    {"id": "driver-043", "name": "Henry Perez"},
-    {"id": "driver-044", "name": "Scarlett Roberts"},
-    {"id": "driver-045", "name": "Sebastian Turner"},
-    {"id": "driver-046", "name": "Grace Phillips"},
-    {"id": "driver-047", "name": "Jack Campbell"},
-    {"id": "driver-048", "name": "Chloe Parker"},
-    {"id": "driver-049", "name": "Owen Evans"},
-    {"id": "driver-050", "name": "Lily Edwards"},
-    {"id": "driver-051", "name": "Ryan Collins"},
-    {"id": "driver-052", "name": "Zoe Stewart"},
-    {"id": "driver-053", "name": "Nathan Sanchez"},
-    {"id": "driver-054", "name": "Hannah Morris"},
-    {"id": "driver-055", "name": "Caleb Rogers"},
-    {"id": "driver-056", "name": "Aria Reed"},
-    {"id": "driver-057", "name": "Isaac Cook"},
+# Additional addresses for other Australian states
+SAMPLE_ADDRESSES_VIC = [
+    {"recipient": "Oliver Thompson", "address": "120 Collins Street, Melbourne VIC 3000", "phone": "+61 3 9654 1234", "priority": "normal", "notes": "CBD office building"},
+    {"recipient": "Emma Wilson", "address": "1 Flinders Street, Melbourne VIC 3000", "phone": "+61 3 9619 5000", "priority": "normal", "notes": "Near Flinders Street Station"},
+    {"recipient": "Noah Brown", "address": "8 Exhibition Street, Melbourne VIC 3000", "phone": "+61 3 9639 8888", "priority": "urgent", "notes": "Parliament precinct"},
+    {"recipient": "Sophia Martin", "address": "501 Swanston Street, Melbourne VIC 3000", "phone": "+61 3 9347 2000", "priority": "normal", "notes": "University area"},
+    {"recipient": "Liam Davis", "address": "181 William Street, Melbourne VIC 3000", "phone": "+61 3 9320 5000", "priority": "normal", "notes": "Legal district"},
 ]
+
+SAMPLE_ADDRESSES_QLD = [
+    {"recipient": "Ava Johnson", "address": "100 Queen Street, Brisbane QLD 4000", "phone": "+61 7 3229 9111", "priority": "normal", "notes": "Brisbane CBD"},
+    {"recipient": "William Taylor", "address": "12 Creek Street, Brisbane QLD 4000", "phone": "+61 7 3221 6111", "priority": "urgent", "notes": "Financial district"},
+    {"recipient": "Isabella White", "address": "45 Eagle Street, Brisbane QLD 4000", "phone": "+61 7 3221 2333", "priority": "normal", "notes": "Riverside area"},
+    {"recipient": "James Anderson", "address": "111 George Street, Brisbane QLD 4000", "phone": "+61 7 3229 8111", "priority": "normal", "notes": "Treasury building area"},
+    {"recipient": "Mia Thompson", "address": "320 Adelaide Street, Brisbane QLD 4000", "phone": "+61 7 3222 1234", "priority": "normal", "notes": "Central Brisbane"},
+]
+
+SAMPLE_ADDRESSES_SA = [
+    {"recipient": "Lucas Harris", "address": "91 King William Street, Adelaide SA 5000", "phone": "+61 8 8223 1234", "priority": "normal", "notes": "Adelaide CBD"},
+    {"recipient": "Charlotte Miller", "address": "45 Grenfell Street, Adelaide SA 5000", "phone": "+61 8 8212 3456", "priority": "normal", "notes": "City center"},
+    {"recipient": "Henry Wilson", "address": "136 North Terrace, Adelaide SA 5000", "phone": "+61 8 8207 1234", "priority": "urgent", "notes": "Cultural precinct"},
+    {"recipient": "Amelia Jones", "address": "25 Pirie Street, Adelaide SA 5000", "phone": "+61 8 8223 5678", "priority": "normal", "notes": "Retail district"},
+]
+
+SAMPLE_ADDRESSES_WA = [
+    {"recipient": "Benjamin Clark", "address": "125 St Georges Terrace, Perth WA 6000", "phone": "+61 8 9220 1234", "priority": "normal", "notes": "Perth CBD"},
+    {"recipient": "Harper Lewis", "address": "200 Murray Street, Perth WA 6000", "phone": "+61 8 9321 5678", "priority": "normal", "notes": "City center"},
+    {"recipient": "Ethan Walker", "address": "108 Hay Street, Perth WA 6000", "phone": "+61 8 9321 8888", "priority": "urgent", "notes": "Shopping district"},
+]
+
+SAMPLE_ADDRESSES_ACT = [
+    {"recipient": "Olivia Robinson", "address": "1 Constitution Avenue, Canberra ACT 2600", "phone": "+61 2 6270 1234", "priority": "urgent", "notes": "Government precinct"},
+    {"recipient": "Alexander King", "address": "45 Northbourne Avenue, Canberra ACT 2600", "phone": "+61 2 6248 5678", "priority": "normal", "notes": "Civic area"},
+]
+
+# Sample drivers - 57 drivers distributed across Australian states
+# NSW: 25 drivers, VIC: 12 drivers, QLD: 10 drivers, SA: 6 drivers, WA: 3 drivers, ACT: 1 driver
+SAMPLE_DRIVERS = [
+    # NSW Drivers (25)
+    {"id": "driver-001", "name": "John Smith", "state": "NSW"},
+    {"id": "driver-002", "name": "Maria Garcia", "state": "NSW"},
+    {"id": "driver-003", "name": "David Wong", "state": "NSW"},
+    {"id": "driver-004", "name": "Emily Thompson", "state": "NSW"},
+    {"id": "driver-005", "name": "Robert Kumar", "state": "NSW"},
+    {"id": "driver-006", "name": "Jessica O'Brien", "state": "NSW"},
+    {"id": "driver-007", "name": "Michael Nguyen", "state": "NSW"},
+    {"id": "driver-008", "name": "Sarah Mitchell", "state": "NSW"},
+    {"id": "driver-009", "name": "Christopher Lee", "state": "NSW"},
+    {"id": "driver-010", "name": "Amanda Roberts", "state": "NSW"},
+    {"id": "driver-011", "name": "Daniel Foster", "state": "NSW"},
+    {"id": "driver-012", "name": "Rachel Hughes", "state": "NSW"},
+    {"id": "driver-013", "name": "Matthew Singh", "state": "NSW"},
+    {"id": "driver-014", "name": "Lauren Edwards", "state": "NSW"},
+    {"id": "driver-015", "name": "Andrew Campbell", "state": "NSW"},
+    {"id": "driver-016", "name": "Nicole Zhang", "state": "NSW"},
+    {"id": "driver-017", "name": "Patrick Walsh", "state": "NSW"},
+    {"id": "driver-018", "name": "Victoria Chen", "state": "NSW"},
+    {"id": "driver-019", "name": "Thomas Anderson", "state": "NSW"},
+    {"id": "driver-020", "name": "Sophia Martinez", "state": "NSW"},
+    {"id": "driver-021", "name": "James Wilson", "state": "NSW"},
+    {"id": "driver-022", "name": "Isabella Taylor", "state": "NSW"},
+    {"id": "driver-023", "name": "Benjamin Moore", "state": "NSW"},
+    {"id": "driver-024", "name": "Mia Jackson", "state": "NSW"},
+    {"id": "driver-025", "name": "Lucas Martin", "state": "NSW"},
+    
+    # VIC Drivers (12)
+    {"id": "driver-026", "name": "Charlotte Lee", "state": "VIC"},
+    {"id": "driver-027", "name": "Mason Harris", "state": "VIC"},
+    {"id": "driver-028", "name": "Amelia Clark", "state": "VIC"},
+    {"id": "driver-029", "name": "Ethan Lewis", "state": "VIC"},
+    {"id": "driver-030", "name": "Harper Walker", "state": "VIC"},
+    {"id": "driver-031", "name": "Alexander Young", "state": "VIC"},
+    {"id": "driver-032", "name": "Evelyn Hall", "state": "VIC"},
+    {"id": "driver-033", "name": "Daniel Allen", "state": "VIC"},
+    {"id": "driver-034", "name": "Abigail King", "state": "VIC"},
+    {"id": "driver-035", "name": "Matthew Wright", "state": "VIC"},
+    {"id": "driver-036", "name": "Emily Scott", "state": "VIC"},
+    {"id": "driver-037", "name": "Joseph Green", "state": "VIC"},
+    
+    # QLD Drivers (10)
+    {"id": "driver-038", "name": "Elizabeth Adams", "state": "QLD"},
+    {"id": "driver-039", "name": "David Baker", "state": "QLD"},
+    {"id": "driver-040", "name": "Sofia Nelson", "state": "QLD"},
+    {"id": "driver-041", "name": "Samuel Carter", "state": "QLD"},
+    {"id": "driver-042", "name": "Avery Mitchell", "state": "QLD"},
+    {"id": "driver-043", "name": "Henry Perez", "state": "QLD"},
+    {"id": "driver-044", "name": "Scarlett Roberts", "state": "QLD"},
+    {"id": "driver-045", "name": "Sebastian Turner", "state": "QLD"},
+    {"id": "driver-046", "name": "Grace Phillips", "state": "QLD"},
+    {"id": "driver-047", "name": "Jack Campbell", "state": "QLD"},
+    
+    # SA Drivers (6)
+    {"id": "driver-048", "name": "Chloe Parker", "state": "SA"},
+    {"id": "driver-049", "name": "Owen Evans", "state": "SA"},
+    {"id": "driver-050", "name": "Lily Edwards", "state": "SA"},
+    {"id": "driver-051", "name": "Ryan Collins", "state": "SA"},
+    {"id": "driver-052", "name": "Zoe Stewart", "state": "SA"},
+    {"id": "driver-053", "name": "Nathan Sanchez", "state": "SA"},
+    
+    # WA Drivers (3)
+    {"id": "driver-054", "name": "Hannah Morris", "state": "WA"},
+    {"id": "driver-055", "name": "Caleb Rogers", "state": "WA"},
+    {"id": "driver-056", "name": "Aria Reed", "state": "WA"},
+    
+    # ACT Driver (1)
+    {"id": "driver-057", "name": "Isaac Cook", "state": "ACT"},
+]
+
+# Map states to their address pools
+STATE_ADDRESS_POOLS = {
+    "NSW": SAMPLE_ADDRESSES,
+    "VIC": SAMPLE_ADDRESSES_VIC,
+    "QLD": SAMPLE_ADDRESSES_QLD,
+    "SA": SAMPLE_ADDRESSES_SA,
+    "WA": SAMPLE_ADDRESSES_WA,
+    "ACT": SAMPLE_ADDRESSES_ACT,
+}
 
 async def create_sample_parcels(db: ParcelTrackingDB, num_parcels: int = 2500):
     """Create sample parcels in the database
@@ -254,7 +311,7 @@ async def create_sample_parcels(db: ParcelTrackingDB, num_parcels: int = 2500):
             await db.register_parcel(
                 barcode=barcode,
                 sender_name="DT Logistics Warehouse",
-                sender_address="123 Industrial Drive, Sydney NSW 2000",
+                sender_address="1 Homebush Bay Drive, Rhodes NSW 2138",
                 sender_phone="+61 2 9999 0000",
                 recipient_name=f"{addr_info['recipient']} #{i}",  # Add number to make unique
                 recipient_address=addr_info["address"],
@@ -281,6 +338,80 @@ async def create_sample_parcels(db: ParcelTrackingDB, num_parcels: int = 2500):
     
     print(f"   ✅ Total parcels ready: {len(barcodes)}")
     return barcodes
+
+async def create_sample_parcels_by_state(db: ParcelTrackingDB):
+    """Create sample parcels distributed across different Australian states
+    
+    Returns:
+        Dictionary mapping state codes to lists of barcodes
+    """
+    from config.depots import get_depot_manager
+    depot_mgr = get_depot_manager()
+    
+    print(f"Creating parcels across Australian states...")
+    state_barcodes = {state: [] for state in STATE_ADDRESS_POOLS.keys()}
+    
+    # Calculate parcels per state based on number of drivers
+    state_driver_counts = {}
+    for driver in SAMPLE_DRIVERS:
+        state = driver.get('state', 'NSW')
+        state_driver_counts[state] = state_driver_counts.get(state, 0) + 1
+    
+    parcel_counter = 1
+    
+    for state, address_pool in STATE_ADDRESS_POOLS.items():
+        num_drivers = state_driver_counts.get(state, 0)
+        if num_drivers == 0:
+            continue
+            
+        # ~40 parcels per driver average
+        num_parcels = num_drivers * 40
+        
+        # Get depot for this state
+        depot_address = depot_mgr.get_depot(state) or depot_mgr.get_default_depot()
+        
+        print(f"\n   {state}: Creating {num_parcels} parcels for {num_drivers} drivers")
+        print(f"      Depot: {depot_address}")
+        
+        for i in range(num_parcels):
+            barcode = f"DT{datetime.now().strftime('%Y%m%d')}{parcel_counter:04d}"
+            parcel_counter += 1
+            
+            # Cycle through addresses for this state
+            addr_info = address_pool[i % len(address_pool)]
+            
+            # Extract postcode and state from address
+            address_parts = addr_info["address"].split(",")
+            state_postcode = address_parts[-1].strip()
+            actual_state = state_postcode.split()[0] if state_postcode else state
+            postcode = state_postcode.split()[1] if len(state_postcode.split()) > 1 else "0000"
+            
+            try:
+                await db.register_parcel(
+                    barcode=barcode,
+                    sender_name="DT Logistics Warehouse",
+                    sender_address=depot_address,
+                    sender_phone="+61 2 9999 0000",
+                    recipient_name=f"{addr_info['recipient']} #{parcel_counter}",
+                    recipient_address=addr_info["address"],
+                    recipient_phone=addr_info["phone"],
+                    destination_postcode=postcode,
+                    destination_state=actual_state,
+                    service_type=addr_info["priority"],
+                    weight=round(0.5 + ((parcel_counter % 50) * 0.3), 2),
+                    dimensions=f"{20+(parcel_counter%30)}x{15+(parcel_counter%25)}x{10+(parcel_counter%20)}cm",
+                    special_instructions=addr_info["notes"]
+                )
+                state_barcodes[state].append(barcode)
+            except Exception as e:
+                if "already exists" in str(e):
+                    state_barcodes[state].append(barcode)
+                else:
+                    print(f"      ❌ Error creating parcel {barcode}: {e}")
+        
+        print(f"      ✅ Created {len(state_barcodes[state])} parcels for {state}")
+    
+    return state_barcodes
 
 async def delete_all_manifests(db: ParcelTrackingDB):
     """Delete all existing driver manifests"""
@@ -330,42 +461,46 @@ async def delete_all_manifests(db: ParcelTrackingDB):
         traceback.print_exc()
         return 0
 
-async def create_driver_manifests(db: ParcelTrackingDB, all_barcodes: list):
-    """Create manifests for sample drivers with varied parcel counts (30-50 each)"""
+async def create_driver_manifests(db: ParcelTrackingDB, state_barcodes: dict):
+    """Create manifests for sample drivers with varied parcel counts (30-50 each)
+    
+    Args:
+        state_barcodes: Dictionary mapping state codes to lists of barcodes
+    """
     
     import random
     from datetime import datetime
     
-    print(f"\n🚚 Creating driver manifests for {len(SAMPLE_DRIVERS)} drivers...")
-    print(f"   Total parcels available: {len(all_barcodes)}")
-    
-    # Shuffle barcodes for random distribution
-    shuffled_barcodes = all_barcodes.copy()
-    random.shuffle(shuffled_barcodes)
+    print(f"\n🚚 Creating driver manifests for {len(SAMPLE_DRIVERS)} drivers across states...")
     
     # Distribute parcels with variation (30-50 per driver)
-    current_idx = 0
     manifests_created = 0
     
     for driver in SAMPLE_DRIVERS:
-        # Random number of parcels between 30 and 50
-        num_parcels = random.randint(30, 50)
+        driver_state = driver.get('state', 'NSW')
         
-        # Get parcels for this driver
-        driver_barcodes = shuffled_barcodes[current_idx:current_idx + num_parcels]
-        current_idx += num_parcels
+        # Get available barcodes for this driver's state
+        available_barcodes = state_barcodes.get(driver_state, [])
         
-        if not driver_barcodes:
-            print(f"   ⚠️  No more parcels available for {driver['name']}")
+        if not available_barcodes:
+            print(f"\n   ⚠️  No parcels available for {driver['name']} in {driver_state}")
             continue
         
-        print(f"\n   Driver: {driver['name']} ({driver['id']}) - {len(driver_barcodes)} parcels")
+        # Random number of parcels between 30 and 50
+        num_parcels = min(random.randint(30, 50), len(available_barcodes))
+        
+        # Get parcels for this driver and remove from pool
+        driver_barcodes = available_barcodes[:num_parcels]
+        state_barcodes[driver_state] = available_barcodes[num_parcels:]
+        
+        print(f"\n   Driver: {driver['name']} ({driver['id']}) [{driver_state}] - {len(driver_barcodes)} parcels")
         
         try:
             manifest_id = await db.create_driver_manifest(
                 driver_id=driver['id'],
                 driver_name=driver['name'],
-                parcel_barcodes=driver_barcodes
+                parcel_barcodes=driver_barcodes,
+                driver_state=driver_state
             )
             
             if manifest_id:
@@ -390,10 +525,22 @@ async def create_driver_manifests(db: ParcelTrackingDB, all_barcodes: list):
         except Exception as e:
             print(f"      ❌ Error: {e}")
     
+    # Calculate total parcels distributed
+    total_distributed = len(SAMPLE_DRIVERS) * 40  # approximate
+    
     print(f"\n   📊 Summary:")
     print(f"      Created: {manifests_created} manifests")
     print(f"      Total drivers: {len(SAMPLE_DRIVERS)}")
-    print(f"   📦 Parcels distributed: {current_idx}/{len(all_barcodes)}")
+    
+    # Show breakdown by state
+    state_counts = {}
+    for driver in SAMPLE_DRIVERS:
+        state = driver.get('state', 'NSW')
+        state_counts[state] = state_counts.get(state, 0) + 1
+    
+    print(f"\n   🗺️  Distribution by state:")
+    for state, count in sorted(state_counts.items()):
+        print(f"      {state}: {count} drivers")
 
 async def main():
     """Main demonstration setup"""
@@ -419,24 +566,25 @@ async def main():
         # Delete existing manifests
         await delete_all_manifests(db)
         
-        # Create sample parcels
-        barcodes = await create_sample_parcels(db)
+        # Create sample parcels by state
+        state_barcodes = await create_sample_parcels_by_state(db)
         
-        if not barcodes:
+        total_parcels = sum(len(barcodes) for barcodes in state_barcodes.values())
+        if total_parcels == 0:
             print("\n❌ No parcels were created. Cannot generate manifests.")
             return
         
-        print(f"\n✅ Created {len(barcodes)} sample parcels")
+        print(f"\n✅ Created {total_parcels} sample parcels across {len(state_barcodes)} states")
         
         # Create driver manifests
-        await create_driver_manifests(db, barcodes)
+        await create_driver_manifests(db, state_barcodes)
     
     print("\n" + "=" * 70)
     print("✅ Demo Data Generation Complete!")
     print("=" * 70)
     print()
     print(f"Generated:")
-    print(f"   • {len(barcodes)} parcels")
+    print(f"   • {total_parcels} parcels")
     print(f"   • {len(SAMPLE_DRIVERS)} driver manifests")
     print(f"   • 30-50 parcels per driver (randomized)")
     print()

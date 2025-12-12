@@ -1185,7 +1185,8 @@ class ParcelTrackingDB:
 
     async def create_driver_manifest(self, driver_id: str, driver_name: str, 
                                      parcel_barcodes: List[str], 
-                                     manifest_date: str = None) -> Optional[str]:
+                                     manifest_date: str = None,
+                                     driver_state: str = None) -> Optional[str]:
         """Create a delivery manifest for a driver with up to 50 parcels"""
         try:
             if len(parcel_barcodes) > 50:
@@ -1219,6 +1220,7 @@ class ParcelTrackingDB:
                 "id": manifest_id,
                 "driver_id": driver_id,
                 "driver_name": driver_name,
+                "driver_state": driver_state or "NSW",
                 "manifest_date": manifest_date,
                 "items": manifest_items,
                 "total_items": len(manifest_items),

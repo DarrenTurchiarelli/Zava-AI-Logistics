@@ -40,7 +40,7 @@ class DepotManager:
         
         # Fallback to default depot if no state-specific depots configured
         if not depots:
-            default_depot = os.getenv('DEPOT_ADDRESS', '123 Industrial Drive, Sydney NSW 2000')
+            default_depot = os.getenv('DEPOT_ADDRESS', '1 Homebush Bay Drive, Rhodes NSW 2138')
             depots['NSW'] = default_depot
             
         return depots
@@ -72,7 +72,7 @@ class DepotManager:
         # Fallback to first available depot or default
         if not depot:
             depot = next(iter(self.depots.values()), 
-                        os.getenv('DEPOT_ADDRESS', '123 Industrial Drive, Sydney NSW 2000'))
+                        os.getenv('DEPOT_ADDRESS', '1 Homebush Bay Drive, Rhodes NSW 2138'))
         
         return depot
     
@@ -94,7 +94,7 @@ class DepotManager:
         """
         if not addresses:
             return next(iter(self.depots.values()), 
-                       os.getenv('DEPOT_ADDRESS', '123 Industrial Drive, Sydney NSW 2000'))
+                       os.getenv('DEPOT_ADDRESS', '1 Homebush Bay Drive, Rhodes NSW 2138'))
         
         # Count states in addresses
         state_counts = {}
@@ -112,7 +112,7 @@ class DepotManager:
         
         # Fallback
         return next(iter(self.depots.values()), 
-                   os.getenv('DEPOT_ADDRESS', '123 Industrial Drive, Sydney NSW 2000'))
+                   os.getenv('DEPOT_ADDRESS', '1 Homebush Bay Drive, Rhodes NSW 2138'))
     
     def get_closest_depot_to_address(self, address: str) -> str:
         """Find the depot closest to the given address using Azure Maps distance calculation
@@ -125,11 +125,11 @@ class DepotManager:
         """
         if not address:
             # No address provided, return first depot
-            return next(iter(self.depots.values()), '123 Industrial Drive, Sydney NSW 2000')
+            return next(iter(self.depots.values()), '1 Homebush Bay Drive, Rhodes NSW 2138')
         
         if not self.depots:
             # No depots configured
-            return '123 Industrial Drive, Sydney NSW 2000'
+            return '1 Homebush Bay Drive, Rhodes NSW 2138'
         
         # Try to use Azure Maps to calculate distances
         azure_maps_key = os.getenv('AZURE_MAPS_SUBSCRIPTION_KEY', '')
@@ -287,7 +287,7 @@ class DepotManager:
             Default depot address (first configured depot or env default)
         """
         return os.getenv('DEPOT_ADDRESS') or next(iter(self.depots.values()), 
-                                                   '123 Industrial Drive, Sydney NSW 2000')
+                                                   '1 Homebush Bay Drive, Rhodes NSW 2138')
 
 
 # Convenience function for quick depot lookup

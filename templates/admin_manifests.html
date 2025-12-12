@@ -49,19 +49,38 @@
             <!-- Active Manifests -->
             <div class="card">
                 <div class="card-header bg-secondary text-white">
-                    <h5 class="mb-0">
-                        <i class="bi bi-list-ul"></i> Active Manifests Today
-                        <span class="badge bg-light text-dark">{{ manifests|length }}</span>
-                    </h5>
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <h5 class="mb-0">
+                                <i class="bi bi-list-ul"></i> Active Manifests Today
+                                <span class="badge bg-light text-dark">{{ manifests|length }}</span>
+                            </h5>
+                        </div>
+                        <div class="col-auto">
+                            <!-- State Filter -->
+                            <select id="stateFilter" class="form-select form-select-sm" style="min-width: 150px;">
+                                <option value="">All States</option>
+                                <option value="NSW">NSW</option>
+                                <option value="VIC">VIC</option>
+                                <option value="QLD">QLD</option>
+                                <option value="SA">SA</option>
+                                <option value="WA">WA</option>
+                                <option value="TAS">TAS</option>
+                                <option value="ACT">ACT</option>
+                                <option value="NT">NT</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body">
                     {% if manifests %}
                     <div class="table-responsive">
-                        <table class="table table-hover">
+                        <table class="table table-hover" id="manifestTable">
                             <thead>
                                 <tr>
                                     <th>Manifest ID</th>
                                     <th>Driver</th>
+                                    <th>State</th>
                                     <th>Items</th>
                                     <th>Progress</th>
                                     <th>Route</th>
@@ -73,7 +92,7 @@
                             </thead>
                             <tbody>
                                 {% for manifest in manifests %}
-                                <tr>
+                                <tr data-state="{{ manifest.driver_state or 'NSW' }}">
                                     <td>
                                         <a href="{{ url_for('view_manifest_details', manifest_id=manifest.id) }}" 
                                            class="text-decoration-none">
@@ -84,6 +103,9 @@
                                     <td>
                                         <strong>{{ manifest.driver_name }}</strong><br>
                                         <small class="text-muted">ID: {{ manifest.driver_id }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ manifest.driver_state or 'NSW' }}</span>
                                     </td>
                                     <td>
                                         <span class="badge bg-info">{{ manifest.total_items }} items</span>
@@ -144,4 +166,24 @@
         </div>
     </div>
 </div>
+
+<script>
+// State filter functionality
+document.getElementById('stateFilter').addEventListener('change', function() {
+    const selectedState = this.value;
+    const table = document.getElementById('manifestTable');
+    const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+    
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const rowState = row.getAttribute('data-state');
+        
+        if (selectedState === '' || rowState === selectedState) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    }
+});
+</script>
 {% endblock %}
