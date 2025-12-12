@@ -6,6 +6,7 @@ This module replaces local Python agent implementations with real Azure AI agent
 Required Azure RBAC Permissions for Managed Identity:
 - Cognitive Services OpenAI Contributor (for OpenAI operations)
 - Azure AI Developer (for agents/write permissions)
+- Cognitive Services User (for agents/read permissions)
 
 Setup Instructions:
 1. Enable managed identity on App Service

@@ -145,6 +145,13 @@ az role assignment create \
   --assignee-principal-type ServicePrincipal \
   --role "Azure AI Developer" \
   --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/dt-logistics-rg"
+
+# Assign Cognitive Services User role (for agents/read operations)
+az role assignment create \
+  --assignee-object-id $PRINCIPAL_ID \
+  --assignee-principal-type ServicePrincipal \
+  --role "Cognitive Services User" \
+  --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/dt-logistics-rg"
 ```
 
 ### 3. Verify Role Assignments
@@ -160,10 +167,11 @@ az role assignment list \
 ### Required Roles Summary
 
 | Service | Role | Purpose |
-|---------|------|---------|------|
+|---------|------|---------|
 | **Cosmos DB** | `Cosmos DB Built-in Data Contributor` | Full data plane access (CRUD operations) |
 | **Azure AI Foundry** | `Cognitive Services OpenAI Contributor` | OpenAI model and agent operations |
 | **Azure AI Foundry** | `Azure AI Developer` | Agents create/write/execute permissions |
+| **Azure AI Foundry** | `Cognitive Services User` | Agents read permissions |
 | **Azure Speech** | Configured via API key | Speech synthesis and recognition |
 
 **Important**: Role assignments can take up to 5 minutes to propagate. Restart the App Service after granting permissions:

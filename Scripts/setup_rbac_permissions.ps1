@@ -96,6 +96,25 @@ if ($LASTEXITCODE -eq 0) {
 }
 Write-Host ""
 
+# 4. Cognitive Services User (for read operations)
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "4️⃣  Azure AI Foundry - Read Access" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+
+Write-Host "Granting 'Cognitive Services User' role..." -ForegroundColor Yellow
+az role assignment create `
+    --assignee-object-id $principalId `
+    --assignee-principal-type ServicePrincipal `
+    --role "Cognitive Services User" `
+    --scope "/subscriptions/$subscriptionId/resourceGroups/$ResourceGroup"
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "✅ Cognitive Services User role assigned successfully" -ForegroundColor Green
+} else {
+    Write-Host "⚠️  Cognitive Services User role assignment failed (may already exist)" -ForegroundColor Yellow
+}
+Write-Host ""
+
 # Verify role assignments
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "📋 Verifying Role Assignments" -ForegroundColor Cyan
@@ -123,4 +142,10 @@ Write-Host "📋 Required Environment Variables:" -ForegroundColor Yellow
 Write-Host "  • USE_MANAGED_IDENTITY=true" -ForegroundColor White
 Write-Host "  • COSMOS_DB_ENDPOINT=https://$CosmosAccountName.documents.azure.com:443/" -ForegroundColor White
 Write-Host "  • Do NOT set COSMOS_CONNECTION_STRING or COSMOS_DB_KEY" -ForegroundColor Red
+Write-Host ""
+Write-Host "📋 Required Roles Granted:" -ForegroundColor Yellow
+Write-Host "  ✓ Cosmos DB Built-in Data Contributor (data plane access)" -ForegroundColor Green
+Write-Host "  ✓ Cognitive Services OpenAI Contributor (OpenAI operations)" -ForegroundColor Green
+Write-Host "  ✓ Azure AI Developer (agents/write permissions)" -ForegroundColor Green
+Write-Host "  ✓ Cognitive Services User (agents/read permissions)" -ForegroundColor Green
 Write-Host ""
