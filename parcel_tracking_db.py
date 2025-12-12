@@ -1186,11 +1186,11 @@ class ParcelTrackingDB:
     async def create_driver_manifest(self, driver_id: str, driver_name: str, 
                                      parcel_barcodes: List[str], 
                                      manifest_date: str = None) -> Optional[str]:
-        """Create a delivery manifest for a driver with up to 20 parcels"""
+        """Create a delivery manifest for a driver with up to 50 parcels"""
         try:
-            if len(parcel_barcodes) > 20:
-                print(f"⚠️ Warning: Manifest limited to 20 items. Truncating list.")
-                parcel_barcodes = parcel_barcodes[:20]
+            if len(parcel_barcodes) > 50:
+                print(f"⚠️ Warning: Manifest limited to 50 items. Truncating list.")
+                parcel_barcodes = parcel_barcodes[:50]
             
             manifest_id = f"manifest_{driver_id}_{uuid.uuid4().hex[:8]}"
             manifest_date = manifest_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
