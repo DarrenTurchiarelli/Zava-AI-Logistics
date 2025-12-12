@@ -1,8 +1,0 @@
-<step title="Incoming Request" date="2025-12-11T04:18:35.515" instance="436d0a" url="/logstream" method="GET" type="request" pid="768,1,15" Host="dt-logistics-web-8323.scm.azurewebsites.net" User-Agent="AZURECLI/2.48.1 (MSI)" Accept-Encoding="identity" Authorization="Bea..." x-ms-client-request-id="6d8396a1-d648-11f0-9d5e-c403a8f40dc5" X-ARR-LOG-ID="6d8396a1-d648-11f0-9d5e-c403a8f40dc5" CLIENT-IP="49.184.242.129:21147" X-SITE-DEPLOYMENT-ID="dt-logistics-web-8323" WAS-DEFAULT-HOSTNAME="dt-logistics-web-8323.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/logstream" X-Client-IP="49.184.242.129" X-Client-Port="21147" >
-  <step title="Cleanup Xml Logs" date="2025-12-11T04:18:35.521" >
-    <step title="Cleanup Infos" date="2025-12-11T04:18:35.565" totalFiles="730" totalCleanup="570" /><!-- duration: 17ms -->
-  </step><!-- duration: 92ms -->
-  <step title="LogStreamHandlerMiddleware.Invoke" date="2025-12-11T04:18:35.711" /><!-- duration: 303ms -->
-  <step title="Error occurred" date="2025-12-11T04:21:36.014" type="error" text="LogStreamManager: ProcessRequest end" /><!-- duration: 5ms -->
-  <step title="Outgoing response" date="2025-12-11T04:21:36.036" type="response" statusCode="200" statusText="OK" /><!-- duration: 6ms -->
-</step><!-- duration: 180531ms -->
