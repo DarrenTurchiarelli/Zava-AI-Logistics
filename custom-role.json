@@ -1,0 +1,16 @@
+{
+  "Name": "Azure AI Services Agent Operator",
+  "Description": "Can read and execute AI agents in Azure AI Foundry",
+  "Actions": [],
+  "NotActions": [],
+  "DataActions": [
+    "Microsoft.CognitiveServices/accounts/AIServices/agents/read",
+    "Microsoft.CognitiveServices/accounts/AIServices/agents/write",
+    "Microsoft.CognitiveServices/accounts/AIServices/threads/read",
+    "Microsoft.CognitiveServices/accounts/AIServices/threads/write"
+  ],
+  "NotDataActions": [],
+  "AssignableScopes": [
+    "/subscriptions/5f49bef6-fafc-4401-9a6a-6e8cc5c66380"
+  ]
+}

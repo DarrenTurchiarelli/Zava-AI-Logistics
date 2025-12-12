@@ -9,7 +9,13 @@ param(
     [string]$ResourceGroup = "dt-logistics-rg",
     
     [Parameter(Mandatory=$true)]
-    [string]$CosmosAccountName = "logisticstracking"
+    [string]$CosmosAccountName = "logisticstracking",
+    
+    [Parameter(Mandatory=$false)]
+    [string]$AIHubName = "dtaihub0018140454363",
+    
+    [Parameter(Mandatory=$false)]
+    [string]$AIHubResourceGroup = "dt-dev-australiaeast-rg-1"
 )
 
 Write-Host "========================================" -ForegroundColor Cyan
@@ -115,6 +121,57 @@ if ($LASTEXITCODE -eq 0) {
 }
 Write-Host ""
 
+# 5. AI Hub Resource-Specific Permissions (CRITICAL)
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "5️⃣  AI Hub Resource Permissions (agents/read)" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+
+$aiHubScope = "/subscriptions/$subscriptionId/resourceGroups/$AIHubResourceGroup/providers/Microsoft.CognitiveServices/accounts/$AIHubName"
+Write-Host "AI Hub Scope: $aiHubScope" -ForegroundColor Yellow
+Write-Host ""
+
+Write-Host "Granting 'Cognitive Services Contributor' to AI Hub..." -ForegroundColor Yellow
+az role assignment create `
+    --assignee-object-id $principalId `
+    --assignee-principal-type ServicePrincipal `
+    --role "Cognitive Services Contributor" `
+    --scope $aiHubScope
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "✅ Cognitive Services Contributor assigned to AI Hub" -ForegroundColor Green
+} else {
+    Write-Host "⚠️  AI Hub role assignment failed (may already exist)" -ForegroundColor Yellow
+}
+Write-Host ""
+
+Write-Host "Granting 'Azure AI Developer' to AI Hub..." -ForegroundColor Yellow
+az role assignment create `
+    --assignee-object-id $principalId `
+    --assignee-principal-type ServicePrincipal `
+    --role "Azure AI Developer" `
+    --scope $aiHubScope
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "✅ Azure AI Developer assigned to AI Hub" -ForegroundColor Green
+} else {
+    Write-Host "⚠️  AI Hub role assignment failed (may already exist)" -ForegroundColor Yellow
+}
+Write-Host ""
+
+Write-Host "Granting 'Cognitive Services OpenAI Contributor' to AI Hub..." -ForegroundColor Yellow
+az role assignment create `
+    --assignee-object-id $principalId `
+    --assignee-principal-type ServicePrincipal `
+    --role "Cognitive Services OpenAI Contributor" `
+    --scope $aiHubScope
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "✅ Cognitive Services OpenAI Contributor assigned to AI Hub" -ForegroundColor Green
+} else {
+    Write-Host "⚠️  AI Hub role assignment failed (may already exist)" -ForegroundColor Yellow
+}
+Write-Host ""
+
 # Verify role assignments
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "📋 Verifying Role Assignments" -ForegroundColor Cyan
@@ -148,4 +205,7 @@ Write-Host "  ✓ Cosmos DB Built-in Data Contributor (data plane access)" -Fore
 Write-Host "  ✓ Cognitive Services OpenAI Contributor (OpenAI operations)" -ForegroundColor Green
 Write-Host "  ✓ Azure AI Developer (agents/write permissions)" -ForegroundColor Green
 Write-Host "  ✓ Cognitive Services User (agents/read permissions)" -ForegroundColor Green
+Write-Host "  ✓ Cognitive Services Contributor (AI Hub - includes agents/read)" -ForegroundColor Green
+Write-Host ""
+Write-Host "⚠️  CRITICAL: AI Hub resource-specific roles are required for agents/read permission" -ForegroundColor Yellow
 Write-Host ""

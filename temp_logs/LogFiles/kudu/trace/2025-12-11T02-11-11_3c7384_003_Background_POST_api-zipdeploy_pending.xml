@@ -1,0 +1,59 @@
+<step title="BackgroundTrace" date="2025-12-11T02:11:11.426" instance="3c7384" url="/api/zipdeploy" method="POST" >
+  <step title="Creating temporary deployment - FetchDeploymentManager" date="2025-12-11T02:11:11.766" /><!-- duration: 2ms -->
+  <step title="Creating temporary deployment" date="2025-12-11T02:11:11.772" /><!-- duration: 145ms -->
+  <step title="Performing fetch based deployment" date="2025-12-11T02:11:11.984" >
+    <step title="Cleaning up temp folders from previous zip deployments and extracting pushed zip file /tmp/zipdeploy/b0b47838-ce00-4a3e-be08-243cea25f52c.zip (0.43 MB) to /tmp/zipdeploy/extracted" date="2025-12-11T02:11:13.478" >
+      <step title="ChmodRecursive Process exited with total time taken in ms: 123" date="2025-12-11T02:11:13.756" /><!-- duration: 8ms -->
+    </step><!-- duration: 290ms -->
+    <step title="Deployment timer started" date="2025-12-11T02:11:15.801" >
+      <step title="DeploymentManager.Deploy(id:ed7a367e-ab24-4a80-a49b-852cd3673e4d)" date="2025-12-11T02:11:15.839" >
+        <step title="Collecting changeset information" date="2025-12-11T02:11:15.888" /><!-- duration: 100ms -->
+        <step title="Updating submodules" date="2025-12-11T02:11:15.991" /><!-- duration: 1149ms -->
+        <step title="Determining deployment builder" date="2025-12-11T02:11:17.462" >
+          <step title="Builder is OryxBuilder" date="2025-12-11T02:11:17.489" /><!-- duration: 9ms -->
+        </step><!-- duration: 46ms -->
+        <step title="PreDeployment: context.CleanOutputPath False" date="2025-12-11T02:11:17.619" >
+          <step title="PreDeployment: context.OutputPath /home/site/wwwroot" date="2025-12-11T02:11:17.809" >
+            <step title="Building" date="2025-12-11T02:11:18.069" >
+              <step title="Executing external process" date="2025-12-11T02:11:18.794" type="process" path="bash" arguments="-c &quot;oryx build /tmp/zipdeploy/extracted -o /home/site/wwwroot --platform python --platform-version 3.11 -p virtualenv_name=antenv --log-file /tmp/build-debug.log  -i /tmp/8de385a91a8ebac --compress-destination-dir | tee /tmp/oryx-build.log ; exit $PIPESTATUS &quot;" >
+                <step title="Error occurred" date="2025-12-11T02:13:50.274" type="error" text="GetParentProcessLinux (3267) failed.: Could not find a part of the path &apos;/proc/3267/stat&apos;." stackTrace="   at Interop.ThrowExceptionForIoErrno(ErrorInfo errorInfo, String path, Boolean isDirError)
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, UnixFileMode openPermissions, Int64&amp; fileLength, UnixFileMode&amp; filePermissions, Boolean failForSymlink, Boolean&amp; wasSymlink, Func`4 createOpenException)
+   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.StreamReader.ValidateArgsAndOpenPath(String path, Encoding encoding, Int32 bufferSize)
+   at System.IO.File.ReadLines(String path)
+   at Kudu.Core.Infrastructure.ProcessExtensions.GetParentProcessLinux(Process process, ITracer tracer) in /tmp/KuduLite/Kudu.Core/Infrastructure/ProcessExtensions.cs:line 155" /><!-- duration: 12ms -->
+                <step title="Error occurred" date="2025-12-11T02:13:50.316" type="error" text="GetParentProcessLinux (3271) failed.: Could not find a part of the path &apos;/proc/3271/stat&apos;." stackTrace="   at Interop.ThrowExceptionForIoErrno(ErrorInfo errorInfo, String path, Boolean isDirError)
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, UnixFileMode openPermissions, Int64&amp; fileLength, UnixFileMode&amp; filePermissions, Boolean failForSymlink, Boolean&amp; wasSymlink, Func`4 createOpenException)
+   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.StreamReader.ValidateArgsAndOpenPath(String path, Encoding encoding, Int32 bufferSize)
+   at System.IO.File.ReadLines(String path)
+   at Kudu.Core.Infrastructure.ProcessExtensions.GetParentProcessLinux(Process process, ITracer tracer) in /tmp/KuduLite/Kudu.Core/Infrastructure/ProcessExtensions.cs:line 155" /><!-- duration: 20ms -->
+                <step title="Cpu: python(3235,33.810s)+ts(3238,0.120s)+build.sh(3234,0.000s)+build.sh(3233,0.000s)+build.sh(3125,0.070s)+oryx(3102,6.690s)+tee(3103,0.000s)+bash(3101,0.000s)=total(40.670s)" date="2025-12-11T02:13:50.507" /><!-- duration: 19ms -->
+                <step title="bash: no io activity for 60s, prev-cpu=-1.000s, current-cpu=40.670s" date="2025-12-11T02:13:50.577" /><!-- duration: 29ms -->
+                <step title="Cpu: python(3235,66.120s)+ts(3238,0.210s)+build.sh(3234,0.000s)+build.sh(3233,0.000s)+build.sh(3125,0.090s)+oryx(3102,6.860s)+tee(3103,0.000s)+bash(3101,0.000s)=total(73.280s)" date="2025-12-11T02:14:51.192" /><!-- duration: 27ms -->
+                <step title="bash: no io activity for 122s, prev-cpu=40.670s, current-cpu=73.280s" date="2025-12-11T02:14:51.241" /><!-- duration: 11ms -->
+                <step title="Cpu: python(3235,85.280s)+ts(3238,0.210s)+build.sh(3234,0.000s)+build.sh(3233,0.000s)+build.sh(3125,0.090s)+oryx(3102,7.040s)+tee(3103,0.000s)+bash(3101,0.000s)=total(92.620s)" date="2025-12-11T02:15:52.273" /><!-- duration: 19ms -->
+                <step title="bash: no io activity for 183s, prev-cpu=73.280s, current-cpu=92.620s" date="2025-12-11T02:15:52.526" /><!-- duration: 41ms -->
+                <step title="Cpu: python(3235,111.130s)+ts(3238,0.210s)+build.sh(3234,0.000s)+build.sh(3233,0.000s)+build.sh(3125,0.090s)+oryx(3102,7.110s)+tee(3103,0.000s)+bash(3101,0.000s)=total(118.540s)" date="2025-12-11T02:16:53.297" /><!-- duration: 41ms -->
+                <step title="bash: no io activity for 244s, prev-cpu=92.620s, current-cpu=118.540s" date="2025-12-11T02:16:53.398" /><!-- duration: 40ms -->
+                <step title="Cpu: python(3235,137.070s)+ts(3238,0.210s)+build.sh(3234,0.000s)+build.sh(3233,0.000s)+build.sh(3125,0.090s)+oryx(3102,7.170s)+tee(3103,0.000s)+bash(3101,0.000s)=total(144.530s)" date="2025-12-11T02:17:54.296" /><!-- duration: 11ms -->
+                <step title="bash: no io activity for 305s, prev-cpu=118.540s, current-cpu=144.530s" date="2025-12-11T02:17:54.336" /><!-- duration: 9ms -->
+                <step title="Cpu: gzip(3475,43.400s)+sh(3474,0.000s)+tar(3472,2.470s)+build.sh(3125,0.100s)+oryx(3102,8.230s)+tee(3103,0.000s)+bash(3101,0.000s)=total(54.200s)" date="2025-12-11T02:19:56.316" /><!-- duration: 3ms -->
+                <step title="bash: no io activity for 60s, prev-cpu=-1.000s, current-cpu=54.200s" date="2025-12-11T02:19:56.368" /><!-- duration: 20ms -->
+                <step title="Cpu: gzip(3475,81.880s)+sh(3474,0.000s)+tar(3472,4.000s)+build.sh(3125,0.100s)+oryx(3102,8.240s)+tee(3103,0.000s)+bash(3101,0.000s)=total(94.210s)" date="2025-12-11T02:20:56.961" /><!-- duration: 10ms -->
+                <step title="bash: no io activity for 121s, prev-cpu=54.200s, current-cpu=94.210s" date="2025-12-11T02:20:56.998" /><!-- duration: 41ms -->
+              </step><!-- duration: 614424ms -->
+              <step title="Using PythonDeploymentLogParser" date="2025-12-11T02:21:33.666" /><!-- duration: 4ms -->
+              <step title="Triggering recycle (preview mode disabled)." date="2025-12-11T02:21:35.035" /><!-- duration: 11ms -->
+              <step title="Modified file to trigger a restart of the app container." date="2025-12-11T02:21:35.146" /><!-- duration: 10ms -->
+              <step title="Skip function trigger and logicapp sync because function is not enabled." date="2025-12-11T02:21:35.198" /><!-- duration: 2ms -->
+            </step><!-- duration: 617958ms -->
+          </step><!-- duration: 618220ms -->
+          <step title="Cleaning up temp files" date="2025-12-11T02:21:36.031" /><!-- duration: 5779ms -->
+          <step title="Cleaning up temp files" date="2025-12-11T02:21:41.813" /><!-- duration: 514ms -->
+          <step title="Reloading status file with latest updates" date="2025-12-11T02:21:42.360" >
+            <step title="WebHooksManager.PublishEventAsync: PostDeployment" date="2025-12-11T02:21:42.366" /><!-- duration: 163ms -->
+          </step><!-- duration: 170ms -->
+          <step title="Cleaning up temporary deployment - fetch deployment was successful" date="2025-12-11T02:21:42.535" /><!-- duration: 2ms -->
+        </step><!-- duration: 625079ms -->
+      </step><!-- duration: 626877ms -->

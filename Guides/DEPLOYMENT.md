@@ -152,6 +152,35 @@ az role assignment create \
   --assignee-principal-type ServicePrincipal \
   --role "Cognitive Services User" \
   --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/dt-logistics-rg"
+
+# CRITICAL: Assign roles to the specific AI Hub resource (required for agents/read)
+# Find your AI Hub resource ID
+AI_HUB_RESOURCE_ID=$(az resource list \
+  --query "[?contains(name, 'dtaihub') && type=='Microsoft.CognitiveServices/accounts'].id | [0]" \
+  -o tsv)
+
+echo "AI Hub Resource: $AI_HUB_RESOURCE_ID"
+
+# Assign Cognitive Services Contributor to AI Hub (includes all agent operations)
+az role assignment create \
+  --assignee-object-id $PRINCIPAL_ID \
+  --assignee-principal-type ServicePrincipal \
+  --role "Cognitive Services Contributor" \
+  --scope "$AI_HUB_RESOURCE_ID"
+
+# Assign Azure AI Developer to AI Hub
+az role assignment create \
+  --assignee-object-id $PRINCIPAL_ID \
+  --assignee-principal-type ServicePrincipal \
+  --role "Azure AI Developer" \
+  --scope "$AI_HUB_RESOURCE_ID"
+
+# Assign Cognitive Services OpenAI Contributor to AI Hub
+az role assignment create \
+  --assignee-object-id $PRINCIPAL_ID \
+  --assignee-principal-type ServicePrincipal \
+  --role "Cognitive Services OpenAI Contributor" \
+  --scope "$AI_HUB_RESOURCE_ID"
 ```
 
 ### 3. Verify Role Assignments
@@ -166,13 +195,18 @@ az role assignment list \
 
 ### Required Roles Summary
 
-| Service | Role | Purpose |
-|---------|------|---------|
-| **Cosmos DB** | `Cosmos DB Built-in Data Contributor` | Full data plane access (CRUD operations) |
-| **Azure AI Foundry** | `Cognitive Services OpenAI Contributor` | OpenAI model and agent operations |
-| **Azure AI Foundry** | `Azure AI Developer` | Agents create/write/execute permissions |
-| **Azure AI Foundry** | `Cognitive Services User` | Agents read permissions |
-| **Azure Speech** | Configured via API key | Speech synthesis and recognition |
+| Service | Role | Scope | Purpose |
+|---------|------|-------|---------|
+| **Cosmos DB** | `Cosmos DB Built-in Data Contributor` | Cosmos DB Account | Full data plane access (CRUD operations) |
+| **AI Foundry (RG)** | `Cognitive Services OpenAI Contributor` | Resource Group | OpenAI model operations |
+| **AI Foundry (RG)** | `Azure AI Developer` | Resource Group | General agent permissions |
+| **AI Foundry (RG)** | `Cognitive Services User` | Resource Group | Agent read operations |
+| **AI Hub (Resource)** | `Cognitive Services Contributor` | AI Hub Resource | **CRITICAL**: Includes agents/read data action |
+| **AI Hub (Resource)** | `Azure AI Developer` | AI Hub Resource | Agent write/execute on specific resource |
+| **AI Hub (Resource)** | `Cognitive Services OpenAI Contributor` | AI Hub Resource | OpenAI operations on specific resource |
+| **Azure Speech** | Configured via API key | N/A | Speech synthesis and recognition |
+
+**⚠️ CRITICAL**: The `agents/read` permission requires roles assigned directly to the AI Hub **resource**, not just the resource group. Without this, chatbot and fraud detection will fail with permission errors.
 
 **Important**: Role assignments can take up to 5 minutes to propagate. Restart the App Service after granting permissions:
 ```bash
