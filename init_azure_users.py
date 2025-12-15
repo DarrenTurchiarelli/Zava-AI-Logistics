@@ -86,17 +86,25 @@ async def init_azure_users():
                 'username': 'driver002',
                 'password': 'driver123',
                 'role': UserManager.ROLE_DRIVER,
-                'full_name': 'Sarah Jones',
-                'email': 'sarah.jones@dtlogistics.com.au',
+                'full_name': 'Maria Garcia',
+                'email': 'maria.garcia@dtlogistics.com.au',
                 'driver_id': 'driver-002'
             },
             {
                 'username': 'driver003',
                 'password': 'driver123',
                 'role': UserManager.ROLE_DRIVER,
-                'full_name': 'Mike Brown',
-                'email': 'mike.brown@dtlogistics.com.au',
+                'full_name': 'David Wong',
+                'email': 'david.wong@dtlogistics.com.au',
                 'driver_id': 'driver-003'
+            },
+            {
+                'username': 'driver004',
+                'password': 'driver123',
+                'role': UserManager.ROLE_DRIVER,
+                'full_name': 'Test Driver (Scalability)',
+                'email': 'test.driver@dtlogistics.com.au',
+                'driver_id': 'driver-004'
             },
             {
                 'username': 'depot_mgr',
@@ -160,7 +168,7 @@ async def init_azure_users():
         print("  Password: support123")
         print()
         print("DRIVERS:")
-        print("  Username: driver001, driver002, driver003")
+        print("  Username: driver001, driver002, driver003, driver004")
         print("  Password: driver123")
         print()
         print("DEPOT MANAGER:")

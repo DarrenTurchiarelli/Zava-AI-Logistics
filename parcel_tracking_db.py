@@ -73,8 +73,8 @@ def get_cached_credential():
             # Running in Azure App Service - use ManagedIdentityCredential
             _cached_credential = ManagedIdentityCredential()
         else:
-            # Running locally - use AzureCliCredential with short timeout
-            _cached_credential = AzureCliCredential(process_timeout=5)
+            # Running locally - use AzureCliCredential with longer timeout for background threads
+            _cached_credential = AzureCliCredential(process_timeout=60)
     return _cached_credential
 
 
@@ -1216,12 +1216,13 @@ class ParcelTrackingDB:
     async def create_driver_manifest(self, driver_id: str, driver_name: str, 
                                      parcel_barcodes: List[str], 
                                      manifest_date: str = None,
-                                     driver_state: str = None) -> Optional[str]:
-        """Create a delivery manifest for a driver with up to 50 parcels"""
+                                     driver_state: str = None,
+                                     max_items: int = 150) -> Optional[str]:
+        """Create a delivery manifest for a driver with configurable max parcels (default 150)"""
         try:
-            if len(parcel_barcodes) > 50:
-                print(f"⚠️ Warning: Manifest limited to 50 items. Truncating list.")
-                parcel_barcodes = parcel_barcodes[:50]
+            if len(parcel_barcodes) > max_items:
+                print(f"⚠️ Warning: Manifest limited to {max_items} items. Truncating list.")
+                parcel_barcodes = parcel_barcodes[:max_items]
             
             manifest_id = f"manifest_{driver_id}_{uuid.uuid4().hex[:8]}"
             manifest_date = manifest_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -1351,7 +1352,7 @@ class ParcelTrackingDB:
                 
                 # Store all route options if provided
                 if all_routes:
-                    manifest["route_options"] = all_routes
+                    manifest["all_routes"] = all_routes  # Changed from route_options to all_routes
                     manifest["multi_route_enabled"] = True
                 
                 await container.replace_item(item=manifest_id, body=manifest)
@@ -1383,17 +1384,17 @@ class ParcelTrackingDB:
             
             async for manifest in container.query_items(query=query, parameters=parameters):
                 # Check if multi-route is enabled
-                if not manifest.get("multi_route_enabled") or not manifest.get("route_options"):
+                if not manifest.get("multi_route_enabled") or not manifest.get("all_routes"):
                     print(f"⚠️ Multi-route not available for manifest {manifest_id}")
                     return False
                 
-                route_options = manifest["route_options"]
+                all_routes = manifest["all_routes"]  # Changed from route_options to all_routes
                 
-                if route_type not in route_options:
+                if route_type not in all_routes:
                     print(f"❌ Route type '{route_type}' not available")
                     return False
                 
-                selected_route = route_options[route_type]
+                selected_route = all_routes[route_type]
                 
                 # Update manifest with selected route
                 manifest["selected_route_type"] = route_type

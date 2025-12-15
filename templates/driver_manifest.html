@@ -45,19 +45,29 @@
                         </div>
                         <div class="col-md-3">
                             <strong><i class="bi bi-geo-alt"></i> Distance:</strong><br>
-                            {% if manifest.estimated_distance_km %}
+                            <span data-stat="distance">
+                            {% if manifest.get('selected_route_type') and manifest.estimated_distance_km %}
                                 {{ manifest.estimated_distance_km }} km
+                                {% if manifest.get('split_into_runs') %}
+                                <br><small class="text-muted">({{ manifest.total_runs }} runs)</small>
+                                {% endif %}
                             {% else %}
-                                Calculating...
+                                <span class="text-muted">Select route to calculate</span>
                             {% endif %}
+                            </span>
                         </div>
                         <div class="col-md-3">
                             <strong><i class="bi bi-clock"></i> Est. Time:</strong><br>
-                            {% if manifest.estimated_duration_minutes %}
+                            <span data-stat="time">
+                            {% if manifest.get('selected_route_type') and manifest.estimated_duration_minutes %}
                                 {{ (manifest.estimated_duration_minutes / 60)|round(1) }} hours
+                                {% if manifest.get('split_into_runs') %}
+                                <br><small class="text-muted">(across {{ manifest.total_runs }} runs)</small>
+                                {% endif %}
                             {% else %}
-                                Calculating...
+                                <span class="text-muted">Select route to calculate</span>
                             {% endif %}
+                            </span>
                         </div>
                         <div class="col-md-3">
                             <strong><i class="bi bi-shield-check"></i> Status:</strong><br>
@@ -84,20 +94,41 @@
                 </div>
                 
                 <!-- Route Selection Options -->
-                {% if manifest.get('multi_route_enabled') and manifest.get('route_options') %}
+                {% if manifest.get('multi_route_enabled') %}
                 <div class="card-body bg-light border-bottom">
-                    <h6 class="mb-3"><i class="bi bi-signpost-split"></i> Choose Your Route Preference</h6>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="mb-0"><i class="bi bi-signpost-split"></i> Choose Your Route Optimization</h6>
+                        {% if not manifest.get('selected_route_type') %}
+                        <span class="badge bg-warning text-dark">
+                            <i class="bi bi-info-circle"></i> Initial Route - Select optimization below
+                        </span>
+                        {% else %}
+                        <span class="badge bg-success">
+                            <i class="bi bi-check-circle"></i> Using {{ manifest.route_type_display }}
+                        </span>
+                        {% endif %}
+                    </div>
+                    
+                    {% if manifest.get('split_into_runs') %}
+                    <div class="alert alert-info mb-3">
+                        <i class="bi bi-truck"></i> <strong>Multiple Delivery Runs:</strong> 
+                        This manifest has been automatically split into <strong>{{ manifest.total_runs }} delivery runs</strong> 
+                        (max 25 addresses per run due to Azure Maps API limits).
+                    </div>
+                    {% endif %}
+                    
                     <div class="row">
                         {% set route_options = manifest.route_options %}
-                        {% set selected_type = manifest.get('selected_route_type', 'fastest') %}
+                        {% set selected_type = manifest.get('selected_route_type', 'safest') %}
                         
-                        {% if 'fastest' in route_options %}
+                        <!-- Fastest Route -->
                         <div class="col-md-4 mb-3">
+                            {% if 'fastest' in route_options %}
                             <div class="card route-option-card {% if selected_type == 'fastest' %}border-primary{% endif %}" 
                                  onclick="switchRoute('{{ manifest.id }}', 'fastest')"
                                  style="cursor: pointer;">
                                 <div class="card-body text-center">
-                                    <h2 class="mb-2">{{ route_options.fastest.icon }}</h2>
+                                    <h2 class="mb-2">🏎️</h2>
                                     <h5 class="card-title">
                                         Fastest Route
                                         {% if selected_type == 'fastest' %}
@@ -105,7 +136,7 @@
                                         {% endif %}
                                     </h5>
                                     <p class="card-text small text-muted">
-                                        {{ route_options.fastest.description }}
+                                        Optimized for quickest delivery time
                                     </p>
                                     <hr>
                                     <div class="row">
@@ -125,16 +156,38 @@
                                     {% endif %}
                                 </div>
                             </div>
+                            {% else %}
+                            <div class="card border-secondary" style="cursor: pointer;" 
+                                 onclick="calculateRoute('{{ manifest.id }}', 'fastest')">
+                                <div class="card-body text-center">
+                                    <h2 class="mb-2 text-muted">🏎️</h2>
+                                    <h5 class="card-title text-muted">Fastest Route</h5>
+                                    <p class="card-text small text-muted">
+                                        Click to calculate fastest route
+                                    </p>
+                                    <hr>
+                                    <button class="btn btn-outline-primary btn-sm" type="button">
+                                        <i class="bi bi-calculator"></i> Calculate Route
+                                    </button>
+                                    <div class="mt-2 d-none" id="fastest-spinner">
+                                        <div class="spinner-border spinner-border-sm" role="status">
+                                            <span class="visually-hidden">Calculating...</span>
+                                        </div>
+                                        <small class="d-block mt-1">Calculating...</small>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
                         </div>
-                        {% endif %}
                         
-                        {% if 'shortest' in route_options %}
+                        <!-- Shortest Route -->
                         <div class="col-md-4 mb-3">
+                            {% if 'shortest' in route_options %}
                             <div class="card route-option-card {% if selected_type == 'shortest' %}border-primary{% endif %}" 
                                  onclick="switchRoute('{{ manifest.id }}', 'shortest')"
                                  style="cursor: pointer;">
                                 <div class="card-body text-center">
-                                    <h2 class="mb-2">{{ route_options.shortest.icon }}</h2>
+                                    <h2 class="mb-2">📏</h2>
                                     <h5 class="card-title">
                                         Shortest Route
                                         {% if selected_type == 'shortest' %}
@@ -142,7 +195,7 @@
                                         {% endif %}
                                     </h5>
                                     <p class="card-text small text-muted">
-                                        {{ route_options.shortest.description }}
+                                        Minimizes total distance traveled
                                     </p>
                                     <hr>
                                     <div class="row">
@@ -157,16 +210,38 @@
                                     </div>
                                 </div>
                             </div>
+                            {% else %}
+                            <div class="card border-secondary" style="cursor: pointer;" 
+                                 onclick="calculateRoute('{{ manifest.id }}', 'shortest')">
+                                <div class="card-body text-center">
+                                    <h2 class="mb-2 text-muted">📏</h2>
+                                    <h5 class="card-title text-muted">Shortest Route</h5>
+                                    <p class="card-text small text-muted">
+                                        Click to calculate shortest route
+                                    </p>
+                                    <hr>
+                                    <button class="btn btn-outline-primary btn-sm" type="button">
+                                        <i class="bi bi-calculator"></i> Calculate Route
+                                    </button>
+                                    <div class="mt-2 d-none" id="shortest-spinner">
+                                        <div class="spinner-border spinner-border-sm" role="status">
+                                            <span class="visually-hidden">Calculating...</span>
+                                        </div>
+                                        <small class="d-block mt-1">Calculating...</small>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
                         </div>
-                        {% endif %}
                         
-                        {% if 'safest' in route_options %}
+                        <!-- Safest Route -->
                         <div class="col-md-4 mb-3">
+                            {% if 'safest' in route_options %}
                             <div class="card route-option-card {% if selected_type == 'safest' %}border-primary{% endif %}" 
                                  onclick="switchRoute('{{ manifest.id }}', 'safest')"
                                  style="cursor: pointer;">
                                 <div class="card-body text-center">
-                                    <h2 class="mb-2">{{ route_options.safest.icon }}</h2>
+                                    <h2 class="mb-2">🛡️</h2>
                                     <h5 class="card-title">
                                         Safest Route
                                         {% if selected_type == 'safest' %}
@@ -174,7 +249,7 @@
                                         {% endif %}
                                     </h5>
                                     <p class="card-text small text-muted">
-                                        {{ route_options.safest.description }}
+                                        Safest driving conditions
                                     </p>
                                     <hr>
                                     <div class="row">
@@ -187,25 +262,38 @@
                                             <small class="text-muted">km</small>
                                         </div>
                                     </div>
-                                    {% if route_options.safest.get('crossing_warnings') is defined %}
-                                    <small class="{% if route_options.safest.crossing_warnings == 0 %}text-success{% else %}text-warning{% endif %} mt-2 d-block">
-                                        <i class="bi bi-shield-check"></i> 
-                                        {% if route_options.safest.crossing_warnings == 0 %}
-                                        Minimal road crossings
-                                        {% else %}
-                                        {{ route_options.safest.crossing_warnings }} crossing warnings
-                                        {% endif %}
-                                    </small>
-                                    <small class="text-info d-block">
-                                        Safety Score: {{ route_options.safest.get('safety_score', 100) }}/100
+                                    {% if route_options.safest.get('side_of_road_considered') %}
+                                    <small class="text-success mt-2 d-block">
+                                        <i class="bi bi-shield-check"></i> Safety-optimized
                                     </small>
                                     {% endif %}
                                 </div>
                             </div>
+                            {% else %}
+                            <div class="card border-secondary" style="cursor: pointer;" 
+                                 onclick="calculateRoute('{{ manifest.id }}', 'safest')">
+                                <div class="card-body text-center">
+                                    <h2 class="mb-2 text-muted">🛡️</h2>
+                                    <h5 class="card-title text-muted">Safest Route</h5>
+                                    <p class="card-text small text-muted">
+                                        Click to calculate safest route
+                                    </p>
+                                    <hr>
+                                    <button class="btn btn-outline-primary btn-sm" type="button">
+                                        <i class="bi bi-calculator"></i> Calculate Route
+                                    </button>
+                                    <div class="mt-2 d-none" id="safest-spinner">
+                                        <div class="spinner-border spinner-border-sm" role="status">
+                                            <span class="visually-hidden">Calculating...</span>
+                                        </div>
+                                        <small class="d-block mt-1">Calculating...</small>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
                         </div>
-                        {% endif %}
                     </div>
-                    <div class="alert alert-info mb-0">
+                    <div class="alert alert-info mb-0 mt-3">
                         <i class="bi bi-lightbulb"></i> <strong>Tip:</strong> Click on any route option to switch. The map will update automatically with your selected route.
                     </div>
                 </div>
@@ -537,6 +625,29 @@
 </style>
 
 <script>
+function updateManifestStats(route) {
+    // Update distance
+    const distanceElem = document.querySelector('[data-stat="distance"]');
+    if (distanceElem && route.total_distance_km) {
+        let distanceText = `${route.total_distance_km} km`;
+        if (route.split_into_runs && route.total_runs) {
+            distanceText += `<br><small class="text-muted">(${route.total_runs} runs)</small>`;
+        }
+        distanceElem.innerHTML = distanceText;
+    }
+    
+    // Update time
+    const timeElem = document.querySelector('[data-stat="time"]');
+    if (timeElem && route.total_duration_minutes) {
+        const hours = (route.total_duration_minutes / 60).toFixed(1);
+        let timeText = `${hours} hours`;
+        if (route.split_into_runs && route.total_runs) {
+            timeText += `<br><small class="text-muted">(across ${route.total_runs} runs)</small>`;
+        }
+        timeElem.innerHTML = timeText;
+    }
+}
+
 function toggleCardedFields(loopIndex, isCarded) {
     const cardedFields = document.getElementById('cardedFields' + loopIndex);
     const postOfficeSelect = document.getElementById('postOffice' + loopIndex);
@@ -551,6 +662,68 @@ function toggleCardedFields(loopIndex, isCarded) {
         postOfficeSelect.removeAttribute('required');
         submitText.textContent = 'Mark as Delivered';
     }
+}
+
+function calculateRoute(manifestId, routeType) {
+    // Show confirmation popup
+    if (!confirm(`Calculate ${routeType} route?\n\nThis will take 10-20 seconds to optimize ${routeType === 'fastest' ? 'the quickest path' : 'the shortest distance'}.`)) {
+        return;
+    }
+    
+    // Show spinner
+    const spinner = document.getElementById(`${routeType}-spinner`);
+    if (spinner) {
+        spinner.classList.remove('d-none');
+    }
+    
+    // Disable the card
+    event.currentTarget.style.pointerEvents = 'none';
+    event.currentTarget.style.opacity = '0.6';
+    
+    fetch(`/driver/manifest/${manifestId}/calculate-route/${routeType}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            if (data.cached) {
+                showToast(`${routeType.charAt(0).toUpperCase() + routeType.slice(1)} route already calculated`, 'info');
+            } else {
+                showToast(`${routeType.charAt(0).toUpperCase() + routeType.slice(1)} route calculated successfully!`, 'success');
+            }
+            
+            // Update distance and time in the header before reloading
+            if (data.route) {
+                updateManifestStats(data.route);
+            }
+            
+            // Reload page to show new route option
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        } else {
+            showToast(`Error: ${data.error}`, 'danger');
+            // Re-enable card
+            event.currentTarget.style.pointerEvents = 'auto';
+            event.currentTarget.style.opacity = '1';
+            if (spinner) {
+                spinner.classList.add('d-none');
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error calculating route:', error);
+        showToast('Failed to calculate route', 'danger');
+        // Re-enable card
+        event.currentTarget.style.pointerEvents = 'auto';
+        event.currentTarget.style.opacity = '1';
+        if (spinner) {
+            spinner.classList.add('d-none');
+        }
+    });
 }
 
 function switchRoute(manifestId, routeType) {
@@ -628,5 +801,63 @@ function createToastContainer() {
     document.body.appendChild(container);
     return container;
 }
+
+// Server-Sent Events for real-time route updates
+{% if manifest.id %}
+(function() {
+    const manifestId = '{{ manifest.id }}';
+    let eventSource = null;
+    
+    function connectSSE() {
+        console.log('🔌 Connecting to SSE for manifest:', manifestId);
+        
+        eventSource = new EventSource(`/api/driver/manifest/${manifestId}/events`);
+        
+        eventSource.addEventListener('connected', function(e) {
+            const data = JSON.parse(e.data);
+            console.log('✅ SSE Connected:', data);
+        });
+        
+        eventSource.addEventListener('route_updated', function(e) {
+            const data = JSON.parse(e.data);
+            console.log('🗺️ Route updated:', data);
+            
+            // Show toast notification
+            showToast(data.message || 'Background optimization complete! Refreshing map...', 'success');
+            
+            // Reload the page to show the updated route
+            setTimeout(() => {
+                location.reload();
+            }, 2000);
+        });
+        
+        eventSource.addEventListener('ping', function(e) {
+            // Keep-alive ping, no action needed
+            console.log('💓 SSE ping');
+        });
+        
+        eventSource.onerror = function(e) {
+            console.error('❌ SSE Error:', e);
+            eventSource.close();
+            
+            // Reconnect after 5 seconds
+            setTimeout(() => {
+                console.log('🔄 Reconnecting SSE...');
+                connectSSE();
+            }, 5000);
+        };
+    }
+    
+    // Connect when page loads
+    connectSSE();
+    
+    // Clean up on page unload
+    window.addEventListener('beforeunload', function() {
+        if (eventSource) {
+            eventSource.close();
+        }
+    });
+})();
+{% endif %}
 </script>
 {% endblock %}

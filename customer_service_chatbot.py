@@ -93,7 +93,7 @@ class CustomerServiceChatbot:
         print(f"🔎 Looking up parcel data for: {tracking_number}")
         try:
             # Get parcel from database
-            parcels_container = await self.db.get_container("parcels")
+            parcels_container = self.db.database.get_container_client("parcels")
             
             query = "SELECT * FROM c WHERE c.tracking_number = @tracking_number"
             parameters = [{"name": "@tracking_number", "value": tracking_number}]
@@ -114,7 +114,7 @@ class CustomerServiceChatbot:
             parcel = items[0]
             
             # Get tracking events
-            events_container = await self.db.get_container("tracking_events")
+            events_container = self.db.database.get_container_client("tracking_events")
             
             events_query = "SELECT * FROM c WHERE c.tracking_number = @tracking_number ORDER BY c.timestamp DESC"
             events = []
@@ -234,7 +234,7 @@ class CustomerServiceChatbot:
         """
         try:
             # Get parcel from database
-            parcels_container = await self.db.get_container("parcels")
+            parcels_container = self.db.database.get_container_client("parcels")
             
             query = f"SELECT * FROM c WHERE c.tracking_number = @tracking_number"
             parameters = [{"name": "@tracking_number", "value": tracking_number}]
@@ -256,7 +256,7 @@ class CustomerServiceChatbot:
             parcel = items[0]
             
             # Get tracking events
-            events_container = await self.db.get_container("tracking_events")
+            events_container = self.db.database.get_container_client("tracking_events")
             events_query = f"SELECT * FROM c WHERE c.tracking_number = @tracking_number ORDER BY c.timestamp DESC"
             
             events = []
@@ -300,7 +300,7 @@ class CustomerServiceChatbot:
             List of fraud reports
         """
         try:
-            suspicious_container = await self.db.get_container("suspicious_messages")
+            suspicious_container = self.db.database.get_container_client("suspicious_messages")
             
             query = "SELECT * FROM c ORDER BY c.timestamp DESC OFFSET 0 LIMIT @limit"
             parameters = [{"name": "@limit", "value": limit}]

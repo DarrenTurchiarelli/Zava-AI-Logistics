@@ -59,17 +59,8 @@
     const progressText = document.getElementById('progressText');
     const loadingMessage = document.getElementById('loadingMessage');
     
-    let progress = 0;
     let checkCount = 0;
-    
-    const messages = [
-        'Analyzing delivery addresses...',
-        'Calculating optimal routes...',
-        'Considering traffic conditions...',
-        'Grouping parcels by address...',
-        'Minimizing travel distance...',
-        'Finalizing route plan...'
-    ];
+    let completionCheckCount = 0;
     
     // Start optimization immediately
     fetch(`/api/driver/manifest/${manifestId}/optimize`, {
@@ -85,57 +76,55 @@
           console.error('Error starting optimization:', error);
       });
     
-    // Update progress bar with simulated progress
-    const progressInterval = setInterval(() => {
-        if (progress < 90) {
-            progress += Math.random() * 15;
-            if (progress > 90) progress = 90;
-            
-            progressBar.style.width = progress + '%';
-            progressText.textContent = Math.round(progress) + '%';
-            
-            // Update message based on progress
-            const messageIndex = Math.floor((progress / 100) * messages.length);
-            if (messageIndex < messages.length) {
-                loadingMessage.textContent = messages[messageIndex];
-            }
-        }
-    }, 500);
-    
-    // Check status periodically
+    // Check status periodically and update real progress
     const statusInterval = setInterval(() => {
         checkCount++;
         
         fetch(`/api/driver/manifest/${manifestId}/status`)
             .then(response => response.json())
             .then(data => {
+                // Update progress bar with real progress from backend
+                const realProgress = data.progress || 0;
+                progressBar.style.width = realProgress + '%';
+                progressText.textContent = Math.round(realProgress) + '%';
+                
+                // Update message with current step
+                if (data.step) {
+                    loadingMessage.textContent = data.step;
+                }
+                
+                // If stuck at 100% for more than 5 seconds, show manual continue button
+                if (realProgress >= 100) {
+                    completionCheckCount++;
+                    if (completionCheckCount > 5 && !data.ready) {
+                        loadingMessage.innerHTML = '<strong>Route optimization complete!</strong><br><a href="/driver/manifest" class="btn btn-primary mt-2">View Your Manifest</a>';
+                        clearInterval(statusInterval);
+                    }
+                }
+                
                 if (data.ready) {
                     // Optimization complete!
-                    clearInterval(progressInterval);
                     clearInterval(statusInterval);
                     
-                    progress = 100;
                     progressBar.style.width = '100%';
                     progressText.textContent = '100%';
                     progressBar.classList.remove('progress-bar-animated');
                     progressBar.classList.add('bg-success');
                     
-                    loadingMessage.textContent = 'Route optimized successfully! Redirecting...';
+                    loadingMessage.innerHTML = 'Route optimized successfully! Redirecting...<br><a href="/driver/manifest" class="btn btn-success btn-sm mt-2">Continue Now</a>';
                     
                     setTimeout(() => {
                         window.location.href = '/driver/manifest';
-                    }, 1000);
-                } else if (checkCount > 60) {
-                    // Timeout after 60 seconds
-                    clearInterval(progressInterval);
+                    }, 2000);
+                } else if (checkCount > 120) {
+                    // Timeout after 120 seconds - stop checking to avoid infinite loop
                     clearInterval(statusInterval);
                     
-                    progressBar.classList.add('bg-warning');
-                    loadingMessage.innerHTML = '<strong>Taking longer than expected...</strong><br>Refreshing page in 5 seconds...';
-                    
-                    setTimeout(() => {
-                        window.location.href = '/driver/manifest';
-                    }, 5000);
+                    progressBar.classList.remove('progress-bar-animated');
+                    progressBar.classList.add('bg-danger');
+                    loadingMessage.innerHTML = '<strong>⚠️ Optimization Timeout</strong><br>The route optimization is taking longer than expected.<br><br>' +
+                        '<a href="/driver/manifest" class="btn btn-primary mt-2">Continue Anyway</a> ' +
+                        '<a href="/logout" class="btn btn-outline-secondary mt-2">Logout</a>';
                 }
             })
             .catch(error => {

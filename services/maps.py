@@ -14,6 +14,7 @@ Migrated from Bing Maps (deprecated) to Azure Maps
 import os
 import requests
 import base64
+import time
 from typing import List, Dict, Any, Optional, Tuple
 from dotenv import load_dotenv
 
@@ -26,10 +27,14 @@ class BingMapsRouter:
     but now uses Azure Maps API
     """
     
-    def __init__(self):
+    def __init__(self, geocode_cache=None, cache_lock=None):
         self.subscription_key = os.getenv('AZURE_MAPS_SUBSCRIPTION_KEY', '')
         self.base_url = "https://atlas.microsoft.com"
         self.api_version = "1.0"
+        # External cache for geocoding results (shared across instances)
+        self.geocode_cache = geocode_cache if geocode_cache is not None else {}
+        self.cache_lock = cache_lock
+        self.cache_ttl = 86400  # 24 hours in seconds
     
     def _geographic_optimization(self, waypoints: List[str]) -> List[str]:
         """Optimize route using nearest-neighbor algorithm based on coordinates
@@ -86,6 +91,124 @@ class BingMapsRouter:
                 break
         
         return optimized
+    
+    def _large_route_optimization(self, addresses: List[str], start_location: str = None, route_type: str = 'fastest') -> Dict[str, Any]:
+        """Optimize routes with >25 addresses by splitting into chunks and calling Azure Maps API
+        
+        For large address sets, split into chunks of 20 addresses each, get actual road routes
+        from Azure Maps API, then combine the results.
+        """
+        waypoints = [start_location] + addresses if start_location else addresses
+        
+        # Geocode all addresses first
+        coords_map = {}
+        print(f"🗺️  Geocoding {len(waypoints)} addresses for large route optimization...")
+        for addr in waypoints:
+            coords = self.geocode_address(addr)
+            if coords:
+                coords_map[addr] = coords
+        
+        if len(coords_map) < 2:
+            print(f"❌ Insufficient geocoded addresses")
+            return self._mock_optimization(addresses, start_location)
+        
+        # Apply nearest-neighbor optimization to get initial ordering
+        optimized_waypoints = self._geographic_optimization(waypoints)
+        print(f"✅ Nearest-neighbor optimization complete: {len(optimized_waypoints)} stops")
+        
+        # Split into chunks of 20 waypoints for Azure Maps API
+        chunk_size = 20
+        total_distance = 0
+        total_duration = 0
+        route_legs = []
+        all_route_points = []
+        
+        print(f"📊 Splitting route into chunks of {chunk_size} for Azure Maps API...")
+        
+        for chunk_idx in range(0, len(optimized_waypoints), chunk_size):
+            chunk = optimized_waypoints[chunk_idx:chunk_idx + chunk_size]
+            print(f"   Processing chunk {chunk_idx//chunk_size + 1}: waypoints {chunk_idx+1}-{min(chunk_idx+chunk_size, len(optimized_waypoints))}")
+            
+            # Get coordinates for this chunk
+            chunk_coords = []
+            for addr in chunk:
+                if addr in coords_map:
+                    chunk_coords.append(coords_map[addr])
+            
+            if len(chunk_coords) < 2:
+                continue
+            
+            # Call Azure Maps Route API for this chunk
+            try:
+                route_url = f"{self.base_url}/route/directions/json"
+                query_coords = ":".join([f"{lat},{lon}" for lat, lon in chunk_coords])
+                
+                route_params = self._get_route_params(route_type)
+                params = {
+                    'api-version': self.api_version,
+                    'subscription-key': self.subscription_key,
+                    'query': query_coords,
+                    'traffic': 'true' if route_type == 'fastest' else 'false',
+                    'travelMode': 'car',
+                    'routeType': route_params['routeType'],
+                    'instructionsType': 'text',
+                    'language': 'en-US'
+                }
+                
+                response = requests.get(route_url, params=params, timeout=30)
+                response.raise_for_status()
+                route_data = response.json()
+                
+                if route_data.get('routes') and len(route_data['routes']) > 0:
+                    route = route_data['routes'][0]
+                    summary = route.get('summary', {})
+                    
+                    chunk_distance = summary.get('lengthInMeters', 0) / 1000
+                    chunk_duration = summary.get('travelTimeInSeconds', 0) / 60
+                    
+                    total_distance += chunk_distance
+                    total_duration += chunk_duration
+                    
+                    # Extract route geometry points
+                    for leg in route.get('legs', []):
+                        for point in leg.get('points', []):
+                            all_route_points.append([point['longitude'], point['latitude']])
+                        
+                        leg_summary = leg.get('summary', {})
+                        route_legs.append({
+                            'distance_km': leg_summary.get('lengthInMeters', 0) / 1000,
+                            'duration_minutes': leg_summary.get('travelTimeInSeconds', 0) / 60,
+                            'summary': f"Leg {len(route_legs) + 1}"
+                        })
+                    
+                    print(f"      ✓ Chunk {chunk_idx//chunk_size + 1}: {chunk_distance:.1f}km, {chunk_duration:.0f}min, {len(all_route_points)} route points")
+                else:
+                    print(f"      ⚠️ No route data for chunk {chunk_idx//chunk_size + 1}")
+                    
+            except Exception as e:
+                print(f"      ❌ Error processing chunk {chunk_idx//chunk_size + 1}: {e}")
+                # Continue with next chunk
+        
+        # Add 3 minutes per stop for delivery time
+        total_duration += (len(optimized_waypoints) - 1) * 3
+        
+        print(f"✅ Large route optimized: {len(optimized_waypoints)} stops, {total_distance:.1f}km, {total_duration:.0f}min")
+        print(f"   Route geometry: {len(all_route_points)} road-following points")
+        
+        return {
+            'waypoints': optimized_waypoints,
+            'total_distance_km': round(total_distance, 2),
+            'total_duration_minutes': round(total_duration, 1),
+            'route_url': self.generate_map_url(optimized_waypoints),
+            'route_legs': route_legs,
+            'route_points': all_route_points,  # Include actual route geometry
+            'optimized': True,
+            'traffic_considered': route_type == 'fastest',
+            'route_type': route_type,
+            'side_of_road_considered': route_type == 'safest',
+            'large_route': True,
+            'chunks_processed': (len(optimized_waypoints) + chunk_size - 1) // chunk_size
+        }
         
     def optimize_route(self, addresses: List[str], start_location: str = None, route_type: str = 'fastest') -> Optional[Dict[str, Any]]:
         """
@@ -112,10 +235,12 @@ class BingMapsRouter:
         
         if not addresses or len(addresses) == 0:
             return None
-            
-        if len(addresses) > 20:
-            print(f"⚠️ Route limited to 20 waypoints for optimal performance.")
-            addresses = addresses[:20]
+        
+        # For large address sets (>25), use geographic clustering instead of Azure Maps API
+        # Azure Maps Route API has a 25-waypoint limit
+        if len(addresses) > 25:
+            print(f"📊 Large address set ({len(addresses)} addresses) - using geographic optimization")
+            return self._large_route_optimization(addresses, start_location, route_type)
         
         try:
             # First, geocode all addresses to get coordinates
@@ -675,6 +800,7 @@ class BingMapsRouter:
     def geocode_address(self, address: str) -> Optional[Tuple[float, float]]:
         """
         Convert address to latitude/longitude coordinates using Azure Maps
+        Uses caching to avoid redundant API calls
         
         Returns:
             Tuple of (latitude, longitude) or None if geocoding fails
@@ -682,7 +808,28 @@ class BingMapsRouter:
         if not self.subscription_key:
             return None
         
+        # Check cache first
+        if self.cache_lock:
+            with self.cache_lock:
+                if address in self.geocode_cache:
+                    cached_data = self.geocode_cache[address]
+                    timestamp = cached_data.get('timestamp', 0)
+                    if time.time() - timestamp < self.cache_ttl:
+                        coords = cached_data.get('coords')
+                        if coords:
+                            print(f"💾 Cache hit: {address} -> {coords}")
+                            return coords
+        elif address in self.geocode_cache:
+            cached_data = self.geocode_cache[address]
+            timestamp = cached_data.get('timestamp', 0)
+            if time.time() - timestamp < self.cache_ttl:
+                coords = cached_data.get('coords')
+                if coords:
+                    print(f"💾 Cache hit: {address} -> {coords}")
+                    return coords
+        
         try:
+            import time as time_module
             search_url = f"{self.base_url}/search/address/json"
             params = {
                 'api-version': self.api_version,
@@ -704,7 +851,20 @@ class BingMapsRouter:
                 # Validate coordinates are in Australia/Oceania range
                 # Australia: lat -44 to -10, lon 113 to 154
                 if -45 <= lat <= -9 and 110 <= lon <= 160:
-                    return (lat, lon)
+                    coords = (lat, lon)
+                    # Store in cache
+                    if self.cache_lock:
+                        with self.cache_lock:
+                            self.geocode_cache[address] = {
+                                'coords': coords,
+                                'timestamp': time_module.time()
+                            }
+                    else:
+                        self.geocode_cache[address] = {
+                            'coords': coords,
+                            'timestamp': time_module.time()
+                        }
+                    return coords
                 else:
                     print(f"⚠️ Geocoded to non-Australian location: {address} -> ({lat}, {lon})")
                     # Try adding "Australia" to the query

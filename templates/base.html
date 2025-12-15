@@ -1049,6 +1049,12 @@
             
             // End chat
             function clearChat() {
+                // Stop any playing audio
+                if (window.currentAudio) {
+                    window.currentAudio.pause();
+                    window.currentAudio = null;
+                }
+                
                 messagesContainer.innerHTML = `
                     <div class="chat-widget-welcome">
                         <img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot" style="width: 64px; height: 64px; margin-bottom: 10px;">
@@ -1056,7 +1062,7 @@
                         <p>Ask me about deliveries, tracking, or general inquiries.</p>
                     </div>
                 `;
-                console.log('🗑️ Chat cleared');
+                console.log('🗑️ Chat cleared and audio stopped');
             }
             
             // Event listeners
