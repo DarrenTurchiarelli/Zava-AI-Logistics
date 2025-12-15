@@ -168,7 +168,7 @@
         {% if messages %}
             <div class="container mt-3">
                 {% for category, message in messages %}
-                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                <div class="alert alert-{{ category }} alert-dismissible alert-persistent fade show" role="alert">
                     {{ message }}
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
@@ -754,8 +754,8 @@
                         <input type="checkbox" id="chatWidgetAutoSpeak" style="margin-right: 4px;">
                         Auto-speak responses
                     </label>
-                    <button class="btn btn-sm btn-outline-danger ms-2" id="chatWidgetClear" title="Clear chat history" style="font-size: 10px; padding: 2px 8px;">
-                        <i class="bi bi-trash-fill"></i> Clear Chat
+                    <button class="btn btn-sm btn-outline-danger ms-2" id="chatWidgetClear" title="End chat session" style="font-size: 10px; padding: 2px 8px;">
+                        <i class="bi bi-x-circle-fill"></i> End Chat
                     </button>
                 </div>
             </div>
@@ -1047,7 +1047,7 @@
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
             }
             
-            // Clear chat
+            // End chat
             function clearChat() {
                 messagesContainer.innerHTML = `
                     <div class="chat-widget-welcome">

@@ -30,6 +30,62 @@ class BingMapsRouter:
         self.subscription_key = os.getenv('AZURE_MAPS_SUBSCRIPTION_KEY', '')
         self.base_url = "https://atlas.microsoft.com"
         self.api_version = "1.0"
+    
+    def _geographic_optimization(self, waypoints: List[str]) -> List[str]:
+        """Optimize route using nearest-neighbor algorithm based on coordinates
+        
+        This is a fallback when Azure Maps doesn't return optimized order.
+        Uses a greedy nearest-neighbor approach to minimize travel distance.
+        """
+        if not waypoints or len(waypoints) <= 2:
+            return waypoints
+        
+        # Geocode all waypoints
+        coords_map = {}
+        for addr in waypoints:
+            coords = self.geocode_address(addr)
+            if coords:
+                coords_map[addr] = coords
+        
+        if len(coords_map) < 2:
+            return waypoints
+        
+        # Start with the first waypoint (usually depot)
+        optimized = [waypoints[0]]
+        remaining = set(waypoints[1:])
+        current_coords = coords_map.get(waypoints[0])
+        
+        if not current_coords:
+            return waypoints
+        
+        # Greedy nearest-neighbor: always go to the closest unvisited waypoint
+        while remaining:
+            nearest = None
+            nearest_dist = float('inf')
+            
+            for addr in remaining:
+                if addr not in coords_map:
+                    continue
+                    
+                target_coords = coords_map[addr]
+                # Calculate Euclidean distance (good enough for local optimization)
+                dist = ((current_coords[0] - target_coords[0])**2 + 
+                       (current_coords[1] - target_coords[1])**2)**0.5
+                
+                if dist < nearest_dist:
+                    nearest_dist = dist
+                    nearest = addr
+            
+            if nearest:
+                optimized.append(nearest)
+                remaining.remove(nearest)
+                current_coords = coords_map[nearest]
+            else:
+                # Fallback: add remaining in original order
+                optimized.extend(sorted(remaining, key=lambda x: waypoints.index(x)))
+                break
+        
+        return optimized
         
     def optimize_route(self, addresses: List[str], start_location: str = None, route_type: str = 'fastest') -> Optional[Dict[str, Any]]:
         """
@@ -121,13 +177,32 @@ class BingMapsRouter:
             total_distance = summary.get('lengthInMeters', 0) / 1000  # Convert to km
             total_duration = summary.get('travelTimeInSeconds', 0) / 60  # Convert to minutes
             
+            # Debug: Print the route structure to understand what Azure Maps returns
+            print(f"🔍 Azure Maps route response keys: {route.keys()}")
+            if 'optimizedWaypoints' in route:
+                print(f"   optimizedWaypoints found: {route['optimizedWaypoints']}")
+            if 'guidance' in route:
+                print(f"   guidance found with keys: {route['guidance'].keys() if isinstance(route['guidance'], dict) else type(route['guidance'])}")
+            
             # Get optimized waypoint order
+            # Azure Maps returns optimized order in the guidance.instructions or legs
             optimized_order = route.get('optimizedWaypoints', [])
-            if optimized_order:
+            if optimized_order and len(optimized_order) > 0:
                 # Map optimized indices back to addresses
                 optimized_addresses = [waypoints[wp['optimizedIndex']] for wp in optimized_order]
+                print(f"🔄 Azure Maps optimized waypoint order:")
+                for idx, addr in enumerate(optimized_addresses):
+                    original_idx = waypoints.index(addr)
+                    print(f"   {idx+1}. {addr[:50]}... (was #{original_idx+1})")
             else:
-                optimized_addresses = waypoints
+                # No optimized order returned - Azure Maps might not support this with current params
+                # Fall back to geographic nearest-neighbor optimization
+                print(f"⚠️ No optimized order returned by Azure Maps")
+                print(f"   Applying geographic nearest-neighbor optimization...")
+                optimized_addresses = self._geographic_optimization(waypoints)
+                for idx, addr in enumerate(optimized_addresses):
+                    original_idx = waypoints.index(addr)
+                    print(f"   {idx+1}. {addr[:50]}... (was #{original_idx+1})")
             
             # Generate map URL
             map_url = self.generate_map_url(optimized_addresses)
@@ -509,18 +584,17 @@ class BingMapsRouter:
             
             # Get detailed route between two points
             route_url = f"{self.base_url}/route/directions/json"
+            
+            # Azure Maps requires specific coordinate format: lat1,lon1:lat2,lon2
             query = f"{from_coords[0]},{from_coords[1]}:{to_coords[0]},{to_coords[1]}"
             
             params = {
                 'api-version': self.api_version,
                 'subscription-key': self.subscription_key,
                 'query': query,
-                'traffic': 'false',
                 'travelMode': 'car',
-                'routeType': 'safest',
-                'instructionsType': 'text',
-                'sectionType': 'traffic',
-                'language': 'en-US'
+                'routeType': 'shortest',  # Changed from 'safest' which may not be valid
+                'instructionsType': 'text'
             }
             
             response = requests.get(route_url, params=params, timeout=10)
@@ -563,8 +637,14 @@ class BingMapsRouter:
             
             return None
             
+        except requests.HTTPError as e:
+            # HTTP errors are expected when API rejects params - silently skip
+            if os.getenv('DEBUG_MODE') == 'true':
+                print(f"   ⚠️  Could not analyze leg safety: {e}")
+            return None
         except Exception as e:
-            print(f"   ⚠️  Could not analyze leg safety: {e}")
+            if os.getenv('DEBUG_MODE') == 'true':
+                print(f"   ⚠️  Could not analyze leg safety: {e}")
             return None
     
     def _mock_optimization(self, addresses: List[str], start_location: str = None) -> Dict[str, Any]:

@@ -113,7 +113,11 @@
             <div class="card shadow-sm">
                 <div class="card-header bg-primary text-white">
                     <div class="d-flex justify-content-between align-items-center">
-                        <strong><i class="bi bi-clock-history"></i> Approval Request</strong>
+                        <div>
+                            <strong><i class="bi bi-clock-history"></i> Approval Request</strong>
+                            <br>
+                            <small><i class="bi bi-upc-scan"></i> {{ approval.tracking_number or approval.parcel_id or 'N/A' }}</small>
+                        </div>
                         <span class="badge bg-light text-dark">Pending</span>
                     </div>
                 </div>
@@ -124,8 +128,8 @@
                     
                     <div class="row mb-3">
                         <div class="col-6">
-                            <strong>Parcel:</strong><br>
-                            <code>{{ approval.parcel_id }}</code>
+                            <strong>Tracking Number:</strong><br>
+                            <code>{{ approval.tracking_number or approval.parcel_id }}</code>
                         </div>
                         <div class="col-6">
                             <strong>Type:</strong><br>
@@ -153,11 +157,40 @@
                     
                     {% if approval.fraud_risk is defined %}
                     <div class="mb-3">
-                        <strong><i class="bi bi-shield-exclamation"></i> Fraud Risk:</strong>
-                        <span class="badge {% if approval.fraud_risk > 70 %}bg-danger{% elif approval.fraud_risk > 30 %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                        <strong><i class="bi bi-shield-exclamation" 
+                                  data-bs-toggle="tooltip" 
+                                  data-bs-placement="right" 
+                                  data-bs-html="true"
+                                  title="<strong>Fraud Risk Analysis</strong><br>{{ approval.fraud_details|replace('|', '<br>')|safe if approval.fraud_details else 'No detailed analysis available' }}"></i> Fraud Risk:</strong>
+                        <span class="badge {% if approval.fraud_risk > 70 %}bg-danger{% elif approval.fraud_risk > 30 %}bg-warning text-dark{% else %}bg-success{% endif %}"
+                              data-bs-toggle="tooltip" 
+                              data-bs-placement="right"
+                              data-bs-html="true" 
+                              title="<strong>Risk Score: {{ approval.fraud_risk }}%</strong><br>{{ approval.fraud_details|replace('|', '<br>')|safe if approval.fraud_details else 'Standard fraud risk assessment' }}">
                             {{ approval.fraud_risk }}%
                         </span>
                     </div>
+                    
+                    {% if approval.address_notes and approval.address_notes|length > 0 %}
+                    <div class="alert alert-warning mb-3 alert-persistent" role="alert">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <strong><i class="bi bi-exclamation-triangle-fill"></i> Address Risk Notes:</strong>
+                                <ul class="mb-0 mt-2 small">
+                                    {% for note in approval.address_notes %}
+                                    <li>{{ note }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            <button type="button" 
+                                    class="btn btn-sm btn-danger ms-2 flex-shrink-0" 
+                                    onclick="escalateToAuthorities('{{ approval.id }}', '{{ approval.tracking_number }}', '{{ approval.fraud_risk }}'); event.stopPropagation();"
+                                    title="Escalate to law enforcement or customs authorities">
+                                <i class="bi bi-megaphone-fill"></i> Escalate
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
                     {% endif %}
 
                     {% if approval.reason %}
@@ -305,7 +338,44 @@
 </div>
 
 <script>
+// Escalate to authorities function
+function escalateToAuthorities(approvalId, trackingNumber, riskScore) {
+    if (confirm(`⚠️ ESCALATE TO AUTHORITIES\n\nTracking: ${trackingNumber}\nRisk Score: ${riskScore}%\n\nThis will notify law enforcement and customs authorities.\n\nProceed with escalation?`)) {
+        fetch('/api/escalate-to-authorities', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                approval_id: approvalId,
+                tracking_number: trackingNumber,
+                risk_score: riskScore,
+                escalated_by: '{{ session.username or "operator" }}'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('✅ Successfully escalated to authorities\n\nReference: ' + data.reference_id);
+                // Optionally reload the page
+                location.reload();
+            } else {
+                alert('❌ Escalation failed: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            alert('❌ Error: ' + error.message);
+        });
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Bootstrap tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
     const toggleBtn = document.getElementById('toggleAgentMode');
     const agentPanel = document.getElementById('agentModePanel');
     const runAgentBtn = document.getElementById('runAgentApproval');
@@ -676,6 +746,29 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('rejectMissingDocs').checked = config.rejectMissingDocs || false;
         }
     }
+    
+    // Prevent any automatic dismissal of persistent alerts
+    document.querySelectorAll('.alert-persistent').forEach(alert => {
+        alert.addEventListener('close.bs.alert', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        });
+    });
 });
 </script>
+
+<style>
+/* Ensure address risk notes alerts are always visible and not dismissible */
+.alert-persistent {
+    position: relative !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.alert-persistent .btn-close {
+    display: none !important;
+}
+</style>
 {% endblock %}

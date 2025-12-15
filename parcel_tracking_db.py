@@ -118,6 +118,7 @@ class ParcelTrackingDB:
         self.feedback_container = "feedback"
         self.company_info_container = "company_info"
         self.suspicious_messages_container = "suspicious_messages"
+        self.address_history_container = "address_history"
         
         # Connection objects
         self.client = None
@@ -151,12 +152,15 @@ class ParcelTrackingDB:
                         id=self.database_name,
                         offer_throughput=400
                     )
-                    print(f"✓ Connected to Cosmos DB using account key")
+                    # Only print in debug mode
+                    if os.getenv('DEBUG_MODE') == 'true':
+                        print(f"✓ Connected to Cosmos DB using account key")
                     
                 except Exception as key_error:
                     # If key auth fails, only try Azure AD if the error suggests it
                     if "Local Authorization is disabled" in str(key_error):
-                        print(f"⚠️ Key-based auth disabled, trying Azure AD...")
+                        if os.getenv('DEBUG_MODE') == 'true':
+                            print(f"⚠️ Key-based auth disabled, trying Azure AD...")
                         # Use cached credential to avoid re-authentication timeout
                         self.credential = get_cached_credential()
                         self.client = CosmosClient(self.endpoint, self.credential)
@@ -164,14 +168,16 @@ class ParcelTrackingDB:
                         
                         # Just get the database client (don't try to create - requires readMetadata permission)
                         self.database = self.client.get_database_client(self.database_name)
-                        print(f"✓ Connected to Cosmos DB using Azure AD (AzureCliCredential)")
+                        if os.getenv('DEBUG_MODE') == 'true':
+                            print(f"✓ Connected to Cosmos DB using Azure AD (AzureCliCredential)")
                     else:
                         # For other errors, re-raise them
                         print(f"❌ Cosmos DB connection failed: {key_error}")
                         raise key_error
             else:
                 # No key provided - must use Azure AD
-                print(f"⚠️ No account key found, trying Azure AD authentication...")
+                if os.getenv('DEBUG_MODE') == 'true':
+                    print(f"⚠️ No account key found, trying Azure AD authentication...")
                 # Use cached credential to avoid re-authentication timeout
                 self.credential = get_cached_credential()
                 self.client = CosmosClient(self.endpoint, self.credential)
@@ -179,7 +185,8 @@ class ParcelTrackingDB:
                 
                 # Just get the database client (don't try to create - requires readMetadata permission)
                 self.database = self.client.get_database_client(self.database_name)
-                print(f"✓ Connected to Cosmos DB using Azure AD (AzureCliCredential)")
+                if os.getenv('DEBUG_MODE') == 'true':
+                    print(f"✓ Connected to Cosmos DB using Azure AD (AzureCliCredential)")
             
             # Create containers if they don't exist (skip if using Azure AD without elevated permissions)
             if not self.using_azure_ad:
@@ -263,6 +270,17 @@ class ParcelTrackingDB:
                         {"path": "/*"}
                     ]
                 }
+            },
+            {
+                "id": self.address_history_container,
+                "partition_key": PartitionKey(path="/address_normalized"),
+                "indexing_policy": {
+                    "indexingMode": "consistent",
+                    "automatic": True,
+                    "includedPaths": [
+                        {"path": "/*"}
+                    ]
+                }
             }
         ]
         
@@ -273,11 +291,10 @@ class ParcelTrackingDB:
                     partition_key=container_spec["partition_key"],
                     indexing_policy=container_spec["indexing_policy"]
                 )
-                # Container ready - operations can proceed
-                pass
+                print(f"✓ Container ready: {container_spec['id']}")
             except Exception as e:
-                # Container creation failed - continue with error
-                raise
+                # Log error but don't fail - some containers might be optional
+                print(f"⚠️ Container creation warning for {container_spec['id']}: {str(e)[:100]}")
 
     async def close(self):
         """Close database connections and cleanup resources"""
@@ -384,6 +401,19 @@ class ParcelTrackingDB:
                 location=store_location,
                 description=f"Parcel registered for {recipient_name}"
             )
+            
+            # Add to address history (optional - don't fail if container doesn't exist)
+            try:
+                await self.add_address_delivery(
+                    address=recipient_address,
+                    parcel_barcode=barcode,
+                    recipient_name=recipient_name,
+                    sender_name=sender_name,
+                    notes=special_instructions
+                )
+            except Exception as addr_error:
+                # Address history is optional - log but don't fail registration
+                print(f"⚠️ Could not update address history: {addr_error}")
             
             return created_parcel
         except exceptions.CosmosHttpResponseError as e:
@@ -1513,8 +1543,15 @@ class ParcelTrackingDB:
             
             return []
             
-        except Exception as e:
+        except RuntimeError as e:
+            if "cannot schedule new futures after shutdown" in str(e):
+                # Event loop shutting down during Flask reload, return empty list
+                return []
             print(f"❌ Error retrieving address notes: {e}")
+            return []
+        except Exception as e:
+            if os.getenv('DEBUG_MODE') == 'True':
+                print(f"❌ Error retrieving address notes: {e}")
             return []
 
     async def get_all_active_manifests(self) -> List[Dict[str, Any]]:
@@ -1766,12 +1803,67 @@ class ParcelTrackingDB:
                     'fraud_risk_score': parcel_doc['fraud_risk_score']
                 })
                 
+                # Generate realistic parcel history based on current status
+                await self._generate_parcel_history(parcel['barcode'], status_info['status'], dc, store)
+                
             except Exception as e:
                 print(f"Warning: Could not update parcel {parcel['barcode']} with DC info: {e}")
             
             parcels.append(parcel)
         
         return parcels
+
+    async def _generate_parcel_history(self, barcode: str, current_status: str, dc: str, store: str):
+        """Generate realistic tracking history based on parcel's current status"""
+        
+        # Define the progression stages with time delays (in hours)
+        history_stages = [
+            {'status': 'Registered', 'location': store, 'description': 'Parcel registered and lodged', 'hours_ago': 72},
+            {'status': 'Collected', 'location': 'Collection Point', 'description': 'Parcel collected for transit', 'hours_ago': 68},
+            {'status': 'In Transit', 'location': 'En Route to Sorting Center', 'description': 'In transit to sorting facility', 'hours_ago': 60},
+            {'status': 'At Depot', 'location': f'{dc}', 'description': f'Arrived at {dc}', 'hours_ago': 48},
+            {'status': 'Sorting', 'location': f'{dc} Sorting Facility', 'description': 'Parcel being sorted', 'hours_ago': 46},
+            {'status': 'In Transit', 'location': f'{dc} - Distribution Hub', 'description': 'In transit to distribution center', 'hours_ago': 36},
+            {'status': 'Out for Delivery', 'location': 'Delivery Vehicle', 'description': 'Out for delivery with courier', 'hours_ago': 4},
+            {'status': 'Delivered', 'location': 'Recipient Address', 'description': 'Parcel successfully delivered', 'hours_ago': 1}
+        ]
+        
+        # Determine which stages to include based on current status
+        status_index = {
+            'Registered': 0,
+            'Collected': 1,
+            'At Depot': 3,
+            'Sorting': 4,
+            'In Transit': 5,
+            'Out for Delivery': 6,
+            'Delivered': 7
+        }
+        
+        end_index = status_index.get(current_status, 0)
+        
+        # Create tracking events for each stage up to current status
+        for i in range(end_index + 1):
+            stage = history_stages[i]
+            event_time = datetime.now(timezone.utc) - timedelta(hours=stage['hours_ago'])
+            
+            try:
+                container = self.database.get_container_client(self.tracking_events_container)
+                event = {
+                    "id": str(uuid.uuid4()),
+                    "barcode": barcode,
+                    "event_type": "status_update",
+                    "location": stage['location'],
+                    "description": stage['description'],
+                    "scanned_by": "system" if i == 0 else random.choice(["Driver-A", "Handler-B", "Sorter-C", "Courier-D"]),
+                    "timestamp": event_time.isoformat(),
+                    "additional_info": {
+                        "status": stage['status'],
+                        "scan_type": "automated" if i < 2 else "manual"
+                    }
+                }
+                await container.create_item(body=event)
+            except Exception as e:
+                print(f"Warning: Could not create tracking event for {barcode}: {e}")
 
     async def add_random_approval_requests(self, count: int = 3) -> List[str]:
         """Add random approval requests for logistics operations"""
@@ -1879,6 +1971,198 @@ class ParcelTrackingDB:
                 print(f"❌ Error cleaning up container {container_name}: {e}")
         
         return True
+
+    # ==================== ADDRESS HISTORY METHODS ====================
+    
+    def normalize_address(self, address: str) -> str:
+        """
+        Normalize an address for consistent matching
+        Removes extra spaces, standardizes case, removes unit numbers for matching
+        """
+        if not address:
+            return ""
+        
+        # Convert to lowercase and strip
+        normalized = address.lower().strip()
+        
+        # Remove common variations
+        normalized = normalized.replace(',', ' ')
+        normalized = ' '.join(normalized.split())  # Remove extra spaces
+        
+        # Standardize state abbreviations
+        state_map = {
+            'new south wales': 'nsw',
+            'victoria': 'vic',
+            'queensland': 'qld',
+            'south australia': 'sa',
+            'western australia': 'wa',
+            'tasmania': 'tas',
+            'northern territory': 'nt',
+            'australian capital territory': 'act'
+        }
+        
+        for full_name, abbrev in state_map.items():
+            normalized = normalized.replace(full_name, abbrev)
+        
+        return normalized
+    
+    async def add_address_delivery(self, address: str, parcel_barcode: str, 
+                                   recipient_name: str, sender_name: str = None,
+                                   notes: str = None) -> dict:
+        """
+        Add a delivery record to an address's history
+        Creates or updates the address history document
+        
+        Args:
+            address: Delivery address
+            parcel_barcode: Barcode of the parcel being delivered
+            recipient_name: Name of recipient
+            sender_name: Name of sender (optional)
+            notes: Any notes about this delivery (optional)
+            
+        Returns:
+            Updated address history document
+        """
+        container = self.database.get_container_client(self.address_history_container)
+        address_normalized = self.normalize_address(address)
+        
+        # Try to get existing address history
+        try:
+            query = f"SELECT * FROM c WHERE c.address_normalized = @address"
+            parameters = [{"name": "@address", "value": address_normalized}]
+            
+            items = []
+            async for item in container.query_items(
+                query=query,
+                parameters=parameters,
+                partition_key=address_normalized
+            ):
+                items.append(item)
+            
+            if items:
+                # Update existing history
+                address_doc = items[0]
+            else:
+                # Create new address history document
+                address_doc = {
+                    "id": str(uuid.uuid4()),
+                    "address_normalized": address_normalized,
+                    "address_display": address,
+                    "first_delivery_date": datetime.now(timezone.utc).isoformat(),
+                    "deliveries": [],
+                    "total_deliveries": 0,
+                    "notes": []
+                }
+        except Exception:
+            # Create new document
+            address_doc = {
+                "id": str(uuid.uuid4()),
+                "address_normalized": address_normalized,
+                "address_display": address,
+                "first_delivery_date": datetime.now(timezone.utc).isoformat(),
+                "deliveries": [],
+                "total_deliveries": 0,
+                "notes": []
+            }
+        
+        # Add new delivery record
+        delivery_record = {
+            "parcel_barcode": parcel_barcode,
+            "recipient_name": recipient_name,
+            "sender_name": sender_name,
+            "delivery_date": datetime.now(timezone.utc).isoformat(),
+            "notes": notes
+        }
+        
+        address_doc["deliveries"].append(delivery_record)
+        address_doc["total_deliveries"] = len(address_doc["deliveries"])
+        address_doc["last_delivery_date"] = datetime.now(timezone.utc).isoformat()
+        
+        # Add general notes if provided
+        if notes:
+            address_doc["notes"].append({
+                "note": notes,
+                "date": datetime.now(timezone.utc).isoformat(),
+                "parcel_barcode": parcel_barcode
+            })
+        
+        # Upsert the document
+        result = await container.upsert_item(address_doc)
+        return result
+    
+    async def get_address_history(self, address: str) -> Optional[dict]:
+        """
+        Get complete delivery history for an address
+        
+        Args:
+            address: Address to look up
+            
+        Returns:
+            Address history document with all deliveries and notes, or None if not found
+        """
+        container = self.database.get_container_client(self.address_history_container)
+        address_normalized = self.normalize_address(address)
+        
+        try:
+            query = f"SELECT * FROM c WHERE c.address_normalized = @address"
+            parameters = [{"name": "@address", "value": address_normalized}]
+            
+            async for item in container.query_items(
+                query=query,
+                parameters=parameters,
+                partition_key=address_normalized
+            ):
+                return item
+            
+            return None
+        except Exception as e:
+            print(f"Error getting address history: {e}")
+            return None
+    
+    async def add_address_note(self, address: str, note: str) -> bool:
+        """
+        Add a general note to an address (not tied to a specific parcel)
+        
+        Args:
+            address: Address to add note to
+            note: Note text
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        container = self.database.get_container_client(self.address_history_container)
+        address_normalized = self.normalize_address(address)
+        
+        try:
+            # Get existing address history
+            address_doc = await self.get_address_history(address)
+            
+            if not address_doc:
+                # Create new address document if it doesn't exist
+                address_doc = {
+                    "id": str(uuid.uuid4()),
+                    "address_normalized": address_normalized,
+                    "address_display": address,
+                    "first_delivery_date": datetime.now(timezone.utc).isoformat(),
+                    "deliveries": [],
+                    "total_deliveries": 0,
+                    "notes": []
+                }
+            
+            # Add the note
+            address_doc["notes"].append({
+                "note": note,
+                "date": datetime.now(timezone.utc).isoformat(),
+                "parcel_barcode": None
+            })
+            
+            # Update the document
+            await container.upsert_item(address_doc)
+            return True
+            
+        except Exception as e:
+            print(f"Error adding address note: {e}")
+            return False
 
     # ==================== SYNCHRONOUS WRAPPERS ====================
 

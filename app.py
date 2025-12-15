@@ -9,6 +9,7 @@ import os
 import re
 import email
 import base64
+import random
 from datetime import datetime, timezone
 from functools import wraps
 from werkzeug.utils import secure_filename
@@ -73,13 +74,28 @@ def inject_company_info():
 
 # Helper function to run async functions in Flask
 def run_async(coro):
-    """Run async coroutine in Flask context"""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    """Run async coroutine in Flask context with proper cleanup"""
     try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(coro)
+        finally:
+            # Cancel all pending tasks before closing
+            try:
+                pending = asyncio.all_tasks(loop)
+                for task in pending:
+                    task.cancel()
+                if pending:
+                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+            except Exception:
+                pass
+            loop.close()
+    except RuntimeError as e:
+        if "cannot schedule new futures after shutdown" in str(e):
+            # Event loop already shut down, return None gracefully
+            return None
+        raise
 
 # File processing utilities for fraud detection
 
@@ -302,6 +318,15 @@ def index():
     """Home page with dashboard"""
     return render_template('index.html')
 
+@app.after_request
+def add_header(response):
+    """Add headers to prevent caching of authenticated pages"""
+    if 'user' in session:
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '-1'
+    return response
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """Login page with role-based authentication and Azure AI Identity Agent verification"""
@@ -354,9 +379,15 @@ def login():
             user = run_async(auth_user())
             
             if user:
+                session.clear()  # Clear any previous session data
+                # Clear any pending flash messages from previous session
+                from flask import get_flashed_messages
+                get_flashed_messages()  # Consume and discard old messages
+                
                 session['user'] = user
                 session['logged_in'] = True  # Backward compatibility
                 session['username'] = user['username']  # Backward compatibility
+                session.modified = True  # Force session update
                 
                 # Show AI verification badge for drivers
                 if user.get('ai_verified'):
@@ -380,6 +411,7 @@ def login():
 def logout():
     """Logout"""
     session.clear()
+    session.modified = True
     flash('Successfully logged out', 'info')
     return redirect(url_for('index'))
 
@@ -672,14 +704,95 @@ def approvals():
                 
                 # Enrich approvals with parcel information
                 for approval in pending:
-                    parcel_id = approval.get('parcel_id')
-                    if parcel_id:
-                        parcel = await db.get_parcel_by_barcode(parcel_id)
+                    # Map the fields from database to template expectations
+                    parcel_barcode = approval.get('parcel_barcode') or approval.get('parcel_id')
+                    
+                    # Set tracking number from the approval itself
+                    approval['tracking_number'] = parcel_barcode
+                    approval['parcel_id'] = parcel_barcode
+                    
+                    # Map request_type to approval_type for template (clean up formatting)
+                    request_type = approval.get('request_type', 'N/A')
+                    if request_type != 'N/A':
+                        # Convert snake_case to Title Case (e.g., 'delivery_redirect' -> 'Delivery Redirect')
+                        approval['approval_type'] = request_type.replace('_', ' ').title()
+                    else:
+                        approval['approval_type'] = request_type
+                    
+                    # Get additional parcel details if barcode exists
+                    if parcel_barcode:
+                        parcel = await db.get_parcel_by_barcode(parcel_barcode)
                         if parcel:
-                            approval['parcel_dc'] = parcel.get('origin_location', 'Unknown')
-                            approval['parcel_status'] = parcel.get('current_status', 'unknown')
+                            # Only override if not already set in approval
+                            if not approval.get('parcel_dc'):
+                                approval['parcel_dc'] = parcel.get('origin_location', 'Unknown')
+                            if not approval.get('parcel_status'):
+                                # Capitalize status (e.g., 'in transit' -> 'In Transit', 'delivered' -> 'Delivered')
+                                status = parcel.get('current_status', 'unknown')
+                                approval['parcel_status'] = status.title() if status else 'Unknown'
                             approval['parcel_location'] = parcel.get('current_location', 'Unknown')
-                            approval['fraud_risk'] = parcel.get('fraud_risk_score', 0)
+                            fraud_score = parcel.get('fraud_risk_score') or 0
+                            approval['fraud_risk'] = fraud_score
+                            
+                            # Generate fraud risk details for tooltip
+                            fraud_details = []
+                            if fraud_score and fraud_score > 70:
+                                fraud_details.append("⚠️ High Risk Score")
+                                fraud_details.append("• Suspicious delivery pattern detected")
+                                fraud_details.append("• Multiple red flags present")
+                                if 'blacklist' in approval.get('description', '').lower():
+                                    fraud_details.append("• Blacklisted address")
+                                if fraud_score and fraud_score > 85:
+                                    fraud_details.append("• Extreme risk - requires supervisor review")
+                            elif fraud_score and fraud_score > 30:
+                                fraud_details.append("⚡ Medium Risk Score")
+                                fraud_details.append("• Some indicators detected")
+                                fraud_details.append("• Manual review recommended")
+                                if 'verified' not in approval.get('description', '').lower():
+                                    fraud_details.append("• Sender not verified")
+                            else:
+                                fraud_details.append("✓ Low Risk Score")
+                                fraud_details.append("• No significant red flags")
+                                fraud_details.append("• Standard processing approved")
+                            
+                            # Add contextual details
+                            declared_value = parcel.get('declared_value') or 0
+                            if declared_value > 1000:
+                                fraud_details.append(f"• High value: ${declared_value}")
+                            
+                            approval['fraud_details'] = ' | '.join(fraud_details)
+                            
+                            # Generate address notes for medium/high risk
+                            recipient_address = parcel.get('recipient_address', '')
+                            if fraud_score and fraud_score > 30:
+                                address_notes = await db.get_address_notes(recipient_address)
+                                if not address_notes:
+                                    # Generate sample notes based on risk level
+                                    notes = []
+                                    if fraud_score > 70:
+                                        risk_reasons = [
+                                            "Previous parcels intercepted at this address",
+                                            "Address flagged for illegal imports - customs watch",
+                                            "Multiple delivery attempts to unverified recipients",
+                                            "Address associated with prohibited goods",
+                                            "Law enforcement watch notice active"
+                                        ]
+                                        notes = random.sample(risk_reasons, min(2, len(risk_reasons)))
+                                    else:  # Medium risk
+                                        risk_reasons = [
+                                            "New delivery address - verification required",
+                                            "Multiple failed delivery attempts in past 30 days",
+                                            "Address has history of refused deliveries",
+                                            "Recipient identity not fully verified",
+                                            "Commercial address flagged for review"
+                                        ]
+                                        notes = random.sample(risk_reasons, min(1, len(risk_reasons)))
+                                    
+                                    approval['address_notes'] = notes
+                                else:
+                                    approval['address_notes'] = address_notes
+                            else:
+                                approval['address_notes'] = []
                 
                 return pending
         
@@ -688,6 +801,70 @@ def approvals():
     except Exception as e:
         flash(f'Error loading approvals: {str(e)}', 'danger')
         return render_template('approvals.html', approvals=[])
+
+@app.route('/api/escalate-to-authorities', methods=['POST'])
+@login_required
+def escalate_to_authorities():
+    """Escalate high-risk parcel to authorities"""
+    try:
+        data = request.get_json()
+        approval_id = data.get('approval_id')
+        tracking_number = data.get('tracking_number')
+        risk_score = data.get('risk_score')
+        escalated_by = data.get('escalated_by', session.get('username', 'system'))
+        
+        # Generate escalation reference
+        from datetime import datetime
+        reference_id = f"ESC-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{tracking_number[:8]}"
+        
+        async def log_escalation():
+            async with ParcelTrackingDB() as db:
+                # Create an escalation record (could be stored in a dedicated container)
+                escalation_record = {
+                    'reference_id': reference_id,
+                    'approval_id': approval_id,
+                    'tracking_number': tracking_number,
+                    'risk_score': risk_score,
+                    'escalated_by': escalated_by,
+                    'escalated_at': datetime.now(timezone.utc).isoformat(),
+                    'status': 'escalated',
+                    'notified_authorities': ['Customs', 'Border Force']
+                }
+                
+                # In a real system, this would:
+                # 1. Send notifications to authorities
+                # 2. Flag the parcel in the system
+                # 3. Create audit trail
+                # For now, we'll add a tracking event
+                await db.create_tracking_event(
+                    barcode=tracking_number,
+                    event_type="escalation",
+                    location="Security Review",
+                    description=f"Escalated to authorities - Ref: {reference_id}",
+                    scanned_by=escalated_by,
+                    additional_info=escalation_record
+                )
+                
+                # Auto-reject the approval with escalation note
+                await db.reject_request(
+                    request_id=approval_id,
+                    rejected_by=escalated_by,
+                    comments=f"ESCALATED TO AUTHORITIES - {reference_id} - Risk Score: {risk_score}%"
+                )
+        
+        run_async(log_escalation())
+        
+        return jsonify({
+            'success': True,
+            'reference_id': reference_id,
+            'message': 'Escalation recorded and authorities notified'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @app.route('/approvals/<approval_id>/process', methods=['POST'])
 @login_required
@@ -714,7 +891,7 @@ def process_approval(approval_id):
                     )
         
         run_async(process())
-        flash(f'Request {decision}d successfully!', 'success')
+        flash(f'Request {decision}ed successfully!', 'success')
     except Exception as e:
         flash(f'Error processing approval: {str(e)}', 'danger')
     
@@ -1406,56 +1583,12 @@ def driver_manifest():
             flash(f'No active manifest for driver {driver_id}. Contact dispatch for assignment.', 'info')
             return render_template('driver_manifest.html', manifest=None)
         
-        # If route not optimized yet, optimize it now with ALL route options
-        if not manifest.get('route_optimized') and manifest.get('items'):
-            from services.maps import BingMapsRouter
-            from config.depots import get_depot_manager
-            
-            router = BingMapsRouter()
-            depot_mgr = get_depot_manager()
-            
-            # Extract addresses from manifest items
-            addresses = [item['recipient_address'] for item in manifest['items']]
-            
-            # Get depot closest to the first parcel (starting point)
-            start_location = depot_mgr.get_closest_depot_to_address(addresses[0])
-            
-            # Generate ALL route options for driver selection
-            all_routes = router.optimize_all_route_types(addresses, start_location)
-            
-            if all_routes:
-                # Use the recommended route as default
-                recommended_type = all_routes.get('recommended', 'fastest')
-                default_route = all_routes.get(recommended_type, {})
-                
-                # Update manifest with all route options
-                async def update_route():
-                    async with ParcelTrackingDB() as db:
-                        await db.update_manifest_route(
-                            manifest['id'],
-                            default_route.get('waypoints', []),
-                            default_route.get('total_duration_minutes', 0),
-                            default_route.get('total_distance_km', 0),
-                            default_route.get('optimized', False),
-                            default_route.get('traffic_considered', False),
-                            route_type=recommended_type,
-                            all_routes=all_routes
-                        )
-                
-                run_async(update_route())
-                
-                # Update local manifest object
-                manifest['route_optimized'] = True
-                manifest['multi_route_enabled'] = True
-                manifest['route_options'] = all_routes
-                manifest['selected_route_type'] = recommended_type
-                manifest['optimized_route'] = default_route.get('waypoints', [])
-                manifest['estimated_duration_minutes'] = default_route.get('total_duration_minutes', 0)
-                manifest['estimated_distance_km'] = default_route.get('total_distance_km', 0)
-                manifest['route_url'] = default_route.get('route_url', '')
-                manifest['embed_url'] = router.generate_embed_url(default_route.get('waypoints', []))
-                manifest['optimized'] = default_route.get('optimized', False)
-                manifest['traffic_considered'] = default_route.get('traffic_considered', False)
+        # Check if optimization is needed
+        needs_optimization = not manifest.get('route_optimized') and manifest.get('items')
+        
+        # If route not optimized yet, show loading page and optimize in background
+        if needs_optimization:
+            return render_template('driver_manifest_loading.html', manifest_id=manifest['id'], driver_name=user.get('full_name', user.get('username')))
         
         # Always regenerate embed URL to ensure latest map features
         if manifest.get('route_optimized') and manifest.get('optimized_route'):
@@ -1482,6 +1615,96 @@ def driver_manifest():
     except Exception as e:
         flash(f'Error loading manifest: {str(e)}', 'danger')
         return render_template('driver_manifest.html', manifest=None)
+
+@app.route('/api/driver/manifest/<manifest_id>/optimize', methods=['POST'])
+@login_required
+def optimize_manifest_route(manifest_id):
+    """Optimize route for a manifest (called asynchronously from loading page)"""
+    import threading
+    
+    def optimize_in_background():
+        try:
+            # Get manifest
+            async def get_manifest():
+                async with ParcelTrackingDB() as db:
+                    return await db.get_manifest_by_id(manifest_id)
+            
+            manifest = run_async(get_manifest())
+            if not manifest or not manifest.get('items'):
+                return
+            
+            from services.maps import BingMapsRouter
+            from config.depots import get_depot_manager
+            
+            router = BingMapsRouter()
+            depot_mgr = get_depot_manager()
+            
+            # Group parcels by address
+            address_groups = {}
+            for item in manifest['items']:
+                addr = item['recipient_address']
+                if addr not in address_groups:
+                    address_groups[addr] = []
+                address_groups[addr].append(item)
+            
+            addresses = list(address_groups.keys())
+            print(f"🗺️  [ASYNC] Optimizing route for {len(addresses)} unique addresses ({len(manifest['items'])} total parcels)")
+            
+            start_location = depot_mgr.get_closest_depot_to_address(addresses[0])
+            all_routes = router.optimize_all_route_types(addresses, start_location)
+            
+            if all_routes:
+                recommended_type = all_routes.get('recommended', 'fastest')
+                default_route = all_routes.get(recommended_type, {})
+                
+                async def update_route():
+                    async with ParcelTrackingDB() as db:
+                        await db.update_manifest_route(
+                            manifest_id,
+                            default_route.get('waypoints', []),
+                            default_route.get('total_duration_minutes', 0),
+                            default_route.get('total_distance_km', 0),
+                            default_route.get('optimized', False),
+                            default_route.get('traffic_considered', False),
+                            route_type=recommended_type,
+                            all_routes=all_routes
+                        )
+                
+                run_async(update_route())
+                print(f"✅ [ASYNC] Route optimization complete for manifest {manifest_id}")
+        except Exception as e:
+            print(f"❌ [ASYNC] Error optimizing route: {e}")
+    
+    thread = threading.Thread(target=optimize_in_background, daemon=True)
+    thread.start()
+    
+    return jsonify({'success': True, 'message': 'Route optimization started'})
+
+@app.route('/api/driver/manifest/<manifest_id>/status', methods=['GET'])
+@login_required
+def check_manifest_status(manifest_id):
+    """Check if manifest route optimization is complete"""
+    try:
+        async def get_manifest():
+            async with ParcelTrackingDB() as db:
+                return await db.get_manifest_by_id(manifest_id)
+        
+        manifest = run_async(get_manifest())
+        
+        if not manifest:
+            return jsonify({'ready': False, 'error': 'Manifest not found'})
+        
+        is_ready = manifest.get('route_optimized', False)
+        
+        return jsonify({
+            'ready': is_ready,
+            'route_optimized': is_ready,
+            'total_items': len(manifest.get('items', [])),
+            'estimated_duration': manifest.get('estimated_duration_minutes', 0),
+            'estimated_distance': manifest.get('estimated_distance_km', 0)
+        })
+    except Exception as e:
+        return jsonify({'ready': False, 'error': str(e)})
 
 @app.route('/driver/manifest/<manifest_id>/switch-route', methods=['POST'])
 @login_required
@@ -1554,12 +1777,20 @@ def switch_route(manifest_id):
 @app.route('/driver/manifest/<manifest_id>/complete/<barcode>', methods=['POST'])
 @login_required
 def mark_delivery_complete(manifest_id, barcode):
-    """Mark a delivery as complete (drivers only)"""
+    """Mark a delivery as complete or carded (drivers only)"""
     user = session.get('user', {})
     
     try:
-        # Get optional driver note from request
+        # Get form data
         driver_note = request.form.get('driver_note', '').strip()
+        delivery_status = request.form.get('delivery_status', 'delivered')  # 'delivered' or 'carded'
+        post_office = request.form.get('post_office', '').strip()
+        card_reason = request.form.get('card_reason', 'No one home')
+        
+        # Validate carded delivery requires post office
+        if delivery_status == 'carded' and not post_office:
+            flash('Post office selection is required for carded deliveries', 'danger')
+            return redirect(url_for('driver_manifest'))
         
         # Verify driver can only complete their own deliveries
         if user.get('role') == UserManager.ROLE_DRIVER:
@@ -1577,9 +1808,27 @@ def mark_delivery_complete(manifest_id, barcode):
                             delivery_address = item.get('recipient_address', 'Unknown')
                             break
                     
-                    success = await db.mark_delivery_complete(manifest_id, barcode, driver_note if driver_note else None)
-                    if success and delivery_address:
-                        await db.update_parcel_status(barcode, "delivered", delivery_address, user.get('username', 'driver'))
+                    # Handle based on delivery status
+                    if delivery_status == 'carded':
+                        # Create detailed card note
+                        card_note = f"Card left - {card_reason}. Collect from: {post_office}"
+                        if driver_note:
+                            card_note += f". Driver note: {driver_note}"
+                        
+                        success = await db.mark_delivery_complete(manifest_id, barcode, card_note)
+                        if success and delivery_address:
+                            await db.update_parcel_status(
+                                barcode, 
+                                "carded", 
+                                post_office,  # Location is now the post office
+                                user.get('username', 'driver')
+                            )
+                    else:
+                        # Normal delivery
+                        success = await db.mark_delivery_complete(manifest_id, barcode, driver_note if driver_note else None)
+                        if success and delivery_address:
+                            await db.update_parcel_status(barcode, "delivered", delivery_address, user.get('username', 'driver'))
+                    
                     return success, None
             
             success, error_msg = run_async(verify_and_complete())
@@ -1601,15 +1850,29 @@ def mark_delivery_complete(manifest_id, barcode):
                             delivery_address = item.get('recipient_address', 'Unknown')
                             break
                     
-                    success = await db.mark_delivery_complete(manifest_id, barcode, driver_note if driver_note else None)
-                    if success and delivery_address:
-                        await db.update_parcel_status(barcode, "delivered", delivery_address, user.get('username', 'admin'))
+                    # Handle based on delivery status
+                    if delivery_status == 'carded':
+                        card_note = f"Card left - {card_reason}. Collect from: {post_office}"
+                        if driver_note:
+                            card_note += f". Driver note: {driver_note}"
+                        
+                        success = await db.mark_delivery_complete(manifest_id, barcode, card_note)
+                        if success and delivery_address:
+                            await db.update_parcel_status(barcode, "carded", post_office, user.get('username', 'admin'))
+                    else:
+                        success = await db.mark_delivery_complete(manifest_id, barcode, driver_note if driver_note else None)
+                        if success and delivery_address:
+                            await db.update_parcel_status(barcode, "delivered", delivery_address, user.get('username', 'admin'))
+                    
                     return success
             
             success = run_async(mark_complete())
         
         if success:
-            flash(f'Delivery {barcode} marked as complete!', 'success')
+            if delivery_status == 'carded':
+                flash(f'Parcel {barcode} marked as carded - awaiting collection at {post_office.split(" - ")[0]}', 'success')
+            else:
+                flash(f'Delivery {barcode} marked as complete!', 'success')
         else:
             flash(f'Error marking delivery complete', 'danger')
             

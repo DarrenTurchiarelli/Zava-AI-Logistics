@@ -2,7 +2,7 @@
 
 // Auto-dismiss alerts after 5 seconds
 document.addEventListener('DOMContentLoaded', function() {
-    const alerts = document.querySelectorAll('.alert:not(.alert-permanent)');
+    const alerts = document.querySelectorAll('.alert:not(.alert-permanent):not(.alert-persistent)');
     alerts.forEach(alert => {
         setTimeout(() => {
             const bsAlert = new bootstrap.Alert(alert);
