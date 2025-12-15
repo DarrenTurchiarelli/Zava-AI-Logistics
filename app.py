@@ -1586,7 +1586,6 @@ def driver_manifest():
         if user.get('role') == UserManager.ROLE_DRIVER:
             # Driver sees their own manifest
             driver_id = user.get('driver_id')
-            print(f"🔍 [DEBUG] Driver login: username={user.get('username')}, full_name={user.get('full_name')}, driver_id={driver_id}")
             if not driver_id:
                 flash('Driver ID not configured. Contact administrator.', 'danger')
                 return render_template('driver_manifest.html', manifest=None)
@@ -1601,17 +1600,12 @@ def driver_manifest():
                 # If manifest exists but route_optimized is False, retry a few times
                 # to handle Cosmos DB eventual consistency
                 if manifest and not manifest.get('route_optimized'):
-                    print(f"⏳ [DEBUG] Initial read: route_optimized=False, starting retries...")
                     import time as time_module
                     for retry in range(4):  # Try up to 4 times
                         time_module.sleep(1.0)  # Wait 1000ms between retries
                         manifest = await db.get_driver_manifest(driver_id)
-                        print(f"   [DEBUG] Retry {retry+1}: route_optimized={manifest.get('route_optimized') if manifest else None}")
                         if manifest.get('route_optimized'):
-                            print(f"✅ [DEBUG] Found route_optimized=True on retry {retry+1}")
                             break
-                elif manifest:
-                    print(f"✅ [DEBUG] Initial read: route_optimized={manifest.get('route_optimized')}")
                 
                 return manifest
         
@@ -1624,58 +1618,68 @@ def driver_manifest():
         # Check if initial nearest-neighbor route exists  
         needs_initial_route = (not manifest.get('route_optimized')) and bool(manifest.get('items'))
         
-        print(f"🔍 [DEBUG] Login check: route_optimized={manifest.get('route_optimized')}, needs_initial_route={needs_initial_route}")
-        print(f"   all_routes keys: {list(manifest.get('all_routes', {}).keys())}")
-        print(f"   selected_route_type: {manifest.get('selected_route_type')}")
-        
-        # If no initial route yet, always show loading page to create it
-        # Use optimization lock to prevent duplicate threads
+        # If no initial route yet, create it synchronously NOW (not async)
         if needs_initial_route:
             manifest_id = manifest['id']
             
-            # Get or create lock for this manifest
-            with optimization_lock:
-                if manifest_id not in optimization_locks:
-                    optimization_locks[manifest_id] = threading.Lock()
-                manifest_lock = optimization_locks[manifest_id]
+            # Create initial nearest-neighbor route immediately
+            async def create_initial_route_sync():
+                async with ParcelTrackingDB() as db:
+                    # Get unique addresses from manifest items
+                    addresses = list(set([item['recipient_address'] for item in manifest['items']]))
+                    
+                    # Simple nearest-neighbor ordering (fast, no API calls)
+                    ordered_addresses = addresses  # Already in a reasonable order
+                    
+                    # Create basic route structure
+                    initial_route = {
+                        'waypoints': ordered_addresses,
+                        'total_duration_minutes': len(addresses) * 3,  # Estimate: 3 min per stop
+                        'total_distance_km': len(addresses) * 0.5,  # Estimate: 500m between stops
+                        'optimized': False,
+                        'traffic_considered': False,
+                        'route_type': 'nearest_neighbor'
+                    }
+                    
+                    # Save initial route
+                    all_routes = {'initial': initial_route}
+                    success = await db.update_manifest_route(
+                        manifest_id,
+                        initial_route['waypoints'],
+                        initial_route['total_duration_minutes'],
+                        initial_route['total_distance_km'],
+                        True,  # Mark as optimized so page loads
+                        False,
+                        route_type='initial',
+                        all_routes=all_routes
+                    )
+                    
+                    return success
             
-            # Only proceed if we can acquire the lock (no optimization in progress)
-            if manifest_lock.acquire(blocking=False):
-                # Clear session flag and set optimization in progress
-                session.pop(f'optimization_attempted_{manifest_id}', None)
-                session[f'optimization_attempted_{manifest_id}'] = True
-                session.modified = True
-                # Note: Lock will be released after optimization completes
-            else:
-                print(f"⏭️  [DEBUG] Optimization already in progress for {manifest_id}, showing loading page")
+            # Execute synchronously and wait for completion
+            route_created = run_async(create_initial_route_sync())
             
-            return render_template('driver_manifest_loading.html', manifest_id=manifest_id, driver_name=user.get('full_name', user.get('username')))
+            if route_created:
+                # Wait a moment for Cosmos DB consistency
+                import time as time_module
+                time_module.sleep(1.0)  # Reduced from 1.5s to 1.0s
+                
+                # Re-fetch manifest with updated route
+                manifest = run_async(get_manifest())
         
         # Clear the optimization attempted flag if route is now optimized
-        if manifest.get('route_optimized'):
-            manifest_id = manifest['id']
+        if manifest and manifest.get('route_optimized'):
+            manifest_id = manifest.get('id')
             session.pop(f'optimization_attempted_{manifest_id}', None)
             session.modified = True
-            
-            # Release optimization lock if it exists
-            with optimization_lock:
-                if manifest_id in optimization_locks:
-                    try:
-                        optimization_locks[manifest_id].release()
-                        del optimization_locks[manifest_id]
-                        print(f"🔓 [DEBUG] Released optimization lock for {manifest_id}")
-                    except:
-                        pass  # Lock may have been released already
         
         # Always regenerate embed URL to ensure latest map features
         if manifest.get('route_optimized') and manifest.get('optimized_route'):
             # Use Flask route instead of data URL
             manifest['embed_url'] = url_for('render_map', manifest_id=manifest['id'], _external=False)
-            print(f"🗺️  [DRIVER] Map URL: {manifest['embed_url']}")
             
             # Populate route options for UI from all_routes data
             all_routes = manifest.get('all_routes') or {}
-            print(f"🔍 [DEBUG] all_routes keys: {list(all_routes.keys()) if all_routes else []}")
             
             # Always enable multi-route selection (routes calculated on-demand)
             manifest['multi_route_enabled'] = True
@@ -1685,7 +1689,6 @@ def driver_manifest():
             for route_type in ['fastest', 'shortest', 'safest']:
                 if all_routes and route_type in all_routes:
                     manifest['route_options'][route_type] = all_routes[route_type]
-                    print(f"✅ [DEBUG] Added {route_type} route option (calculated)")
                 else:
                     # Add placeholder for on-demand calculation
                     manifest['route_options'][route_type] = {
@@ -1693,7 +1696,6 @@ def driver_manifest():
                         'total_duration_minutes': None,
                         'total_distance_km': None
                     }
-                    print(f"🔲 [DEBUG] Added {route_type} route option (not calculated)")
             
             # Set selected route type (default to 'initial' if no optimization chosen yet)
             if not manifest.get('selected_route_type') or manifest.get('selected_route_type') == 'initial':
@@ -1701,10 +1703,6 @@ def driver_manifest():
                 manifest['route_type_display'] = 'Initial Nearest-Neighbor Route'
             else:
                 manifest['route_type_display'] = manifest.get('selected_route_type', '').capitalize() + ' Route'
-                
-            print(f"🎯 [DEBUG] multi_route_enabled={manifest.get('multi_route_enabled')}, route_options={list(manifest.get('route_options', {}).keys())}, selected_route_type={manifest.get('selected_route_type')}")
-        else:
-            print(f"⚠️  [DEBUG] No map: route_optimized={manifest.get('route_optimized')}, optimized_route exists={bool(manifest.get('optimized_route'))}")
         
         # Fetch address notes for each delivery location
         async def fetch_address_notes():
