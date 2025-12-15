@@ -1617,15 +1617,17 @@ def driver_manifest():
             flash(f'No active manifest for driver {driver_id}. Contact dispatch for assignment.', 'info')
             return render_template('driver_manifest.html', manifest=None)
         
-        # Check if initial nearest-neighbor route exists
-        needs_initial_route = not manifest.get('route_optimized') and manifest.get('items')
+        # Check if initial nearest-neighbor route exists  
+        needs_initial_route = (not manifest.get('route_optimized')) and bool(manifest.get('items'))
         
-        # If no initial route yet, show loading page and create nearest-neighbor route
-        # But only if we haven't already tried (to prevent infinite loop)
-        optimization_attempted = session.get(f'optimization_attempted_{manifest["id"]}', False)
+        print(f"🔍 [DEBUG] Login check: route_optimized={manifest.get('route_optimized')}, needs_initial_route={needs_initial_route}")
+        print(f"   all_routes keys: {list(manifest.get('all_routes', {}).keys())}")
+        print(f"   selected_route_type: {manifest.get('selected_route_type')}")
         
-        if needs_initial_route and not optimization_attempted:
-            # Mark that we've attempted initial route creation for this manifest
+        # If no initial route yet, always show loading page to create it
+        # Clear any old session flags first
+        if needs_initial_route:
+            session.pop(f'optimization_attempted_{manifest["id"]}', None)
             session[f'optimization_attempted_{manifest["id"]}'] = True
             session.modified = True
             return render_template('driver_manifest_loading.html', manifest_id=manifest['id'], driver_name=user.get('full_name', user.get('username')))
@@ -1642,18 +1644,26 @@ def driver_manifest():
             print(f"🗺️  [DRIVER] Map URL: {manifest['embed_url']}")
             
             # Populate route options for UI from all_routes data
-            all_routes = manifest.get('all_routes', {})
-            print(f"🔍 [DEBUG] all_routes keys: {list(all_routes.keys())}")
+            all_routes = manifest.get('all_routes') or {}
+            print(f"🔍 [DEBUG] all_routes keys: {list(all_routes.keys()) if all_routes else []}")
             
             # Always enable multi-route selection (routes calculated on-demand)
             manifest['multi_route_enabled'] = True
             manifest['route_options'] = {}
             
-            # Add calculated routes to options
+            # Add calculated routes to options, OR create placeholders for on-demand calculation
             for route_type in ['fastest', 'shortest', 'safest']:
-                if route_type in all_routes:
+                if all_routes and route_type in all_routes:
                     manifest['route_options'][route_type] = all_routes[route_type]
-                    print(f"✅ [DEBUG] Added {route_type} route option")
+                    print(f"✅ [DEBUG] Added {route_type} route option (calculated)")
+                else:
+                    # Add placeholder for on-demand calculation
+                    manifest['route_options'][route_type] = {
+                        'calculated': False,
+                        'total_duration_minutes': None,
+                        'total_distance_km': None
+                    }
+                    print(f"🔲 [DEBUG] Added {route_type} route option (not calculated)")
             
             # Set selected route type (default to 'initial' if no optimization chosen yet)
             if not manifest.get('selected_route_type') or manifest.get('selected_route_type') == 'initial':
