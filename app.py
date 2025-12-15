@@ -1617,15 +1617,15 @@ def driver_manifest():
             flash(f'No active manifest for driver {driver_id}. Contact dispatch for assignment.', 'info')
             return render_template('driver_manifest.html', manifest=None)
         
-        # Check if optimization is needed
-        needs_optimization = not manifest.get('route_optimized') and manifest.get('items')
+        # Check if initial nearest-neighbor route exists
+        needs_initial_route = not manifest.get('route_optimized') and manifest.get('items')
         
-        # If route not optimized yet, show loading page and optimize in background
+        # If no initial route yet, show loading page and create nearest-neighbor route
         # But only if we haven't already tried (to prevent infinite loop)
         optimization_attempted = session.get(f'optimization_attempted_{manifest["id"]}', False)
         
-        if needs_optimization and not optimization_attempted:
-            # Mark that we've attempted optimization for this manifest
+        if needs_initial_route and not optimization_attempted:
+            # Mark that we've attempted initial route creation for this manifest
             session[f'optimization_attempted_{manifest["id"]}'] = True
             session.modified = True
             return render_template('driver_manifest_loading.html', manifest_id=manifest['id'], driver_name=user.get('full_name', user.get('username')))
@@ -1865,86 +1865,13 @@ def optimize_manifest_route(manifest_id):
                         return False
             
             verified = run_async(verify_saved())
-            run_async(update_progress(30, 'Initial route ready. Optimizing in background...'))
+            run_async(update_progress(100, 'Initial route ready. Select optimization type.'))
             
             print(f"✅ [AI-AGENT-{thread_id}] Initial route saved. Page can load now.")
-            print(f"🔄 [AI-AGENT-{thread_id}] Starting background Azure Maps optimization...")
+            print(f"📍 [AI-AGENT-{thread_id}] Driver can now select route optimization type (Fastest/Shortest/Safest)")
             
-            # BACKGROUND OPTIMIZATION: Now optimize with Azure Maps for accuracy
-            # Calculate all three route types for driver selection
-            run_async(update_progress(50, 'Calculating all route options...'))
-            
-            print(f"🔄 [AI-AGENT-{thread_id}] Starting background Azure Maps optimization...")
-            print(f"   Calculating: Fastest, Shortest, and Safest routes")
-            
-            # Calculate all three route types
-            all_routes = {}
-            
-            # 1. Safest route (avoids unpaved roads, considers safety)
-            run_async(update_progress(60, 'Calculating safest route...'))
-            safest_route = router.optimize_route(addresses, start_location, route_type='safest')
-            if safest_route:
-                all_routes['safest'] = safest_route
-                print(f"   ✅ Safest: {safest_route['total_distance_km']}km, {safest_route['total_duration_minutes']}min")
-            
-            # 2. Fastest route (optimizes for time with traffic)
-            run_async(update_progress(70, 'Calculating fastest route...'))
-            fastest_route = router.optimize_route(addresses, start_location, route_type='fastest')
-            if fastest_route:
-                all_routes['fastest'] = fastest_route
-                print(f"   ✅ Fastest: {fastest_route['total_distance_km']}km, {fastest_route['total_duration_minutes']}min")
-            
-            # 3. Shortest route (optimizes for distance)
-            run_async(update_progress(80, 'Calculating shortest route...'))
-            shortest_route = router.optimize_route(addresses, start_location, route_type='shortest')
-            if shortest_route:
-                all_routes['shortest'] = shortest_route
-                print(f"   ✅ Shortest: {shortest_route['total_distance_km']}km, {shortest_route['total_duration_minutes']}min")
-            
-            run_async(update_progress(90, 'All routes calculated. Finalizing...'))
-            
-            # Set recommended route to safest
-            all_routes['recommended'] = 'safest'
-            
-            if all_routes:
-                recommended_type = all_routes.get('recommended', 'safest')
-                default_route = all_routes.get(recommended_type, {})
-                
-                async def update_route():
-                    async with ParcelTrackingDB() as db:
-                        await db.update_manifest_route(
-                            manifest_id,
-                            default_route.get('waypoints', []),
-                            default_route.get('total_duration_minutes', 0),
-                            default_route.get('total_distance_km', 0),
-                            True,  # route_optimized = True
-                            default_route.get('traffic_considered', False),
-                            route_type=recommended_type,
-                            all_routes=all_routes
-                        )
-                
-                run_async(update_route())
-                run_async(update_progress(100, 'Route optimization complete!'))
-                
-                # Send SSE update for real-time map refresh
-                send_sse_update('route_updated', {
-                    'manifest_id': manifest_id,
-                    'route_type': recommended_type,
-                    'duration_minutes': default_route.get('total_duration_minutes', 0),
-                    'distance_km': default_route.get('total_distance_km', 0),
-                    'waypoints_count': len(default_route.get('waypoints', [])),
-                    'message': 'Background optimization complete! Map updated with optimized route.'
-                })
-                
-                end_time = datetime.now()
-                duration = (end_time - start_time).total_seconds()
-                
-                print(f"\n{'='*80}")
-                print(f"✅ [AI-AGENT-{thread_id}] [{thread_name}] Optimization COMPLETE")
-                print(f"   Manifest: {manifest_id}")
-                print(f"   Duration: {duration:.1f} seconds")
-                print(f"   Completed at: {end_time.strftime('%H:%M:%S.%f')[:-3]}")
-                print(f"{'='*80}\n")
+            # Don't calculate routes in background - let driver choose on-demand
+            print(f"✅ [AI-AGENT-{thread_id}] Optimization complete - awaiting driver selection")
                 
         except Exception as e:
             print(f"❌ [AI-AGENT-{thread_id}] Error optimizing route: {e}")
