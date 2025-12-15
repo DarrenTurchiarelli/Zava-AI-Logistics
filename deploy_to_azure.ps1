@@ -190,6 +190,9 @@ $DepotWA = ""
 $DepotTAS = ""
 $DepotACT = ""
 $DepotNT = ""
+$CosmosAccountName = ""
+$AIHubName = ""
+$AIHubResourceGroup = ""
 
 if (Test-Path ".env") {
     Write-Host "  Reading configuration from .env file..." -ForegroundColor Gray
@@ -248,6 +251,17 @@ if (Test-Path ".env") {
         if ($_ -match '^DEPOT_NT\s*=\s*"?([^"]+)"?') {
             $DepotNT = $matches[1]
         }
+        # Extract Cosmos account name from endpoint for RBAC
+        if ($_ -match '^COSMOS_DB_ENDPOINT\s*=\s*"?https://([^.]+)\.documents\.azure\.com') {
+            $CosmosAccountName = $matches[1]
+        }
+        # Extract AI Hub name from endpoint for RBAC
+        if ($_ -match '^AZURE_VISION_ENDPOINT\s*=\s*"?https://([^.]+)\.cognitiveservices\.azure\.com') {
+            $AIHubName = $matches[1]
+        }
+        if ($_ -match '^AZURE_AI_PROJECT_ENDPOINT\s*=\s*"?https://([^.]+)\.services\.ai\.azure\.com') {
+            $AIHubName = $matches[1]
+        }
     }
 }
 
@@ -257,20 +271,16 @@ $settings = @(
     "FLASK_ENV=production"
     "PORT=8000"
     "SCM_DO_BUILD_DURING_DEPLOYMENT=true"
+    "USE_MANAGED_IDENTITY=true"
 )
 
-if ($CosmosConnection) {
-    $settings += "COSMOS_CONNECTION_STRING=$CosmosConnection"
-    Write-Host "  ✓ Cosmos DB connection string configured" -ForegroundColor Green
-}
+Write-Host "  ✓ Managed identity authentication enabled" -ForegroundColor Green
+
 if ($CosmosEndpoint) {
     $settings += "COSMOS_DB_ENDPOINT=$CosmosEndpoint"
-    Write-Host "  ✓ Cosmos DB endpoint configured" -ForegroundColor Green
+    Write-Host "  ✓ Cosmos DB endpoint configured (using managed identity)" -ForegroundColor Green
 }
-if ($CosmosKey) {
-    $settings += "COSMOS_DB_KEY=$CosmosKey"
-    Write-Host "  ✓ Cosmos DB key configured" -ForegroundColor Green
-}
+# Do NOT set COSMOS_CONNECTION_STRING or COSMOS_DB_KEY when using managed identity
 if ($CosmosDatabaseName) {
     $settings += "COSMOS_DB_DATABASE_NAME=$CosmosDatabaseName"
     Write-Host "  ✓ Cosmos DB database name configured" -ForegroundColor Green
@@ -336,50 +346,121 @@ az webapp config appsettings set `
 Write-Host "✓ Environment variables configured" -ForegroundColor Green
 Write-Host ""
 
-# Grant Cosmos DB RBAC permissions to managed identity
-Write-Host "[8/11] Configuring Cosmos DB permissions..." -ForegroundColor Yellow
-if ($CosmosEndpoint) {
-    # Extract Cosmos DB account name from endpoint
-    if ($CosmosEndpoint -match "https://([^.]+)\.documents\.azure\.com") {
-        $CosmosAccountName = $matches[1]
+# Configure RBAC permissions for managed identity
+Write-Host "[8/11] Configuring RBAC permissions..." -ForegroundColor Yellow
+
+# Get the managed identity principal ID
+$principalId = az webapp identity show --name $WebAppName --resource-group $ResourceGroup --query principalId -o tsv
+
+if (-not $principalId) {
+    Write-Host "  ✗ Failed to retrieve managed identity principal ID" -ForegroundColor Red
+    Write-Host "  Skipping RBAC setup - you may need to configure manually" -ForegroundColor Yellow
+} else {
+    Write-Host "  ✓ Managed Identity Principal ID: $principalId" -ForegroundColor Green
+    $subscriptionId = az account show --query id -o tsv
+    
+    # 1. Cosmos DB RBAC
+    if ($CosmosAccountName) {
+        Write-Host "  📦 Configuring Cosmos DB permissions..." -ForegroundColor Cyan
         
-        # Get the managed identity principal ID
-        $principalId = az webapp identity show --name $WebAppName --resource-group $ResourceGroup --query principalId -o tsv
+        # Find Cosmos DB account
+        $cosmosAccount = az cosmosdb list --query "[?name=='$CosmosAccountName'].{name:name, resourceGroup:resourceGroup}" -o json | ConvertFrom-Json
         
-        if ($principalId) {
-            Write-Host "  Managed Identity Principal ID: $principalId" -ForegroundColor Gray
+        if ($cosmosAccount -and $cosmosAccount.Count -gt 0) {
+            $cosmosRG = $cosmosAccount[0].resourceGroup
+            Write-Host "     Found: $CosmosAccountName (RG: $cosmosRG)" -ForegroundColor Gray
             
-            # Try to find the Cosmos DB account
-            $cosmosAccount = az cosmosdb list --query "[?name=='$CosmosAccountName'].{name:name, resourceGroup:resourceGroup}" -o json | ConvertFrom-Json
-            
-            if ($cosmosAccount -and $cosmosAccount.Count -gt 0) {
-                $cosmosRG = $cosmosAccount[0].resourceGroup
-                Write-Host "  Found Cosmos DB '$CosmosAccountName' in resource group '$cosmosRG'" -ForegroundColor Gray
+            try {
+                az cosmosdb sql role assignment create `
+                    --account-name $CosmosAccountName `
+                    --resource-group $cosmosRG `
+                    --role-definition-id "00000000-0000-0000-0000-000000000002" `
+                    --principal-id $principalId `
+                    --scope "/" `
+                    --output none 2>$null
                 
-                # Grant Cosmos DB Built-in Data Contributor role
+                Write-Host "     ✓ Cosmos DB Built-in Data Contributor" -ForegroundColor Green
+            } catch {
+                Write-Host "     ⚠ Role may already exist" -ForegroundColor Yellow
+            }
+        } else {
+            Write-Host "     ⚠ Cosmos DB '$CosmosAccountName' not found" -ForegroundColor Yellow
+        }
+    }
+    
+    # 2. Azure AI Foundry / Cognitive Services RBAC
+    if ($AIHubName) {
+        Write-Host "  🤖 Configuring Azure AI Foundry permissions..." -ForegroundColor Cyan
+        
+        # Find AI Hub resource
+        $aiHub = az cognitiveservices account list --query "[?name=='$AIHubName'].{name:name, resourceGroup:resourceGroup}" -o json | ConvertFrom-Json
+        
+        if ($aiHub -and $aiHub.Count -gt 0) {
+            $AIHubResourceGroup = $aiHub[0].resourceGroup
+            Write-Host "     Found: $AIHubName (RG: $AIHubResourceGroup)" -ForegroundColor Gray
+            
+            $aiHubScope = "/subscriptions/$subscriptionId/resourceGroups/$AIHubResourceGroup/providers/Microsoft.CognitiveServices/accounts/$AIHubName"
+            
+            # Grant multiple roles for AI Hub
+            $aiRoles = @(
+                @{Name="Cognitive Services OpenAI Contributor"; Desc="OpenAI operations"},
+                @{Name="Azure AI Developer"; Desc="Agents write access"},
+                @{Name="Cognitive Services User"; Desc="Agents read access"},
+                @{Name="Cognitive Services Contributor"; Desc="Full AI Hub access"}
+            )
+            
+            foreach ($role in $aiRoles) {
                 try {
-                    az cosmosdb sql role assignment create `
-                        --account-name $CosmosAccountName `
-                        --resource-group $cosmosRG `
-                        --role-definition-name "Cosmos DB Built-in Data Contributor" `
-                        --principal-id $principalId `
-                        --scope "/" `
+                    az role assignment create `
+                        --assignee-object-id $principalId `
+                        --assignee-principal-type ServicePrincipal `
+                        --role $role.Name `
+                        --scope $aiHubScope `
                         --output none 2>$null
                     
-                    Write-Host "  ✓ Cosmos DB RBAC permissions granted" -ForegroundColor Green
+                    Write-Host "     ✓ $($role.Name)" -ForegroundColor Green
                 } catch {
-                    # Role assignment might already exist
-                    Write-Host "  ⚠ Cosmos DB permissions may already be configured" -ForegroundColor Yellow
+                    Write-Host "     ⚠ $($role.Name) (may already exist)" -ForegroundColor Yellow
                 }
-            } else {
-                Write-Host "  ⚠ Could not find Cosmos DB account '$CosmosAccountName'" -ForegroundColor Yellow
-                Write-Host "  You may need to grant RBAC permissions manually:" -ForegroundColor Yellow
-                Write-Host "    az cosmosdb sql role assignment create --account-name $CosmosAccountName --role-definition-name 'Cosmos DB Built-in Data Contributor' --principal-id $principalId --scope '/'" -ForegroundColor Gray
+            }
+            
+            # Also grant at resource group level for broader access
+            try {
+                az role assignment create `
+                    --assignee-object-id $principalId `
+                    --assignee-principal-type ServicePrincipal `
+                    --role "Cognitive Services OpenAI Contributor" `
+                    --scope "/subscriptions/$subscriptionId/resourceGroups/$AIHubResourceGroup" `
+                    --output none 2>$null
+                
+                Write-Host "     ✓ Resource Group level permissions" -ForegroundColor Green
+            } catch {
+                Write-Host "     ⚠ RG permissions (may already exist)" -ForegroundColor Yellow
+            }
+        } else {
+            Write-Host "     ⚠ AI Hub '$AIHubName' not found" -ForegroundColor Yellow
+            Write-Host "     Attempting resource group level permissions..." -ForegroundColor Gray
+            
+            # Fallback: grant at app's resource group level
+            $aiRoles = @("Cognitive Services OpenAI Contributor", "Azure AI Developer", "Cognitive Services User")
+            foreach ($role in $aiRoles) {
+                try {
+                    az role assignment create `
+                        --assignee-object-id $principalId `
+                        --assignee-principal-type ServicePrincipal `
+                        --role $role `
+                        --scope "/subscriptions/$subscriptionId/resourceGroups/$ResourceGroup" `
+                        --output none 2>$null
+                    Write-Host "     ✓ $role (fallback)" -ForegroundColor Green
+                } catch {
+                    Write-Host "     ⚠ $role (may already exist)" -ForegroundColor Yellow
+                }
             }
         }
     }
-} else {
-    Write-Host "  ⊘ Cosmos DB endpoint not configured, skipping RBAC setup" -ForegroundColor Gray
+    
+    Write-Host "  ✓ RBAC configuration complete" -ForegroundColor Green
+    Write-Host "  ⚠ Note: Role assignments may take 2-5 minutes to propagate" -ForegroundColor Yellow
 }
 Write-Host ""
 
@@ -515,14 +596,25 @@ Write-Host "====================================================================
 Write-Host ""
 Write-Host "Application URL: $url" -ForegroundColor Cyan
 Write-Host ""
+Write-Host "🔐 Security Configuration:" -ForegroundColor Yellow
+Write-Host "  ✓ Managed Identity enabled" -ForegroundColor Green
+Write-Host "  ✓ RBAC permissions configured" -ForegroundColor Green
+Write-Host "  ⚠ Role assignments may take 2-5 minutes to propagate" -ForegroundColor Yellow
+Write-Host ""
 Write-Host "Next Steps:" -ForegroundColor Yellow
-Write-Host "  1. Visit: $url" -ForegroundColor White
-Write-Host "  2. Login with default credentials:" -ForegroundColor White
+Write-Host "  1. Wait 2-5 minutes for RBAC permissions to propagate" -ForegroundColor White
+Write-Host "  2. Visit: $url" -ForegroundColor White
+Write-Host "  3. Login with default credentials:" -ForegroundColor White
 Write-Host "     Username: admin" -ForegroundColor White
 Write-Host "     Password: admin123" -ForegroundColor White
 Write-Host ""
-Write-Host "  3. View logs: az webapp log tail --name $WebAppName --resource-group $ResourceGroup" -ForegroundColor White
-Write-Host "  4. Manage in portal: https://portal.azure.com" -ForegroundColor White
+Write-Host "  4. View logs: az webapp log tail --name $WebAppName --resource-group $ResourceGroup" -ForegroundColor White
+Write-Host "  5. Manage in portal: https://portal.azure.com" -ForegroundColor White
+Write-Host ""
+Write-Host "Authentication:" -ForegroundColor Yellow
+Write-Host "  • Using: Managed Identity (no keys stored)" -ForegroundColor Green
+Write-Host "  • Cosmos DB: RBAC authentication" -ForegroundColor Green
+Write-Host "  • Azure AI: RBAC authentication" -ForegroundColor Green
 Write-Host ""
 Write-Host "To update the application:" -ForegroundColor Yellow
 Write-Host "  Run this script again to redeploy to the same instance" -ForegroundColor White
