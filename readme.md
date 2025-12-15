@@ -338,6 +338,32 @@ pip install -r requirements.txt
 - `azure-ai-vision-imageanalysis>=1.0.0` - OCR and image analysis
 - `python-dotenv>=1.0.0` - Environment variable management
 - `pytesseract>=0.3.10` - Text extraction from images
+
+### 6. Generate Demo Data (First-Time Setup)
+
+After deployment or initial setup, generate sample parcels and driver manifests:
+
+```powershell
+# Navigate to generators directory
+cd utils/generators
+
+# Generate demo manifests for all 57 drivers (30-50 parcels each)
+python generate_demo_manifests.py
+
+# OR generate large scalability test for driver-004 (120 parcels)
+python generate_demo_manifests.py --large-default
+
+# OR generate custom large manifest
+python generate_demo_manifests.py --large 200
+```
+
+**What this creates:**
+- ✅ Sample parcels distributed across Australian states (NSW, VIC, QLD, SA, WA, ACT)
+- ✅ Driver manifests for 57 drivers (driver-001 through driver-057)
+- ✅ Realistic Sydney addresses and delivery details
+- ✅ Ready-to-use demo environment for testing
+
+**Note**: Run this after every fresh deployment to populate the database with demo data.
 - `Pillow>=10.0.0` - Image processing
 
 ### 6. Database Initialization

@@ -215,7 +215,39 @@ az webapp restart --name dt-logistics-web --resource-group dt-logistics-rg
 
 ## Post-Deployment Configuration
 
-### Enable Always On
+### 1. Generate Demo Data (First-Time Setup)
+
+After your first deployment, populate the database with sample parcels and driver manifests:
+
+**Automatic (via post_deploy.py):**
+The `post_deploy.py` script runs automatically after deployment and creates:
+- ✅ Default user accounts (admin, support, drivers, depot_mgr)
+- ✅ 57 driver manifests (driver-001 through driver-057)
+- ✅ Sample parcels distributed across Australian states
+- ✅ Ready-to-use demo environment
+
+**Manual (if needed):**
+```bash
+# SSH into your App Service or run locally
+cd utils/generators
+
+# Generate demo manifests for all 57 drivers
+python generate_demo_manifests.py
+
+# OR generate large scalability test for driver-004 (120 parcels)
+python generate_demo_manifests.py --large-default
+
+# OR generate custom large manifest
+python generate_demo_manifests.py --large 200
+```
+
+**What this creates:**
+- Sample parcels across NSW, VIC, QLD, SA, WA, ACT
+- Driver manifests with 30-50 parcels each
+- Realistic Sydney addresses and delivery details
+- Immediate testing capability for all features
+
+### 2. Enable Always On
 ```bash
 az webapp config set \
   --name dt-logistics-web \
@@ -223,7 +255,7 @@ az webapp config set \
   --always-on true
 ```
 
-### Configure Logging
+### 3. Configure Logging
 ```bash
 az webapp log config \
   --name dt-logistics-web \
@@ -233,7 +265,7 @@ az webapp log config \
   --web-server-logging filesystem
 ```
 
-### View Logs
+### 4. View Logs
 ```bash
 az webapp log tail \
   --name dt-logistics-web \
