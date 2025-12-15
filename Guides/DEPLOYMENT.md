@@ -219,8 +219,8 @@ az webapp restart --name dt-logistics-web --resource-group dt-logistics-rg
 
 After your first deployment, populate the database with sample parcels and driver manifests:
 
-**Automatic (via post_deploy.py):**
-The `post_deploy.py` script runs automatically after deployment and creates:
+**Automatic (via deploy_to_azure.ps1):**
+The deployment script automatically runs post-deployment tasks that create:
 - ✅ Default user accounts (admin, support, drivers, depot_mgr)
 - ✅ 57 driver manifests (driver-001 through driver-057)
 - ✅ Sample parcels distributed across Australian states
@@ -228,14 +228,13 @@ The `post_deploy.py` script runs automatically after deployment and creates:
 
 **Manual (if needed):**
 ```bash
-# SSH into your App Service or run locally
-cd utils/generators
+# If automatic setup failed or you need to regenerate data
 
 # Generate demo manifests for all 57 drivers
-python generate_demo_manifests.py
+python utils/generators/generate_demo_manifests.py --all
 
 # OR generate large scalability test for driver-004 (120 parcels)
-python generate_demo_manifests.py --large-default
+python utils/generators/generate_demo_manifests.py --large-default
 
 # OR generate custom large manifest
 python generate_demo_manifests.py --large 200

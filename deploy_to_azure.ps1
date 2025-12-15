@@ -452,19 +452,39 @@ az webapp update `
 Write-Host "  ✓ HTTPS-only enabled" -ForegroundColor Green
 Write-Host ""
 
-# Initialize users in Cosmos DB
-Write-Host "[11/11] Initializing default users..." -ForegroundColor Yellow
-if (Test-Path "init_azure_users.py") {
+# Post-deployment tasks
+Write-Host "[11/11] Running post-deployment tasks..." -ForegroundColor Yellow
+
+# Task 1: Setup default users
+Write-Host "  📋 Setting up default users..." -ForegroundColor Cyan
+if (Test-Path "utils\setup\setup_users.py") {
     try {
-        python init_azure_users.py
+        $env:PYTHONPATH = "$PWD;$PWD\utils\setup"
+        python utils\setup\setup_users.py
         Write-Host "  ✓ Default users initialized" -ForegroundColor Green
     } catch {
-        Write-Host "  ⚠ User initialization failed (users may already exist)" -ForegroundColor Yellow
+        Write-Host "  ⚠ User initialization failed (users may already exist): $_" -ForegroundColor Yellow
     }
 } else {
-    Write-Host "  ⚠ init_azure_users.py not found, skipping user initialization" -ForegroundColor Yellow
-    Write-Host "  You may need to run setup_users.py manually after deployment" -ForegroundColor Gray
+    Write-Host "  ⚠ utils\setup\setup_users.py not found, skipping user setup" -ForegroundColor Yellow
 }
+
+# Task 2: Generate demo manifests
+Write-Host "  📋 Generating demo manifests for all drivers..." -ForegroundColor Cyan
+if (Test-Path "utils\generators\generate_demo_manifests.py") {
+    try {
+        $env:PYTHONPATH = "$PWD;$PWD\utils\generators"
+        python utils\generators\generate_demo_manifests.py --all
+        Write-Host "  ✓ Demo manifests generated successfully" -ForegroundColor Green
+    } catch {
+        Write-Host "  ⚠ Demo manifest generation failed: $_" -ForegroundColor Yellow
+        Write-Host "  You can generate manifests manually after deployment" -ForegroundColor Gray
+    }
+} else {
+    Write-Host "  ⚠ utils\generators\generate_demo_manifests.py not found, skipping manifest generation" -ForegroundColor Yellow
+}
+
+Write-Host "  ✓ Post-deployment tasks completed" -ForegroundColor Green
 Write-Host ""
 
 # Save deployment configuration
