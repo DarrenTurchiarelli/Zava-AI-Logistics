@@ -1232,6 +1232,40 @@ def synthesize_speech():
     else:
         return jsonify({'error': 'Speech synthesis failed'}), 500
 
+@app.route('/api/speech/voices', methods=['GET'])
+def get_available_voices():
+    """Get list of available voice personas"""
+    from services.speech import AzureSpeechService
+    
+    voices = AzureSpeechService.list_available_voices()
+    return jsonify({
+        'voices': voices,
+        'count': len(voices)
+    })
+
+@app.route('/api/speech/voice', methods=['POST'])
+@login_required
+def set_voice_persona():
+    """Change the active voice persona"""
+    from services.speech import get_speech_service
+    
+    data = request.get_json()
+    persona = data.get('persona', '')
+    
+    if not persona:
+        return jsonify({'error': 'Persona is required'}), 400
+    
+    speech_service = get_speech_service(voice_persona=persona)
+    
+    if speech_service.enabled:
+        return jsonify({
+            'success': True,
+            'voice': speech_service.current_voice,
+            'persona': speech_service.voice_persona
+        })
+    else:
+        return jsonify({'error': 'Speech services not configured'}), 500
+
 
 @app.route('/admin/agents')
 @login_required

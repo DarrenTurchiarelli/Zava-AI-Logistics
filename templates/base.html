@@ -751,9 +751,12 @@
                 </div>
                 <div class="chat-widget-controls">
                     <label style="font-size: 11px; color: #666; margin: 0;">
-                        <input type="checkbox" id="chatWidgetAutoSpeak" checked style="margin-right: 4px;">
+                        <input type="checkbox" id="chatWidgetAutoSpeak" style="margin-right: 4px;">
                         Auto-speak responses
                     </label>
+                    <button class="btn btn-sm btn-outline-danger ms-2" id="chatWidgetClear" title="Clear chat history" style="font-size: 10px; padding: 2px 8px;">
+                        <i class="bi bi-trash-fill"></i> Clear Chat
+                    </button>
                 </div>
             </div>
         </div>
@@ -884,26 +887,62 @@
                 
                 const cleanText = text.replace(/\*\*/g, '').replace(/<[^>]+>/g, '').trim();
                 
-                if (useWidgetAzureSpeech && widgetSpeechConfig) {
-                    const player = new window.SpeechSDK.SpeakerAudioDestination();
-                    const audioConfig = window.SpeechSDK.AudioConfig.fromSpeakerOutput(player);
-                    widgetSynthesizer = new window.SpeechSDK.SpeechSynthesizer(widgetSpeechConfig, audioConfig);
-                    
-                    widgetSynthesizer.speakTextAsync(
-                        cleanText,
-                        function (result) {
-                            widgetSynthesizer.close();
-                            widgetSynthesizer = null;
+                // Use server-side Azure Neural TTS for high quality
+                speakWidgetWithAzure(cleanText);
+            }
+            
+            async function speakWidgetWithAzure(text) {
+                try {
+                    console.log('🔊 Widget using Azure Neural voice: natasha');
+                    const response = await fetch('/api/speech/synthesize', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
                         },
-                        function (error) {
-                            console.error('Speech error:', error);
-                            widgetSynthesizer.close();
-                            widgetSynthesizer = null;
-                        }
-                    );
-                } else if (window.speechSynthesis) {
-                    const utterance = new SpeechSynthesisUtterance(cleanText);
+                        body: JSON.stringify({
+                            text: text,
+                            voice_persona: 'natasha'
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const audioBlob = await response.blob();
+                        const audioUrl = URL.createObjectURL(audioBlob);
+                        const audio = new Audio(audioUrl);
+                        
+                        audio.onended = () => {
+                            URL.revokeObjectURL(audioUrl);
+                            console.log('🔊 Widget Azure speech ended');
+                        };
+                        
+                        audio.onerror = (error) => {
+                            console.error('🔊 Widget audio playback error:', error);
+                            // Fallback to browser speech
+                            speakWidgetWithBrowser(text);
+                        };
+                        
+                        await audio.play();
+                    } else {
+                        console.warn('Widget Azure speech failed, falling back to browser');
+                        speakWidgetWithBrowser(text);
+                    }
+                } catch (error) {
+                    console.error('Widget Azure speech error:', error);
+                    speakWidgetWithBrowser(text);
+                }
+            }
+            
+            function speakWidgetWithBrowser(text) {
+                if (window.speechSynthesis) {
+                    const utterance = new SpeechSynthesisUtterance(text);
                     utterance.lang = 'en-AU';
+                    const voices = window.speechSynthesis.getVoices();
+                    const naturalVoice = voices.find(v => v.name.includes('Natural') || v.name.includes('Premium')) 
+                                      || voices.find(v => v.lang.startsWith('en-AU'))
+                                      || voices.find(v => v.lang.startsWith('en'));
+                    if (naturalVoice) {
+                        utterance.voice = naturalVoice;
+                    }
                     window.speechSynthesis.speak(utterance);
                 }
             }
@@ -1008,6 +1047,18 @@
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
             }
             
+            // Clear chat
+            function clearChat() {
+                messagesContainer.innerHTML = `
+                    <div class="chat-widget-welcome">
+                        <img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot" style="width: 64px; height: 64px; margin-bottom: 10px;">
+                        <p><strong>Welcome to DT Logistics AI Copilot!</strong></p>
+                        <p>Ask me about deliveries, tracking, or general inquiries.</p>
+                    </div>
+                `;
+                console.log('🗑️ Chat cleared');
+            }
+            
             // Event listeners
             sendBtn.addEventListener('click', sendMessage);
             input.addEventListener('keypress', function(e) {
@@ -1015,6 +1066,9 @@
                     sendMessage();
                 }
             });
+            
+            const clearBtn = document.getElementById('chatWidgetClear');
+            clearBtn.addEventListener('click', clearChat);
         })();
     </script>
     

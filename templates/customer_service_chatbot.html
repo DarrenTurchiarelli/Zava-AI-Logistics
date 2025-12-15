@@ -88,11 +88,20 @@
                         </button>
                     </div>
                     <div class="mt-2">
-                        <small class="text-muted">
-                            <input type="checkbox" id="autoSpeak" checked> Auto-speak responses
-                            <button class="btn btn-sm btn-outline-secondary ms-2" onclick="stopSpeaking()" title="Stop Speaking">
-                                <i class="bi bi-volume-mute-fill"></i>
-                            </button>
+                        <small class="text-muted d-flex align-items-center gap-2">
+                            <div>
+                                <input type="checkbox" id="autoSpeak"> Auto-speak responses
+                            </div>
+                            <div>
+                                <select id="voiceSelector" class="form-select form-select-sm" style="width: 200px;">
+                                    <option value="">Loading voices...</option>
+                                </select>
+                            </div>
+                            <div>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="stopSpeaking()" title="Stop Speaking">
+                                    <i class="bi bi-volume-mute-fill"></i>
+                                </button>
+                            </div>
                         </small>
                     </div>
                 </div>
@@ -138,6 +147,77 @@ let recognition = null;
 let isListening = false;
 let speechSynthesis = window.speechSynthesis;
 let currentUtterance = null;
+let availableVoices = [];
+let selectedVoice = null;
+let azureVoices = {};
+
+// Load Azure Neural voices from API
+async function loadAzureVoices() {
+    try {
+        const response = await fetch('/api/speech/voices');
+        if (response.ok) {
+            const data = await response.json();
+            azureVoices = data.voices || {};
+            console.log('✅ Loaded', Object.keys(azureVoices).length, 'Azure Neural voices');
+        }
+    } catch (error) {
+        console.warn('Could not load Azure voices:', error);
+    }
+}
+
+// Populate voice selector
+function populateVoiceSelector() {
+    availableVoices = speechSynthesis.getVoices();
+    const voiceSelector = document.getElementById('voiceSelector');
+    voiceSelector.innerHTML = '';
+    
+    // Add Azure Neural voices first (premium)
+    if (Object.keys(azureVoices).length > 0) {
+        const azureGroup = document.createElement('optgroup');
+        azureGroup.label = '🌟 Azure Neural Voices (Premium)';
+        
+        Object.entries(azureVoices).forEach(([key, voice]) => {
+            const option = document.createElement('option');
+            option.value = 'azure:' + key;
+            option.textContent = `${voice.display_name} (${voice.gender}) - ${voice.description}`;
+            azureGroup.appendChild(option);
+        });
+        
+        voiceSelector.appendChild(azureGroup);
+    }
+    
+    // Add browser voices
+    if (availableVoices.length > 0) {
+        const browserGroup = document.createElement('optgroup');
+        browserGroup.label = '🔊 Browser Voices';
+        
+        const enVoices = availableVoices.filter(v => v.lang.startsWith('en'));
+        enVoices.forEach(voice => {
+            const option = document.createElement('option');
+            option.value = 'browser:' + voice.name;
+            option.textContent = `${voice.name} (${voice.lang})`;
+            browserGroup.appendChild(option);
+        });
+        
+        voiceSelector.appendChild(browserGroup);
+    }
+    
+    // Set default to Natasha (Azure Neural) or first available
+    const defaultOption = voiceSelector.querySelector('option[value="azure:natasha"]');
+    if (defaultOption) {
+        voiceSelector.value = 'azure:natasha';
+    }
+}
+
+// Initialize voices
+loadAzureVoices().then(() => {
+    populateVoiceSelector();
+});
+
+// Reload voices when they change (browser behavior)
+if (speechSynthesis.onvoiceschanged !== undefined) {
+    speechSynthesis.onvoiceschanged = populateVoiceSelector;
+}
 
 // Initialize speech recognition
 if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -200,17 +280,12 @@ function toggleVoiceInput() {
     }
 }
 
-function speak(text) {
+async function speak(text) {
     // Stop any current speech
     stopSpeaking();
     
     // Check if auto-speak is enabled
     if (!document.getElementById('autoSpeak').checked) {
-        return;
-    }
-    
-    if (!speechSynthesis) {
-        console.warn('Speech synthesis not supported');
         return;
     }
     
@@ -223,28 +298,99 @@ function speak(text) {
         .replace(/`/g, '') // Remove code backticks
         .trim();
     
-    currentUtterance = new SpeechSynthesisUtterance(cleanText);
+    // Get selected voice
+    const voiceSelector = document.getElementById('voiceSelector');
+    const selectedValue = voiceSelector.value;
+    
+    // Check if Azure Neural voice is selected
+    if (selectedValue.startsWith('azure:')) {
+        const voiceKey = selectedValue.replace('azure:', '');
+        await speakWithAzure(cleanText, voiceKey);
+    } else {
+        // Use browser speech synthesis
+        speakWithBrowser(cleanText, selectedValue);
+    }
+}
+
+async function speakWithAzure(text, voicePersona) {
+    try {
+        console.log('🔊 Using Azure Neural voice:', voicePersona);
+        const response = await fetch('/api/speech/synthesize', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                text: text,
+                voice_persona: voicePersona
+            })
+        });
+        
+        if (response.ok) {
+            const audioBlob = await response.blob();
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+            
+            audio.onended = () => {
+                URL.revokeObjectURL(audioUrl);
+                console.log('🔊 Azure speech ended');
+            };
+            
+            audio.onerror = (error) => {
+                console.error('🔊 Audio playback error:', error);
+                // Fallback to browser speech
+                speakWithBrowser(text);
+            };
+            
+            await audio.play();
+        } else {
+            console.warn('Azure speech failed, falling back to browser');
+            speakWithBrowser(text);
+        }
+    } catch (error) {
+        console.error('Azure speech error:', error);
+        speakWithBrowser(text);
+    }
+}
+
+function speakWithBrowser(text, voiceName = null) {
+    if (!speechSynthesis) {
+        console.warn('Speech synthesis not supported');
+        return;
+    }
+    
+    currentUtterance = new SpeechSynthesisUtterance(text);
     currentUtterance.rate = 1.0;
     currentUtterance.pitch = 1.0;
     currentUtterance.volume = 1.0;
     
-    // Use a more natural voice if available
+    // Use selected voice or find a good default
     const voices = speechSynthesis.getVoices();
-    const preferredVoice = voices.find(v => v.name.includes('Natural') || v.name.includes('Premium')) 
-                          || voices.find(v => v.lang.startsWith('en'));
-    if (preferredVoice) {
-        currentUtterance.voice = preferredVoice;
+    let voice = null;
+    
+    if (voiceName && voiceName.startsWith('browser:')) {
+        const name = voiceName.replace('browser:', '');
+        voice = voices.find(v => v.name === name);
+    }
+    
+    if (!voice) {
+        voice = voices.find(v => v.name.includes('Natural') || v.name.includes('Premium')) 
+             || voices.find(v => v.lang.startsWith('en'));
+    }
+    
+    if (voice) {
+        currentUtterance.voice = voice;
     }
     
     currentUtterance.onend = function() {
-        console.log('🔊 Speech ended');
+        console.log('🔊 Browser speech ended');
     };
     
     currentUtterance.onerror = function(event) {
-        console.error('🔊 Speech error:', event.error);
+        console.error('🔊 Browser speech error:', event.error);
     };
     
-    console.log('🔊 Speaking:', cleanText.substring(0, 50) + '...');
+    console.log('🔊 Speaking with browser:', text.substring(0, 50) + '...');
     speechSynthesis.speak(currentUtterance);
 }
 
