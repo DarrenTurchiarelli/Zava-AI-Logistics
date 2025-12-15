@@ -77,6 +77,10 @@ sse_lock = threading.Lock()
 geocode_cache = {}  # address -> (lat, lon, timestamp)
 geocode_cache_lock = threading.Lock()
 
+# Global: Optimization locks to prevent duplicate threads
+optimization_locks = {}  # manifest_id -> threading.Lock()
+optimization_lock = threading.Lock()
+
 # Initialize warning suppression
 setup_warning_suppression()
 
@@ -1599,8 +1603,8 @@ def driver_manifest():
                 if manifest and not manifest.get('route_optimized'):
                     print(f"⏳ [DEBUG] Initial read: route_optimized=False, starting retries...")
                     import time as time_module
-                    for retry in range(3):  # Try up to 3 times
-                        time_module.sleep(0.5)  # Wait 500ms between retries
+                    for retry in range(4):  # Try up to 4 times
+                        time_module.sleep(1.0)  # Wait 1000ms between retries
                         manifest = await db.get_driver_manifest(driver_id)
                         print(f"   [DEBUG] Retry {retry+1}: route_optimized={manifest.get('route_optimized') if manifest else None}")
                         if manifest.get('route_optimized'):
@@ -1625,17 +1629,43 @@ def driver_manifest():
         print(f"   selected_route_type: {manifest.get('selected_route_type')}")
         
         # If no initial route yet, always show loading page to create it
-        # Clear any old session flags first
+        # Use optimization lock to prevent duplicate threads
         if needs_initial_route:
-            session.pop(f'optimization_attempted_{manifest["id"]}', None)
-            session[f'optimization_attempted_{manifest["id"]}'] = True
-            session.modified = True
-            return render_template('driver_manifest_loading.html', manifest_id=manifest['id'], driver_name=user.get('full_name', user.get('username')))
+            manifest_id = manifest['id']
+            
+            # Get or create lock for this manifest
+            with optimization_lock:
+                if manifest_id not in optimization_locks:
+                    optimization_locks[manifest_id] = threading.Lock()
+                manifest_lock = optimization_locks[manifest_id]
+            
+            # Only proceed if we can acquire the lock (no optimization in progress)
+            if manifest_lock.acquire(blocking=False):
+                # Clear session flag and set optimization in progress
+                session.pop(f'optimization_attempted_{manifest_id}', None)
+                session[f'optimization_attempted_{manifest_id}'] = True
+                session.modified = True
+                # Note: Lock will be released after optimization completes
+            else:
+                print(f"⏭️  [DEBUG] Optimization already in progress for {manifest_id}, showing loading page")
+            
+            return render_template('driver_manifest_loading.html', manifest_id=manifest_id, driver_name=user.get('full_name', user.get('username')))
         
         # Clear the optimization attempted flag if route is now optimized
         if manifest.get('route_optimized'):
-            session.pop(f'optimization_attempted_{manifest["id"]}', None)
+            manifest_id = manifest['id']
+            session.pop(f'optimization_attempted_{manifest_id}', None)
             session.modified = True
+            
+            # Release optimization lock if it exists
+            with optimization_lock:
+                if manifest_id in optimization_locks:
+                    try:
+                        optimization_locks[manifest_id].release()
+                        del optimization_locks[manifest_id]
+                        print(f"🔓 [DEBUG] Released optimization lock for {manifest_id}")
+                    except:
+                        pass  # Lock may have been released already
         
         # Always regenerate embed URL to ensure latest map features
         if manifest.get('route_optimized') and manifest.get('optimized_route'):

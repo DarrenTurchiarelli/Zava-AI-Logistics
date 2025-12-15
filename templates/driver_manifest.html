@@ -141,11 +141,11 @@
                                     <hr>
                                     <div class="row">
                                         <div class="col-6">
-                                            <strong>⏱️ {{ route_options.fastest.total_duration_minutes|round(0) }}</strong><br>
+                                            <strong>⏱️ {{ route_options.fastest.total_duration_minutes|round(0) if route_options.fastest.total_duration_minutes else '—' }}</strong><br>
                                             <small class="text-muted">minutes</small>
                                         </div>
                                         <div class="col-6">
-                                            <strong>📏 {{ route_options.fastest.total_distance_km|round(1) }}</strong><br>
+                                            <strong>📏 {{ route_options.fastest.total_distance_km|round(1) if route_options.fastest.total_distance_km else '—' }}</strong><br>
                                             <small class="text-muted">km</small>
                                         </div>
                                     </div>
@@ -200,11 +200,11 @@
                                     <hr>
                                     <div class="row">
                                         <div class="col-6">
-                                            <strong>⏱️ {{ route_options.shortest.total_duration_minutes|round(0) }}</strong><br>
+                                            <strong>⏱️ {{ route_options.shortest.total_duration_minutes|round(0) if route_options.shortest.total_duration_minutes else '—' }}</strong><br>
                                             <small class="text-muted">minutes</small>
                                         </div>
                                         <div class="col-6">
-                                            <strong>📏 {{ route_options.shortest.total_distance_km|round(1) }}</strong><br>
+                                            <strong>📏 {{ route_options.shortest.total_distance_km|round(1) if route_options.shortest.total_distance_km else '—' }}</strong><br>
                                             <small class="text-muted">km</small>
                                         </div>
                                     </div>
@@ -254,11 +254,11 @@
                                     <hr>
                                     <div class="row">
                                         <div class="col-6">
-                                            <strong>⏱️ {{ route_options.safest.total_duration_minutes|round(0) }}</strong><br>
+                                            <strong>⏱️ {{ route_options.safest.total_duration_minutes|round(0) if route_options.safest.total_duration_minutes else '—' }}</strong><br>
                                             <small class="text-muted">minutes</small>
                                         </div>
                                         <div class="col-6">
-                                            <strong>📏 {{ route_options.safest.total_distance_km|round(1) }}</strong><br>
+                                            <strong>📏 {{ route_options.safest.total_distance_km|round(1) if route_options.safest.total_distance_km else '—' }}</strong><br>
                                             <small class="text-muted">km</small>
                                         </div>
                                     </div>

@@ -1281,6 +1281,7 @@ class ParcelTrackingDB:
             container = self.database.get_container_client("driver_manifests")
             manifest_date = manifest_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
             
+            # First try to get manifest for the specific date
             query = """
                 SELECT * FROM c 
                 WHERE c.driver_id = @driver_id 
@@ -1294,6 +1295,21 @@ class ParcelTrackingDB:
             
             async for manifest in container.query_items(query=query, parameters=parameters):
                 return manifest  # Return first active manifest
+            
+            # If no manifest found for today, get the most recent active manifest
+            query_fallback = """
+                SELECT * FROM c 
+                WHERE c.driver_id = @driver_id 
+                AND c.status = 'active'
+                ORDER BY c.manifest_date DESC
+            """
+            parameters_fallback = [
+                {"name": "@driver_id", "value": driver_id}
+            ]
+            
+            async for manifest in container.query_items(query=query_fallback, parameters=parameters_fallback):
+                print(f"📋 [DEBUG] Using fallback manifest dated {manifest.get('manifest_date')} for driver {driver_id}")
+                return manifest  # Return most recent active manifest
             
             return None
             
