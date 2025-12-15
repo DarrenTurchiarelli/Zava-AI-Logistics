@@ -123,7 +123,7 @@
                         
                         <!-- Fastest Route -->
                         <div class="col-md-4 mb-3">
-                            {% if 'fastest' in route_options %}
+                            {% if 'fastest' in route_options and route_options.fastest.get('total_duration_minutes') %}
                             <div class="card route-option-card {% if selected_type == 'fastest' %}border-primary{% endif %}" 
                                  onclick="switchRoute('{{ manifest.id }}', 'fastest')"
                                  style="cursor: pointer;">
@@ -182,7 +182,7 @@
                         
                         <!-- Shortest Route -->
                         <div class="col-md-4 mb-3">
-                            {% if 'shortest' in route_options %}
+                            {% if 'shortest' in route_options and route_options.shortest.get('total_duration_minutes') %}
                             <div class="card route-option-card {% if selected_type == 'shortest' %}border-primary{% endif %}" 
                                  onclick="switchRoute('{{ manifest.id }}', 'shortest')"
                                  style="cursor: pointer;">
@@ -236,7 +236,7 @@
                         
                         <!-- Safest Route -->
                         <div class="col-md-4 mb-3">
-                            {% if 'safest' in route_options %}
+                            {% if 'safest' in route_options and route_options.safest.get('total_duration_minutes') %}
                             <div class="card route-option-card {% if selected_type == 'safest' %}border-primary{% endif %}" 
                                  onclick="switchRoute('{{ manifest.id }}', 'safest')"
                                  style="cursor: pointer;">
