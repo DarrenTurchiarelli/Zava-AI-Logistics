@@ -1,5 +1,0 @@
-# DT Logistics - Azure Cosmos DB Specific Dependencies
-
-azure-cosmos>=4.5.0
-azure-identity>=1.12.0
-python-dotenv>=1.0.0
