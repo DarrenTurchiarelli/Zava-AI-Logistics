@@ -147,6 +147,7 @@ let recognition = null;
 let isListening = false;
 let speechSynthesis = window.speechSynthesis;
 let currentUtterance = null;
+let currentAudio = null;
 let availableVoices = [];
 let selectedVoice = null;
 let azureVoices = {};
@@ -311,9 +312,6 @@ async function speak(text) {
         speakWithBrowser(cleanText, selectedValue);
     }
 }
-
-// Global reference to current audio element for Azure speech
-let currentAudio = null;
 
 async function speakWithAzure(text, voicePersona) {
     try {
