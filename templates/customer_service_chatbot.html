@@ -312,6 +312,9 @@ async function speak(text) {
     }
 }
 
+// Global reference to current audio element for Azure speech
+let currentAudio = null;
+
 async function speakWithAzure(text, voicePersona) {
     try {
         console.log('🔊 Using Azure Neural voice:', voicePersona);
@@ -329,20 +332,22 @@ async function speakWithAzure(text, voicePersona) {
         if (response.ok) {
             const audioBlob = await response.blob();
             const audioUrl = URL.createObjectURL(audioBlob);
-            const audio = new Audio(audioUrl);
+            currentAudio = new Audio(audioUrl);
             
-            audio.onended = () => {
+            currentAudio.onended = () => {
                 URL.revokeObjectURL(audioUrl);
+                currentAudio = null;
                 console.log('🔊 Azure speech ended');
             };
             
-            audio.onerror = (error) => {
+            currentAudio.onerror = (error) => {
                 console.error('🔊 Audio playback error:', error);
+                currentAudio = null;
                 // Fallback to browser speech
                 speakWithBrowser(text);
             };
             
-            await audio.play();
+            await currentAudio.play();
         } else {
             console.warn('Azure speech failed, falling back to browser');
             speakWithBrowser(text);
@@ -395,9 +400,18 @@ function speakWithBrowser(text, voiceName = null) {
 }
 
 function stopSpeaking() {
+    // Stop browser speech synthesis
     if (speechSynthesis && speechSynthesis.speaking) {
         speechSynthesis.cancel();
-        console.log('🔊 Speech stopped');
+        console.log('🔊 Browser speech stopped');
+    }
+    
+    // Stop Azure audio playback
+    if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+        currentAudio = null;
+        console.log('🔊 Azure audio stopped');
     }
 }
 
@@ -563,6 +577,10 @@ function askQuickQuestion(question) {
 }
 
 function clearChat() {
+    // Stop any ongoing speech
+    stopSpeaking();
+    
+    // Clear chat messages
     const chatMessages = document.getElementById('chatMessages');
     chatMessages.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle"></i> <strong>Chat cleared.</strong> How can I help you?</div>';
 }
