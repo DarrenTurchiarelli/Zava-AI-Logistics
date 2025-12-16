@@ -20,80 +20,93 @@ AVAILABLE_VOICES = {
     # Australian English - Natural conversational voices
     "natasha": {
         "name": "en-AU-NatashaNeural",
+        "display_name": "Natasha",
         "gender": "Female",
         "description": "Warm, friendly Australian female voice - great for customer service",
         "style": "Conversational, professional"
     },
     "william": {
-        "name": "en-AU-WilliamNeural", 
+        "name": "en-AU-WilliamNeural",
+        "display_name": "William",
         "gender": "Male",
         "description": "Clear, confident Australian male voice - professional and approachable",
         "style": "Professional, reassuring"
     },
     "annette": {
         "name": "en-AU-AnnetteNeural",
+        "display_name": "Annette",
         "gender": "Female", 
         "description": "Cheerful, energetic Australian female voice - upbeat and engaging",
         "style": "Friendly, energetic"
     },
     "carly": {
         "name": "en-AU-CarlyNeural",
+        "display_name": "Carly",
         "gender": "Female",
         "description": "Natural, conversational Australian female voice - casual and relatable",
         "style": "Casual, conversational"
     },
     "darren": {
         "name": "en-AU-DarrenNeural",
+        "display_name": "Darren",
         "gender": "Male",
         "description": "Warm, friendly Australian male voice - trustworthy narrator style",
         "style": "Narrative, warm"
     },
     "duncan": {
         "name": "en-AU-DuncanNeural",
+        "display_name": "Duncan",
         "gender": "Male",
         "description": "Young, enthusiastic Australian male voice - modern and dynamic",
         "style": "Youthful, energetic"
     },
     "elsie": {
         "name": "en-AU-ElsieNeural",
+        "display_name": "Elsie",
         "gender": "Female",
         "description": "Gentle, calm Australian female voice - soothing and empathetic",
         "style": "Gentle, caring"
     },
     "freya": {
         "name": "en-AU-FreyaNeural",
+        "display_name": "Freya",
         "gender": "Female",
         "description": "Professional, articulate Australian female voice - business focused",
         "style": "Professional, articulate"
     },
     "joanne": {
         "name": "en-AU-JoanneNeural",
+        "display_name": "Joanne",
         "gender": "Female",
         "description": "Mature, experienced Australian female voice - authoritative yet friendly",
         "style": "Authoritative, experienced"
     },
     "ken": {
         "name": "en-AU-KenNeural",
+        "display_name": "Ken",
         "gender": "Male",
         "description": "Deep, resonant Australian male voice - commanding presence",
         "style": "Deep, authoritative"
     },
     "kim": {
         "name": "en-AU-KimNeural",
+        "display_name": "Kim",
         "gender": "Female",
         "description": "Bright, clear Australian female voice - excellent clarity",
         "style": "Clear, professional"
     },
     "neil": {
         "name": "en-AU-NeilNeural",
+        "display_name": "Neil",
         "gender": "Male",
         "description": "Calm, measured Australian male voice - great for instructions",
         "style": "Calm, instructional"
     },
     "tina": {
-        "name": "en-AU-TimNeural",
-        "gender": "Male",
-        "description": "Versatile Australian male voice - adaptable to various contexts",
+        "name": "en-AU-TinaNeural",
+        "display_name": "Tina",
+        "gender": "Female",
+        "description": "Versatile Australian female voice - adaptable to various contexts",
         "style": "Versatile, adaptable"
     },
 }

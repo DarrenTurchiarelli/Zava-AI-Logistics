@@ -71,10 +71,12 @@
                         <i class="bi bi-mic-fill"></i> Listening...
                     </span>
                 </div>
-                <div class="card-body" id="chatMessages" style="overflow-y: auto; height: 550px;">
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle-fill"></i> <strong>Welcome!</strong> I'm your AI customer service assistant. 
-                        <br><small>💬 Type your questions or 🎤 use voice input. I'll speak my responses back to you!</small>
+                <div class="card-body chat-container" id="chatMessages" style="overflow-y: auto; height: 550px; background-color: #fff; padding: 1.5rem;">
+                    <div class="chat-message ai-message">
+                        <div class="message-content" style="background-color: #e8f5e9; border: 1px solid #c8e6c9;">
+                            <i class="bi bi-info-circle-fill"></i> <strong>Welcome!</strong> I'm Alex, your customer service assistant. 
+                            <br><small>💬 Ask me anything about your parcels or 🎤 use voice input!</small>
+                        </div>
                     </div>
                 </div>
                 <div class="card-footer">
@@ -415,10 +417,15 @@ function stopSpeaking() {
 
 function addMessage(message, isUser = false) {
     const chatMessages = document.getElementById('chatMessages');
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `alert ${isUser ? 'alert-primary' : 'alert-success'} ${isUser ? 'text-right' : ''}`;
-    messageDiv.innerHTML = `<strong>${isUser ? 'You' : 'AI Assistant'}:</strong> ${message}`;
-    chatMessages.appendChild(messageDiv);
+    const messageWrapper = document.createElement('div');
+    messageWrapper.className = `chat-message ${isUser ? 'user-message' : 'ai-message'}`;
+    
+    const messageContent = document.createElement('div');
+    messageContent.className = 'message-content';
+    messageContent.innerHTML = message;
+    
+    messageWrapper.appendChild(messageContent);
+    chatMessages.appendChild(messageWrapper);
     chatMessages.scrollTop = chatMessages.scrollHeight;
     
     // Speak AI responses if auto-speak is enabled
@@ -429,10 +436,15 @@ function addMessage(message, isUser = false) {
 
 function addError(message) {
     const chatMessages = document.getElementById('chatMessages');
-    const messageDiv = document.createElement('div');
-    messageDiv.className = 'alert alert-danger';
-    messageDiv.innerHTML = `<i class="bi bi-exclamation-circle-fill"></i> <strong>Error:</strong> ${message}`;
-    chatMessages.appendChild(messageDiv);
+    const messageWrapper = document.createElement('div');
+    messageWrapper.className = 'chat-message error-message';
+    
+    const messageContent = document.createElement('div');
+    messageContent.className = 'message-content';
+    messageContent.innerHTML = `<i class="bi bi-exclamation-circle-fill"></i> ${message}`;
+    
+    messageWrapper.appendChild(messageContent);
+    chatMessages.appendChild(messageWrapper);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
@@ -440,8 +452,8 @@ function addLoading() {
     const chatMessages = document.getElementById('chatMessages');
     const loadingDiv = document.createElement('div');
     loadingDiv.id = 'loadingMessage';
-    loadingDiv.className = 'alert alert-secondary';
-    loadingDiv.innerHTML = '<i class="bi bi-hourglass-split"></i> AI is thinking...';
+    loadingDiv.className = 'chat-message ai-message';
+    loadingDiv.innerHTML = '<div class="message-content typing-indicator"><span></span><span></span><span></span></div>';
     chatMessages.appendChild(loadingDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
@@ -580,7 +592,13 @@ function clearChat() {
     
     // Clear chat messages
     const chatMessages = document.getElementById('chatMessages');
-    chatMessages.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle"></i> <strong>Chat cleared.</strong> How can I help you?</div>';
+    chatMessages.innerHTML = `
+        <div class="chat-message ai-message">
+            <div class="message-content" style="background-color: #e8f5e9; border: 1px solid #c8e6c9;">
+                <i class="bi bi-check-circle-fill"></i> Chat cleared. How can I help you?
+            </div>
+        </div>
+    `;
 }
 
 function handleEnter(event) {

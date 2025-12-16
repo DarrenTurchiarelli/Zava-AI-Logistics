@@ -576,10 +576,13 @@ def track_parcel_page(tracking_number=None):
 @app.route('/parcels/all')
 @login_required
 def all_parcels():
-    """View all parcels with optional status filter"""
+    """View all parcels with optional status and state filters, plus pagination"""
     try:
-        # Get status filter from query parameter
+        # Get filters and pagination from query parameters
         status_filter = request.args.get('status', None)
+        state_filter = request.args.get('state', None)
+        page = int(request.args.get('page', 1))
+        per_page = 25
         
         async def get_all():
             async with ParcelTrackingDB() as db:
@@ -589,13 +592,51 @@ def all_parcels():
                 if status_filter:
                     all_parcels = [p for p in all_parcels if p.get('current_status') == status_filter]
                 
-                return all_parcels
+                # Apply state filter if provided
+                if state_filter:
+                    all_parcels = [p for p in all_parcels if p.get('destination_state') == state_filter]
+                
+                # Calculate pagination
+                total_parcels = len(all_parcels)
+                total_pages = (total_parcels + per_page - 1) // per_page
+                start_idx = (page - 1) * per_page
+                end_idx = start_idx + per_page
+                paginated_parcels = all_parcels[start_idx:end_idx]
+                
+                return {
+                    'parcels': paginated_parcels,
+                    'total': total_parcels,
+                    'page': page,
+                    'total_pages': total_pages,
+                    'per_page': per_page
+                }
         
-        parcels = run_async(get_all())
-        return render_template('all_parcels.html', parcels=parcels, status_filter=status_filter)
+        result = run_async(get_all())
+        
+        # Get unique states for filter dropdown (only valid Australian states)
+        async def get_states():
+            valid_states = ['NSW', 'VIC', 'QLD', 'SA', 'WA', 'ACT', 'TAS', 'NT']
+            async with ParcelTrackingDB() as db:
+                all_parcels = await db.get_all_parcels()
+                states = sorted(set(p.get('destination_state') for p in all_parcels 
+                                   if p.get('destination_state') in valid_states))
+                return states
+        
+        available_states = run_async(get_states())
+        
+        return render_template('all_parcels.html', 
+                             parcels=result['parcels'], 
+                             status_filter=status_filter,
+                             state_filter=state_filter,
+                             available_states=available_states,
+                             page=result['page'],
+                             total_pages=result['total_pages'],
+                             total_parcels=result['total'],
+                             per_page=result['per_page'])
     except Exception as e:
         flash(f'Error loading parcels: {str(e)}', 'danger')
-        return render_template('all_parcels.html', parcels=[], status_filter=None)
+        return render_template('all_parcels.html', parcels=[], status_filter=None, state_filter=None, 
+                             available_states=[], page=1, total_pages=0, total_parcels=0, per_page=25)
 
 # Fraud Detection
 
@@ -1411,11 +1452,12 @@ def synthesize_speech():
     
     data = request.get_json()
     text = data.get('text', '')
+    voice_persona = data.get('voice_persona', 'natasha')  # Get selected voice from frontend
     
     if not text:
         return jsonify({'error': 'Text is required'}), 400
     
-    speech_service = get_speech_service()
+    speech_service = get_speech_service(voice_persona=voice_persona)  # Use selected voice
     audio_data = speech_service.synthesize_speech(text)
     
     if audio_data:

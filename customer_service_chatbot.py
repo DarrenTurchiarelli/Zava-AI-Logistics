@@ -101,8 +101,7 @@ class CustomerServiceChatbot:
             items = []
             async for item in parcels_container.query_items(
                 query=query,
-                parameters=parameters,
-                enable_cross_partition_query=True
+                parameters=parameters
             ):
                 items.append(item)
             
@@ -120,8 +119,7 @@ class CustomerServiceChatbot:
             events = []
             async for event in events_container.query_items(
                 query=events_query,
-                parameters=parameters,
-                enable_cross_partition_query=True
+                parameters=parameters
             ):
                 events.append(event)
             
@@ -242,8 +240,7 @@ class CustomerServiceChatbot:
             items = []
             async for item in parcels_container.query_items(
                 query=query,
-                parameters=parameters,
-                enable_cross_partition_query=True
+                parameters=parameters
             ):
                 items.append(item)
             
@@ -262,8 +259,7 @@ class CustomerServiceChatbot:
             events = []
             async for event in events_container.query_items(
                 query=events_query,
-                parameters=parameters,
-                enable_cross_partition_query=True
+                parameters=parameters
             ):
                 events.append(event)
             
@@ -308,8 +304,7 @@ class CustomerServiceChatbot:
             frauds = []
             async for fraud in suspicious_container.query_items(
                 query=query,
-                parameters=parameters,
-                enable_cross_partition_query=True
+                parameters=parameters
             ):
                 frauds.append(fraud)
             

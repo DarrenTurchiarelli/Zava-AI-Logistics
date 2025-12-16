@@ -11,18 +11,58 @@
                 {% if status_filter %}
                 <span class="badge bg-primary">{{ status_filter }}</span>
                 {% endif %}
+                {% if state_filter %}
+                <span class="badge bg-success">{{ state_filter }}</span>
+                {% endif %}
             </h1>
-            {% if status_filter %}
             <p class="text-muted">
-                Showing parcels with status: <strong>{{ status_filter }}</strong>
-                <a href="{{ url_for('all_parcels') }}" class="ms-2"><i class="bi bi-x-circle"></i> Clear filter</a>
+                Showing {{ parcels|length }} of {{ total_parcels }} parcels
+                {% if status_filter or state_filter %}
+                <a href="{{ url_for('all_parcels') }}" class="ms-2"><i class="bi bi-x-circle"></i> Clear filters</a>
+                {% endif %}
             </p>
-            {% endif %}
         </div>
         <div class="col-auto">
             <a href="{{ url_for('register_parcel') }}" class="btn btn-primary">
                 <i class="bi bi-plus-circle"></i> Register New Parcel
             </a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card shadow-sm mb-3">
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('all_parcels') }}" class="row g-3">
+                <div class="col-md-4">
+                    <label for="stateFilter" class="form-label">Filter by State</label>
+                    <select class="form-select" id="stateFilter" name="state">
+                        <option value="">All States</option>
+                        {% for state in available_states %}
+                        <option value="{{ state }}" {% if state_filter == state %}selected{% endif %}>{{ state }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="statusFilter" class="form-label">Filter by Status</label>
+                    <select class="form-select" id="statusFilter" name="status">
+                        <option value="">All Statuses</option>
+                        <option value="registered" {% if status_filter == 'registered' %}selected{% endif %}>Registered</option>
+                        <option value="in_transit" {% if status_filter == 'in_transit' %}selected{% endif %}>In Transit</option>
+                        <option value="at_depot" {% if status_filter == 'at_depot' %}selected{% endif %}>At Depot</option>
+                        <option value="out_for_delivery" {% if status_filter == 'out_for_delivery' %}selected{% endif %}>Out for Delivery</option>
+                        <option value="delivered" {% if status_filter == 'delivered' %}selected{% endif %}>Delivered</option>
+                        <option value="exception" {% if status_filter == 'exception' %}selected{% endif %}>Exception</option>
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="bi bi-funnel"></i> Apply Filters
+                    </button>
+                    <a href="{{ url_for('all_parcels') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-x-circle"></i> Clear
+                    </a>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -66,6 +106,58 @@
                     </tbody>
                 </table>
             </div>
+            
+            <!-- Pagination -->
+            {% if total_pages > 1 %}
+            <nav aria-label="Parcel pagination" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    <!-- Previous Button -->
+                    <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+                        <a class="page-link" href="{{ url_for('all_parcels', page=page-1, status=status_filter, state=state_filter) if page > 1 else '#' }}">
+                            <i class="bi bi-chevron-left"></i> Previous
+                        </a>
+                    </li>
+                    
+                    <!-- Page Numbers -->
+                    {% set start_page = [1, page - 2]|max %}
+                    {% set end_page = [total_pages, page + 2]|min %}
+                    
+                    {% if start_page > 1 %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('all_parcels', page=1, status=status_filter, state=state_filter) }}">1</a>
+                    </li>
+                    {% if start_page > 2 %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                    {% endif %}
+                    
+                    {% for p in range(start_page, end_page + 1) %}
+                    <li class="page-item {% if p == page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('all_parcels', page=p, status=status_filter, state=state_filter) }}">{{ p }}</a>
+                    </li>
+                    {% endfor %}
+                    
+                    {% if end_page < total_pages %}
+                    {% if end_page < total_pages - 1 %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('all_parcels', page=total_pages, status=status_filter, state=state_filter) }}">{{ total_pages }}</a>
+                    </li>
+                    {% endif %}
+                    
+                    <!-- Next Button -->
+                    <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+                        <a class="page-link" href="{{ url_for('all_parcels', page=page+1, status=status_filter, state=state_filter) if page < total_pages else '#' }}">
+                            Next <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                </ul>
+                <p class="text-center text-muted small">
+                    Page {{ page }} of {{ total_pages }} ({{ total_parcels }} total parcels)
+                </p>
+            </nav>
+            {% endif %}
             {% else %}
             <div class="text-center text-muted py-5">
                 <i class="bi bi-inbox" style="font-size: 4rem;"></i>
