@@ -1,9 +1,0 @@
-<step title="Incoming Request" date="2025-12-15T09:40:39.233" instance="9be4b8" url="/api/deployments/latest" method="GET" type="request" pid="769,1,20" Accept="*/*" Host="dt-logistics-web-9857.scm.azurewebsites.net" User-Agent="AZURECLI/2.48.1 (MSI)" Accept-Encoding="gzip, deflate" Authorization="Bea..." Cache-Control="no-cache" Content-Type="application/octet-stream" Content-Length="0" x-ms-client-request-id="f80e19e4-d999-11f0-bba0-c403a8f40dc5" X-ARR-LOG-ID="f80e19e4-d999-11f0-bba0-c403a8f40dc5" CLIENT-IP="121.200.4.253:45004" X-SITE-DEPLOYMENT-ID="dt-logistics-web-9857" WAS-DEFAULT-HOSTNAME="dt-logistics-web-9857.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/deployments/latest" X-Client-IP="121.200.4.253" X-Client-Port="45004" >
-  <step title="Cleanup Xml Logs" date="2025-12-15T09:40:39.236" /><!-- duration: 6ms -->
-  <step title="DeploymentService.GetResult" date="2025-12-15T09:40:39.254" >
-    <step title="DeploymentService.GetLatestDeployment" date="2025-12-15T09:40:39.257" >
-      <step title="DeploymentManager.GetResults" date="2025-12-15T09:40:39.260" /><!-- duration: 198ms -->
-    </step><!-- duration: 205ms -->
-  </step><!-- duration: 214ms -->
-  <step title="Outgoing response" date="2025-12-15T09:40:39.476" type="response" statusCode="202" statusText="Accepted" /><!-- duration: 6ms -->
-</step><!-- duration: 252ms -->

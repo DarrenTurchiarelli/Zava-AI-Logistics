@@ -106,8 +106,8 @@ async def search_parcels_by_recipient_tool(recipient_name: str = None, postcode:
         if USE_COSMOS_KEY and COSMOS_KEY:
             client = CosmosClient(COSMOS_ENDPOINT, credential=COSMOS_KEY)
         else:
-            # Use Managed Identity in Azure, DefaultAzureCredential locally
-            if os.getenv('WEBSITE_INSTANCE_ID'):
+            # Use Managed Identity when explicitly enabled (Azure deployment)
+            if os.getenv('USE_MANAGED_IDENTITY', 'false').lower() == 'true':
                 credential = ManagedIdentityCredential()
             else:
                 credential = DefaultAzureCredential(exclude_developer_cli_credential=True)
@@ -197,8 +197,8 @@ async def get_delivery_statistics_tool(date_from: str = None, date_to: str = Non
         if USE_COSMOS_KEY and COSMOS_KEY:
             client = CosmosClient(COSMOS_ENDPOINT, credential=COSMOS_KEY)
         else:
-            # Use Managed Identity in Azure, DefaultAzureCredential locally
-            if os.getenv('WEBSITE_INSTANCE_ID'):
+            # Use Managed Identity when explicitly enabled (Azure deployment)
+            if os.getenv('USE_MANAGED_IDENTITY', 'false').lower() == 'true':
                 credential = ManagedIdentityCredential()
             else:
                 credential = DefaultAzureCredential(exclude_developer_cli_credential=True)

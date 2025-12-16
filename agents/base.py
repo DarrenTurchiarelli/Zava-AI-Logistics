@@ -53,9 +53,9 @@ class AzureAIAgentClient:
     def get_client(self) -> AIProjectClient:
         """Get or create Azure AI Project client"""
         if self._client is None:
-            # Check if running in Azure App Service
-            if os.getenv('WEBSITE_INSTANCE_ID'):
-                # Running in Azure - use ManagedIdentityCredential
+            # Use Managed Identity when explicitly enabled (Azure deployment)
+            if os.getenv('USE_MANAGED_IDENTITY', 'false').lower() == 'true':
+                # Running in Azure with managed identity
                 credential = ManagedIdentityCredential()
             else:
                 # Running locally - use DefaultAzureCredential excluding slow credentials

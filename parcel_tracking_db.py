@@ -68,8 +68,8 @@ def get_cached_credential():
     """Get or create a cached Azure credential to avoid timeout in threads"""
     global _cached_credential
     if _cached_credential is None:
-        # Check if running in Azure (WEBSITE_INSTANCE_ID is set in App Service)
-        if os.getenv('WEBSITE_INSTANCE_ID'):
+        # Use Managed Identity when explicitly enabled (Azure deployment)
+        if os.getenv('USE_MANAGED_IDENTITY', 'false').lower() == 'true':
             # Running in Azure App Service - use ManagedIdentityCredential
             _cached_credential = ManagedIdentityCredential()
         else:

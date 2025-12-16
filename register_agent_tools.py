@@ -32,8 +32,8 @@ async def register_tools():
     
     try:
         # Initialize Azure AI client
-        # Use Managed Identity in Azure, DefaultAzureCredential locally
-        if os.getenv('WEBSITE_INSTANCE_ID'):
+        # Use Managed Identity when explicitly enabled (Azure deployment)
+        if os.getenv('USE_MANAGED_IDENTITY', 'false').lower() == 'true':
             credential = ManagedIdentityCredential()
         else:
             credential = DefaultAzureCredential(exclude_developer_cli_credential=True)

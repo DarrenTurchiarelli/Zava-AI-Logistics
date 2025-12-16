@@ -288,6 +288,20 @@ if ($AIHubName) {
             Write-Host "⚠️  AI Hub role assignment failed (may already exist)" -ForegroundColor Yellow
         }
         Write-Host ""
+
+        Write-Host "Granting 'Azure AI Inference Deployment Operator' to AI Hub..." -ForegroundColor Yellow
+        az role assignment create `
+            --assignee-object-id $principalId `
+            --assignee-principal-type ServicePrincipal `
+            --role "Azure AI Inference Deployment Operator" `
+            --scope $aiHubScope 2>$null
+
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "✅ Azure AI Inference Deployment Operator assigned to AI Hub" -ForegroundColor Green
+        } else {
+            Write-Host "⚠️  AI Hub role assignment failed (may already exist)" -ForegroundColor Yellow
+        }
+        Write-Host ""
     } else {
         Write-Host "❌ AI Hub '$AIHubName' not found" -ForegroundColor Red
         Write-Host "⚠️  Skipping AI Hub-specific permissions" -ForegroundColor Yellow
