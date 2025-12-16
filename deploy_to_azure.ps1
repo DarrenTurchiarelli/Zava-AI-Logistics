@@ -406,7 +406,9 @@ if (-not $principalId) {
                 @{Name="Cognitive Services OpenAI Contributor"; Desc="OpenAI operations"},
                 @{Name="Azure AI Developer"; Desc="Agents write access"},
                 @{Name="Cognitive Services User"; Desc="Agents read access"},
-                @{Name="Cognitive Services Contributor"; Desc="Full AI Hub access"}
+                @{Name="Cognitive Services Contributor"; Desc="Full AI Hub access"},
+                @{Name="Cognitive Services OpenAI User"; Desc="Agents/read data action"},
+                @{Name="Cognitive Services Usages Reader"; Desc="Additional read permissions"}
             )
             
             foreach ($role in $aiRoles) {

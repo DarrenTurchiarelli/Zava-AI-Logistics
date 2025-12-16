@@ -260,6 +260,34 @@ if ($AIHubName) {
             Write-Host "⚠️  AI Hub role assignment failed (may already exist)" -ForegroundColor Yellow
         }
         Write-Host ""
+
+        Write-Host "Granting 'Cognitive Services OpenAI User' to AI Hub..." -ForegroundColor Yellow
+        az role assignment create `
+            --assignee-object-id $principalId `
+            --assignee-principal-type ServicePrincipal `
+            --role "Cognitive Services OpenAI User" `
+            --scope $aiHubScope 2>$null
+
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "✅ Cognitive Services OpenAI User assigned to AI Hub" -ForegroundColor Green
+        } else {
+            Write-Host "⚠️  AI Hub role assignment failed (may already exist)" -ForegroundColor Yellow
+        }
+        Write-Host ""
+
+        Write-Host "Granting 'Cognitive Services Usages Reader' to AI Hub..." -ForegroundColor Yellow
+        az role assignment create `
+            --assignee-object-id $principalId `
+            --assignee-principal-type ServicePrincipal `
+            --role "Cognitive Services Usages Reader" `
+            --scope $aiHubScope 2>$null
+
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "✅ Cognitive Services Usages Reader assigned to AI Hub" -ForegroundColor Green
+        } else {
+            Write-Host "⚠️  AI Hub role assignment failed (may already exist)" -ForegroundColor Yellow
+        }
+        Write-Host ""
     } else {
         Write-Host "❌ AI Hub '$AIHubName' not found" -ForegroundColor Red
         Write-Host "⚠️  Skipping AI Hub-specific permissions" -ForegroundColor Yellow
@@ -308,7 +336,9 @@ Write-Host "  ✓ Cognitive Services OpenAI Contributor (OpenAI operations)" -Fo
 Write-Host "  ✓ Azure AI Developer (agents/write permissions)" -ForegroundColor Green
 Write-Host "  ✓ Cognitive Services User (agents/read permissions)" -ForegroundColor Green
 if ($AIHubName) {
-    Write-Host "  ✓ Cognitive Services Contributor (AI Hub - includes agents/read)" -ForegroundColor Green
+    Write-Host "  ✓ Cognitive Services Contributor (AI Hub - full access)" -ForegroundColor Green
+    Write-Host "  ✓ Cognitive Services OpenAI User (agents/read data action)" -ForegroundColor Green
+    Write-Host "  ✓ Cognitive Services Usages Reader (additional read permissions)" -ForegroundColor Green
 }
 Write-Host ""
 Write-Host "⚠️  CRITICAL: AI Hub resource-specific roles are required for agents/read permission" -ForegroundColor Yellow
