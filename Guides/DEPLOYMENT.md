@@ -231,10 +231,11 @@ The deployment script automatically runs post-deployment tasks that create:
 # If automatic setup failed or you need to regenerate data
 
 # Generate demo manifests for all 57 drivers
-python utils/generators/generate_demo_manifests.py --all
+cd utils/generators
+python generate_demo_manifests.py
 
 # OR generate large scalability test for driver-004 (120 parcels)
-python utils/generators/generate_demo_manifests.py --large-default
+python generate_demo_manifests.py --large-default
 
 # OR generate custom large manifest
 python generate_demo_manifests.py --large 200

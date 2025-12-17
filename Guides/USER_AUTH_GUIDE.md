@@ -16,6 +16,7 @@ The DT Logistics system now includes a comprehensive role-based authentication s
 Run the setup script to create the users container in Cosmos DB and initialize default accounts:
 
 ```powershell
+cd utils/setup
 python setup_users.py
 ```
 

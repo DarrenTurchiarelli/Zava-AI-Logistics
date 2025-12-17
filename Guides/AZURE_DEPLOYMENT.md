@@ -112,7 +112,8 @@ If your Cosmos DB has key-based auth disabled (`disableLocalAuth: true`):
 If user initialization didn't run during deployment:
 
 ```powershell
-python init_azure_users.py
+cd utils/setup
+python setup_users.py
 ```
 
 This creates default accounts:

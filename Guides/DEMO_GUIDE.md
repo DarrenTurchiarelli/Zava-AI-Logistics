@@ -7,6 +7,7 @@
 Run this command to create sample parcels and driver manifests:
 
 ```bash
+cd utils/generators
 python generate_demo_manifests.py
 ```
 
@@ -131,7 +132,7 @@ Form Data:
 
 ### Change Delivery Locations
 
-Edit `SAMPLE_ADDRESSES` in `generate_demo_manifests.py`:
+Edit `SAMPLE_ADDRESSES` in `utils/generators/generate_demo_manifests.py`:
 
 ```python
 SAMPLE_ADDRESSES = [
@@ -148,7 +149,7 @@ SAMPLE_ADDRESSES = [
 
 ### Add More Drivers
 
-Edit `SAMPLE_DRIVERS` in `generate_demo_manifests.py`:
+Edit `SAMPLE_DRIVERS` in `utils/generators/generate_demo_manifests.py`:
 
 ```python
 SAMPLE_DRIVERS = [
@@ -169,6 +170,7 @@ DEPOT_ADDRESS=Your Warehouse Address
 ### "Container not found" Error
 Run the setup script first:
 ```bash
+cd Scripts
 python setup_manifest_container.py
 ```
 
@@ -212,7 +214,5 @@ Before using in production:
 
 ## Support Files
 
-- `setup_manifest_container.py` - Create Cosmos DB container
-- `generate_demo_manifests.py` - Generate demo data
-- `AZURE_MAPS_SETUP.md` - Azure Maps migration guide
-- `MANIFEST_GUIDE.md` - Full feature documentation
+- `Scripts/setup_manifest_container.py` - Create Cosmos DB container
+- `utils/generators/generate_demo_manifests.py` - Generate demo data

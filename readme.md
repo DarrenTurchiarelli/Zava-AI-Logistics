@@ -4,11 +4,13 @@ A modern, AI-powered parcel tracking system for last-mile logistics operations b
 
 ## ⭐ **Latest Updates** ⭐
 
-**December 11, 2025**
+**December 17, 2025**
+- ✅ **ChatGPT-Style UI**: Modern chat bubbles with typing indicators
+- ✅ **Conversational AI**: "Alex" agent with natural language responses
+- ✅ **Voice Selection**: Fixed voice persona selection for Azure Speech
+- ✅ **State Filter**: Shows only valid Australian states (NSW, VIC, QLD, etc.)
+- ✅ **Bug Fixes**: Removed deprecated Cosmos DB parameters
 - ✅ **Agent Workflows**: Fraud → Customer Service automated escalation
-- ✅ **Voice Features**: Azure Speech Services integration for chatbot
-- ✅ **Modular Architecture**: Organized into agents/, services/, config/, workflows/ packages
-- ✅ **9 AI Agents**: Full integration with Azure AI Foundry telemetry
 - ✅ **Azure Maps**: Real-time route optimization with traffic analysis
 
 ## 🚀 Quick Start
@@ -364,9 +366,8 @@ python generate_demo_manifests.py --large 200
 - ✅ Ready-to-use demo environment for testing
 
 **Note**: Run this after every fresh deployment to populate the database with demo data.
-- `Pillow>=10.0.0` - Image processing
 
-### 6. Database Initialization
+### 7. Database Initialization
 
 ```bash
 # Initialize Cosmos DB with database and containers
@@ -378,20 +379,6 @@ This will:
 - ✅ Create required containers with proper partitioning
 - ✅ Add sample test data for demonstration
 - ✅ Verify Azure authentication and connectivity
-
-### 7. Company Branding Configuration
-
-Edit `config/company.py` to customize branding:
-
-```python
-COMPANY_NAME = "Your Company Name"
-COMPANY_PHONE = "1300 XXX XXX"
-COMPANY_EMAIL = "support@yourcompany.com"
-COMPANY_WEBSITE = "https://yourcompany.com"
-# ... and more
-```
-
-All templates automatically use these centralized values.
 
 ### 8. Start the Application
 
@@ -605,42 +592,20 @@ success = db.approve_request_sync(request_id, "supervisor_001")
 - GDPR compliance features
 - Data retention policies
 
-## 🚧 **Legacy Files & Migration**
-
-### **Architecture Evolution**
-- **Original**: `Parcel_scanner_cosmosdb_demo.py` - ⚠️ Monolithic 1,700+ line file (still present for reference)
-- **Current**: Modular architecture - 9 focused modules (89-328 lines each)
-- **Migration Status**: All functionality successfully moved to modular system
-
-### **Migration Validation**
-- ✅ All 25 features working identically
-- ✅ Menu system and navigation unchanged  
-- ✅ Database integration maintained
-- ✅ AI agent workflow integration preserved
-- ✅ Error handling and user experience identical
-- ✅ **Fixed postcode mapping**: 3004 now correctly maps to VIC (was NSW)
-
-### **Recommendations**
-- **Use**: `python main.py` for new development (modular system)
-- **Reference**: Original file available during transition
-- **Cleanup**: Archive original monolithic file after full validation
-
 ## 📁 Project Structure
 
 ```
-dt_item_tracker/
-├── README.md                                      # This consolidated documentation
+dt_item_scanner/
+├── readme.md                                     # This consolidated documentation
 ├── .env                                          # Environment configuration  
 ├── requirements.txt                              # Python dependencies
 ├── parcel_tracking_db.py                        # Consolidated database interface
-├── company_config.py                            # Centralized company branding
 │
 ├── 🌐 WEB APPLICATION (Recommended)
-├── app.py                                        # Flask web application (385 lines)
+├── app.py                                        # Flask web application
 ├── startup.sh                                    # Azure App Service startup script
 ├── azure.yaml                                    # Azure deployment configuration
-├── DEPLOYMENT.md                                 # Complete deployment guide
-├── COMPANY_CONFIG_README.md                      # Branding configuration guide
+├── deploy_to_azure.ps1                          # Automated deployment script
 ├── templates/                                    # Jinja2 HTML templates
 │   ├── base.html                                # Master layout with navigation
 │   ├── index.html                               # Landing page
@@ -660,25 +625,21 @@ dt_item_tracker/
 │       └── app.js                               # Client-side JavaScript
 │
 ├── 🚀 MODULAR CLI APPLICATION
-├── main.py                                       # Entry point and routing (108 lines)
-├── logistics_common.py                           # Shared utilities (143 lines)  
-├── logistics_core.py                            # Core operations (328 lines)
-├── logistics_customer.py                        # Customer features (172 lines)
-├── logistics_driver.py                          # Driver operations (139 lines)
-├── logistics_depot.py                           # Depot management (145 lines)
-├── logistics_ai.py                              # AI features (149 lines)
-├── logistics_admin.py                           # Admin functions (206 lines)
-├── logistics_menu.py                            # Menu system (89 lines)
+├── main.py                                       # Entry point and routing
+├── logistics_common.py                           # Shared utilities
+├── logistics_core.py                            # Core operations
+├── logistics_customer.py                        # Customer features
+├── logistics_driver.py                          # Driver operations
+├── logistics_depot.py                           # Depot management
+├── logistics_ai.py                              # AI features
+├── logistics_admin.py                           # Admin functions
+├── logistics_menu.py                            # Menu system
 ├── logistics_parcel.py                          # Parcel data models
-├── fraud_risk_agent.py                          # AI fraud detection agent
-│
-├── 📁 Legacy/Reference Files
-├── Parcel_scanner_cosmosdb_demo.py             # Original monolithic demo (1,700+ lines)
-├── Identity_Test_CosmosDB_connection.py         # Database connection testing
+├── customer_service_chatbot.py                  # AI chatbot agent
 │
 ├── Scripts/                                      # AI Agent Framework
-│   ├── A03_Create_Multiple_Foundry_Agent_Persistent.py  # Create logistics agents
-│   └── W04_Sequential_Workflow_Human_Approval.py        # Main AI workflow
+│   ├── A01_Create_Multiple_Foundry_Agent_Persistent.py  # Create logistics agents
+│   └── W01_Sequential_Workflow_Human_Approval.py        # Main AI workflow
 └── __pycache__/                                 # Python cache files
 ```
 
@@ -696,10 +657,6 @@ This error occurs when AI agents try to use sync database methods within async c
 # Solution: Use Azure AD authentication or enable key-based auth
 az cosmosdb update --name your-account --resource-group your-rg --disable-local-auth false
 ```
-
-#### aiohttp Connection Warnings
-The system includes comprehensive warning suppression. If you still see connection warnings:
-**Solution**: Warning suppression is enabled by default in `Parcel_scanner_cosmosdb_demo.py`.
 
 #### Partition Key Errors
 - Ensure store_location is provided for parcel operations
