@@ -23,7 +23,7 @@ from typing import Dict, List, Any, Tuple, Optional
 from dataclasses import dataclass
 from enum import Enum
 
-from azure.identity import DefaultAzureCredential, ManagedIdentityCredential
+from azure.identity import AzureCliCredential, ManagedIdentityCredential
 from azure.ai.projects import AIProjectClient
 from dotenv import load_dotenv
 
@@ -189,7 +189,7 @@ class FraudRiskAgent:
             if os.getenv('USE_MANAGED_IDENTITY', 'false').lower() == 'true':
                 credential = ManagedIdentityCredential()
             else:
-                credential = DefaultAzureCredential(exclude_developer_cli_credential=True)
+                credential = AzureCliCredential()
             
             project_client = AIProjectClient(
                 endpoint=AZURE_AI_PROJECT_ENDPOINT, 

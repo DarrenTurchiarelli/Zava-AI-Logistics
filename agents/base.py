@@ -58,8 +58,8 @@ class AzureAIAgentClient:
                 # Running in Azure with managed identity
                 credential = ManagedIdentityCredential()
             else:
-                # Running locally - use DefaultAzureCredential excluding slow credentials
-                credential = DefaultAzureCredential(exclude_developer_cli_credential=True)
+                # Running locally - use AzureCliCredential since user is authenticated via Azure CLI
+                credential = AzureCliCredential()
             
             self._client = AIProjectClient(
                 endpoint=AZURE_AI_PROJECT_ENDPOINT,
