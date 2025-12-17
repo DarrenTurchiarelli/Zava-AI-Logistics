@@ -224,179 +224,421 @@
     <!-- Agent Capabilities Reference -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="card border-info">
-                <div class="card-header bg-info text-white">
-                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Deployed AI Agents (Azure AI Foundry)</h5>
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-cpu"></i> Azure AI Foundry Agents - System Status</h5>
                 </div>
                 <div class="card-body">
+                    <p class="mb-3">
+                        <i class="bi bi-info-circle"></i> <strong>9 Specialized AI Agents</strong> integrated with Azure AI Foundry for intelligent logistics automation.
+                        <span class="badge bg-success ms-2">5 Active</span>
+                        <span class="badge bg-secondary ms-1">4 Available</span>
+                    </p>
+
+                    <!-- Active Agents -->
+                    <h6 class="text-success mt-4 mb-3">
+                        <i class="bi bi-check-circle-fill"></i> Active Agents
+                    </h6>
                     <div class="row">
-                        <!-- Row 1 -->
-                        <div class="col-md-4 mb-3">
-                            <div class="card h-100 border-primary">
-                                <div class="card-body">
-                                    <h6 class="card-title">
-                                        <i class="fas fa-box text-primary"></i> Parcel Intake Agent
-                                    </h6>
-                                    <p class="card-text small">
-                                        Validates and processes incoming parcels with automated data verification.
-                                    </p>
-                                    <ul class="small">
-                                        <li>Address validation</li>
-                                        <li>Dimension/weight verification</li>
-                                        <li>Fraud detection screening</li>
-                                    </ul>
-                                    <span class="badge bg-primary">Azure AI Foundry</span>
-                                </div>
-                            </div>
-                        </div>
-                        
+                        <!-- Customer Service Agent -->
                         <div class="col-md-4 mb-3">
                             <div class="card h-100 border-success">
                                 <div class="card-body">
-                                    <h6 class="card-title">
-                                        <i class="fas fa-warehouse text-success"></i> Sorting Facility Agent
-                                    </h6>
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <h6 class="card-title">
+                                            <i class="bi bi-headset text-success"></i> Customer Service Agent
+                                        </h6>
+                                        <span class="badge bg-success">ACTIVE</span>
+                                    </div>
+                                    
+                                    <!-- Agent Metrics -->
+                                    {% set agent_metrics = namespace(found=false) %}
+                                    {% for agent in dashboard.agents %}
+                                        {% if 'Customer Service' in agent.name %}
+                                            {% set agent_metrics.found = true %}
+                                            <div class="row text-center mb-2 mt-2">
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Decisions</small>
+                                                    <strong>{{ agent.total_decisions }}</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Confidence</small>
+                                                    <strong class="text-success">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Speed</small>
+                                                    <strong>{{ agent.avg_execution_ms|round(0)|int }}ms</strong>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if not agent_metrics.found %}
+                                        <div class="alert alert-sm alert-info mb-2 mt-2 py-1 px-2">
+                                            <small><i class="bi bi-info-circle"></i> No usage data yet</small>
+                                        </div>
+                                    {% endif %}
+                                    
                                     <p class="card-text small">
-                                        Optimizes sorting operations and depot routing decisions.
+                                        AI-powered customer support with real-time Cosmos DB queries.
                                     </p>
-                                    <ul class="small">
-                                        <li>Geographic zone assignment</li>
-                                        <li>Depot capacity management</li>
-                                        <li>Priority parcel identification</li>
-                                    </ul>
-                                    <span class="badge bg-success">Azure AI Foundry</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="col-md-4 mb-3">
-                            <div class="card h-100 border-info">
-                                <div class="card-body">
-                                    <h6 class="card-title">
-                                        <i class="fas fa-route text-info"></i> Delivery Coordination Agent
-                                    </h6>
-                                    <p class="card-text small">
-                                        Coordinates delivery schedules and route assignments.
-                                    </p>
-                                    <ul class="small">
-                                        <li>Route clustering</li>
-                                        <li>Time window optimization</li>
-                                        <li>Driver workload balancing</li>
-                                    </ul>
-                                    <span class="badge bg-info">Azure AI Foundry</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Row 2 -->
-                        <div class="col-md-4 mb-3">
-                            <div class="card h-100 border-warning">
-                                <div class="card-body">
-                                    <h6 class="card-title">
-                                        <i class="fas fa-tasks text-warning"></i> Dispatcher Agent
-                                    </h6>
-                                    <p class="card-text small">
-                                        Assigns parcels to drivers based on capacity and route efficiency.
-                                    </p>
-                                    <ul class="small">
-                                        <li>Dynamic manifest generation</li>
-                                        <li>Real-time reassignment</li>
-                                        <li>Capacity optimization</li>
-                                    </ul>
-                                    <span class="badge bg-warning text-dark">Azure AI Foundry</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="col-md-4 mb-3">
-                            <div class="card h-100 border-secondary">
-                                <div class="card-body">
-                                    <h6 class="card-title">
-                                        <i class="fas fa-truck text-secondary"></i> Driver Agent
-                                    </h6>
-                                    <p class="card-text small">
-                                        Assists drivers with delivery decisions and exception handling.
-                                    </p>
-                                    <ul class="small">
-                                        <li>Safe place recommendations</li>
-                                        <li>Delivery attempt guidance</li>
-                                        <li>Customer contact suggestions</li>
-                                    </ul>
-                                    <span class="badge bg-secondary">Azure AI Foundry</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="col-md-4 mb-3">
-                            <div class="card h-100 border-primary">
-                                <div class="card-body">
-                                    <h6 class="card-title">
-                                        <i class="fas fa-chart-line text-primary"></i> Optimization Agent
-                                    </h6>
-                                    <p class="card-text small">
-                                        Azure Maps-powered route optimization with real-time traffic analysis.
-                                    </p>
-                                    <ul class="small">
-                                        <li>Real-time route optimization</li>
-                                        <li>Fuel and time savings</li>
-                                        <li>CO₂ reduction tracking</li>
-                                    </ul>
-                                    <span class="badge bg-primary">Azure AI Foundry + Maps</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Row 3 -->
-                        <div class="col-md-4 mb-3">
-                            <div class="card h-100 border-success">
-                                <div class="card-body">
-                                    <h6 class="card-title">
-                                        <i class="fas fa-headset text-success"></i> Customer Service Agent
-                                    </h6>
-                                    <p class="card-text small">
-                                        AI-powered customer support with Cosmos DB function calling.
-                                    </p>
-                                    <ul class="small">
+                                    <ul class="small mb-2">
                                         <li>Real-time parcel tracking</li>
                                         <li>Delivery status updates</li>
-                                        <li>Multi-format tracking support (DT, DTVIC, OV)</li>
+                                        <li>Multi-format tracking support</li>
                                     </ul>
-                                    <span class="badge bg-success">Azure AI Foundry + Tools</span>
+                                    <div class="d-flex flex-wrap gap-1 mb-2">
+                                        <span class="badge bg-light text-dark">track_parcel</span>
+                                        <span class="badge bg-light text-dark">search_parcels</span>
+                                        <span class="badge bg-light text-dark">get_statistics</span>
+                                    </div>
+                                    <a href="{{ url_for('customer_service_chatbot') }}" class="btn btn-sm btn-success w-100">
+                                        <i class="bi bi-chat-dots"></i> Open Chatbot
+                                    </a>
                                 </div>
                             </div>
                         </div>
                         
+                        <!-- Fraud Detection Agent -->
                         <div class="col-md-4 mb-3">
-                            <div class="card h-100 border-danger">
+                            <div class="card h-100 border-success">
                                 <div class="card-body">
-                                    <h6 class="card-title">
-                                        <i class="fas fa-shield-alt text-danger"></i> Fraud Risk Agent
-                                    </h6>
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <h6 class="card-title">
+                                            <i class="bi bi-shield-exclamation text-danger"></i> Fraud Detection Agent
+                                        </h6>
+                                        <span class="badge bg-success">ACTIVE</span>
+                                    </div>
+                                    
+                                    <!-- Agent Metrics -->
+                                    {% set agent_metrics = namespace(found=false) %}
+                                    {% for agent in dashboard.agents %}
+                                        {% if 'Fraud' in agent.name %}
+                                            {% set agent_metrics.found = true %}
+                                            <div class="row text-center mb-2 mt-2">
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Decisions</small>
+                                                    <strong>{{ agent.total_decisions }}</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Confidence</small>
+                                                    <strong class="text-success">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Speed</small>
+                                                    <strong>{{ agent.avg_execution_ms|round(0)|int }}ms</strong>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if not agent_metrics.found %}
+                                        <div class="alert alert-sm alert-info mb-2 mt-2 py-1 px-2">
+                                            <small><i class="bi bi-info-circle"></i> No usage data yet</small>
+                                        </div>
+                                    {% endif %}
+                                    
                                     <p class="card-text small">
-                                        Azure AI Foundry-powered fraud analysis with threat classification.
+                                        Analyzes messages for fraud risks with multi-category threat classification.
                                     </p>
-                                    <ul class="small">
+                                    <ul class="small mb-2">
                                         <li>Real-time threat analysis</li>
                                         <li>Educational content generation</li>
-                                        <li>Multi-category classification</li>
+                                        <li>Automated workflows</li>
                                     </ul>
-                                    <span class="badge bg-danger">Azure AI Foundry</span>
+                                    <div class="d-flex flex-wrap gap-1 mb-2">
+                                        <span class="badge bg-light text-dark">check_frauds</span>
+                                        <span class="badge bg-light text-dark">validate_sender</span>
+                                    </div>
+                                    <a href="{{ url_for('report_fraud') }}" class="btn btn-sm btn-success w-100">
+                                        <i class="bi bi-shield-exclamation"></i> Report Fraud
+                                    </a>
                                 </div>
                             </div>
                         </div>
                         
+                        <!-- Identity Agent -->
                         <div class="col-md-4 mb-3">
-                            <div class="card h-100 border-info">
+                            <div class="card h-100 border-success">
                                 <div class="card-body">
-                                    <h6 class="card-title">
-                                        <i class="fas fa-id-card text-info"></i> Identity Verification Agent
-                                    </h6>
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <h6 class="card-title">
+                                            <i class="bi bi-person-check text-info"></i> Identity Agent
+                                        </h6>
+                                        <span class="badge bg-success">ACTIVE</span>
+                                    </div>
+                                    
+                                    <!-- Agent Metrics -->
+                                    {% set agent_metrics = namespace(found=false) %}
+                                    {% for agent in dashboard.agents %}
+                                        {% if 'Identity' in agent.name %}
+                                            {% set agent_metrics.found = true %}
+                                            <div class="row text-center mb-2 mt-2">
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Decisions</small>
+                                                    <strong>{{ agent.total_decisions }}</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Confidence</small>
+                                                    <strong class="text-success">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Speed</small>
+                                                    <strong>{{ agent.avg_execution_ms|round(0)|int }}ms</strong>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if not agent_metrics.found %}
+                                        <div class="alert alert-sm alert-info mb-2 mt-2 py-1 px-2">
+                                            <small><i class="bi bi-info-circle"></i> No usage data yet</small>
+                                        </div>
+                                    {% endif %}
+                                    
                                     <p class="card-text small">
-                                        Verifies driver and courier identities with multi-factor validation.
+                                        Verifies customer identity for high-risk fraud cases (≥85% risk score).
                                     </p>
-                                    <ul class="small">
+                                    <ul class="small mb-2">
                                         <li>Credential verification</li>
                                         <li>Employment status checks</li>
+                                        <li>Zone authorization validation</li>
+                                    </ul>
+                                    <div class="d-flex flex-wrap gap-1 mb-2">
+                                        <span class="badge bg-light text-dark">verify_customer</span>
+                                        <span class="badge bg-light text-dark">check_identity</span>
+                                    </div>
+                                    <span class="badge bg-info w-100">Auto-triggered by Fraud Workflow</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Second row of active agents -->
+                    <div class="row">
+                        <!-- Dispatcher Agent (NEW!) -->
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 border-success">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <h6 class="card-title">
+                                            <i class="bi bi-diagram-3 text-warning"></i> Dispatcher Agent
+                                        </h6>
+                                        <span class="badge bg-success">ACTIVE ⭐ NEW</span>
+                                    </div>
+                                    
+                                    <!-- Agent Metrics -->
+                                    {% set agent_metrics = namespace(found=false) %}
+                                    {% for agent in dashboard.agents %}
+                                        {% if 'Dispatch' in agent.name %}
+                                            {% set agent_metrics.found = true %}
+                                            <div class="row text-center mb-2 mt-2">
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Decisions</small>
+                                                    <strong>{{ agent.total_decisions }}</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Confidence</small>
+                                                    <strong class="text-success">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Speed</small>
+                                                    <strong>{{ agent.avg_execution_ms|round(0)|int }}ms</strong>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if not agent_metrics.found %}
+                                        <div class="alert alert-sm alert-info mb-2 mt-2 py-1 px-2">
+                                            <small><i class="bi bi-info-circle"></i> No usage data yet</small>
+                                        </div>
+                                    {% endif %}
+                                    
+                                    <p class="card-text small">
+                                        Intelligent parcel-to-driver assignment with workload balancing.
+                                    </p>
+                                    <ul class="small mb-2">
+                                        <li>Geographic clustering</li>
+                                        <li>Priority-based assignment</li>
+                                        <li>Capacity optimization</li>
+                                    </ul>
+                                    <div class="d-flex flex-wrap gap-1 mb-2">
+                                        <span class="badge bg-light text-dark">optimize_assignment</span>
+                                        <span class="badge bg-light text-dark">balance_workload</span>
+                                    </div>
+                                    <a href="{{ url_for('admin_manifests') }}" class="btn btn-sm btn-success w-100">
+                                        <i class="bi bi-robot"></i> Auto-Assign Parcels
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Parcel Intake Agent - Now Active! -->
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 border-success">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <h6 class="card-title">
+                                            <i class="bi bi-box-seam text-primary"></i> Parcel Intake Agent
+                                        </h6>
+                                        <span class="badge bg-success">ACTIVE ⭐ ENHANCED</span>
+                                    </div>
+                                    
+                                    <!-- Agent Metrics -->
+                                    {% set agent_metrics = namespace(found=false) %}
+                                    {% for agent in dashboard.agents %}
+                                        {% if 'Intake' in agent.name or 'Parcel Intake' in agent.name %}
+                                            {% set agent_metrics.found = true %}
+                                            <div class="row text-center mb-2 mt-2">
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Decisions</small>
+                                                    <strong>{{ agent.total_decisions }}</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Confidence</small>
+                                                    <strong class="text-success">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Speed</small>
+                                                    <strong>{{ agent.avg_execution_ms|round(0)|int }}ms</strong>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if not agent_metrics.found %}
+                                        <div class="alert alert-sm alert-info mb-2 mt-2 py-1 px-2">
+                                            <small><i class="bi bi-info-circle"></i> No usage data yet</small>
+                                        </div>
+                                    {% endif %}
+                                    
+                                    <p class="card-text small">
+                                        <strong>Now Fully Integrated!</strong> Validates parcels during registration with AI-powered insights.
+                                    </p>
+                                    <ul class="small mb-2">
+                                        <li>Service type recommendations</li>
+                                        <li>Address validation & corrections</li>
+                                        <li>Delivery complication detection</li>
+                                        <li>Data quality verification</li>
+                                    </ul>
+                                    <div class="d-flex flex-wrap gap-1 mb-2">
+                                        <span class="badge bg-light text-dark">validate_address</span>
+                                        <span class="badge bg-light text-dark">suggest_service</span>
+                                        <span class="badge bg-light text-dark">detect_issues</span>
+                                    </div>
+                                    <a href="{{ url_for('register_parcel') }}" class="btn btn-sm btn-success w-100">
+                                        <i class="bi bi-box-seam"></i> Register Parcel
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Available for Integration -->
+                    <h6 class="text-secondary mt-4 mb-3">
+                        <i class="bi bi-circle"></i> Available for Integration
+                    </h6>
+                    <div class="row">
+                        <!-- Sorting Facility Agent -->
+                        <div class="col-md-6 mb-3">
+                            <div class="card h-100 border-secondary">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <h6 class="card-title">
+                                            <i class="bi bi-building text-secondary"></i> Sorting Facility Agent
+                                        </h6>
+                                        <span class="badge bg-secondary">AVAILABLE</span>
+                                    </div>
+                                    <p class="card-text small">
+                                        <strong>Potential Use:</strong> Automated routing decisions at sorting facilities
+                                    </p>
+                                    <ul class="small mb-2">
+                                        <li>Optimize facility throughput</li>
+                                        <li>Load balancing across facilities</li>
+                                        <li>Priority-based routing</li>
+                                    </ul>
+                                    <p class="text-muted small mb-0">
+                                        <i class="bi bi-lightbulb"></i> Could integrate with real-time facility capacity monitoring
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Delivery Coordination Agent -->
+                        <div class="col-md-6 mb-3">
+                            <div class="card h-100 border-secondary">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <h6 class="card-title">
+                                            <i class="bi bi-calendar-check text-secondary"></i> Delivery Coordination Agent
+                                        </h6>
+                                        <span class="badge bg-secondary">AVAILABLE</span>
+                                    </div>
+                                    <p class="card-text small">
+                                        <strong>Potential Use:</strong> Multi-stop delivery sequencing and time window management
+                                    </p>
+                                    <ul class="small mb-2">
+                                        <li>Dynamic route adjustments</li>
+                                        <li>Real-time exception handling</li>
+                                        <li>Customer communication</li>
+                                    </ul>
+                                    <p class="text-muted small mb-0">
+                                        <i class="bi bi-lightbulb"></i> Could enhance driver manifest with optimal delivery order
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <!-- Driver Agent -->
+                        <div class="col-md-6 mb-3">
+                            <div class="card h-100 border-secondary">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <h6 class="card-title">
+                                            <i class="bi bi-truck text-secondary"></i> Driver Agent
+                                        </h6>
+                                        <span class="badge bg-secondary">AVAILABLE</span>
+                                    </div>
+                                    <p class="card-text small">
+                                        <strong>Potential Use:</strong> Real-time driver assistance and problem resolution
+                                    </p>
+                                    <ul class="small mb-2">
+                                        <li>Navigation guidance</li>
+                                        <li>Address issue resolution</li>
+                                        <li>Status update assistance</li>
+                                    </ul>
+                                    <p class="text-muted small mb-0">
+                                        <i class="bi bi-lightbulb"></i> Could add chatbot to driver manifest page
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Optimization Agent -->
+                        <div class="col-md-6 mb-3">
+                            <div class="card h-100 border-secondary">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <h6 class="card-title">
+                                            <i class="bi bi-graph-up text-secondary"></i> Optimization Agent
+                                        </h6>
+                                        <span class="badge bg-secondary">AVAILABLE</span>
+                                    </div>
+                                    <p class="card-text small">
+                                        <strong>Potential Use:</strong> Network-wide performance analysis and recommendations
+                                    </p>
+                                    <ul class="small mb-2">
+                                        <li>Cost reduction insights</li>
+                                        <li>Resource allocation optimization</li>
+                                        <li>Predictive analytics</li>
+                                    </ul>
+                                    <p class="text-muted small mb-0">
+                                        <i class="bi bi-lightbulb"></i> Could power a dedicated insights/analytics dashboard
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                                         <li>Zone authorization validation</li>
                                     </ul>
                                     <span class="badge bg-info">Azure AI Foundry</span>

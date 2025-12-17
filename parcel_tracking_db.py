@@ -2384,6 +2384,73 @@ class ParcelTrackingDB:
         async with self:
             return await self.reject_request(request_id, rejected_by, comments)
 
+    async def get_available_drivers(self, state: str = None) -> List[Dict[str, Any]]:
+        """Get list of available drivers for manifest assignment
+        
+        Args:
+            state: Optional filter by driver's state (e.g., 'VIC', 'NSW')
+            
+        Returns:
+            List of driver dictionaries with id, name, and location
+        """
+        try:
+            # For now, return hardcoded drivers based on user database
+            # In production, this would query a drivers table/container
+            container = self.database.get_container_client("users")
+            query = "SELECT * FROM c WHERE c.role = 'driver'"
+            
+            drivers = []
+            async for user in container.query_items(query=query, enable_cross_partition_query=True):
+                driver_info = {
+                    "driver_id": user.get("username"),
+                    "name": user.get("full_name", user.get("username")),
+                    "location": user.get("state", "VIC"),
+                    "max_capacity": 20,
+                    "current_load": 0  # Would calculate from active manifests
+                }
+                
+                # Filter by state if provided
+                if state is None or driver_info["location"] == state:
+                    drivers.append(driver_info)
+            
+            print(f"✅ Found {len(drivers)} available drivers")
+            return drivers
+            
+        except Exception as e:
+            print(f"❌ Error getting available drivers: {e}")
+            return []
+
+    async def get_pending_parcels(self, status: str = "At Depot", max_count: int = None) -> List[Dict[str, Any]]:
+        """Get parcels that are pending manifest assignment
+        
+        Args:
+            status: Parcel status to filter by (default: 'At Depot')
+            max_count: Optional maximum number of parcels to return
+            
+        Returns:
+            List of parcel dictionaries ready for manifest assignment
+        """
+        try:
+            container = self.database.get_container_client(self.parcels_container)
+            
+            # Query for parcels at depot waiting for delivery assignment
+            query = "SELECT * FROM c WHERE c.status = @status ORDER BY c.priority DESC, c.registered_date ASC"
+            parameters = [{"name": "@status", "value": status}]
+            
+            parcels = []
+            async for parcel in container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True):
+                parcels.append(parcel)
+                
+                if max_count and len(parcels) >= max_count:
+                    break
+            
+            print(f"✅ Found {len(parcels)} pending parcels with status '{status}'")
+            return parcels
+            
+        except Exception as e:
+            print(f"❌ Error getting pending parcels: {e}")
+            return []
+
     def scan_parcel_at_location_sync(self, barcode: str, scan_location: str, scanned_by: str = "system", scan_type: str = "arrival") -> Dict[str, Any]:
         """Synchronous wrapper for scan_parcel_at_location"""
         try:

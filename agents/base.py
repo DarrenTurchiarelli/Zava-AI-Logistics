@@ -326,24 +326,57 @@ async def parcel_intake_agent(parcel_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Call Parcel Intake Agent to validate new parcel registrations
     
+    Performs comprehensive validation including:
+    - Service type recommendations based on parcel characteristics
+    - Address validation and completeness checks  
+    - Delivery complication predictions
+    - Weight/dimension verification
+    - Special handling requirements detection
+    
     Args:
         parcel_data: Dictionary with parcel information (tracking_number, sender, recipient, etc.)
         
     Returns:
-        Validation results with status and any issues found
+        Validation results with recommendations, warnings, and insights
     """
     message = f"""
-    Process new parcel registration:
+    Process new parcel registration and provide comprehensive validation:
     
+    PARCEL INFORMATION:
     Tracking Number: {parcel_data.get('tracking_number')}
-    Sender: {parcel_data.get('sender_name')} ({parcel_data.get('sender_address')})
-    Recipient: {parcel_data.get('recipient_name')} ({parcel_data.get('recipient_address')})
     Service Type: {parcel_data.get('service_type', 'standard')}
     Weight: {parcel_data.get('weight_kg', 'Unknown')} kg
     Dimensions: {parcel_data.get('dimensions', 'Unknown')}
-    Special Instructions: {parcel_data.get('special_instructions', 'None')}
+    Declared Value: ${parcel_data.get('declared_value', 0)}
     
-    Validate all fields and identify any issues or missing information.
+    SENDER:
+    Name: {parcel_data.get('sender_name')}
+    Address: {parcel_data.get('sender_address')}
+    
+    RECIPIENT:
+    Name: {parcel_data.get('recipient_name')}
+    Address: {parcel_data.get('recipient_address')}
+    Postcode: {parcel_data.get('destination_postcode')}
+    State: {parcel_data.get('destination_state', 'Unknown')}
+    
+    SPECIAL INSTRUCTIONS: {parcel_data.get('special_instructions', 'None')}
+    
+    PLEASE ANALYZE AND PROVIDE:
+    1. Service Type Recommendation: Based on weight, value, and destination, is '{parcel_data.get('service_type')}' the optimal choice?
+       Consider if Express/Overnight is needed for high-value items, or if Standard is sufficient.
+    
+    2. Address Validation: Check if addresses are complete and properly formatted.
+       Flag any missing elements (street number, suburb, state).
+    
+    3. Delivery Complications: Identify potential issues:
+       - Remote/rural destination requiring special handling
+       - Oversized/overweight requiring freight upgrade
+       - High-value requiring insurance or signature
+       - Fragile items needing special care
+    
+    4. Data Quality: Flag any missing or suspicious information.
+    
+    Provide concise, actionable feedback in a friendly tone.
     """
     
     return await call_azure_agent(PARCEL_INTAKE_AGENT_ID, message, parcel_data)

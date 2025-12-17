@@ -10,10 +10,55 @@
                 <i class="bi bi-clipboard-check"></i> Driver Manifest Management
             </h2>
 
-            <!-- Create New Manifest -->
+            <!-- AI Auto-Assign Section -->
+            <div class="card mb-4 border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-robot"></i> AI Auto-Assign (DISPATCHER_AGENT)
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-3">
+                        <i class="bi bi-stars"></i> Let AI intelligently assign pending parcels to available drivers based on:
+                        <strong>capacity, location, priority, and workload balance</strong>
+                    </p>
+                    <form method="POST" action="{{ url_for('auto_assign_manifests') }}" class="row g-3">
+                        <div class="col-md-4">
+                            <label for="max_parcels" class="form-label">Max Parcels to Assign</label>
+                            <input type="number" class="form-control" id="max_parcels" name="max_parcels" 
+                                   value="100" min="1" max="500">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="state_filter" class="form-label">State Filter (Optional)</label>
+                            <select class="form-select" id="state_filter" name="state_filter">
+                                <option value="">All States</option>
+                                <option value="VIC">Victoria</option>
+                                <option value="NSW">New South Wales</option>
+                                <option value="QLD">Queensland</option>
+                                <option value="SA">South Australia</option>
+                                <option value="WA">Western Australia</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button type="submit" class="btn btn-success w-100">
+                                <i class="bi bi-robot"></i> AI Auto-Assign Parcels
+                            </button>
+                        </div>
+                    </form>
+                    <div class="alert alert-info mt-3 mb-0">
+                        <small>
+                            <i class="bi bi-info-circle"></i> 
+                            <strong>Note:</strong> Route optimization via Azure Maps is NOT performed automatically. 
+                            Drivers can optimize routes on-demand from their manifest view.
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Create New Manifest (Manual) -->
             <div class="card mb-4">
                 <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Create New Manifest</h5>
+                    <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Create Manifest Manually</h5>
                 </div>
                 <div class="card-body">
                     <form method="POST" action="{{ url_for('create_manifest') }}">

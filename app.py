@@ -8,6 +8,7 @@ import asyncio
 import os
 import re
 import warnings
+from typing import Dict, List, Any, Optional
 
 # Suppress asyncio Windows pipe warnings
 warnings.filterwarnings('ignore', category=ResourceWarning, message='unclosed.*transport')
@@ -468,6 +469,7 @@ def register_parcel():
             from logistics_parcel import get_state_from_postcode
             from agents.base import parcel_intake_agent
             import uuid
+            from datetime import datetime
             
             # Get form data
             sender_name = request.form.get('sender_name')
@@ -513,6 +515,8 @@ def register_parcel():
                 # Log AI validation result
                 if validation_result.get('success'):
                     print(f"[AI] Parcel Intake validation completed")
+                    if 'content' in validation_result:
+                        print(f"[AI] Validation feedback: {validation_result['content'][:200]}...")
                 
                 # Register parcel in database (proceed even if AI validation fails)
                 async with ParcelTrackingDB() as db:
@@ -538,9 +542,28 @@ def register_parcel():
             final_tracking, validation = run_async(validate_and_register())
             flash(f'Parcel registered successfully! Tracking: {final_tracking}', 'success')
             
-            # Show AI validation message if available
-            if validation.get('success'):
-                flash('✓ AI validation completed', 'info')
+            # Show AI validation insights
+            if validation.get('success') and validation.get('content'):
+                ai_response = validation.get('content', '')
+                
+                # Parse AI recommendations
+                if 'recommend' in ai_response.lower() or 'suggest' in ai_response.lower():
+                    flash(f'💡 AI Recommendation: {ai_response[:200]}', 'info')
+                
+                # Parse warnings
+                if 'warning' in ai_response.lower() or 'issue' in ai_response.lower():
+                    flash(f'⚠️ AI Alert: {ai_response[:200]}', 'warning')
+                
+                # Parse address validation
+                if 'address' in ai_response.lower() and ('incomplete' in ai_response.lower() or 'invalid' in ai_response.lower()):
+                    flash(f'📍 Address Notice: {ai_response[:200]}', 'warning')
+                
+                # Store validation result in session for display on tracking page
+                session['last_ai_validation'] = {
+                    'tracking_number': final_tracking,
+                    'feedback': ai_response,
+                    'timestamp': datetime.now().isoformat()
+                }
             
             return redirect(url_for('track_parcel_page', tracking_number=final_tracking))
             
@@ -2493,6 +2516,208 @@ def create_manifest():
     except Exception as e:
         flash(f'Error: {str(e)}', 'danger')
         return redirect(url_for('admin_manifests'))
+
+@app.route('/auto_assign_manifests', methods=['POST'])
+def auto_assign_manifests():
+    """AI-powered automatic manifest creation using DISPATCHER_AGENT
+    
+    Intelligently assigns pending parcels to available drivers WITHOUT
+    auto-generating Azure Maps routes (driver-initiated optimization only)
+    """
+    try:
+        from agents.base import dispatcher_agent
+        
+        max_parcels = int(request.form.get('max_parcels', 100))
+        state_filter = request.form.get('state_filter', '')
+        
+        async def auto_assign():
+            async with ParcelTrackingDB() as db:
+                # Get pending parcels
+                pending_parcels = await db.get_pending_parcels(status="At Depot", max_count=max_parcels)
+                
+                if not pending_parcels:
+                    return {"success": False, "message": "No pending parcels found"}
+                
+                # Get available drivers
+                drivers = await db.get_available_drivers(state=state_filter if state_filter else None)
+                
+                if not drivers:
+                    return {"success": False, "message": "No available drivers found"}
+                
+                print(f"\n🤖 Auto-Assign: {len(pending_parcels)} parcels → {len(drivers)} drivers")
+                
+                # Prepare data for DISPATCHER_AGENT
+                route_request = {
+                    "parcel_count": len(pending_parcels),
+                    "available_drivers": [d['driver_id'] for d in drivers],
+                    "service_level": "standard",
+                    "delivery_window": "08:00 - 18:00",
+                    "zone": state_filter or "ALL",
+                    "parcels": [
+                        {
+                            "barcode": p['barcode'],
+                            "tracking_number": p.get('tracking_number', p['barcode']),
+                            "address": p['recipient_address'],
+                            "postcode": p.get('postcode', ''),
+                            "priority": p.get('priority', 2),
+                            "recipient_name": p.get('recipient_name', '')
+                        }
+                        for p in pending_parcels
+                    ]
+                }
+                
+                # Call DISPATCHER_AGENT for intelligent assignment
+                print("🤖 Calling DISPATCHER_AGENT for intelligent parcel-to-driver assignment...")
+                agent_result = await dispatcher_agent(route_request)
+                
+                if not agent_result.get('success'):
+                    print(f"⚠️ Agent returned error: {agent_result.get('error')}")
+                    # Fallback to simple round-robin assignment
+                    return await _fallback_round_robin_assignment(db, pending_parcels, drivers)
+                
+                # Parse AI recommendations
+                ai_response = agent_result.get('response', '')
+                print(f"✅ DISPATCHER_AGENT response: {ai_response[:200]}...")
+                
+                # Extract driver assignments from AI response
+                # The AI should return recommendations like "Assign to driver001: 10 parcels, driver002: 8 parcels"
+                assignments = _parse_dispatcher_recommendations(ai_response, pending_parcels, drivers)
+                
+                # Create manifests based on AI assignments
+                manifest_ids = []
+                manifests_created = 0
+                total_assigned = 0
+                
+                for driver_id, assigned_parcels in assignments.items():
+                    if assigned_parcels:
+                        driver = next((d for d in drivers if d['driver_id'] == driver_id), None)
+                        if driver:
+                            barcodes = [p['barcode'] for p in assigned_parcels]
+                            manifest_id = await db.create_driver_manifest(
+                                driver_id=driver_id,
+                                driver_name=driver['name'],
+                                parcel_barcodes=barcodes
+                            )
+                            
+                            if manifest_id:
+                                manifest_ids.append(manifest_id)
+                                manifests_created += 1
+                                total_assigned += len(barcodes)
+                                print(f"✅ Created manifest {manifest_id} for {driver['name']}: {len(barcodes)} parcels")
+                
+                return {
+                    "success": True,
+                    "manifests_created": manifests_created,
+                    "parcels_assigned": total_assigned,
+                    "manifest_ids": manifest_ids,
+                    "ai_recommendation": ai_response[:300]  # First 300 chars
+                }
+        
+        result = run_async(auto_assign())
+        
+        if result.get('success'):
+            flash(f"🤖 AI Auto-Assign Complete! Created {result['manifests_created']} manifests, "
+                  f"assigned {result['parcels_assigned']} parcels", 'success')
+        else:
+            flash(f"⚠️ {result.get('message', 'Auto-assign failed')}", 'warning')
+            
+        return redirect(url_for('admin_manifests'))
+        
+    except Exception as e:
+        flash(f'Error during auto-assign: {str(e)}', 'danger')
+        return redirect(url_for('admin_manifests'))
+
+async def _fallback_round_robin_assignment(db, parcels, drivers):
+    """Fallback assignment if AI agent fails - simple round-robin"""
+    print("⚙️ Using fallback round-robin assignment...")
+    
+    # Distribute parcels evenly across drivers
+    parcels_per_driver = len(parcels) // len(drivers)
+    extra_parcels = len(parcels) % len(drivers)
+    
+    assignments = {}
+    parcel_index = 0
+    
+    for i, driver in enumerate(drivers):
+        count = parcels_per_driver + (1 if i < extra_parcels else 0)
+        assignments[driver['driver_id']] = parcels[parcel_index:parcel_index + count]
+        parcel_index += count
+    
+    # Create manifests
+    manifests_created = 0
+    total_assigned = 0
+    
+    for driver_id, assigned_parcels in assignments.items():
+        if assigned_parcels:
+            driver = next(d for d in drivers if d['driver_id'] == driver_id)
+            barcodes = [p['barcode'] for p in assigned_parcels]
+            manifest_id = await db.create_driver_manifest(
+                driver_id=driver_id,
+                driver_name=driver['name'],
+                parcel_barcodes=barcodes
+            )
+            
+            if manifest_id:
+                manifests_created += 1
+                total_assigned += len(barcodes)
+    
+    return {
+        "success": True,
+        "manifests_created": manifests_created,
+        "parcels_assigned": total_assigned,
+        "fallback_used": True
+    }
+
+def _parse_dispatcher_recommendations(ai_response: str, parcels, drivers) -> Dict[str, List[Dict]]:
+    """Parse DISPATCHER_AGENT recommendations into driver assignments
+    
+    The AI might respond with structured recommendations or natural language.
+    This function extracts driver assignments from the response.
+    """
+    import re
+    
+    # Try to find driver assignments in response
+    # Look for patterns like "driver001: 10" or "assign to driver002: 8 parcels"
+    assignments = {d['driver_id']: [] for d in drivers}
+    
+    # Pattern matching for driver assignments
+    driver_pattern = r'(driver\d+).*?(\d+)\s*parcel'
+    matches = re.findall(driver_pattern, ai_response.lower())
+    
+    if matches:
+        # AI provided specific assignments
+        print("✅ Parsed specific driver assignments from AI response")
+        parcel_queue = parcels.copy()
+        
+        for driver_id, count_str in matches:
+            count = int(count_str)
+            if driver_id in assignments and parcel_queue:
+                # Assign parcels to this driver
+                assignments[driver_id] = parcel_queue[:count]
+                parcel_queue = parcel_queue[count:]
+        
+        # Assign any remaining parcels to first available driver
+        if parcel_queue:
+            for driver_id in assignments:
+                if len(assignments[driver_id]) < 20:  # Max capacity
+                    remaining_capacity = 20 - len(assignments[driver_id])
+                    assignments[driver_id].extend(parcel_queue[:remaining_capacity])
+                    parcel_queue = parcel_queue[remaining_capacity:]
+                    if not parcel_queue:
+                        break
+    else:
+        # AI didn't provide specific counts, distribute evenly
+        print("⚙️ AI didn't specify counts, using intelligent distribution")
+        parcels_per_driver = len(parcels) // len(drivers)
+        extra = len(parcels) % len(drivers)
+        
+        idx = 0
+        for i, driver_id in enumerate(assignments.keys()):
+            count = parcels_per_driver + (1 if i < extra else 0)
+            assignments[driver_id] = parcels[idx:idx + count]
+            idx += count
+    
+    return assignments
 
 # Public Parcel Tracking (Customer-Facing)
 

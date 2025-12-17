@@ -130,7 +130,7 @@
     </div>
 
     <!-- AI Performance -->
-    <div class="row">
+    <div class="row mb-4">
         <div class="col-12">
             <a href="{{ url_for('approvals') }}" class="text-decoration-none">
                 <div class="card shadow-sm card-hover">
@@ -166,6 +166,231 @@
                     </div>
                 </div>
             </a>
+        </div>
+    </div>
+
+    <!-- AI Agents Overview -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-cpu"></i> Azure AI Foundry Agents - System Overview</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-3">
+                        <i class="bi bi-info-circle"></i> <strong>9 Specialized AI Agents</strong> integrated with Azure AI Foundry for intelligent logistics automation.
+                        <span class="badge bg-success ms-2">5 Active</span>
+                        <span class="badge bg-secondary ms-1">4 Available</span>
+                    </p>
+
+                    <!-- Active Agents -->
+                    <h6 class="text-success mt-4"><i class="bi bi-check-circle-fill"></i> Active Agents</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <div class="card border-success">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <span class="badge bg-success">ACTIVE</span> Customer Service Agent
+                                    </h6>
+                                    <p class="card-text small mb-2">
+                                        <strong>Purpose:</strong> Provides AI-powered customer support via chatbot<br>
+                                        <strong>Tools:</strong> track_parcel, search_parcels_by_recipient, get_delivery_statistics<br>
+                                        <strong>Usage:</strong> Customer Service Chatbot page
+                                    </p>
+                                    <a href="{{ url_for('customer_service_chatbot') }}" class="btn btn-sm btn-success">
+                                        <i class="bi bi-chat-dots"></i> Open Chatbot
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-success">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <span class="badge bg-success">ACTIVE</span> Fraud Detection Agent
+                                    </h6>
+                                    <p class="card-text small mb-2">
+                                        <strong>Purpose:</strong> Analyzes messages for fraud risks and scams<br>
+                                        <strong>Tools:</strong> check_frauds, validate_sender<br>
+                                        <strong>Usage:</strong> Report Fraud page with automated workflows
+                                    </p>
+                                    <a href="{{ url_for('report_fraud') }}" class="btn btn-sm btn-success">
+                                        <i class="bi bi-shield-exclamation"></i> Report Fraud
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-success">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <span class="badge bg-success">ACTIVE</span> Identity Agent
+                                    </h6>
+                                    <p class="card-text small mb-2">
+                                        <strong>Purpose:</strong> Verifies customer identity for high-risk cases<br>
+                                        <strong>Tools:</strong> verify_customer, check_identity<br>
+                                        <strong>Usage:</strong> Automatically triggered for fraud scores ≥85%
+                                    </p>
+                                    <span class="badge bg-info">Auto-triggered</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-success">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <span class="badge bg-success">ACTIVE</span> Dispatcher Agent (NEW!)
+                                    </h6>
+                                    <p class="card-text small mb-2">
+                                        <strong>Purpose:</strong> Intelligent parcel-to-driver assignment<br>
+                                        <strong>Features:</strong> Workload balancing, geographic clustering, priority handling<br>
+                                        <strong>Usage:</strong> Admin Manifests - AI Auto-Assign button
+                                    </p>
+                                    <a href="{{ url_for('admin_manifests') }}" class="btn btn-sm btn-success">
+                                        <i class="bi bi-robot"></i> Auto-Assign Parcels
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-success">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <span class="badge bg-success">ACTIVE</span> Parcel Intake Agent ⭐ ENHANCED
+                                    </h6>
+                                    <p class="card-text small mb-2">
+                                        <strong>Purpose:</strong> AI-powered parcel validation during registration<br>
+                                        <strong>Features:</strong> Service recommendations, address validation, complication detection<br>
+                                        <strong>Usage:</strong> Automatically validates all new parcel registrations
+                                    </p>
+                                    <a href="{{ url_for('register_parcel') }}" class="btn btn-sm btn-success">
+                                        <i class="bi bi-box-seam"></i> Register Parcel
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Available for Integration -->
+                    <h6 class="text-secondary mt-4"><i class="bi bi-circle"></i> Available for Integration</h6>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="card border-secondary">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <span class="badge bg-secondary">AVAILABLE</span> Sorting Facility Agent
+                                    </h6>
+                                    <p class="card-text small mb-0">
+                                        <strong>Potential Use:</strong> Automated routing decisions when parcels arrive at depots<br>
+                                        <strong>Benefits:</strong> Faster depot processing, optimal consolidation
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-secondary">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <span class="badge bg-secondary">AVAILABLE</span> Delivery Coordination Agent
+                                    </h6>
+                                    <p class="card-text small mb-0">
+                                        <strong>Potential Use:</strong> Autonomous exception handling (customer unavailable, wrong address)<br>
+                                        <strong>Benefits:</strong> 80% reduction in manual interventions
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-secondary">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <span class="badge bg-secondary">AVAILABLE</span> Driver Agent
+                                    </h6>
+                                    <p class="card-text small mb-0">
+                                        <strong>Potential Use:</strong> Real-time delivery assistance for drivers<br>
+                                        <strong>Benefits:</strong> Faster on-road decisions, reduced dispatcher calls
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-secondary">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <span class="badge bg-secondary">AVAILABLE</span> Optimization Agent
+                                    </h6>
+                                    <p class="card-text small mb-0">
+                                        <strong>Potential Use:</strong> Enhanced route intelligence with traffic patterns<br>
+                                        <strong>Benefits:</strong> 15-25% reduction in delivery time
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info mt-4 mb-0">
+                        <i class="bi bi-lightbulb"></i> <strong>Integration Guide:</strong>
+                        See <a href="/static/docs/DISPATCHER_AGENT_GUIDE.md" target="_blank" class="alert-link">DISPATCHER_AGENT_GUIDE.md</a>
+                        for examples of how agents are integrated. Similar patterns can be used for the available agents.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Multi-Agent Workflows -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="bi bi-diagram-3"></i> Multi-Agent Workflows</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-3">
+                        <i class="bi bi-info-circle"></i> Agents can communicate with each other for complex orchestration and decision-making.
+                    </p>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title text-success">
+                                        <i class="bi bi-check-circle-fill"></i> Fraud → Customer Service Workflow
+                                    </h6>
+                                    <p class="card-text small">
+                                        <strong>Trigger:</strong> High-risk fraud detected (score ≥ 70%)<br>
+                                        <strong>Flow:</strong> Fraud Agent → Customer Service Agent → Customer Notification<br>
+                                        <strong>Actions:</strong> Email warnings, SMS alerts, identity verification, parcel holds
+                                    </p>
+                                    <span class="badge bg-success">Active</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-light border-secondary">
+                                <div class="card-body">
+                                    <h6 class="card-title text-secondary">
+                                        <i class="bi bi-circle"></i> Exception Resolution Workflow
+                                    </h6>
+                                    <p class="card-text small">
+                                        <strong>Potential Trigger:</strong> Delivery exception<br>
+                                        <strong>Potential Flow:</strong> Driver Agent → Delivery Coordination → Customer Service<br>
+                                        <strong>Benefits:</strong> Autonomous problem resolution, reduced escalations
+                                    </p>
+                                    <span class="badge bg-secondary">Available</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle"></i> Workflows are defined in <code>workflows/</code> directory.
+                            Each workflow coordinates multiple agents to solve complex business problems autonomously.
+                        </small>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
