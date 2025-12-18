@@ -52,6 +52,7 @@ async def track_parcel_tool(tracking_number: str) -> str:
             result = {
                 "found": True,
                 "tracking_number": parcel.get("tracking_number"),
+                "barcode": parcel.get("barcode"),
                 "status": parcel.get("status"),
                 "current_location": parcel.get("current_location"),
                 "destination": parcel.get("destination"),
@@ -59,7 +60,9 @@ async def track_parcel_tool(tracking_number: str) -> str:
                 "service_type": parcel.get("service_type"),
                 "created_at": parcel.get("created_at"),
                 "sender_name": parcel.get("sender", {}).get("name") if parcel.get("sender") else None,
+                "sender_address": parcel.get("sender", {}).get("address") if parcel.get("sender") else None,
                 "recipient_name": parcel.get("recipient", {}).get("name"),
+                "recipient_address": parcel.get("recipient", {}).get("address"),
                 "recipient_postcode": parcel.get("recipient", {}).get("postcode"),
                 "recent_events": [
                     {
@@ -88,94 +91,58 @@ async def track_parcel_tool(tracking_number: str) -> str:
         return json.dumps(error_result)
 
 
-async def search_parcels_by_recipient_tool(recipient_name: str = None, postcode: str = None) -> str:
+async def search_parcels_by_recipient_tool(recipient_name: str = None, postcode: str = None, address: str = None, days_back: int = None) -> str:
     """
-    Tool for AI agents to search parcels by recipient name or postcode.
+    Tool for AI agents to search parcels by recipient name, postcode, or address with optional date filtering.
     
     Args:
         recipient_name: Recipient name to search for (optional)
         postcode: Postcode to search for (optional)
+        address: Full or partial address to search for (optional)
+        days_back: Number of days to look back from today (e.g., 21 for last 3 weeks, 7 for last week)
         
     Returns:
-        JSON string with list of matching parcels
+        JSON string with list of matching parcels including barcode and created_at
     """
-    print(f"🔧 Agent Tool: search_parcels_by_recipient_tool called")
+    print(f"🔧 Agent Tool: search_parcels_by_recipient_tool called - name={recipient_name}, postcode={postcode}, address={address}, days_back={days_back}")
     
     try:
-        # Initialize Cosmos DB client
-        if USE_COSMOS_KEY and COSMOS_KEY:
-            client = CosmosClient(COSMOS_ENDPOINT, credential=COSMOS_KEY)
-        else:
-            # Use Managed Identity when explicitly enabled (Azure deployment)
-            if os.getenv('USE_MANAGED_IDENTITY', 'false').lower() == 'true':
-                credential = ManagedIdentityCredential()
-            else:
-                credential = AzureCliCredential()
-            client = CosmosClient(COSMOS_ENDPOINT, credential=credential)
+        # Ensure environment variables are loaded
+        load_dotenv(override=True)
         
-        database = client.get_database_client(COSMOS_DATABASE)
-        parcels_container = database.get_container_client("parcels")
-        
-        # Build query based on provided parameters
-        if recipient_name and postcode:
-            query = """
-                SELECT c.tracking_number, c.status, c.current_location, c.estimated_delivery, 
-                       c.recipient.name as recipient_name, c.recipient.postcode as postcode
-                FROM c 
-                WHERE CONTAINS(LOWER(c.recipient.name), @name) 
-                AND c.recipient.postcode = @postcode
-            """
-            parameters = [
-                {"name": "@name", "value": recipient_name.lower()},
-                {"name": "@postcode", "value": postcode}
-            ]
-        elif recipient_name:
-            query = """
-                SELECT c.tracking_number, c.status, c.current_location, c.estimated_delivery,
-                       c.recipient.name as recipient_name, c.recipient.postcode as postcode
-                FROM c 
-                WHERE CONTAINS(LOWER(c.recipient.name), @name)
-            """
-            parameters = [{"name": "@name", "value": recipient_name.lower()}]
-        elif postcode:
-            query = """
-                SELECT c.tracking_number, c.status, c.current_location, c.estimated_delivery,
-                       c.recipient.name as recipient_name, c.recipient.postcode as postcode
-                FROM c 
-                WHERE c.recipient.postcode = @postcode
-            """
-            parameters = [{"name": "@postcode", "value": postcode}]
-        else:
-            return json.dumps({
-                "found": False,
-                "message": "Please provide at least recipient name or postcode to search"
-            })
-        
-        parcels = []
-        async for item in parcels_container.query_items(
-            query=query,
-            parameters=parameters,
-            enable_cross_partition_query=True
-        ):
-            parcels.append(item)
-        
-        await client.close()
-        
-        result = {
-            "found": len(parcels) > 0,
-            "count": len(parcels),
-            "parcels": parcels[:10]  # Limit to 10 results
-        }
-        
-        print(f"✅ Agent Tool: Found {len(parcels)} parcels")
-        return json.dumps(result, indent=2)
+        # Use existing ParcelTrackingDB for consistent access
+        async with ParcelTrackingDB() as db:
+            # Use the new search method
+            parcels = await db.search_parcels_by_recipient(
+                recipient_name=recipient_name,
+                postcode=postcode,
+                address=address,
+                days_back=days_back
+            )
+            
+            result = {
+                "found": len(parcels) > 0,
+                "count": len(parcels),
+                "parcels": parcels,
+                "search_criteria": {
+                    "recipient_name": recipient_name,
+                    "postcode": postcode,
+                    "address": address,
+                    "days_back": days_back
+                }
+            }
+            
+            print(f"   ✅ Found {len(parcels)} parcels matching search criteria")
+            return json.dumps(result, indent=2)
         
     except Exception as e:
         error_result = {
             "found": False,
             "error": str(e)
         }
-        print(f"❌ Agent Tool Error: {str(e)}")
+        print(f"   ❌ Agent Tool Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return json.dumps(error_result)
 
 
@@ -193,53 +160,46 @@ async def get_delivery_statistics_tool(date_from: str = None, date_to: str = Non
     print(f"🔧 Agent Tool: get_delivery_statistics_tool called")
     
     try:
-        # Initialize Cosmos DB client
-        if USE_COSMOS_KEY and COSMOS_KEY:
-            client = CosmosClient(COSMOS_ENDPOINT, credential=COSMOS_KEY)
-        else:
-            # Use Managed Identity when explicitly enabled (Azure deployment)
-            if os.getenv('USE_MANAGED_IDENTITY', 'false').lower() == 'true':
-                credential = ManagedIdentityCredential()
-            else:
-                credential = AzureCliCredential()
-            client = CosmosClient(COSMOS_ENDPOINT, credential=credential)
+        # Ensure environment variables are loaded
+        load_dotenv(override=True)
         
-        database = client.get_database_client(COSMOS_DATABASE)
-        parcels_container = database.get_container_client("parcels")
-        
-        # Query for statistics
-        query = "SELECT c.status FROM c"
-        parameters = []
-        
-        parcels = []
-        async for item in parcels_container.query_items(
-            query=query,
-            parameters=parameters,
-            enable_cross_partition_query=True
-        ):
-            parcels.append(item)
-        
-        await client.close()
-        
-        # Calculate statistics
-        status_counts = {}
-        for parcel in parcels:
-            status = parcel.get("status", "unknown")
-            status_counts[status] = status_counts.get(status, 0) + 1
-        
-        result = {
-            "total_parcels": len(parcels),
-            "status_breakdown": status_counts
-        }
-        
-        print(f"✅ Agent Tool: Statistics - {len(parcels)} total parcels")
-        return json.dumps(result, indent=2)
+        # Use existing ParcelTrackingDB for consistent access
+        async with ParcelTrackingDB() as db:
+            # Query for statistics
+            query = "SELECT c.status FROM c"
+            parameters = []
+            
+            container = db.database.get_container_client("parcels")
+            parcels = []
+            
+            async for item in container.query_items(
+                query=query,
+                parameters=parameters,
+                enable_cross_partition_query=True
+            ):
+                parcels.append(item)
+            
+            # Calculate statistics
+            status_counts = {}
+            for parcel in parcels:
+                status = parcel.get("status", "unknown")
+                status_counts[status] = status_counts.get(status, 0) + 1
+            
+            result = {
+                "total_parcels": len(parcels),
+                "status_breakdown": status_counts
+            }
+            
+            print(f"   ✅ Statistics - {len(parcels)} total parcels")
+            return json.dumps(result, indent=2)
         
     except Exception as e:
         error_result = {
             "error": str(e)
         }
-        print(f"❌ Agent Tool Error: {str(e)}")
+        print(f"   ❌ Agent Tool Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return json.dumps(error_result)
 
 
@@ -249,13 +209,13 @@ AGENT_TOOLS = [
         "type": "function",
         "function": {
             "name": "track_parcel",
-            "description": "**CRITICAL: ALWAYS call this function when user mentions ANY tracking number or asks about parcel details.** This includes questions like 'who is the sender of [number]', 'where is [number]', 'track [number]', 'status of [number]'. Tracking numbers can be ANY alphanumeric format: DT202512090001, DTVIC123456, OV69491491MM, OV77274939DA, etc. The database contains ALL tracking formats. DO NOT assume a tracking number is invalid - ALWAYS call this function to check. Returns: status, sender name, recipient, location, delivery estimate, and tracking history.",
+            "description": "**CRITICAL: ALWAYS call this function when user mentions ANY tracking number, barcode, or asks about parcel details.** This includes questions like 'what is the parcel history for [barcode]', 'confirm recipient name/address for [tracking number]', 'who is the sender of [number]', 'where is [number]', 'track [number]', 'status of [number]'. Tracking numbers/barcodes can be ANY alphanumeric format: DT202512090001, DTVIC123456, OV69491491MM, OV77274939DA, etc. The database contains ALL tracking formats. DO NOT assume a tracking number is invalid - ALWAYS call this function to check. Returns: barcode, status, sender name & address, recipient name & address, location, delivery estimate, and tracking history.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "tracking_number": {
                         "type": "string",
-                        "description": "The parcel tracking number - ANY alphanumeric code (DT*, DTVIC*, OV*, etc.)"
+                        "description": "The parcel tracking number or barcode - ANY alphanumeric code (DT*, DTVIC*, OV*, etc.)"
                     }
                 },
                 "required": ["tracking_number"]
@@ -266,7 +226,7 @@ AGENT_TOOLS = [
         "type": "function",
         "function": {
             "name": "search_parcels_by_recipient",
-            "description": "Use this function to find parcels when the user provides a recipient name and/or postcode but doesn't have a tracking number. For example: 'find parcels for John Smith' or 'search parcels in postcode 3000'. Returns a list of matching parcels from Cosmos DB.",
+            "description": "Use this function to find parcels when the user provides a recipient name, address, and/or postcode, with optional date filtering. For example: 'find parcels for John Smith', 'parcels going to 1 Constitution Avenue', 'search parcels in postcode 3000', or 'how many parcels sent to [address] in the last 3 weeks'. Use days_back parameter for time-based queries (e.g., 7 for last week, 21 for last 3 weeks, 30 for last month). Returns a list of matching parcels with barcodes and creation dates.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -274,9 +234,17 @@ AGENT_TOOLS = [
                         "type": "string",
                         "description": "The recipient's name to search for (e.g., 'John Smith')"
                     },
+                    "address": {
+                        "type": "string",
+                        "description": "The delivery address to search for (e.g., '1 Constitution Avenue, Canberra ACT 2600')"
+                    },
                     "postcode": {
                         "type": "string",
                         "description": "Australian postcode - 4 digits (e.g., '3000', '2000')"
+                    },
+                    "days_back": {
+                        "type": "integer",
+                        "description": "Number of days to look back from today (e.g., 7 for last week, 21 for last 3 weeks, 30 for last month)"
                     }
                 }
             }

@@ -467,6 +467,73 @@ class ParcelTrackingDB:
             print(f"❌ Error retrieving parcel by tracking number: {e}")
             return None
 
+    async def search_parcels_by_recipient(
+        self, 
+        recipient_name: str = None, 
+        postcode: str = None, 
+        address: str = None, 
+        days_back: int = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Search parcels by recipient information with optional date filtering
+        
+        Args:
+            recipient_name: Recipient name to search for (optional)
+            postcode: Postcode to search for (optional)
+            address: Full or partial address to search for (optional)
+            days_back: Number of days to look back from today (optional)
+            
+        Returns:
+            List of matching parcels
+        """
+        container = self.database.get_container_client(self.parcels_container)
+        
+        try:
+            # Build query based on provided parameters
+            query_parts = []
+            parameters = []
+            
+            if recipient_name:
+                query_parts.append("CONTAINS(LOWER(c.recipient.name), @name)")
+                parameters.append({"name": "@name", "value": recipient_name.lower()})
+            
+            if postcode:
+                query_parts.append("c.recipient.postcode = @postcode")
+                parameters.append({"name": "@postcode", "value": postcode})
+            
+            if address:
+                query_parts.append("CONTAINS(LOWER(c.recipient.address), @address)")
+                parameters.append({"name": "@address", "value": address.lower()})
+            
+            # Add date filtering if days_back is provided
+            if days_back:
+                cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days_back)).isoformat()
+                query_parts.append("c.created_at >= @cutoff_date")
+                parameters.append({"name": "@cutoff_date", "value": cutoff_date})
+            
+            if not query_parts:
+                return []
+            
+            where_clause = " AND ".join(query_parts)
+            # Return full documents instead of projected fields for compatibility
+            query = f"""
+                SELECT * FROM c 
+                WHERE {where_clause}
+                ORDER BY c.created_at DESC
+            """
+            
+            parcels = []
+            async for item in container.query_items(query=query, parameters=parameters):
+                parcels.append(item)
+            
+            return parcels[:20]  # Limit to 20 results
+            
+        except exceptions.CosmosHttpResponseError as e:
+            print(f"❌ Error searching parcels by recipient: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+
     async def update_parcel_status(self, barcode: str, status: str, location: str, scanned_by: str = "system") -> bool:
         """Update the status and location of a parcel"""
         container = self.database.get_container_client(self.parcels_container)
@@ -1575,13 +1642,12 @@ class ParcelTrackingDB:
         """Get all active manifests for admin overview"""
         try:
             container = self.database.get_container_client("driver_manifests")
-            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
             
-            query = "SELECT * FROM c WHERE c.manifest_date = @date AND c.status = 'active'"
-            parameters = [{"name": "@date", "value": today}]
+            # Get all active manifests, not just today's (for demo purposes)
+            query = "SELECT * FROM c WHERE c.status = 'active' ORDER BY c.manifest_date DESC"
             
             manifests = []
-            async for manifest in container.query_items(query=query, parameters=parameters):
+            async for manifest in container.query_items(query=query):
                 manifests.append(manifest)
             
             return manifests

@@ -27,11 +27,17 @@
                     <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Track parcel')">
                         <i class="bi bi-search"></i> Track Parcel
                     </button>
+                    <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Show parcels sent to 1 Constitution Avenue in the last 3 weeks')">
+                        <i class="bi bi-geo-alt-fill"></i> Recent Deliveries to Address
+                    </button>
                     <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Show recent fraud reports')">
                         <i class="bi bi-shield-fill-exclamation"></i> Check Frauds
                     </button>
                     <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Show all parcels in transit')">
                         <i class="bi bi-truck"></i> Parcels in Transit
+                    </button>
+                    <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Show delivery statistics')">
+                        <i class="bi bi-bar-chart-fill"></i> Delivery Statistics
                     </button>
                     <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Show parcels at distribution center')">
                         <i class="bi bi-building"></i> At Distribution Center
@@ -45,18 +51,55 @@
             <!-- Parcel Lookup Panel -->
             <div class="card">
                 <div class="card-header bg-info text-white">
-                    <i class="bi bi-box-seam"></i> Parcel Lookup
+                    <i class="bi bi-box-seam"></i> Quick Lookup
                 </div>
                 <div class="card-body">
-                    <div class="form-group">
-                        <label for="trackingNumber">Tracking Number</label>
-                        <input type="text" class="form-control" id="trackingNumber" placeholder="Enter tracking #">
+                    <div class="form-group mb-2">
+                        <label for="trackingNumber" class="small">Tracking/Barcode</label>
+                        <input type="text" class="form-control" id="trackingNumber" placeholder="DT202512090001">
                     </div>
-                    <button class="btn btn-info btn-block" onclick="trackParcel()">
-                        <i class="bi bi-search"></i> Track
+                    <button class="btn btn-info btn-block btn-sm" onclick="trackParcel()">
+                        <i class="bi bi-search"></i> Get Details
                     </button>
-                    <button class="btn btn-secondary btn-block mt-2" onclick="getParcelLocation()">
-                        <i class="bi bi-geo-alt-fill"></i> Get Location
+                    <button class="btn btn-secondary btn-block btn-sm mt-1" onclick="getParcelHistory()">
+                        <i class="bi bi-clock-history"></i> Get History
+                    </button>
+                    
+                    <hr class="my-3">
+                    
+                    <div class="form-group mb-2">
+                        <label for="recipientAddress" class="small">Street Address</label>
+                        <input type="text" class="form-control form-control-sm" id="recipientAddress" placeholder="147 Northbourne Avenue">
+                    </div>
+                    <div class="form-group mb-2">
+                        <label for="recipientState" class="small">State</label>
+                        <select class="form-control form-control-sm" id="recipientState">
+                            <option value="">All States</option>
+                            <option value="NSW">NSW</option>
+                            <option value="VIC">VIC</option>
+                            <option value="QLD">QLD</option>
+                            <option value="SA">SA</option>
+                            <option value="WA">WA</option>
+                            <option value="TAS">TAS</option>
+                            <option value="NT">NT</option>
+                            <option value="ACT" selected>ACT</option>
+                        </select>
+                    </div>
+                    <div class="form-group mb-2">
+                        <label for="recipientPostcode" class="small">Postcode</label>
+                        <input type="text" class="form-control form-control-sm" id="recipientPostcode" placeholder="2600" maxlength="4" pattern="[0-9]{4}">
+                    </div>
+                    <div class="form-group mb-2">
+                        <label for="timeRange" class="small">Time Range</label>
+                        <select class="form-control form-control-sm" id="timeRange">
+                            <option value="7">Last 7 days</option>
+                            <option value="21" selected>Last 3 weeks</option>
+                            <option value="30">Last month</option>
+                            <option value="">All time</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-success btn-block btn-sm" onclick="searchByAddress()">
+                        <i class="bi bi-search"></i> Search Address
                     </button>
                 </div>
             </div>
@@ -128,14 +171,14 @@
                 <div class="card-body">
                     <p class="small mb-2"><strong>🎤 Try saying:</strong></p>
                     <ul class="small">
-                        <li>"Where is parcel DTVIC123?"</li>
-                        <li>"Show me recent fraud reports"</li>
-                        <li>"Track parcel"</li>
-                        <li>"How many parcels are in transit?"</li>
-                        <li>"What's the status of delivery to Sydney?"</li>
+                        <li>"What is the parcel history for DT202512090001?"</li>
+                        <li>"How many parcels sent to 147 Northbourne Avenue, ACT in the last 3 weeks?"</li>
+                        <li>"Confirm the recipient address for tracking number DTVIC123456"</li>
+                        <li>"Show me delivery statistics"</li>
+                        <li>"Search parcels in postcode 2600"</li>
                     </ul>
                     <p class="small text-muted mt-2">
-                        <i class="bi bi-info-circle-fill"></i> Click the microphone button and speak naturally.
+                        <i class="bi bi-info-circle-fill"></i> Click the microphone button and speak naturally. Agent can search by tracking number, address, postcode, or date range.
                     </p>
                 </div>
             </div>
@@ -584,6 +627,43 @@ async function getParcelLocation() {
 function askQuickQuestion(question) {
     document.getElementById('chatInput').value = question;
     sendMessage();
+}
+
+function getParcelHistory() {
+    const trackingNumber = document.getElementById('trackingNumber').value.trim();
+    if (!trackingNumber) {
+        addError('Please enter a tracking number or barcode');
+        return;
+    }
+    const question = `What is the parcel history for ${trackingNumber}?`;
+    askQuickQuestion(question);
+}
+
+function searchByAddress() {
+    const address = document.getElementById('recipientAddress').value.trim();
+    const state = document.getElementById('recipientState').value;
+    const postcode = document.getElementById('recipientPostcode').value.trim();
+    const days = document.getElementById('timeRange').value;
+    
+    if (!address && !state && !postcode) {
+        addError('Please enter at least a street address, state, or postcode');
+        return;
+    }
+    
+    // Build the question with all provided details
+    let parts = [];
+    if (address) parts.push(address);
+    if (state) parts.push(state);
+    if (postcode) parts.push(postcode);
+    
+    let question = `How many parcels sent to ${parts.join(', ')}`;
+    if (days) {
+        const weeks = days == 21 ? '3 weeks' : days == 7 ? '1 week' : days == 30 ? '1 month' : days + ' days';
+        question += ` in the last ${weeks}`;
+    }
+    question += '?';
+    
+    askQuickQuestion(question);
 }
 
 function clearChat() {
