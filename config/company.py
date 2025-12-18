@@ -5,16 +5,16 @@ Update these values once and they will be applied throughout the application
 """
 
 # Company Information
-COMPANY_NAME = "DT Logistics"
-COMPANY_NAME_SHORT = "DT"
+COMPANY_NAME = "Zava Logistics"
+COMPANY_NAME_SHORT = "Zava"
 COMPANY_TAGLINE = "Fast, Reliable, Trusted Delivery"
 COMPANY_ABN = "12 345 678 901"
 
 # Contact Information
 COMPANY_PHONE = "1300 384 669"
-COMPANY_EMAIL = "support@dtlogistics.com.au"
-COMPANY_SUPPORT_EMAIL = "help@dtlogistics.com.au"
-COMPANY_FRAUD_EMAIL = "security@dtlogistics.com.au"
+COMPANY_EMAIL = "support@zava.com.au"
+COMPANY_SUPPORT_EMAIL = "help@zava.com.au"
+COMPANY_FRAUD_EMAIL = "security@zava.com.au"
 
 # Address
 COMPANY_ADDRESS_LINE1 = "123 Logistics Drive"
@@ -22,10 +22,10 @@ COMPANY_ADDRESS_LINE2 = "Melbourne VIC 3000"
 COMPANY_ADDRESS_FULL = f"{COMPANY_ADDRESS_LINE1}, {COMPANY_ADDRESS_LINE2}"
 
 # Web & Social
-COMPANY_WEBSITE = "https://www.dtlogistics.com.au"
-COMPANY_FACEBOOK = "https://facebook.com/dtlogistics"
-COMPANY_TWITTER = "https://x.com/dtlogistics"
-COMPANY_LINKEDIN = "https://linkedin.com/company/dtlogistics"
+COMPANY_WEBSITE = "https://www.zava.com.au"
+COMPANY_FACEBOOK = "https://facebook.com/zava"
+COMPANY_TWITTER = "https://x.com/zava"
+COMPANY_LINKEDIN = "https://linkedin.com/company/zava"
 
 # Business Hours
 BUSINESS_HOURS = "Monday - Friday: 8:00 AM - 6:00 PM"
@@ -49,10 +49,12 @@ SERVICE_AREAS = {
 }
 
 # Branding Colors (for future CSS customization)
-BRAND_PRIMARY_COLOR = "#2563eb"  # Blue
-BRAND_SECONDARY_COLOR = "#10b981"  # Green
-BRAND_ACCENT_COLOR = "#f59e0b"  # Amber
-BRAND_DANGER_COLOR = "#ef4444"  # Red
+BRAND_PRIMARY_COLOR = "#eb2525" 
+BRAND_SECONDARY_COLOR = "#000000"  
+BRAND_ACCENT_COLOR = "#ffffff" 
+BRAND_DANGER_COLOR = "#eb2525"
+BRAND_SUCCESS_COLOR = "#198754"  # Green for positive metrics, Active status, success rates
+BRAND_ALERT_COLOR = "#fff3cd"  # Light yellow for alerts and warnings  
 
 # Terms & Legal
 TERMS_URL = f"{COMPANY_WEBSITE}/terms"
@@ -81,7 +83,13 @@ def get_company_info():
         'copyright': APP_COPYRIGHT,
         'terms_url': TERMS_URL,
         'privacy_url': PRIVACY_URL,
-        'abn': ABN
+        'abn': ABN,
+        'brand_primary_color': BRAND_PRIMARY_COLOR,
+        'brand_secondary_color': BRAND_SECONDARY_COLOR,
+        'brand_accent_color': BRAND_ACCENT_COLOR,
+        'brand_danger_color': BRAND_DANGER_COLOR,
+        'brand_success_color': BRAND_SUCCESS_COLOR,
+        'brand_alert_color': BRAND_ALERT_COLOR
     }
 
 def get_contact_methods():

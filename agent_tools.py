@@ -165,7 +165,7 @@ async def get_delivery_statistics_tool(date_from: str = None, date_to: str = Non
         
         # Use existing ParcelTrackingDB for consistent access
         async with ParcelTrackingDB() as db:
-            # Query for statistics
+            # Query for statistics - removed enable_cross_partition_query (not supported in async SDK)
             query = "SELECT c.status FROM c"
             parameters = []
             
@@ -174,8 +174,7 @@ async def get_delivery_statistics_tool(date_from: str = None, date_to: str = Non
             
             async for item in container.query_items(
                 query=query,
-                parameters=parameters,
-                enable_cross_partition_query=True
+                parameters=parameters
             ):
                 parcels.append(item)
             

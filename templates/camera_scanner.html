@@ -7,7 +7,7 @@
     <div class="row justify-content-center">
         <div class="col-lg-10">
             <div class="card shadow-lg">
-                <div class="card-header bg-warning text-white">
+                <div class="card-header bg-primary text-white">
                     <h4 class="mb-0">
                         <i class="bi bi-camera"></i> AI Camera Scanner
                     </h4>
@@ -15,7 +15,7 @@
                 </div>
                 <div class="card-body">
                     <!-- Instructions -->
-                    <div class="alert alert-info mb-4">
+                    <div class="alert alert-permanent alert-info mb-4">
                         <i class="bi bi-info-circle"></i> 
                         <strong>How to use:</strong> Click "Start Camera" and point at a barcode or handwritten address. 
                         The AI will automatically detect and extract text to pre-fill the parcel registration form.
@@ -23,14 +23,14 @@
 
                     <!-- Camera Controls -->
                     <div class="text-center mb-4">
-                        <button id="startCamera" class="btn btn-success btn-lg me-2">
-                            <i class="bi bi-camera-video"></i> Start Camera
+                        <button id="startCamera" class="btn btn-lg me-2" style="background-color: #f8f9fa; color: #198754; border: 1px solid #dee2e6;">
+                            <i class="bi bi-camera-video" style="color: #198754;"></i> Start Camera
                         </button>
-                        <button id="captureImage" class="btn btn-primary btn-lg me-2" disabled>
-                            <i class="bi bi-camera-fill"></i> Capture Image
+                        <button id="captureImage" class="btn btn-lg me-2" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;" disabled>
+                            <i class="bi bi-camera-fill" style="color: #eb2525;"></i> Capture Image
                         </button>
-                        <button id="stopCamera" class="btn btn-danger btn-lg" disabled>
-                            <i class="bi bi-stop-circle"></i> Stop Camera
+                        <button id="stopCamera" class="btn btn-lg" style="background-color: #f8f9fa; color: #dc3545; border: 1px solid #dee2e6;" disabled>
+                            <i class="bi bi-stop-circle" style="color: #dc3545;"></i> Stop Camera
                         </button>
                     </div>
 

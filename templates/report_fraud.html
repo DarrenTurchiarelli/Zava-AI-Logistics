@@ -7,11 +7,11 @@
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <div class="card shadow-sm">
-                <div class="card-header bg-danger text-white">
+                <div class="card-header bg-primary text-white">
                     <h4 class="mb-0"><i class="bi bi-shield-exclamation"></i> Report Suspicious Message</h4>
                 </div>
                 <div class="card-body">
-                    <div class="alert alert-info">
+                    <div class="alert alert-permanent alert-light border" style="color: #000000 !important;">
                         <i class="bi bi-info-circle"></i>
                         <strong>Help us protect you and others!</strong><br>
                         Our AI-powered fraud detection system analyzes suspicious messages to identify scams and phishing attempts.
@@ -42,7 +42,7 @@
                                 📧 <strong>Email files:</strong> .EML (standard email), .MSG (Outlook), .TXT<br>
                                 📏 <strong>Max size:</strong> 16MB
                             </small>
-                            <div class="alert alert-light border mt-2">
+                            <div class="alert alert-permanent alert-light border mt-2">
                                 <small>
                                     <i class="bi bi-lightbulb"></i> <strong>Tips:</strong><br>
                                     • Just upload the file - no need to paste text separately!<br>
@@ -68,7 +68,7 @@
                         <hr class="my-4">
                         
                         <h6 class="mb-3"><i class="bi bi-person-badge"></i> Your Contact Information (Optional - for automated protection)</h6>
-                        <div class="alert alert-light border">
+                        <div class="alert alert-permanent alert-light border">
                             <small>
                                 <i class="bi bi-shield-check"></i> <strong>Automated Protection:</strong> If we detect high-risk fraud, we can automatically send you a personalized warning message with protection tips. Your info is only used for your security.
                             </small>
@@ -96,7 +96,7 @@
                         </div>
 
                         <div class="d-grid">
-                            <button type="submit" class="btn btn-danger btn-lg" id="analyzeBtn">
+                            <button type="submit" class="btn btn-primary btn-lg" id="analyzeBtn">
                                 <i class="bi bi-shield-check"></i> Analyze & Report Message
                             </button>
                         </div>
@@ -214,8 +214,8 @@
                     {% endif %}
 
                     <!-- Educational Content -->
-                    <div class="card border-info">
-                        <div class="card-header bg-info text-white">
+                    <div class="card border-primary">
+                        <div class="card-header bg-primary text-white">
                             <strong><i class="bi bi-book"></i> {{ analysis.educational_content.title }}</strong>
                         </div>
                         <div class="card-body">

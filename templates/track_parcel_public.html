@@ -44,7 +44,7 @@
             <!-- Loop through each tracking result -->
             {% for tracking_data in tracking_results %}
             <div class="card shadow-lg mb-4">
-                <div class="card-header {% if tracking_data.current_status == 'Delivered' %}bg-success{% elif tracking_data.current_status == 'Out for Delivery' %}bg-info{% else %}bg-secondary{% endif %} text-white">
+                <div class="card-header {% if tracking_data.current_status == 'Delivered' %}bg-success{% elif tracking_data.current_status == 'Out for Delivery' %}bg-primary{% else %}bg-secondary{% endif %} text-white">
                     <h4 class="mb-0">
                         <i class="bi bi-box-seam"></i> {{ tracking_data.barcode }}
                     </h4>
@@ -116,14 +116,14 @@
                     <!-- Out for Delivery Map (only shown when status is Out for Delivery) -->
                     {% if tracking_data.current_status == 'Out for Delivery' and tracking_data.delivery_map_url %}
                     <hr class="my-4">
-                    <div class="card border-info">
-                        <div class="card-header bg-info text-white">
+                    <div class="card border-primary">
+                        <div class="card-header bg-primary text-white">
                             <h5 class="mb-0">
                                 <i class="bi bi-truck"></i> Your Delivery is Nearby
                             </h5>
                         </div>
                         <div class="card-body">
-                            <div class="alert alert-info mb-3">
+                            <div class="alert alert-permanent alert-info mb-3">
                                 <i class="bi bi-info-circle"></i> 
                                 Your parcel is approximately <strong>{{ tracking_data.deliveries_away }}</strong> deliveries away.
                                 The driver is within <strong>5km</strong> of your delivery address.
@@ -197,12 +197,12 @@
     background: #f8f9fa;
     padding: 15px;
     border-radius: 8px;
-    border-left: 3px solid #0d6efd;
+    border-left: 3px solid var(--dt-primary);
 }
 
 .timeline-item.active .timeline-content {
     background: #e7f3ff;
-    border-left-color: #0d6efd;
+    border-left-color: var(--dt-primary);
 }
 </style>
 {% endblock %}

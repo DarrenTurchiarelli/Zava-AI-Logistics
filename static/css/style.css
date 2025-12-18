@@ -1,11 +1,14 @@
 /* DT Logistics Custom Styles */
 
+/* Note: Primary brand color is now set dynamically in base.html from company config */
+/* Note: Info/secondary color is now set dynamically in base.html from company config */
+/* Other colors below can be customized as needed */
 :root {
-    --dt-primary: #0d6efd;
+    /* --dt-primary is set in base.html from company.brand_primary_color */
+    /* --dt-info is set in base.html from company.brand_secondary_color */
     --dt-success: #198754;
     --dt-danger: #dc3545;
     --dt-warning: #ffc107;
-    --dt-info: #0dcaf0;
 }
 
 body {
@@ -139,14 +142,15 @@ body {
 }
 
 .user-message .message-content {
-    background-color: #0084ff;
+    background-color: var(--dt-primary);
     color: white;
     border-bottom-right-radius: 0.25rem;
 }
 
 .ai-message .message-content {
-    background-color: #f0f0f0;
+    background-color: transparent;
     color: #333;
+    border: 1px solid #dee2e6;
     border-bottom-left-radius: 0.25rem;
 }
 

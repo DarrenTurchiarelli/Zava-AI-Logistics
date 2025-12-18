@@ -27,10 +27,10 @@
         </div>
         
         <div class="col-md-3">
-            <div class="card border-info">
+            <div class="card border-primary">
                 <div class="card-body">
                     <h6 class="card-subtitle mb-2 text-muted">Average Confidence</h6>
-                    <h2 class="card-title text-info">
+                    <h2 class="card-title text-dark">
                         {{ (dashboard.overall_avg_confidence * 100)|round(0)|int }}%
                     </h2>
                     <p class="card-text small">
@@ -41,10 +41,10 @@
         </div>
         
         <div class="col-md-3">
-            <div class="card border-info">
+            <div class="card border-primary">
                 <div class="card-body">
                     <h6 class="card-subtitle mb-2 text-muted">Avg Response Time</h6>
-                    <h2 class="card-title text-info">
+                    <h2 class="card-title text-dark">
                         {{ dashboard.overall_avg_execution_ms|round(0)|int }} ms
                     </h2>
                     <p class="card-text small">
@@ -55,10 +55,10 @@
         </div>
         
         <div class="col-md-3">
-            <div class="card border-info">
+            <div class="card border-primary">
                 <div class="card-body">
                     <h6 class="card-subtitle mb-2 text-muted">Active Agents</h6>
-                    <h2 class="card-title text-info">{{ dashboard.configured_active_agents }}</h2>
+                    <h2 class="card-title text-dark">{{ dashboard.configured_active_agents }}</h2>
                     <p class="card-text small">
                         <i class="fas fa-brain"></i> Currently deployed
                     </p>
@@ -80,7 +80,7 @@
                     </p>
 
                     <!-- Active Agents -->
-                    <h6 class="text-info mt-4 mb-3">
+                    <h6 class="text-primary mt-4 mb-3">
                         <i class="bi bi-check-circle-fill"></i> Active Agents
                     </h6>
                     
@@ -92,9 +92,9 @@
                                 <div class="card-body d-flex flex-column">
                                     <div class="d-flex justify-content-between align-items-start">
                                         <h6 class="card-title">
-                                            <i class="bi bi-headset text-info"></i> Customer Service Agent
+                                            <i class="bi bi-headset text-primary"></i> Customer Service Agent
                                         </h6>
-                                        <span class="badge bg-info">ACTIVE</span>
+                                        <span class="badge bg-success">ACTIVE</span>
                                     </div>
                                     
                                     <!-- Agent Metrics -->
@@ -109,7 +109,7 @@
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Confidence</small>
-                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                    <strong class="text-dark">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Speed</small>
@@ -147,7 +147,7 @@
                                         <h6 class="card-title">
                                             <i class="bi bi-shield-exclamation text-danger"></i> Fraud Detection Agent
                                         </h6>
-                                        <span class="badge bg-info">ACTIVE</span>
+                                        <span class="badge bg-success">ACTIVE</span>
                                     </div>
                                     
                                     <!-- Agent Metrics -->
@@ -162,7 +162,7 @@
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Confidence</small>
-                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                    <strong class="text-dark">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Speed</small>
@@ -197,9 +197,9 @@
                                 <div class="card-body d-flex flex-column">
                                     <div class="d-flex justify-content-between align-items-start">
                                         <h6 class="card-title">
-                                            <i class="bi bi-person-check text-info"></i> Identity Agent
+                                            <i class="bi bi-person-check text-primary"></i> Identity Agent
                                         </h6>
-                                        <span class="badge bg-info">ACTIVE</span>
+                                        <span class="badge bg-success">ACTIVE</span>
                                     </div>
                                     
                                     <!-- Agent Metrics -->
@@ -214,7 +214,7 @@
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Confidence</small>
-                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                    <strong class="text-dark">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Speed</small>
@@ -254,7 +254,7 @@
                                         <h6 class="card-title">
                                             <i class="bi bi-diagram-3 text-warning"></i> Dispatcher Agent
                                         </h6>
-                                        <span class="badge bg-info">ACTIVE</span>
+                                        <span class="badge bg-success">ACTIVE</span>
                                     </div>
                                     
                                     <!-- Agent Metrics -->
@@ -269,7 +269,7 @@
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Confidence</small>
-                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                    <strong class="text-dark">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Speed</small>
@@ -306,7 +306,7 @@
                                         <h6 class="card-title">
                                             <i class="bi bi-box-seam text-primary"></i> Parcel Intake Agent
                                         </h6>
-                                        <span class="badge bg-info">ACTIVE</span>
+                                        <span class="badge bg-success">ACTIVE</span>
                                     </div>
                                     
                                     <!-- Agent Metrics -->
@@ -321,7 +321,7 @@
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Confidence</small>
-                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                    <strong class="text-dark">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Speed</small>
@@ -359,7 +359,7 @@
                                         <h6 class="card-title">
                                             <i class="bi bi-graph-up text-primary"></i> Optimization Agent
                                         </h6>
-                                        <span class="badge bg-info">ACTIVE</span>
+                                        <span class="badge bg-success">ACTIVE</span>
                                     </div>
                                     
                                     <!-- Agent Metrics -->
@@ -374,7 +374,7 @@
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Confidence</small>
-                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                    <strong class="text-dark">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Speed</small>
@@ -412,9 +412,9 @@
                                 <div class="card-body d-flex flex-column">
                                     <div class="d-flex justify-content-between align-items-start">
                                         <h6 class="card-title">
-                                            <i class="bi bi-building text-info"></i> Sorting Facility Agent
+                                            <i class="bi bi-building text-primary"></i> Sorting Facility Agent
                                         </h6>
-                                        <span class="badge bg-info">ACTIVE</span>
+                                        <span class="badge bg-success">ACTIVE</span>
                                     </div>
                                     
                                     <!-- Agent Metrics -->
@@ -429,7 +429,7 @@
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Confidence</small>
-                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                    <strong class="text-dark">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Speed</small>
@@ -466,7 +466,7 @@
                                         <h6 class="card-title">
                                             <i class="bi bi-calendar-check text-warning"></i> Delivery Coordination Agent
                                         </h6>
-                                        <span class="badge bg-info">ACTIVE</span>
+                                        <span class="badge bg-success">ACTIVE</span>
                                     </div>
                                     
                                     <!-- Agent Metrics -->
@@ -481,7 +481,7 @@
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Confidence</small>
-                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                    <strong class="text-dark">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Speed</small>
@@ -551,8 +551,8 @@
                                     <td>
                                         <div class="progress" style="height: 20px;">
                                             <div class="progress-bar 
-                                                {% if agent.success_rate > 0.9 %}bg-info
-                                                {% elif agent.success_rate > 0.7 %}bg-warning
+                                                {% if agent.success_rate > 0.7 %}bg-success
+                                                {% elif agent.success_rate > 0.3 %}bg-warning
                                                 {% else %}bg-danger{% endif %}"
                                                 role="progressbar" 
                                                 style="width: {{ (agent.success_rate * 100)|int }}%">
@@ -562,7 +562,7 @@
                                     </td>
                                     <td>
                                         <span class="badge 
-                                            {% if agent.avg_confidence > 0.8 %}bg-info
+                                            {% if agent.avg_confidence > 0.8 %}bg-success
                                             {% elif agent.avg_confidence > 0.6 %}bg-warning
                                             {% else %}bg-danger{% endif %}">
                                             {{ (agent.avg_confidence * 100)|round(0)|int }}%
@@ -578,7 +578,7 @@
                                     </td>
                                     <td>
                                         {% if agent.last_execution %}
-                                        <span class="badge bg-info">
+                                        <span class="badge bg-success">
                                             <i class="fas fa-check-circle"></i> Active
                                         </span>
                                         {% else %}
@@ -633,7 +633,7 @@
 }
 
 .list-group-item:hover {
-    border-left-color: #0d6efd;
+    border-left-color: var(--dt-primary);
     background-color: #f8f9fa;
 }
 

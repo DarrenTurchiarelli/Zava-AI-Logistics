@@ -50,7 +50,7 @@
 
             <!-- Parcel Lookup Panel -->
             <div class="card">
-                <div class="card-header bg-info text-white">
+                <div class="card-header bg-primary text-white">
                     <i class="bi bi-box-seam"></i> Quick Lookup
                 </div>
                 <div class="card-body">
@@ -58,7 +58,7 @@
                         <label for="trackingNumber" class="small">Tracking/Barcode</label>
                         <input type="text" class="form-control" id="trackingNumber" placeholder="DT202512090001">
                     </div>
-                    <button class="btn btn-info btn-block btn-sm" onclick="trackParcel()">
+                    <button class="btn btn-primary btn-block btn-sm" onclick="trackParcel()">
                         <i class="bi bi-search"></i> Get Details
                     </button>
                     <button class="btn btn-secondary btn-block btn-sm mt-1" onclick="getParcelHistory()">
@@ -98,7 +98,7 @@
                             <option value="">All time</option>
                         </select>
                     </div>
-                    <button class="btn btn-success btn-block btn-sm" onclick="searchByAddress()">
+                    <button class="btn btn-primary btn-block btn-sm" onclick="searchByAddress()">
                         <i class="bi bi-search"></i> Search Address
                     </button>
                 </div>
@@ -108,7 +108,7 @@
         <!-- Chat Panel -->
         <div class="col-md-6">
             <div class="card" style="height: 700px;">
-                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                     <span><i class="bi bi-chat-dots-fill"></i> Chat with AI Assistant</span>
                     <span id="voiceStatus" class="badge badge-light text-dark" style="display:none;">
                         <i class="bi bi-mic-fill"></i> Listening...
@@ -116,7 +116,7 @@
                 </div>
                 <div class="card-body chat-container" id="chatMessages" style="overflow-y: auto; height: 550px; background-color: #fff; padding: 1.5rem;">
                     <div class="chat-message ai-message">
-                        <div class="message-content" style="background-color: #e8f5e9; border: 1px solid #c8e6c9;">
+                        <div class="message-content" style="background-color: transparent; border: 1px solid #dee2e6;">
                             <i class="bi bi-info-circle-fill"></i> <strong>Welcome!</strong> I'm Alex, your customer service assistant. 
                             <br><small>💬 Ask me anything about your parcels or 🎤 use voice input!</small>
                         </div>
@@ -128,7 +128,7 @@
                         <button class="btn btn-primary" id="voiceBtn" onclick="toggleVoiceInput()" title="Voice Input">
                             <i class="bi bi-mic-fill" id="micIcon"></i>
                         </button>
-                        <button class="btn btn-success" onclick="sendMessage()">
+                        <button class="btn btn-primary" onclick="sendMessage()">
                             <i class="bi bi-send-fill"></i> Send
                         </button>
                     </div>
@@ -156,7 +156,7 @@
         <!-- Information Panel -->
         <div class="col-md-3">
             <div class="card">
-                <div class="card-header bg-warning text-dark">
+                <div class="card-header bg-primary text-white">
                     <i class="bi bi-info-circle-fill"></i> Information
                 </div>
                 <div class="card-body" id="infoPanel">
@@ -165,7 +165,7 @@
             </div>
 
             <div class="card mt-3">
-                <div class="card-header bg-secondary text-white">
+                <div class="card-header bg-primary text-white">
                     <i class="bi bi-lightbulb-fill"></i> Voice & Text Examples
                 </div>
                 <div class="card-body">
@@ -674,7 +674,7 @@ function clearChat() {
     const chatMessages = document.getElementById('chatMessages');
     chatMessages.innerHTML = `
         <div class="chat-message ai-message">
-            <div class="message-content" style="background-color: #e8f5e9; border: 1px solid #c8e6c9;">
+            <div class="message-content" style="background-color: transparent; border: 1px solid #dee2e6;">
                 <i class="bi bi-check-circle-fill"></i> Chat cleared. How can I help you?
             </div>
         </div>

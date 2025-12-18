@@ -82,7 +82,7 @@
             <!-- Route Map -->
             {% if manifest.route_optimized and manifest.get('embed_url') %}
             <div class="card mb-4">
-                <div class="card-header bg-info text-white">
+                <div class="card-header bg-primary text-white">
                     <h5 class="mb-0">
                         <i class="bi bi-map"></i> Optimized Route Map
                         {% if manifest.get('route_url') %}
@@ -110,7 +110,7 @@
                     </div>
                     
                     {% if manifest.get('split_into_runs') %}
-                    <div class="alert alert-info mb-3">
+                    <div class="alert alert-permanent alert-info mb-3">
                         <i class="bi bi-truck"></i> <strong>Multiple Delivery Runs:</strong> 
                         This manifest has been automatically split into <strong>{{ manifest.total_runs }} delivery runs</strong> 
                         (max 25 addresses per run due to Azure Maps API limits).
@@ -376,7 +376,7 @@
                                     </td>
                                     <td>
                                         {% if item.get('address_notes') %}
-                                        <button type="button" class="btn btn-sm btn-info" 
+                                        <button type="button" class="btn btn-sm btn-primary" 
                                                 data-bs-toggle="modal" 
                                                 data-bs-target="#notesModal{{ loop.index }}">
                                             <i class="bi bi-sticky"></i> {{ item.address_notes|length }} note(s)
@@ -398,7 +398,7 @@
                                     </td>
                                     <td>
                                         {% if item.status != 'delivered' %}
-                                        <button type="button" class="btn btn-sm btn-info mb-1" 
+                                        <button type="button" class="btn btn-sm btn-primary mb-1" 
                                                 onclick="notifyCustomer('{{ item.barcode }}', '{{ item.recipient_name }}', {{ loop.index }})">
                                             <i class="bi bi-chat-dots"></i> Notify Customer
                                         </button>
@@ -441,11 +441,11 @@
                 <div class="modal fade" id="notesModal{{ loop.index }}" tabindex="-1" aria-labelledby="notesModalLabel{{ loop.index }}" aria-hidden="true">
                     <div class="modal-dialog modal-dialog-scrollable">
                         <div class="modal-content">
-                            <div class="modal-header bg-info text-white">
-                                <h5 class="modal-title" id="notesModalLabel{{ loop.index }}">
+                            <div class="modal-header bg-light">
+                                <h5 class="modal-title text-dark" id="notesModalLabel{{ loop.index }}">
                                     <i class="bi bi-sticky"></i> Address Notes
                                 </h5>
-                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                             <div class="modal-body">
                                 <p><strong>Address:</strong> {{ item.recipient_address }}</p>
@@ -888,7 +888,7 @@ function notifyCustomer(barcode, recipientName, itemIndex) {
     .then(data => {
         // Show success message
         btn.innerHTML = '<i class="bi bi-check-circle"></i> Notified';
-        btn.classList.remove('btn-info');
+        btn.classList.remove('btn-primary');
         btn.classList.add('btn-success');
         
         // Show toast notification
@@ -899,7 +899,7 @@ function notifyCustomer(barcode, recipientName, itemIndex) {
             btn.disabled = false;
             btn.innerHTML = originalHtml;
             btn.classList.remove('btn-success');
-            btn.classList.add('btn-info');
+            btn.classList.add('btn-primary');
         }, 3000);
     })
     .catch(error => {

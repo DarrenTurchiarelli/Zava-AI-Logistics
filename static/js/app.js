@@ -158,6 +158,7 @@ function exportData(data, filename) {
 }
 
 // Console welcome message
-console.log('%cDT Logistics', 'font-size: 24px; font-weight: bold; color: #0d6efd;');
+const brandColor = getComputedStyle(document.documentElement).getPropertyValue('--dt-primary').trim();
+console.log('%cDT Logistics', `font-size: 24px; font-weight: bold; color: ${brandColor};`);
 console.log('%cAI-Powered Last-Mile Delivery Management System', 'font-size: 14px; color: #6c757d;');
 console.log('Version: 1.0.0');

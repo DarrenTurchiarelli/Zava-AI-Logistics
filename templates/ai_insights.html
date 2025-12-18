@@ -22,7 +22,7 @@
                         <i class="bi bi-box-seam text-primary" style="font-size: 2rem;"></i>
                         <h3 class="mt-2">{{ insights.total_parcels }}</h3>
                         <p class="text-muted mb-0">Total Parcels</p>
-                        <small class="text-primary"><i class="bi bi-arrow-right-circle"></i> View All</small>
+                        <small class="text-dark"><i class="bi bi-arrow-right-circle"></i> View All</small>
                     </div>
                 </div>
             </a>
@@ -34,7 +34,7 @@
                         <i class="bi bi-truck text-warning" style="font-size: 2rem;"></i>
                         <h3 class="mt-2">{{ insights.in_transit }}</h3>
                         <p class="text-muted mb-0">In Transit</p>
-                        <small class="text-warning"><i class="bi bi-arrow-right-circle"></i> Track Now</small>
+                        <small class="text-dark"><i class="bi bi-arrow-right-circle"></i> Track Now</small>
                     </div>
                 </div>
             </a>
@@ -46,15 +46,15 @@
                         <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
                         <h3 class="mt-2">{{ insights.delivered }}</h3>
                         <p class="text-muted mb-0">Delivered</p>
-                        <small class="text-success"><i class="bi bi-arrow-right-circle"></i> View History</small>
+                        <small class="text-dark"><i class="bi bi-arrow-right-circle"></i> View History</small>
                     </div>
                 </div>
             </a>
         </div>
         <div class="col-md-3">
-            <div class="card text-center border-info">
+            <div class="card text-center border-primary">
                 <div class="card-body">
-                    <i class="bi bi-speedometer text-info" style="font-size: 2rem;"></i>
+                    <i class="bi bi-trophy text-success" style="font-size: 2rem;"></i>
                     <h3 class="mt-2">{{ insights.success_rate }}%</h3>
                     <p class="text-muted mb-0">Success Rate</p>
                     <small class="text-muted">Delivered vs Exceptions</small>
@@ -66,37 +66,29 @@
     <!-- Driver & Delivery Metrics -->
     <div class="row g-4 mb-4">
         <div class="col-lg-6">
-            <div class="card shadow-sm h-100">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0"><i class="bi bi-clipboard-check"></i> Operations Status</h5>
+            <div class="card shadow-sm">
+                <div class="card-header bg-white py-2">
+                    <h6 class="mb-0"><i class="bi bi-clipboard-check"></i> Operations Status</h6>
                 </div>
-                <div class="card-body">
+                <div class="card-body py-2">
                     <div class="row text-center">
-                        <div class="col-6 mb-3">
+                        <div class="col-4">
                             <a href="{{ url_for('all_parcels') }}?status=At Depot" class="text-decoration-none">
-                                <h3 class="text-primary">{{ insights.at_depot }}</h3>
-                                <p class="text-muted mb-0">At Depot</p>
-                                <small class="text-primary"><i class="bi bi-arrow-right-circle"></i></small>
+                                <h5 class="text-primary mb-0">{{ insights.at_depot }}</h5>
+                                <p class="text-muted mb-0 small">At Depot</p>
                             </a>
                         </div>
-                        <div class="col-6 mb-3">
+                        <div class="col-4">
                             <a href="{{ url_for('all_parcels') }}?status=Sorting" class="text-decoration-none">
-                                <h3 class="text-warning">{{ insights.sorting }}</h3>
-                                <p class="text-muted mb-0">Sorting</p>
-                                <small class="text-warning"><i class="bi bi-arrow-right-circle"></i></small>
+                                <h5 class="text-muted mb-0">{{ insights.sorting }}</h5>
+                                <p class="text-muted mb-0 small">Sorting</p>
                             </a>
                         </div>
-                        <div class="col-12 mb-3">
+                        <div class="col-4">
                             <a href="{{ url_for('all_parcels') }}?status=Out for Delivery" class="text-decoration-none">
-                                <h3 class="text-info">{{ insights.out_for_delivery }}</h3>
-                                <p class="text-muted mb-0">Out for Delivery</p>
-                                <small class="text-info"><i class="bi bi-arrow-right-circle"></i></small>
+                                <h5 class="text-dark mb-0">{{ insights.out_for_delivery }}</h5>
+                                <p class="text-muted mb-0 small">Out for Delivery</p>
                             </a>
-                        </div>
-                    </div>
-                    <div class="progress" style="height: 30px;">
-                        <div class="progress-bar bg-success" style="width: {{ (insights.active_parcels / insights.total_parcels * 100) if insights.total_parcels > 0 else 0 }}%">
-                            Active Parcels: {{ insights.active_parcels }}
                         </div>
                     </div>
                 </div>
@@ -105,24 +97,13 @@
 
         <div class="col-lg-6">
             <a href="{{ url_for('driver_manifest') }}" class="text-decoration-none">
-                <div class="card shadow-sm h-100 card-hover">
-                    <div class="card-header bg-white">
-                        <h5 class="mb-0"><i class="bi bi-truck-front"></i> Driver Manifests</h5>
+                <div class="card shadow-sm card-hover">
+                    <div class="card-header bg-white py-2">
+                        <h6 class="mb-0"><i class="bi bi-truck-front"></i> Driver Manifests</h6>
                     </div>
-                    <div class="card-body">
-                        <div class="row text-center">
-                            <div class="col-12 mb-3">
-                                <i class="bi bi-file-earmark-text text-primary" style="font-size: 3rem;"></i>
-                                <h3 class="text-primary mt-2">View Active Manifests</h3>
-                                <p class="text-muted mb-0">Check driver assignments and routes</p>
-                                <small class="text-primary mt-2"><i class="bi bi-arrow-right-circle"></i> Go to Manifests</small>
-                            </div>
-                        </div>
-                        <div class="progress" style="height: 30px;">
-                            <div class="progress-bar bg-info" style="width: {{ (insights.out_for_delivery / insights.total_parcels * 100) if insights.total_parcels > 0 else 0 }}%">
-                                Delivery Progress
-                            </div>
-                        </div>
+                    <div class="card-body py-2 text-center">
+                        <h5 class="text-primary mb-0">View Active Manifests</h5>
+                        <p class="text-muted mb-0 small">Check driver assignments and routes</p>
                     </div>
                 </div>
             </a>
@@ -134,34 +115,31 @@
         <div class="col-12">
             <a href="{{ url_for('approvals') }}" class="text-decoration-none">
                 <div class="card shadow-sm card-hover">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0"><i class="bi bi-robot"></i> AI Agent Performance</h5>
+                    <div class="card-header bg-primary text-white py-2">
+                        <h6 class="mb-0"><i class="bi bi-robot"></i> AI Agent Performance</h6>
                     </div>
-                    <div class="card-body">
+                    <div class="card-body py-2">
                         <div class="row text-center">
                             <div class="col-md-3">
-                                <i class="bi bi-lightning-charge text-warning" style="font-size: 2rem;"></i>
-                                <h4 class="mt-2">{{ insights.total_approvals }}</h4>
-                                <p class="text-muted">Total Requests</p>
+                                <i class="bi bi-lightning-charge text-warning" style="font-size: 1.5rem;"></i>
+                                <h5 class="mt-1 mb-0">{{ insights.total_approvals }}</h5>
+                                <p class="text-muted mb-0 small">Total Requests</p>
                             </div>
                             <div class="col-md-3">
-                                <i class="bi bi-check-all text-success" style="font-size: 2rem;"></i>
-                                <h4 class="mt-2">{{ insights.valid_dc_approvals }}</h4>
-                                <p class="text-muted">Ready for Processing</p>
+                                <i class="bi bi-check-all text-success" style="font-size: 1.5rem;"></i>
+                                <h5 class="mt-1 mb-0">{{ insights.valid_dc_approvals }}</h5>
+                                <p class="text-muted mb-0 small">Ready for Processing</p>
                             </div>
                             <div class="col-md-3">
-                                <i class="bi bi-hourglass-split text-info" style="font-size: 2rem;"></i>
-                                <h4 class="mt-2">{{ insights.pending_approvals }}</h4>
-                                <p class="text-muted">Pending Review</p>
+                                <i class="bi bi-hourglass-split text-primary" style="font-size: 1.5rem;"></i>
+                                <h5 class="mt-1 mb-0">{{ insights.pending_approvals }}</h5>
+                                <p class="text-muted mb-0 small">Pending Review</p>
                             </div>
                             <div class="col-md-3">
-                                <i class="bi bi-stopwatch text-danger" style="font-size: 2rem;"></i>
-                                <h4 class="mt-2">{{ insights.avg_decision_time }}</h4>
-                                <p class="text-muted">Avg Decision Time</p>
+                                <i class="bi bi-stopwatch text-primary" style="font-size: 1.5rem;"></i>
+                                <h5 class="mt-1 mb-0">{{ insights.avg_decision_time }}</h5>
+                                <p class="text-muted mb-0 small">Avg Decision Time</p>
                             </div>
-                        </div>
-                        <div class="mt-3 text-center">
-                            <small class="text-primary"><i class="bi bi-arrow-right-circle"></i> Click to manage approval requests</small>
                         </div>
                     </div>
                 </div>
@@ -187,10 +165,10 @@
                     <div class="row g-3">
                         <!-- Customer Service Agent -->
                         <div class="col-lg-4 col-md-6">
-                            <div class="card border-info h-100">
+                            <div class="card border-primary h-100">
                                 <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-start mb-2">
-                                        <h6 class="mb-0"><i class="bi bi-headset text-info"></i> Customer Service Agent</h6>
+                                        <h6 class="mb-0"><i class="bi bi-headset text-primary"></i> Customer Service Agent</h6>
                                         <span class="badge bg-success">Active</span>
                                     </div>
                                     <p class="small text-muted mb-2">AI-powered customer support with real-time parcel tracking</p>
@@ -203,7 +181,7 @@
                         
                         <!-- Fraud Detection Agent -->
                         <div class="col-lg-4 col-md-6">
-                            <div class="card border-info h-100">
+                            <div class="card border-primary h-100">
                                 <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-start mb-2">
                                         <h6 class="mb-0"><i class="bi bi-shield-exclamation text-danger"></i> Fraud Detection Agent</h6>
@@ -219,10 +197,10 @@
                         
                         <!-- Identity Agent -->
                         <div class="col-lg-4 col-md-6">
-                            <div class="card border-info h-100">
+                            <div class="card border-primary h-100">
                                 <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-start mb-2">
-                                        <h6 class="mb-0"><i class="bi bi-person-check text-info"></i> Identity Agent</h6>
+                                        <h6 class="mb-0"><i class="bi bi-person-check text-primary"></i> Identity Agent</h6>
                                         <span class="badge bg-success">Active</span>
                                     </div>
                                     <p class="small text-muted mb-2">Customer identity verification for high-risk cases</p>
@@ -235,7 +213,7 @@
                         
                         <!-- Dispatcher Agent -->
                         <div class="col-lg-4 col-md-6">
-                            <div class="card border-info h-100">
+                            <div class="card border-primary h-100">
                                 <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-start mb-2">
                                         <h6 class="mb-0"><i class="bi bi-diagram-3 text-warning"></i> Dispatcher Agent</h6>
@@ -251,7 +229,7 @@
                         
                         <!-- Parcel Intake Agent -->
                         <div class="col-lg-4 col-md-6">
-                            <div class="card border-info h-100">
+                            <div class="card border-primary h-100">
                                 <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-start mb-2">
                                         <h6 class="mb-0"><i class="bi bi-box-seam text-primary"></i> Parcel Intake Agent</h6>
@@ -267,7 +245,7 @@
                         
                         <!-- Optimization Agent -->
                         <div class="col-lg-4 col-md-6">
-                            <div class="card border-info h-100">
+                            <div class="card border-primary h-100">
                                 <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-start mb-2">
                                         <h6 class="mb-0"><i class="bi bi-graph-up text-primary"></i> Optimization Agent</h6>
@@ -283,10 +261,10 @@
                         
                         <!-- Sorting Facility Agent -->
                         <div class="col-lg-4 col-md-6">
-                            <div class="card border-info h-100">
+                            <div class="card border-primary h-100">
                                 <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-start mb-2">
-                                        <h6 class="mb-0"><i class="bi bi-building text-info"></i> Sorting Facility Agent</h6>
+                                        <h6 class="mb-0"><i class="bi bi-building text-primary"></i> Sorting Facility Agent</h6>
                                         <span class="badge bg-success">Active</span>
                                     </div>
                                     <p class="small text-muted mb-2">Real-time capacity monitoring and automated routing</p>
@@ -299,7 +277,7 @@
                         
                         <!-- Delivery Coordination Agent -->
                         <div class="col-lg-4 col-md-6">
-                            <div class="card border-info h-100">
+                            <div class="card border-primary h-100">
                                 <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-start mb-2">
                                         <h6 class="mb-0"><i class="bi bi-calendar-check text-warning"></i> Delivery Coordination Agent</h6>
@@ -328,11 +306,11 @@
     <!-- Sorting Facility Agent - Real-Time Capacity Monitoring -->
     <div class="row mb-4" id="sorting-facility">
         <div class="col-12">
-            <div class="card shadow-sm border-info">
-                <div class="card-header bg-info text-white">
+            <div class="card shadow-sm border-primary">
+                <div class="card-header bg-primary text-white">
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="mb-0"><i class="bi bi-building"></i> Sorting Facility Agent - Capacity Monitoring</h5>
-                        <span class="badge bg-light text-info">Real-Time Data</span>
+                        <span class="badge bg-light text-primary">Real-Time Data</span>
                     </div>
                 </div>
                 <div class="card-body">
@@ -441,10 +419,10 @@
                                     <div class="mb-3">
                                         <div class="d-flex justify-content-between align-items-center mb-1">
                                             <small><strong>Overall Network Capacity:</strong></small>
-                                            <small class="text-info">70% (1,047/1,500)</small>
+                                            <small class="text-dark">70% (1,047/1,500)</small>
                                         </div>
                                         <div class="progress" style="height: 20px;">
-                                            <div class="progress-bar bg-info" role="progressbar" style="width: 70%;" aria-valuenow="70" aria-valuemin="0" aria-valuemax="100">70%</div>
+                                            <div class="progress-bar bg-primary" role="progressbar" style="width: 70%;" aria-valuenow="70" aria-valuemin="0" aria-valuemax="100">70%</div>
                                         </div>
                                     </div>
                                     <hr>
@@ -456,7 +434,7 @@
                                         </div>
                                         <div class="col-6">
                                             <small class="text-muted d-block">Parcels Routed Today</small>
-                                            <strong class="text-primary">2,847</strong>
+                                            <strong class="text-success">2,847</strong>
                                             <small class="text-success d-block"><i class="bi bi-arrow-up"></i> 8% vs yesterday</small>
                                         </div>
                                     </div>
@@ -464,7 +442,7 @@
                                     <div class="row">
                                         <div class="col-6">
                                             <small class="text-muted d-block">AI Interventions</small>
-                                            <strong class="text-info">47 today</strong>
+                                            <strong class="text-dark">47 today</strong>
                                         </div>
                                         <div class="col-6">
                                             <small class="text-muted d-block">Efficiency Gain</small>
@@ -493,11 +471,11 @@
     <!-- Delivery Coordination Agent - Customer Communication -->
     <div class="row mb-4" id="delivery-coordination">
         <div class="col-12">
-            <div class="card shadow-sm border-warning">
-                <div class="card-header bg-warning text-dark">
+            <div class="card shadow-sm border-primary">
+                <div class="card-header bg-primary text-white">
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="mb-0"><i class="bi bi-calendar-check"></i> Delivery Coordination Agent - Customer Communication</h5>
-                        <span class="badge bg-dark">Real-Time Notifications</span>
+                        <span class="badge bg-light text-primary">Real-Time Notifications</span>
                     </div>
                 </div>
                 <div class="card-body">
@@ -517,10 +495,10 @@
                             </div>
                         </div>
                         <div class="col-md-3">
-                            <div class="card border-info h-100">
+                            <div class="card border-primary h-100">
                                 <div class="card-body text-center">
-                                    <i class="bi bi-phone-vibrate text-info" style="font-size: 2rem;"></i>
-                                    <h3 class="mt-2 text-info">89%</h3>
+                                    <i class="bi bi-phone-vibrate text-muted" style="font-size: 2rem;"></i>
+                                    <h3 class="mt-2 text-muted">89%</h3>
                                     <p class="small text-muted mb-0">SMS Delivery Rate</p>
                                 </div>
                             </div>
@@ -550,7 +528,7 @@
                         <div class="col-md-6">
                             <div class="card bg-light h-100">
                                 <div class="card-body">
-                                    <h6 class="text-warning"><i class="bi bi-gear"></i> How It Works</h6>
+                                    <h6 class="text-primary"><i class="bi bi-gear"></i> How It Works</h6>
                                     <ol class="small mb-0">
                                         <li class="mb-2"><strong>Driver Triggers:</strong> Press "Notify Customer" button when 1-3 stops away from delivery address</li>
                                         <li class="mb-2"><strong>AI Routing:</strong> Agent determines optimal communication channel (SMS or Email) based on customer preferences</li>
@@ -563,7 +541,7 @@
                         <div class="col-md-6">
                             <div class="card bg-light h-100">
                                 <div class="card-body">
-                                    <h6 class="text-warning"><i class="bi bi-graph-up-arrow"></i> Impact & Benefits</h6>
+                                    <h6 class="text-primary"><i class="bi bi-graph-up-arrow"></i> Impact & Benefits</h6>
                                     <ul class="small mb-0">
                                         <li class="mb-2"><strong>Reduced Failed Deliveries:</strong> 23% decrease in "customer unavailable" exceptions</li>
                                         <li class="mb-2"><strong>Improved Efficiency:</strong> Drivers spend less time waiting or making return trips</li>
@@ -577,7 +555,7 @@
                     </div>
 
                     <!-- Active Notifications -->
-                    <div class="alert alert-info alert-persistent mb-0">
+                    <div class="alert alert-warning alert-persistent mb-0">
                         <h6 class="alert-heading"><i class="bi bi-bell-fill"></i> Recent Notifications (Last Hour)</h6>
                         <ul class="mb-0">
                             <li><strong>13:42:</strong> SMS sent to customer at 25 Collins St - Delivery ETA 10 minutes (Driver: John Smith)</li>
@@ -608,9 +586,9 @@
                     <!-- Cost Reduction Insights -->
                     <div class="row g-4 mb-4">
                         <div class="col-md-4">
-                            <div class="card border-info h-100">
+                            <div class="card border-primary h-100">
                                 <div class="card-body">
-                                    <h6 class="card-title text-info">
+                                    <h6 class="card-title text-dark">
                                         <i class="bi bi-cash-coin"></i> Cost Reduction Opportunities
                                     </h6>
                                     <div class="mt-3">
@@ -629,10 +607,10 @@
                                         <div class="recommendation-item" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#depotConsolModal">
                                             <div class="d-flex justify-content-between mb-2 align-items-center">
                                                 <small><i class="bi bi-info-circle text-primary"></i> Depot Consolidation</small>
-                                                <span class="badge bg-info">$1,800/mo</span>
+                                                <span class="badge bg-primary">$1,800/mo</span>
                                             </div>
                                             <div class="progress mb-3" style="height: 8px;">
-                                                <div class="progress-bar bg-info" style="width: 65%"></div>
+                                                <div class="progress-bar bg-primary" style="width: 65%"></div>
                                             </div>
                                         </div>
                                         
@@ -660,7 +638,7 @@
                         <div class="col-md-4">
                             <div class="card border-primary h-100">
                                 <div class="card-body">
-                                    <h6 class="card-title text-primary">
+                                    <h6 class="card-title text-dark">
                                         <i class="bi bi-bullseye"></i> Resource Allocation
                                     </h6>
                                     <div class="mt-3">
@@ -699,7 +677,7 @@
                         <div class="col-md-4">
                             <div class="card border-warning h-100">
                                 <div class="card-body">
-                                    <h6 class="card-title text-warning">
+                                    <h6 class="card-title text-dark">
                                         <i class="bi bi-graph-up-arrow"></i> Predictive Analytics
                                     </h6>
                                     <div class="mt-3">
@@ -707,7 +685,7 @@
                                         <div class="mb-3 recommendation-item" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#volumePredictModal">
                                             <div class="d-flex justify-content-between mb-1 align-items-center">
                                                 <small class="text-muted"><i class="bi bi-info-circle text-primary"></i> Next Week Volume</small>
-                                                <strong class="text-primary">+{{ ((insights.total_parcels * 1.15)|round(0)|int - insights.total_parcels) }}</strong>
+                                                <strong class="text-success">+{{ ((insights.total_parcels * 1.15)|round(0)|int - insights.total_parcels) }}</strong>
                                             </div>
                                             <small class="text-success">
                                                 <i class="bi bi-arrow-up"></i> 15% increase predicted
@@ -718,7 +696,7 @@
                                         <div class="mb-3 recommendation-item" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#peakDayModal">
                                             <div class="d-flex justify-content-between mb-1 align-items-center">
                                                 <small class="text-muted"><i class="bi bi-info-circle text-primary"></i> Peak Demand Day</small>
-                                                <strong class="text-info">Friday</strong>
+                                                <strong class="text-dark">Friday</strong>
                                             </div>
                                             <small class="text-muted">
                                                 <i class="bi bi-calendar-event"></i> Prepare extra capacity
@@ -747,7 +725,7 @@
                     </div>
 
                     <!-- Action Recommendations -->
-                    <div class="alert alert-primary alert-persistent mb-0">
+                    <div class="alert alert-warning alert-persistent mb-0">
                         <h6 class="alert-heading"><i class="bi bi-lightbulb-fill"></i> Top AI Recommendations</h6>
                         <ul class="mb-0">
                             <li><strong>Immediate:</strong> Reassign 3 parcels from DC-MEL-001 to DC-MEL-002 to balance workload (est. 2hr delivery improvement)</li>
@@ -844,7 +822,7 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="alert alert-info">
+                <div class="alert alert-permanent alert-info">
                     <strong><i class="bi bi-robot"></i> AI Confidence:</strong> 85% (High) | <strong>Estimated Savings:</strong> $2,400/month
                 </div>
                 
@@ -907,9 +885,9 @@
 <div class="modal fade" id="depotConsolModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header bg-info text-white">
-                <h5 class="modal-title"><i class="bi bi-building"></i> Depot Consolidation - AI Analysis</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            <div class="modal-header bg-light">
+                <h5 class="modal-title text-dark"><i class="bi bi-building"></i> Depot Consolidation - AI Analysis</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="alert alert-info">
@@ -1065,9 +1043,9 @@
 <div class="modal fade" id="peakDayModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header bg-info text-white">
-                <h5 class="modal-title"><i class="bi bi-calendar-event"></i> Peak Demand Forecast - AI Analysis</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            <div class="modal-header bg-light">
+                <h5 class="modal-title text-dark"><i class="bi bi-calendar-event"></i> Peak Demand Forecast - AI Analysis</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="alert alert-info">
@@ -1173,9 +1151,9 @@
 <div class="modal fade" id="routingBalanceModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header bg-info text-white">
-                <h5 class="modal-title"><i class="bi bi-diagram-3"></i> Load Balancing - AI Analysis</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            <div class="modal-header bg-light">
+                <h5 class="modal-title text-dark"><i class="bi bi-diagram-3"></i> Load Balancing - AI Analysis</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="alert alert-info">
@@ -1192,7 +1170,7 @@
                 </ul>
                 
                 <h6 class="text-primary mt-3"><i class="bi bi-lightbulb"></i> AI Recommendation</h6>
-                <div class="card border-info">
+                <div class="card border-primary">
                     <div class="card-body">
                         <p><strong>Action:</strong> Redirect next 25 incoming parcels from DC-MEL-002 to DC-MEL-003</p>
                         <p class="mb-0"><strong>Expected Results:</strong></p>

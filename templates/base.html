@@ -14,6 +14,263 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     
+    <!-- Dynamic Brand Colors -->
+    <style>
+        :root {
+            /* Custom app variables */
+            --dt-primary: {{ company.brand_primary_color }};
+            --dt-secondary: {{ company.brand_secondary_color }};
+            --dt-accent: {{ company.brand_accent_color }};
+            --dt-danger: {{ company.brand_danger_color }};
+            --dt-info: {{ company.brand_secondary_color }};
+            --dt-success: {{ company.brand_success_color }};
+            --dt-alert: {{ company.brand_alert_color }};
+        }
+        
+        /* Override Bootstrap primary color classes with brand colors */
+        .bg-primary {
+            background-color: {{ company.brand_primary_color }} !important;
+        }
+        
+        .btn-primary {
+            background-color: {{ company.brand_primary_color }} !important;
+            border-color: {{ company.brand_primary_color }} !important;
+        }
+        
+        .btn-primary:hover,
+        .btn-primary:focus,
+        .btn-primary:active {
+            background-color: {{ company.brand_primary_color }} !important;
+            border-color: {{ company.brand_primary_color }} !important;
+            filter: brightness(0.85);
+        }
+        
+        .btn-outline-primary {
+            color: {{ company.brand_primary_color }} !important;
+            border-color: {{ company.brand_primary_color }} !important;
+        }
+        
+        .btn-outline-primary:hover,
+        .btn-outline-primary:focus,
+        .btn-outline-primary:active {
+            background-color: {{ company.brand_primary_color }} !important;
+            border-color: {{ company.brand_primary_color }} !important;
+            color: white !important;
+        }
+        
+        .text-primary {
+            color: {{ company.brand_primary_color }} !important;
+        }
+        
+        .border-primary {
+            border-color: {{ company.brand_primary_color }} !important;
+        }
+        
+        .link-primary {
+            color: {{ company.brand_primary_color }} !important;
+        }
+        
+        .navbar-dark .navbar-brand:hover,
+        .navbar-dark .navbar-brand:focus {
+            color: rgba(255, 255, 255, 0.9);
+        }
+        
+        /* Badge primary */
+        .badge.bg-primary {
+            background-color: {{ company.brand_primary_color }} !important;
+        }
+        
+        /* Alert primary */
+        .alert-primary {
+            background-color: {{ company.brand_primary_color }}20 !important;
+            border-color: {{ company.brand_primary_color }} !important;
+            color: {{ company.brand_primary_color }} !important;
+        }
+        
+        /* Override Bootstrap info color classes with secondary brand color */
+        .bg-info {
+            background-color: {{ company.brand_secondary_color }} !important;
+        }
+        
+        .text-info {
+            color: {{ company.brand_secondary_color }} !important;
+        }
+        
+        .border-info {
+            border-color: {{ company.brand_secondary_color }} !important;
+        }
+        
+        .badge.bg-info {
+            background-color: #f8f9fa !important;
+            color: {{ company.brand_primary_color }} !important;
+        }
+        
+        /* Force ALL badges to use light background - override Bootstrap defaults */
+        .badge,
+        .badge.bg-success,
+        .badge.bg-warning,
+        .badge.bg-danger,
+        .badge.bg-primary,
+        .badge.bg-secondary,
+        .badge.bg-light,
+        .badge.bg-dark,
+        .badge.bg-info,
+        span.badge[class*="bg-"] {
+            background-color: #f8f9fa !important;
+            border: 1px solid #dee2e6 !important;
+        }
+        
+        /* Text colors based on semantic meaning */
+        .badge.bg-success {
+            color: {{ company.brand_success_color }} !important;
+            background-color: #f8f9fa !important;
+        }
+        
+        .badge.bg-warning {
+            color: #ffc107 !important;
+            background-color: #f8f9fa !important;
+        }
+        
+        .badge.bg-danger {
+            color: {{ company.brand_danger_color }} !important;
+            background-color: #f8f9fa !important;
+        }
+        
+        .badge.bg-primary,
+        .badge.bg-info,
+        .badge.bg-light,
+        .badge.bg-dark,
+        .badge.bg-secondary {
+            color: {{ company.brand_primary_color }} !important;
+            background-color: #f8f9fa !important;
+        }
+        
+        .alert-info {
+            background-color: {{ company.brand_secondary_color }}20 !important;
+            border-color: {{ company.brand_secondary_color }} !important;
+            color: {{ company.brand_secondary_color }} !important;
+        }
+        
+        .progress-bar.bg-info {
+            background-color: {{ company.brand_secondary_color }} !important;
+        }
+        
+        .card-header.bg-info {
+            background-color: {{ company.brand_secondary_color }} !important;
+        }
+        
+        .modal-header.bg-info {
+            background-color: {{ company.brand_secondary_color }} !important;
+        }
+        
+        .card-header.bg-primary {
+            background-color: {{ company.brand_primary_color }} !important;
+        }
+        
+        .modal-header.bg-primary {
+            background-color: {{ company.brand_primary_color }} !important;
+        }
+        
+        /* Override Bootstrap success color classes for positive metrics */
+        .bg-success {
+            background-color: {{ company.brand_success_color }} !important;
+        }
+        
+        .text-success {
+            color: {{ company.brand_success_color }} !important;
+        }
+        
+        .border-success {
+            border-color: {{ company.brand_success_color }} !important;
+        }
+        
+        .badge.bg-success {
+            background-color: {{ company.brand_success_color }} !important;
+        }
+        
+        .progress-bar.bg-success {
+            background-color: {{ company.brand_success_color }} !important;
+        }
+        
+        .btn-success {
+            background-color: {{ company.brand_success_color }} !important;
+            border-color: {{ company.brand_success_color }} !important;
+        }
+        
+        .btn-success:hover,
+        .btn-success:focus,
+        .btn-success:active {
+            background-color: {{ company.brand_success_color }} !important;
+            border-color: {{ company.brand_success_color }} !important;
+            filter: brightness(0.85);
+        }
+        
+        /* Override Bootstrap warning color classes with alert brand color */
+        .bg-warning {
+            background-color: {{ company.brand_alert_color }} !important;
+        }
+        
+        .text-warning {
+            color: {{ company.brand_alert_color }} !important;
+        }
+        
+        .border-warning {
+            border-color: {{ company.brand_alert_color }} !important;
+        }
+        
+        .badge.bg-warning {
+            background-color: {{ company.brand_alert_color }} !important;
+            color: #000 !important;
+        }
+        
+        .alert-warning {
+            background-color: {{ company.brand_alert_color }}50 !important;
+            border-color: {{ company.brand_alert_color }} !important;
+            color: #000 !important;
+        }
+        
+        .alert-warning .alert-heading {
+            color: #000 !important;
+        }
+        
+        .progress-bar.bg-warning {
+            background-color: {{ company.brand_alert_color }} !important;
+        }
+        
+        /* Dropdown menu item hover and active states */
+        .dropdown-item:hover,
+        .dropdown-item:focus {
+            background-color: {{ company.brand_primary_color }} !important;
+            color: #ffffff !important;
+        }
+        
+        .dropdown-item:active {
+            background-color: {{ company.brand_primary_color }} !important;
+            color: #ffffff !important;
+        }
+        
+        /* Form control focus states */
+        .form-control:focus,
+        .form-select:focus {
+            border-color: {{ company.brand_primary_color }} !important;
+            box-shadow: 0 0 0 0.25rem {{ company.brand_primary_color }}40 !important;
+        }
+        
+        /* Chat widget input - override to use blue instead of red */
+        #chatWidgetInput:focus,
+        .chat-widget-input:focus {
+            border-color: #007bff !important;
+            box-shadow: 0 0 0 0.25rem rgba(0, 123, 255, 0.25) !important;
+        }
+        
+        /* Alert success - use brand primary color */
+        .alert-success {
+            background-color: {{ company.brand_primary_color }}20 !important;
+            border-color: {{ company.brand_primary_color }} !important;
+            color: #000000 !important;
+        }
+    </style>
+    
     {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -504,30 +761,30 @@
             width: 60px;
             height: 60px;
             border-radius: 50%;
-            background: rgba(13, 110, 253, 0.15);
+            background: rgba(0, 123, 255, 0.15);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
-            border: 2px solid rgba(13, 110, 253, 0.3);
-            box-shadow: 0 4px 12px rgba(13, 110, 253, 0.2);
+            border: 2px solid rgba(0, 123, 255, 0.3);
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.2);
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             transition: all 0.3s ease;
-            color: #0d6efd;
+            color: #007bff;
             font-size: 24px;
         }
         
         .chat-widget-button:hover {
             transform: scale(1.1);
-            background: rgba(13, 110, 253, 0.25);
-            border: 2px solid rgba(13, 110, 253, 0.5);
-            box-shadow: 0 6px 16px rgba(13, 110, 253, 0.3);
+            background: rgba(0, 123, 255, 0.25);
+            border: 2px solid rgba(0, 123, 255, 0.5);
+            box-shadow: 0 6px 16px rgba(0, 123, 255, 0.3);
         }
         
         .chat-widget-button.active {
-            background: rgba(13, 110, 253, 0.2);
-            border: 2px solid rgba(13, 110, 253, 0.4);
+            background: rgba(0, 123, 255, 0.2);
+            border: 2px solid rgba(0, 123, 255, 0.4);
         }
         
         .chat-widget-window {
@@ -541,7 +798,7 @@
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
             border-radius: 12px;
-            border: 1px solid rgba(13, 110, 253, 0.2);
+            border: 1px solid rgba(0, 123, 255, 0.2);
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
             flex-direction: column;
             overflow: hidden;
@@ -552,11 +809,11 @@
         }
         
         .chat-widget-header {
-            background: rgba(13, 110, 253, 0.15);
+            background: rgba(0, 123, 255, 0.15);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(13, 110, 253, 0.2);
-            color: #0d6efd;
+            border-bottom: 1px solid rgba(0, 123, 255, 0.2);
+            color: #007bff;
             padding: 15px 20px;
             display: flex;
             justify-content: space-between;
@@ -572,7 +829,7 @@
         .chat-widget-close {
             background: none;
             border: none;
-            color: #0d6efd;
+            color: #007bff;
             font-size: 20px;
             cursor: pointer;
             padding: 0;
@@ -609,7 +866,7 @@
         }
         
         .chat-widget-message.user .chat-widget-message-bubble {
-            background: #0d6efd;
+            background: #007bff;
             color: white;
             border-bottom-right-radius: 4px;
         }
@@ -642,12 +899,19 @@
         }
         
         .chat-widget-input:focus {
-            border-color: #0d6efd;
-            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+            border-color: #007bff !important;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important;
+            outline: none !important;
+        }
+        
+        /* Double specificity to ensure chat widget input uses blue */
+        #chatWidgetInput.chat-widget-input:focus {
+            border-color: #007bff !important;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important;
         }
         
         .chat-widget-voice {
-            background: #0d6efd;
+            background: #007bff;
             border: none;
             color: white;
             width: 36px;
@@ -662,11 +926,11 @@
         }
         
         .chat-widget-voice:hover {
-            background: #0a58ca;
+            background: #0056b3;
         }
         
         .chat-widget-send {
-            background: #0d6efd;
+            background: #007bff;
             border: none;
             color: white;
             width: 36px;
@@ -681,7 +945,7 @@
         }
         
         .chat-widget-send:hover {
-            background: #0a58ca;
+            background: #0056b3;
         }
         
         .chat-widget-send:disabled {
@@ -732,9 +996,14 @@
         <div class="chat-widget-window" id="chatWidgetWindow">
             <div class="chat-widget-header">
                 <h5><img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot" style="width: 20px; height: 20px; margin-right: 8px;"> AI Copilot</h5>
-                <button class="chat-widget-close" id="chatWidgetClose">
-                    <i class="bi bi-x"></i>
-                </button>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button class="chat-widget-close" id="chatWidgetMinimize" title="Minimize">
+                        <i class="bi bi-dash"></i>
+                    </button>
+                    <button class="chat-widget-close" id="chatWidgetClose">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
             </div>
             
             <div class="chat-widget-body" id="chatWidgetMessages">
@@ -760,7 +1029,7 @@
                         <input type="checkbox" id="chatWidgetAutoSpeak" style="margin-right: 4px;">
                         Auto-speak responses
                     </label>
-                    <button class="btn btn-sm btn-outline-danger ms-2" id="chatWidgetClear" title="End chat session" style="font-size: 10px; padding: 2px 8px;">
+                    <button class="btn btn-sm ms-2" id="chatWidgetClear" title="End chat session" style="font-size: 10px; padding: 2px 8px; background-color: #007bff; border-color: #007bff; color: white;">
                         <i class="bi bi-x-circle-fill"></i> End Chat
                     </button>
                 </div>
@@ -773,6 +1042,7 @@
         (function() {
             const toggleBtn = document.getElementById('chatWidgetToggle');
             const closeBtn = document.getElementById('chatWidgetClose');
+            const minimizeBtn = document.getElementById('chatWidgetMinimize');
             const chatWindow = document.getElementById('chatWidgetWindow');
             const messagesContainer = document.getElementById('chatWidgetMessages');
             const input = document.getElementById('chatWidgetInput');
@@ -822,6 +1092,13 @@
             
             // Close chat window
             closeBtn.addEventListener('click', function() {
+                isOpen = false;
+                chatWindow.classList.remove('open');
+                toggleBtn.classList.remove('active');
+            });
+            
+            // Minimize chat window (same as close)
+            minimizeBtn.addEventListener('click', function() {
                 isOpen = false;
                 chatWindow.classList.remove('open');
                 toggleBtn.classList.remove('active');
