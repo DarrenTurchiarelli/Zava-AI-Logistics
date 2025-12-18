@@ -166,8 +166,8 @@
                                         Click to calculate fastest route
                                     </p>
                                     <hr>
-                                    <button class="btn btn-outline-primary btn-sm" type="button">
-                                        <i class="bi bi-calculator"></i> Calculate Route
+                                    <button class="btn btn-sm" type="button" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
+                                        <i class="bi bi-calculator" style="color: #eb2525;"></i> Calculate Route
                                     </button>
                                     <div class="mt-2 d-none" id="fastest-spinner">
                                         <div class="spinner-border spinner-border-sm" role="status">
@@ -220,8 +220,8 @@
                                         Click to calculate shortest route
                                     </p>
                                     <hr>
-                                    <button class="btn btn-outline-primary btn-sm" type="button">
-                                        <i class="bi bi-calculator"></i> Calculate Route
+                                    <button class="btn btn-sm" type="button" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
+                                        <i class="bi bi-calculator" style="color: #eb2525;"></i> Calculate Route
                                     </button>
                                     <div class="mt-2 d-none" id="shortest-spinner">
                                         <div class="spinner-border spinner-border-sm" role="status">
@@ -279,8 +279,8 @@
                                         Click to calculate safest route
                                     </p>
                                     <hr>
-                                    <button class="btn btn-outline-primary btn-sm" type="button">
-                                        <i class="bi bi-calculator"></i> Calculate Route
+                                    <button class="btn btn-sm" type="button" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
+                                        <i class="bi bi-calculator" style="color: #eb2525;"></i> Calculate Route
                                     </button>
                                     <div class="mt-2 d-none" id="safest-spinner">
                                         <div class="spinner-border spinner-border-sm" role="status">
@@ -376,10 +376,11 @@
                                     </td>
                                     <td>
                                         {% if item.get('address_notes') %}
-                                        <button type="button" class="btn btn-sm btn-primary" 
+                                        <button type="button" class="btn btn-sm" 
                                                 data-bs-toggle="modal" 
-                                                data-bs-target="#notesModal{{ loop.index }}">
-                                            <i class="bi bi-sticky"></i> {{ item.address_notes|length }} note(s)
+                                                data-bs-target="#notesModal{{ loop.index }}"
+                                                style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
+                                            <i class="bi bi-sticky" style="color: #eb2525;"></i> {{ item.address_notes|length }} note(s)
                                         </button>
                                         {% else %}
                                         <span class="text-muted">No notes</span>
@@ -398,14 +399,16 @@
                                     </td>
                                     <td>
                                         {% if item.status != 'delivered' %}
-                                        <button type="button" class="btn btn-sm btn-primary mb-1" 
-                                                onclick="notifyCustomer('{{ item.barcode }}', '{{ item.recipient_name }}', {{ loop.index }})">
-                                            <i class="bi bi-chat-dots"></i> Notify Customer
+                                        <button type="button" class="btn btn-sm mb-1" 
+                                                onclick="notifyCustomer('{{ item.barcode }}', '{{ item.recipient_name }}', {{ loop.index }})"
+                                                style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
+                                            <i class="bi bi-chat-dots" style="color: #eb2525;"></i> Notify Customer
                                         </button>
-                                        <button type="button" class="btn btn-sm btn-success" 
+                                        <button type="button" class="btn btn-sm" 
                                                 data-bs-toggle="modal" 
-                                                data-bs-target="#completeModal{{ loop.index }}">
-                                            <i class="bi bi-check-circle"></i> Mark as Complete
+                                                data-bs-target="#completeModal{{ loop.index }}"
+                                                style="background-color: #f8f9fa; color: #198754; border: 1px solid #dee2e6;">
+                                            <i class="bi bi-check-circle" style="color: #198754;"></i> Mark as Complete
                                         </button>
                                         {% else %}
                                         <small class="text-muted">
@@ -422,13 +425,13 @@
                 <div class="card-footer">
                     <div class="row">
                         <div class="col-md-6">
-                            <button class="btn btn-primary" onclick="window.print();">
-                                <i class="bi bi-printer"></i> Print Manifest
+                            <button class="btn" onclick="window.print();" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
+                                <i class="bi bi-printer" style="color: #eb2525;"></i> Print Manifest
                             </button>
                         </div>
                         <div class="col-md-6 text-end">
-                            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
-                                <i class="bi bi-house"></i> Back to Dashboard
+                            <a href="{{ url_for('dashboard') }}" class="btn" style="background-color: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6;">
+                                <i class="bi bi-arrow-left" style="color: #6c757d;"></i> Back to Dashboard
                             </a>
                         </div>
                     </div>
@@ -474,7 +477,7 @@
                                 {% endif %}
                             </div>
                             <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                <button type="button" class="btn" data-bs-dismiss="modal" style="background-color: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6;">Close</button>
                             </div>
                         </div>
                     </div>
@@ -583,9 +586,9 @@
                                     </div>
                                 </div>
                                 <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                    <button type="submit" class="btn btn-success" id="submitBtn{{ loop.index }}">
-                                        <i class="bi bi-check-circle"></i> <span id="submitText{{ loop.index }}">Mark as Delivered</span>
+                                    <button type="button" class="btn" data-bs-dismiss="modal" style="background-color: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6;">Cancel</button>
+                                    <button type="submit" class="btn" id="submitBtn{{ loop.index }}" style="background-color: #f8f9fa; color: #198754; border: 1px solid #dee2e6;">
+                                        <i class="bi bi-check-circle" style="color: #198754;"></i> <span id="submitText{{ loop.index }}">Mark as Delivered</span>
                                     </button>
                                 </div>
                             </form>
