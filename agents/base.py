@@ -21,6 +21,7 @@ from typing import Dict, Any, Optional, List
 from azure.ai.projects import AIProjectClient
 from azure.identity import DefaultAzureCredential, AzureCliCredential, ManagedIdentityCredential
 from dotenv import load_dotenv
+from config.company import COMPANY_NAME
 
 load_dotenv()
 
@@ -539,7 +540,7 @@ async def customer_service_agent(customer_request: Dict[str, Any]) -> Dict[str, 
     if is_chat_request:
         # Simpler, more conversational prompt for chat widget
         message = f"""
-        You're Alex, a helpful customer service team member at DT Logistics. You're having a real conversation with a customer who needs help.
+        You're Alex, a helpful customer service team member at {COMPANY_NAME}. You're having a real conversation with a customer who needs help.
         
         Customer's Question:
         {customer_request.get('details', 'No details provided')}

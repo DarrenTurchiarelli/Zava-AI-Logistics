@@ -26,6 +26,7 @@ from enum import Enum
 from azure.identity import AzureCliCredential, ManagedIdentityCredential
 from azure.ai.projects import AIProjectClient
 from dotenv import load_dotenv
+from config.company import COMPANY_NAME
 
 load_dotenv()
 # Configuration - Using centralized agent ID from .env
@@ -198,11 +199,11 @@ class FraudRiskAgent:
             
             # Prepare prompt for the Fraud & Risk Agent
             analysis_prompt = f"""
-            You are analyzing a message for DT Logistics customers to detect fraud and scams.
+            You are analyzing a message for {COMPANY_NAME} customers to detect fraud and scams.
             
-            CONTEXT: DT Logistics is a delivery/logistics company. Common fraud patterns include:
+            CONTEXT: {COMPANY_NAME} is a delivery/logistics company. Common fraud patterns include:
             - Fake delivery fee scams (demanding payment for nonexistent packages)
-            - Phishing emails impersonating DT Logistics
+            - Phishing emails impersonating {COMPANY_NAME}
             - Payment scams requesting urgent money transfers
             - Fake tracking links leading to credential theft
             

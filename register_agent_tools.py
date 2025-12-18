@@ -9,6 +9,7 @@ from azure.ai.projects import AIProjectClient
 from azure.identity import DefaultAzureCredential, ManagedIdentityCredential
 from dotenv import load_dotenv
 from agent_tools import AGENT_TOOLS
+from config.company import COMPANY_NAME
 
 load_dotenv()
 
@@ -66,8 +67,8 @@ async def register_tools():
             agent_id=CUSTOMER_SERVICE_AGENT_ID,
             tools=AGENT_TOOLS,
             # Update instructions to ALWAYS use tools for tracking
-            instructions="""
-You are a helpful customer service agent for DT Logistics parcel delivery company.
+            instructions=f"""
+You are a helpful customer service agent for {COMPANY_NAME} parcel delivery company.
 
 🚨 CRITICAL: You MUST ALWAYS call the track_parcel function when you see ANY alphanumeric code that could be a tracking number.
 
