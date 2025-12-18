@@ -361,6 +361,12 @@ class ParcelTrackingDB:
         """Register a new parcel into the logistics network"""
         container = self.database.get_container_client(self.parcels_container)
         
+        # Check if barcode already exists to prevent duplicates
+        existing_parcel = await self.get_parcel_by_barcode(barcode)
+        if existing_parcel:
+            print(f"⚠️  Parcel with barcode {barcode} already exists (Tracking: {existing_parcel.get('tracking_number')})")
+            raise ValueError(f"Duplicate barcode: Parcel {barcode} already exists in the system")
+        
         # Generate tracking number
         tracking_number = self._generate_tracking_number()
         
