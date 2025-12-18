@@ -370,7 +370,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <span class="badge bg-{{ 'danger' if item.priority == 'urgent' else 'warning' if item.priority == 'high' else 'secondary' }}">
+                                        <span class="badge bg-{{ 'danger' if item.priority == 'urgent' else 'warning' if item.priority == 'high' else 'secondary' }}" style="font-size: 0.875rem; padding: 0.25rem 0.5rem;">
                                             {{ item.priority }}
                                         </span>
                                     </td>
@@ -388,11 +388,11 @@
                                     </td>
                                     <td>
                                         {% if item.status == 'delivered' %}
-                                        <span class="badge bg-success">
+                                        <span class="badge bg-success" style="font-size: 0.875rem; padding: 0.25rem 0.5rem;">
                                             <i class="bi bi-check-circle"></i> Delivered
                                         </span>
                                         {% else %}
-                                        <span class="badge bg-warning">
+                                        <span class="badge bg-warning" style="font-size: 0.875rem; padding: 0.25rem 0.5rem;">
                                             <i class="bi bi-clock"></i> Pending
                                         </span>
                                         {% endif %}
