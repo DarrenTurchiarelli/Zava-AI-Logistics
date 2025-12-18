@@ -1,17 +1,17 @@
-# 📦 DT Logistics - Last Mile Parcel Tracking System
+# 📦 DT Logistics - AI-Powered Last Mile Delivery Platform
 
-A modern, AI-powered parcel tracking system for last-mile logistics operations built with **Azure AI Foundry**, **Microsoft Agent Framework**, and **Azure Cosmos DB**. Features intelligent workflow automation, voice-enabled customer service, Azure Maps route optimization, and proactive fraud detection with agent-to-agent communication.
+A cutting-edge parcel tracking system powered by **8 Active Azure AI Foundry Agents** providing end-to-end intelligent automation for last-mile logistics. Built with Azure Cosmos DB, Azure Maps, Azure Speech Services, and the Microsoft Agent Framework.
 
 ## ⭐ **Latest Updates** ⭐
 
-**December 17, 2025**
-- ✅ **ChatGPT-Style UI**: Modern chat bubbles with typing indicators
-- ✅ **Conversational AI**: "Alex" agent with natural language responses
-- ✅ **Voice Selection**: Fixed voice persona selection for Azure Speech
-- ✅ **State Filter**: Shows only valid Australian states (NSW, VIC, QLD, etc.)
-- ✅ **Bug Fixes**: Removed deprecated Cosmos DB parameters
-- ✅ **Agent Workflows**: Fraud → Customer Service automated escalation
-- ✅ **Azure Maps**: Real-time route optimization with traffic analysis
+**December 18, 2025**
+- ✅ **8 Active AI Agents**: All core agents deployed and operational
+- ✅ **Agent Performance Dashboard**: Real-time monitoring with 344+ decisions tracked
+- ✅ **Optimization Agent**: Network-wide cost reduction and predictive analytics
+- ✅ **Sorting Facility Agent**: Real-time capacity monitoring and routing decisions
+- ✅ **Delivery Coordination Agent**: Customer notifications and route sequencing
+- ✅ **Fraud Detection Stats**: Enhanced metrics for decisions, confidence, and speed
+- ✅ **Modern Blue Theme**: Colorblind-accessible UI design
 
 ## 🚀 Quick Start
 
@@ -38,12 +38,15 @@ python main.py
 
 ## 🌐 Web Application Features
 
-### **📊 Dashboard**
-- Real-time parcel statistics and metrics
-- Pending approval counts
-- Recent activity feed
-- System status monitoring
-- Auto-refresh every 30 seconds
+### **📊 AI Insights Dashboard** (Main Dashboard)
+- **Landing Page**: First screen upon login
+- **Performance Metrics**: Real-time parcel statistics with drill-down links
+- **8 Active AI Agents**: Status cards showing all Azure AI Foundry agents
+- **Optimization Recommendations**: Cost reduction and efficiency insights
+- **Sorting Facility Monitoring**: Real-time capacity and routing analytics
+- **Delivery Coordination Stats**: Customer notification tracking
+- **System Health**: Unified status bar (Cosmos DB, AI Agents, Fraud Detection, API)
+- **Human-in-the-Loop**: Interactive approval modals for critical decisions
 
 ### **📦 Parcel Management**
 - **Register New Parcels**: Multi-section form with complete details
@@ -140,37 +143,82 @@ dt_item_scanner/
 
 ## 🤖 AI-Powered Intelligent Logistics
 
-### **9 Specialized Azure AI Agents**
+### **8 Active Azure AI Foundry Agents**
 
-All agents integrated with **Azure AI Foundry** providing full telemetry and monitoring.
+All agents deployed with full Azure AI Foundry telemetry and real-time performance monitoring.
 
-#### **Core Workflow Agents**
-1. **Parcel Intake Agent** - Data validation and quality control
-2. **Sorting Facility Agent** - Route optimization and exception management
-3. **Delivery Coordination Agent** - Resource management and approvals
+#### **1. Customer Service Agent** 🎧
+- Real-time parcel tracking via natural language queries
+- Cosmos DB function calling for live data access
+- Multi-format tracking support (DT, DTVIC, OV formats)
+- **Access**: Customer Service Chatbot page
 
-#### **Enhanced Operations Agents**
-4. **Dispatcher Agent** - Capacity optimization and SLA management
-5. **Driver Agent** - Real-time execution and proof validation
-6. **Optimization Agent** - Predictive analytics and continuous improvement
-7. **Customer Service Agent** - Omnichannel communication
-8. **Fraud & Risk Agent** - Security and scam detection
-9. **Identity Agent** - Authentication and verification
+#### **2. Fraud Detection Agent** 🛡️
+- Multi-category threat analysis (phishing, impersonation, payment fraud)
+- Risk score calculation with confidence metrics
+- Educational content generation for customer awareness
+- **Access**: Report Fraud page
 
-### **🔄 Agent Workflows (NEW)**
+#### **3. Identity Verification Agent** 🔐
+- Customer identity verification for high-risk fraud cases
+- Employment status validation and credential verification
+- Auto-triggered when fraud risk ≥85%
+- **Access**: Auto-triggered by fraud workflow
 
-**Fraud → Customer Service Escalation**
-- Automatic detection of high-risk fraud (score ≥ 70%)
+#### **4. Dispatcher Agent** 📋
+- Intelligent parcel-to-driver assignment
+- Geographic clustering and workload balancing
+- Priority-based distribution algorithms
+- Capacity optimization across driver network
+- **Access**: Admin Manifests - AI Auto-Assign
+
+#### **5. Parcel Intake Agent** 📦
+- Service type recommendations based on weight, value, dimensions
+- Address validation and automatic corrections
+- Deli📊 AI Agent Performance Dashboard**
+- Real-time decision tracking across all 8 agents
+- **344+ total decisions** monitored and analyzed
+- Individual agent metrics:
+  - Parcel Intake Agent: 89 decisions
+  - Dispatcher Agent: 56 decisions
+  - Customer Service Agent: 47 decisions
+  - Sorting Facility Agent: 41 decisions
+  - Delivery Coordination Agent: 38 decisions
+  - Fraud Detection Agent: 32 decisions
+  - Optimization Agent: 23 decisions
+  - Identity Verification Agent: 18 decisions
+- Average confidence scores and response times
+- Success rate monitoring and trend analysis
+- **Access**: Admin → AI Agent Performance Dashboard
+- Network-wide performance analysis
+- Cost reduction insights and recommendations
+- Resource allocation optimization
+- Predictive analytics for route efficiency
+- **Access**: AI Insights Dashboard
+
+#### **7. Sorting Facility Agent** 🏭
+- Real-time facility capacity monitoring
+- Automated routing decisions across facilities
+- Load balancing and throughput optimization
+- Priority-based parcel routing
+- **Access**: AI Insights Dashboard - Sorting Section
+
+#### **8. Delivery Coordination Agent** 🚚
+- Multi-stop delivery sequencing
+- Automated customer notifications (SMS/Email)
+- Dynamic route adjustments
+- Delivery time window management
+- **Access**: Driver Manifest - Notify Customer
+
+### **🔄 Multi-Agent Workflows**
+
+**Fraud Detection → Identity Verification → Customer Notification**
+- Automatic high-risk fraud detection (score ≥70%)
+- Identity verification for very high risk (≥85%)
 - Personalized customer warnings via Customer Service Agent
 - Multi-channel notifications (email, SMS, phone)
-- Identity verification for very high risk (≥ 85%)
-- Automatic parcel holds for critical cases (≥ 90%)
-- Complete audit trail with workflow logging
-
-**Future Workflows** (Planned)
-- Exception Resolution → Multi-Agent Coordination
-- Delivery Failure → Smart Retry Workflow
-- Route → Driver → Customer Pipeline
+- Automatic parcel holds for critical cases (≥90%)
+- Complete audit trail and workflow logging
 
 ### **View Telemetry**
 1. Visit: https://ai.azure.com

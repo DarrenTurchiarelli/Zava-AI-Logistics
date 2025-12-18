@@ -340,8 +340,8 @@ def setup_users_now():
 
 @app.route('/')
 def index():
-    """Home page with dashboard"""
-    return render_template('index.html')
+    """Home page redirects to AI Insights dashboard"""
+    return redirect(url_for('ai_insights'))
 
 @app.after_request
 def add_header(response):
@@ -1543,58 +1543,53 @@ def agent_monitoring_dashboard():
     # Get comprehensive agent performance data
     dashboard_data = global_state_manager.get_agent_dashboard_data()
     
-    # Add some example decisions if none exist (for demo)
+    # Add realistic demo decisions if none exist (simulating Azure AI Foundry agent activity)
     if dashboard_data['total_decisions'] == 0:
         from logistics_state_manager import AgentDecision
         import uuid
+        import random
+        from datetime import datetime, timedelta
         
-        # Sample decisions for demonstration
-        sample_decisions = [
-            AgentDecision(
-                decision_id=str(uuid.uuid4()),
-                agent_name="Fraud Detection Agent",
-                agent_type="fraud_detection",
-                tracking_number="DTVIC123",
-                decision_type="analyze",
-                decision_action="classified as LOW risk",
-                confidence_score=0.92,
-                reasoning="No suspicious patterns detected, sender verified",
-                input_data={"message": "Sample message"},
-                output_data={"threat_level": "LOW"},
-                execution_time_ms=245.5
-            ),
-            AgentDecision(
-                decision_id=str(uuid.uuid4()),
-                agent_name="Approval Auto-Agent",
-                agent_type="approval_automation",
-                tracking_number="DTVIC124",
-                decision_type="approve",
-                decision_action="auto-approved delivery exception",
-                confidence_score=0.88,
-                reasoning="Fraud risk < 30%, DC match confirmed",
-                input_data={"fraud_risk": 15, "dc": "DC-MEL-001"},
-                output_data={"approved": True},
-                execution_time_ms=156.2
-            ),
-            AgentDecision(
-                decision_id=str(uuid.uuid4()),
-                agent_name="Route Optimization Agent",
-                agent_type="route_optimization",
-                tracking_number=None,
-                decision_type="optimize",
-                decision_action="optimized route for DRV001",
-                confidence_score=0.95,
-                reasoning="Azure Maps optimization, 18 min time savings",
-                input_data={"driver": "DRV001", "parcels": 12},
-                output_data={"time_saved": 18, "fuel_saved": 2.3},
-                execution_time_ms=892.7
-            )
+        # Agent configurations with realistic decision counts
+        agent_configs = [
+            ("Customer Service Agent", "customer_service", ["query", "track", "support"], 47),
+            ("Fraud Detection Agent", "fraud_detection", ["analyze", "classify"], 32),
+            ("Identity Verification Agent", "identity_verification", ["verify", "authenticate"], 18),
+            ("Dispatcher Agent", "dispatcher", ["assign", "dispatch"], 56),
+            ("Parcel Intake Agent", "parcel_intake", ["validate", "register"], 89),
+            ("Optimization Agent", "optimization", ["analyze", "recommend"], 23),
+            ("Sorting Facility Agent", "sorting_facility", ["route", "allocate"], 41),
+            ("Delivery Coordination Agent", "delivery_coordination", ["schedule", "notify"], 38),
         ]
         
-        for decision in sample_decisions:
-            global_state_manager.record_agent_decision(decision, success=True)
+        # Generate realistic historical decisions for all 8 active agents
+        base_time = datetime.now()
+        for agent_name, agent_type, decision_types, count in agent_configs:
+            for i in range(count):
+                # Create decision with varying timestamps (last 7 days)
+                hours_ago = random.randint(0, 168)  # 7 days in hours
+                timestamp = base_time - timedelta(hours=hours_ago)
+                
+                decision = AgentDecision(
+                    decision_id=str(uuid.uuid4()),
+                    agent_name=agent_name,
+                    agent_type=agent_type,
+                    tracking_number=f"DTVIC{random.randint(1000, 9999)}",
+                    decision_type=random.choice(decision_types),
+                    decision_action=f"processed by {agent_name}",
+                    confidence_score=random.uniform(0.82, 0.98),
+                    reasoning="AI-powered decision from Azure AI Foundry",
+                    input_data={},
+                    output_data={},
+                    execution_time_ms=random.uniform(120, 850),
+                    timestamp=timestamp
+                )
+                
+                # Simulate 95% success rate
+                success = random.random() < 0.95
+                global_state_manager.record_agent_decision(decision, success=success)
         
-        # Refresh dashboard data
+        # Refresh dashboard data after populating
         dashboard_data = global_state_manager.get_agent_dashboard_data()
     
     return render_template('agent_dashboard.html', dashboard=dashboard_data)

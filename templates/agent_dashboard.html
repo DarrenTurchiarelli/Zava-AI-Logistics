@@ -67,67 +67,449 @@
         </div>
     </div>
 
-    <!-- Decision Types Breakdown -->
+    <!-- Agent Capabilities Reference -->
     <div class="row mb-4">
-        <div class="col-lg-6">
-            <div class="card">
+        <div class="col-12">
+            <div class="card border-primary">
                 <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0"><i class="fas fa-chart-pie"></i> Decision Types Distribution</h5>
+                    <h5 class="mb-0"><i class="bi bi-cpu"></i> Azure AI Foundry Agents - System Status</h5>
                 </div>
                 <div class="card-body">
-                    {% if dashboard.decision_types %}
-                    <div class="list-group">
-                        {% for decision_type, count in dashboard.decision_types.items() %}
-                        <div class="list-group-item d-flex justify-content-between align-items-center">
-                            <span class="text-capitalize">{{ decision_type.replace('_', ' ') }}</span>
-                            <span class="badge bg-primary rounded-pill">{{ count }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% else %}
-                    <p class="text-muted text-center">No decisions recorded yet</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-lg-6">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0"><i class="fas fa-tasks"></i> Recent Decisions</h5>
-                </div>
-                <div class="card-body" style="max-height: 400px; overflow-y: auto;">
-                    {% if dashboard.recent_decisions %}
-                    <div class="list-group">
-                        {% for decision in dashboard.recent_decisions %}
-                        <div class="list-group-item">
-                            <div class="d-flex w-100 justify-content-between">
-                                <h6 class="mb-1">{{ decision.agent }}</h6>
-                                <small class="text-muted">{{ decision.timestamp[:19] }}</small>
-                            </div>
-                            <p class="mb-1">
-                                <span class="badge bg-info">{{ decision.type }}</span>
-                                {{ decision.action }}
-                            </p>
-                            <div class="progress" style="height: 5px;">
-                                <div class="progress-bar 
-                                    {% if decision.confidence > 0.8 %}bg-info
-                                    {% elif decision.confidence > 0.6 %}bg-warning
-                                    {% else %}bg-danger{% endif %}"
-                                    role="progressbar" 
-                                    style="width: {{ (decision.confidence * 100)|int }}%"
-                                    aria-valuenow="{{ (decision.confidence * 100)|int }}" 
-                                    aria-valuemin="0" 
-                                    aria-valuemax="100">
+                    <p class="mb-3">
+                        <i class="bi bi-info-circle"></i> <strong>8 Specialized AI Agents</strong> integrated with Azure AI Foundry for intelligent logistics automation.
+                    </p>
+
+                    <!-- Active Agents -->
+                    <h6 class="text-info mt-4 mb-3">
+                        <i class="bi bi-check-circle-fill"></i> Active Agents
+                    </h6>
+                    
+                    <!-- Row 1: First 3 Active Agents -->
+                    <div class="row">
+                        <!-- Customer Service Agent -->
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 border-primary shadow-sm">
+                                <div class="card-body d-flex flex-column">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <h6 class="card-title">
+                                            <i class="bi bi-headset text-info"></i> Customer Service Agent
+                                        </h6>
+                                        <span class="badge bg-info">ACTIVE</span>
+                                    </div>
+                                    
+                                    <!-- Agent Metrics -->
+                                    {% set agent_metrics = namespace(found=false) %}
+                                    {% for agent in dashboard.agents %}
+                                        {% if 'Customer Service' in agent.name %}
+                                            {% set agent_metrics.found = true %}
+                                            <div class="row text-center mb-2 mt-2">
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Decisions</small>
+                                                    <strong>{{ agent.total_decisions }}</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Confidence</small>
+                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Speed</small>
+                                                    <strong>{{ agent.avg_execution_ms|round(0)|int }}ms</strong>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    <p class="card-text small mt-2">
+                                        AI-powered customer support with real-time Cosmos DB queries.
+                                    </p>
+                                    <ul class="small mb-2">
+                                        <li>Real-time parcel tracking</li>
+                                        <li>Delivery status updates</li>
+                                        <li>Multi-format tracking support</li>
+                                    </ul>
+                                    <div class="d-flex flex-wrap gap-1 mb-2">
+                                        <span class="badge bg-light text-dark">track_parcel</span>
+                                        <span class="badge bg-light text-dark">search_parcels</span>
+                                        <span class="badge bg-light text-dark">get_statistics</span>
+                                    </div>
+                                    <a href="{{ url_for('customer_service_chatbot') }}" class="btn btn-sm btn-primary w-100 mt-auto">
+                                        <i class="bi bi-chat-dots"></i> Open Chatbot
+                                    </a>
                                 </div>
                             </div>
-                            <small class="text-muted">Confidence: {{ (decision.confidence * 100)|round(0)|int }}%</small>
                         </div>
-                        {% endfor %}
+                        
+                        <!-- Fraud Detection Agent -->
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 border-primary shadow-sm">
+                                <div class="card-body d-flex flex-column">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <h6 class="card-title">
+                                            <i class="bi bi-shield-exclamation text-danger"></i> Fraud Detection Agent
+                                        </h6>
+                                        <span class="badge bg-info">ACTIVE</span>
+                                    </div>
+                                    
+                                    <!-- Agent Metrics -->
+                                    {% set agent_metrics = namespace(found=false) %}
+                                    {% for agent in dashboard.agents %}
+                                        {% if 'Fraud' in agent.name %}
+                                            {% set agent_metrics.found = true %}
+                                            <div class="row text-center mb-2 mt-2">
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Decisions</small>
+                                                    <strong>{{ agent.total_decisions }}</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Confidence</small>
+                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Speed</small>
+                                                    <strong>{{ agent.avg_execution_ms|round(0)|int }}ms</strong>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    <p class="card-text small mt-2">
+                                        Analyzes messages for fraud risks with multi-category threat classification.
+                                    </p>
+                                    <ul class="small mb-2">
+                                        <li>Real-time threat analysis</li>
+                                        <li>Educational content generation</li>
+                                        <li>Automated workflows</li>
+                                    </ul>
+                                    <div class="d-flex flex-wrap gap-1 mb-2">
+                                        <span class="badge bg-light text-dark">check_frauds</span>
+                                        <span class="badge bg-light text-dark">validate_sender</span>
+                                    </div>
+                                    <a href="{{ url_for('report_fraud') }}" class="btn btn-sm btn-primary w-100 mt-auto">
+                                        <i class="bi bi-shield-exclamation"></i> Report Fraud
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Identity Agent -->
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 border-primary shadow-sm">
+                                <div class="card-body d-flex flex-column">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <h6 class="card-title">
+                                            <i class="bi bi-person-check text-info"></i> Identity Agent
+                                        </h6>
+                                        <span class="badge bg-info">ACTIVE</span>
+                                    </div>
+                                    
+                                    <!-- Agent Metrics -->
+                                    {% set agent_metrics = namespace(found=false) %}
+                                    {% for agent in dashboard.agents %}
+                                        {% if 'Identity' in agent.name %}
+                                            {% set agent_metrics.found = true %}
+                                            <div class="row text-center mb-2 mt-2">
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Decisions</small>
+                                                    <strong>{{ agent.total_decisions }}</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Confidence</small>
+                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Speed</small>
+                                                    <strong>{{ agent.avg_execution_ms|round(0)|int }}ms</strong>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    <p class="card-text small mt-2">
+                                        Verifies customer identity for high-risk fraud cases (≥85% risk score).
+                                    </p>
+                                    <ul class="small mb-2">
+                                        <li>Credential verification</li>
+                                        <li>Employment status checks</li>
+                                        <li>Customer authentication</li>
+                                    </ul>
+                                    <div class="d-flex flex-wrap gap-1 mb-2">
+                                        <span class="badge bg-light text-dark">verify_customer</span>
+                                        <span class="badge bg-light text-dark">check_identity</span>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-primary w-100 mt-auto" disabled>
+                                        <i class="bi bi-lightning"></i> Auto-triggered by Fraud Workflow
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    {% else %}
-                    <p class="text-muted text-center">No recent decisions</p>
-                    {% endif %}
+
+                    <!-- Row 2: Remaining Active Agents -->
+                    <div class="row">
+                        <!-- Dispatcher Agent -->
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 border-primary shadow-sm">
+                                <div class="card-body d-flex flex-column">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <h6 class="card-title">
+                                            <i class="bi bi-diagram-3 text-warning"></i> Dispatcher Agent
+                                        </h6>
+                                        <span class="badge bg-info">ACTIVE</span>
+                                    </div>
+                                    
+                                    <!-- Agent Metrics -->
+                                    {% set agent_metrics = namespace(found=false) %}
+                                    {% for agent in dashboard.agents %}
+                                        {% if 'Dispatch' in agent.name %}
+                                            {% set agent_metrics.found = true %}
+                                            <div class="row text-center mb-2 mt-2">
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Decisions</small>
+                                                    <strong>{{ agent.total_decisions }}</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Confidence</small>
+                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Speed</small>
+                                                    <strong>{{ agent.avg_execution_ms|round(0)|int }}ms</strong>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    <p class="card-text small mt-2">
+                                        Intelligent parcel-to-driver assignment with workload balancing.
+                                    </p>
+                                    <ul class="small mb-2">
+                                        <li>Geographic clustering</li>
+                                        <li>Priority-based assignment</li>
+                                        <li>Capacity optimization</li>
+                                    </ul>
+                                    <div class="d-flex flex-wrap gap-1 mb-2">
+                                        <span class="badge bg-light text-dark">optimize_assignment</span>
+                                        <span class="badge bg-light text-dark">balance_workload</span>
+                                    </div>
+                                    <a href="{{ url_for('admin_manifests') }}" class="btn btn-sm btn-primary w-100 mt-auto">
+                                        <i class="bi bi-robot"></i> Auto-Assign Parcels
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Parcel Intake Agent -->
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 border-primary shadow-sm">
+                                <div class="card-body d-flex flex-column">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <h6 class="card-title">
+                                            <i class="bi bi-box-seam text-primary"></i> Parcel Intake Agent
+                                        </h6>
+                                        <span class="badge bg-info">ACTIVE</span>
+                                    </div>
+                                    
+                                    <!-- Agent Metrics -->
+                                    {% set agent_metrics = namespace(found=false) %}
+                                    {% for agent in dashboard.agents %}
+                                        {% if 'Intake' in agent.name or 'Parcel Intake' in agent.name %}
+                                            {% set agent_metrics.found = true %}
+                                            <div class="row text-center mb-2 mt-2">
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Decisions</small>
+                                                    <strong>{{ agent.total_decisions }}</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Confidence</small>
+                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Speed</small>
+                                                    <strong>{{ agent.avg_execution_ms|round(0)|int }}ms</strong>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    <p class="card-text small mt-2">
+                                        Validates parcels during registration with AI-powered insights.
+                                    </p>
+                                    <ul class="small mb-2">
+                                        <li>Service type recommendations</li>
+                                        <li>Address validation & corrections</li>
+                                        <li>Delivery complication detection</li>
+                                    </ul>
+                                    <div class="d-flex flex-wrap gap-1 mb-2">
+                                        <span class="badge bg-light text-dark">validate_address</span>
+                                        <span class="badge bg-light text-dark">suggest_service</span>
+                                        <span class="badge bg-light text-dark">detect_issues</span>
+                                    </div>
+                                    <a href="{{ url_for('register_parcel') }}" class="btn btn-sm btn-primary w-100 mt-auto">
+                                        <i class="bi bi-box-seam"></i> Register Parcel
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Optimization Agent -->
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 border-primary shadow-sm">
+                                <div class="card-body d-flex flex-column">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <h6 class="card-title">
+                                            <i class="bi bi-graph-up text-primary"></i> Optimization Agent
+                                        </h6>
+                                        <span class="badge bg-info">ACTIVE</span>
+                                    </div>
+                                    
+                                    <!-- Agent Metrics -->
+                                    {% set agent_metrics = namespace(found=false) %}
+                                    {% for agent in dashboard.agents %}
+                                        {% if 'Optimization' in agent.name %}
+                                            {% set agent_metrics.found = true %}
+                                            <div class="row text-center mb-2 mt-2">
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Decisions</small>
+                                                    <strong>{{ agent.total_decisions }}</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Confidence</small>
+                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Speed</small>
+                                                    <strong>{{ agent.avg_execution_ms|round(0)|int }}ms</strong>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    <p class="card-text small mt-2">
+                                        Network-wide performance analysis and AI-powered recommendations.
+                                    </p>
+                                    <ul class="small mb-2">
+                                        <li>Cost reduction insights</li>
+                                        <li>Resource allocation optimization</li>
+                                        <li>Predictive analytics</li>
+                                    </ul>
+                                    <div class="d-flex flex-wrap gap-1 mb-2">
+                                        <span class="badge bg-light text-dark">analyze_network</span>
+                                        <span class="badge bg-light text-dark">optimize_costs</span>
+                                    </div>
+                                    <a href="{{ url_for('ai_insights') }}" class="btn btn-sm btn-primary w-100 mt-auto">
+                                        <i class="bi bi-graph-up"></i> View Insights Dashboard
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row 3: More Active Agents -->
+                    <div class="row">
+                        <!-- Sorting Facility Agent -->
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 border-primary shadow-sm">
+                                <div class="card-body d-flex flex-column">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <h6 class="card-title">
+                                            <i class="bi bi-building text-info"></i> Sorting Facility Agent
+                                        </h6>
+                                        <span class="badge bg-info">ACTIVE</span>
+                                    </div>
+                                    
+                                    <!-- Agent Metrics -->
+                                    {% set agent_metrics = namespace(found=false) %}
+                                    {% for agent in dashboard.agents %}
+                                        {% if 'Sorting' in agent.name or 'Facility' in agent.name %}
+                                            {% set agent_metrics.found = true %}
+                                            <div class="row text-center mb-2 mt-2">
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Decisions</small>
+                                                    <strong>{{ agent.total_decisions }}</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Confidence</small>
+                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Speed</small>
+                                                    <strong>{{ agent.avg_execution_ms|round(0)|int }}ms</strong>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    <p class="card-text small mt-2">
+                                        Real-time facility capacity monitoring and automated routing decisions.
+                                    </p>
+                                    <ul class="small mb-2">
+                                        <li>Optimize facility throughput</li>
+                                        <li>Load balancing across facilities</li>
+                                        <li>Priority-based routing</li>
+                                    </ul>
+                                    <div class="d-flex flex-wrap gap-1 mb-2">
+                                        <span class="badge bg-light text-dark">monitor_capacity</span>
+                                        <span class="badge bg-light text-dark">route_parcels</span>
+                                    </div>
+                                    <a href="{{ url_for('ai_insights') }}#sorting-facility" class="btn btn-sm btn-primary w-100 mt-auto">
+                                        <i class="bi bi-speedometer2"></i> View Facility Insights
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Delivery Coordination Agent -->
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 border-primary shadow-sm">
+                                <div class="card-body d-flex flex-column">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <h6 class="card-title">
+                                            <i class="bi bi-calendar-check text-warning"></i> Delivery Coordination Agent
+                                        </h6>
+                                        <span class="badge bg-info">ACTIVE</span>
+                                    </div>
+                                    
+                                    <!-- Agent Metrics -->
+                                    {% set agent_metrics = namespace(found=false) %}
+                                    {% for agent in dashboard.agents %}
+                                        {% if 'Delivery' in agent.name or 'Coordination' in agent.name %}
+                                            {% set agent_metrics.found = true %}
+                                            <div class="row text-center mb-2 mt-2">
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Decisions</small>
+                                                    <strong>{{ agent.total_decisions }}</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Confidence</small>
+                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Speed</small>
+                                                    <strong>{{ agent.avg_execution_ms|round(0)|int }}ms</strong>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    <p class="card-text small mt-2">
+                                        Multi-stop delivery sequencing with automated customer notifications.
+                                    </p>
+                                    <ul class="small mb-2">
+                                        <li>Dynamic route adjustments</li>
+                                        <li>Real-time customer communication</li>
+                                        <li>Delivery time window management</li>
+                                    </ul>
+                                    <div class="d-flex flex-wrap gap-1 mb-2">
+                                        <span class="badge bg-light text-dark">notify_customer</span>
+                                        <span class="badge bg-light text-dark">optimize_sequence</span>
+                                    </div>
+                                    <a href="{{ url_for('driver_manifest') }}" class="btn btn-sm btn-primary w-100 mt-auto">
+                                        <i class="bi bi-truck-front"></i> View Driver Manifest
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -211,7 +593,7 @@
                         </table>
                     </div>
                     {% else %}
-                    <div class="alert alert-info text-center">
+                    <div class="alert alert-info alert-persistent text-center">
                         <i class="fas fa-info-circle"></i> No agent performance data available yet.
                         <br><small>Agents will appear here after making their first decisions.</small>
                     </div>
@@ -221,502 +603,7 @@
         </div>
     </div>
 
-    <!-- Agent Capabilities Reference -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card border-primary">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0"><i class="bi bi-cpu"></i> Azure AI Foundry Agents - System Status</h5>
-                </div>
-                <div class="card-body">
-                    <p class="mb-3">
-                        <i class="bi bi-info-circle"></i> <strong>9 Specialized AI Agents</strong> integrated with Azure AI Foundry for intelligent logistics automation.
-                        <span class="badge bg-info ms-2">8 Active</span>
-                        <span class="badge bg-secondary ms-1">1 Available</span>
-                    </p>
 
-                    <!-- Active Agents -->
-                    <h6 class="text-info mt-4 mb-3">
-                        <i class="bi bi-check-circle-fill"></i> Active Agents
-                    </h6>
-                    
-                    <!-- Row 1: First 3 Active Agents -->
-                    <div class="row">
-                        <!-- Customer Service Agent -->
-                        <div class="col-md-4 mb-3">
-                            <div class="card h-100 border-primary shadow-sm">
-                                <div class="card-body d-flex flex-column">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <h6 class="card-title">
-                                            <i class="bi bi-headset text-info"></i> Customer Service Agent
-                                        </h6>
-                                        <span class="badge bg-info">ACTIVE</span>
-                                    </div>
-                                    
-                                    <!-- Agent Metrics -->
-                                    {% set agent_metrics = namespace(found=false) %}
-                                    {% for agent in dashboard.agents %}
-                                        {% if 'Customer Service' in agent.name %}
-                                            {% set agent_metrics.found = true %}
-                                            <div class="row text-center mb-2 mt-2">
-                                                <div class="col-4">
-                                                    <small class="text-muted d-block">Decisions</small>
-                                                    <strong>{{ agent.total_decisions }}</strong>
-                                                </div>
-                                                <div class="col-4">
-                                                    <small class="text-muted d-block">Confidence</small>
-                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
-                                                </div>
-                                                <div class="col-4">
-                                                    <small class="text-muted d-block">Speed</small>
-                                                    <strong>{{ agent.avg_execution_ms|round(0)|int }}ms</strong>
-                                                </div>
-                                            </div>
-                                        {% endif %}
-                                    {% endfor %}
-                                    {% if not agent_metrics.found %}
-                                        <div class="alert alert-sm alert-info mb-2 mt-2 py-1 px-2">
-                                            <small><i class="bi bi-info-circle"></i> No usage data yet</small>
-                                        </div>
-                                    {% endif %}
-                                    
-                                    <p class="card-text small">
-                                        AI-powered customer support with real-time Cosmos DB queries.
-                                    </p>
-                                    <ul class="small mb-2">
-                                        <li>Real-time parcel tracking</li>
-                                        <li>Delivery status updates</li>
-                                        <li>Multi-format tracking support</li>
-                                    </ul>
-                                    <div class="d-flex flex-wrap gap-1 mb-2">
-                                        <span class="badge bg-light text-dark">track_parcel</span>
-                                        <span class="badge bg-light text-dark">search_parcels</span>
-                                        <span class="badge bg-light text-dark">get_statistics</span>
-                                    </div>
-                                    <a href="{{ url_for('customer_service_chatbot') }}" class="btn btn-sm btn-primary w-100 mt-auto">
-                                        <i class="bi bi-chat-dots"></i> Open Chatbot
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Fraud Detection Agent -->
-                        <div class="col-md-4 mb-3">
-                            <div class="card h-100 border-primary shadow-sm">
-                                <div class="card-body d-flex flex-column">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <h6 class="card-title">
-                                            <i class="bi bi-shield-exclamation text-danger"></i> Fraud Detection Agent
-                                        </h6>
-                                        <span class="badge bg-info">ACTIVE</span>
-                                    </div>
-                                    
-                                    <!-- Agent Metrics -->
-                                    {% set agent_metrics = namespace(found=false) %}
-                                    {% for agent in dashboard.agents %}
-                                        {% if 'Fraud' in agent.name %}
-                                            {% set agent_metrics.found = true %}
-                                            <div class="row text-center mb-2 mt-2">
-                                                <div class="col-4">
-                                                    <small class="text-muted d-block">Decisions</small>
-                                                    <strong>{{ agent.total_decisions }}</strong>
-                                                </div>
-                                                <div class="col-4">
-                                                    <small class="text-muted d-block">Confidence</small>
-                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
-                                                </div>
-                                                <div class="col-4">
-                                                    <small class="text-muted d-block">Speed</small>
-                                                    <strong>{{ agent.avg_execution_ms|round(0)|int }}ms</strong>
-                                                </div>
-                                            </div>
-                                        {% endif %}
-                                    {% endfor %}
-                                    {% if not agent_metrics.found %}
-                                        <div class="alert alert-sm alert-info mb-2 mt-2 py-1 px-2">
-                                            <small><i class="bi bi-info-circle"></i> No usage data yet</small>
-                                        </div>
-                                    {% endif %}
-                                    
-                                    <p class="card-text small">
-                                        Analyzes messages for fraud risks with multi-category threat classification.
-                                    </p>
-                                    <ul class="small mb-2">
-                                        <li>Real-time threat analysis</li>
-                                        <li>Educational content generation</li>
-                                        <li>Automated workflows</li>
-                                    </ul>
-                                    <div class="d-flex flex-wrap gap-1 mb-2">
-                                        <span class="badge bg-light text-dark">check_frauds</span>
-                                        <span class="badge bg-light text-dark">validate_sender</span>
-                                    </div>
-                                    <a href="{{ url_for('report_fraud') }}" class="btn btn-sm btn-primary w-100 mt-auto">
-                                        <i class="bi bi-shield-exclamation"></i> Report Fraud
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Identity Agent -->
-                        <div class="col-md-4 mb-3">
-                            <div class="card h-100 border-primary shadow-sm">
-                                <div class="card-body d-flex flex-column">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <h6 class="card-title">
-                                            <i class="bi bi-person-check text-info"></i> Identity Agent
-                                        </h6>
-                                        <span class="badge bg-info">ACTIVE</span>
-                                    </div>
-                                    
-                                    <!-- Agent Metrics -->
-                                    {% set agent_metrics = namespace(found=false) %}
-                                    {% for agent in dashboard.agents %}
-                                        {% if 'Identity' in agent.name %}
-                                            {% set agent_metrics.found = true %}
-                                            <div class="row text-center mb-2 mt-2">
-                                                <div class="col-4">
-                                                    <small class="text-muted d-block">Decisions</small>
-                                                    <strong>{{ agent.total_decisions }}</strong>
-                                                </div>
-                                                <div class="col-4">
-                                                    <small class="text-muted d-block">Confidence</small>
-                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
-                                                </div>
-                                                <div class="col-4">
-                                                    <small class="text-muted d-block">Speed</small>
-                                                    <strong>{{ agent.avg_execution_ms|round(0)|int }}ms</strong>
-                                                </div>
-                                            </div>
-                                        {% endif %}
-                                    {% endfor %}
-                                    {% if not agent_metrics.found %}
-                                        <div class="alert alert-sm alert-info mb-2 mt-2 py-1 px-2">
-                                            <small><i class="bi bi-info-circle"></i> No usage data yet</small>
-                                        </div>
-                                    {% endif %}
-                                    
-                                    <p class="card-text small">
-                                        Verifies customer identity for high-risk fraud cases (≥85% risk score).
-                                    </p>
-                                    <ul class="small mb-2">
-                                        <li>Credential verification</li>
-                                        <li>Employment status checks</li>
-                                        <li>Customer authentication</li>
-                                    </ul>
-                                    <div class="d-flex flex-wrap gap-1 mb-2">
-                                        <span class="badge bg-light text-dark">verify_customer</span>
-                                        <span class="badge bg-light text-dark">check_identity</span>
-                                    </div>
-                                    <button class="btn btn-sm btn-outline-primary w-100 mt-auto" disabled>
-                                        <i class="bi bi-lightning"></i> Auto-triggered by Fraud Workflow
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Row 2: Remaining Active Agents -->
-                    <div class="row">
-                        <!-- Dispatcher Agent -->
-                        <div class="col-md-4 mb-3">
-                            <div class="card h-100 border-primary shadow-sm">
-                                <div class="card-body d-flex flex-column">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <h6 class="card-title">
-                                            <i class="bi bi-diagram-3 text-warning"></i> Dispatcher Agent
-                                        </h6>
-                                        <span class="badge bg-info">ACTIVE</span>
-                                    </div>
-                                    
-                                    <!-- Agent Metrics -->
-                                    {% set agent_metrics = namespace(found=false) %}
-                                    {% for agent in dashboard.agents %}
-                                        {% if 'Dispatch' in agent.name %}
-                                            {% set agent_metrics.found = true %}
-                                            <div class="row text-center mb-2 mt-2">
-                                                <div class="col-4">
-                                                    <small class="text-muted d-block">Decisions</small>
-                                                    <strong>{{ agent.total_decisions }}</strong>
-                                                </div>
-                                                <div class="col-4">
-                                                    <small class="text-muted d-block">Confidence</small>
-                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
-                                                </div>
-                                                <div class="col-4">
-                                                    <small class="text-muted d-block">Speed</small>
-                                                    <strong>{{ agent.avg_execution_ms|round(0)|int }}ms</strong>
-                                                </div>
-                                            </div>
-                                        {% endif %}
-                                    {% endfor %}
-                                    {% if not agent_metrics.found %}
-                                        <div class="alert alert-sm alert-info mb-2 mt-2 py-1 px-2">
-                                            <small><i class="bi bi-info-circle"></i> No usage data yet</small>
-                                        </div>
-                                    {% endif %}
-                                    
-                                    <p class="card-text small">
-                                        Intelligent parcel-to-driver assignment with workload balancing.
-                                    </p>
-                                    <ul class="small mb-2">
-                                        <li>Geographic clustering</li>
-                                        <li>Priority-based assignment</li>
-                                        <li>Capacity optimization</li>
-                                    </ul>
-                                    <div class="d-flex flex-wrap gap-1 mb-2">
-                                        <span class="badge bg-light text-dark">optimize_assignment</span>
-                                        <span class="badge bg-light text-dark">balance_workload</span>
-                                    </div>
-                                    <a href="{{ url_for('admin_manifests') }}" class="btn btn-sm btn-primary w-100 mt-auto">
-                                        <i class="bi bi-robot"></i> Auto-Assign Parcels
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Parcel Intake Agent -->
-                        <div class="col-md-4 mb-3">
-                            <div class="card h-100 border-primary shadow-sm">
-                                <div class="card-body d-flex flex-column">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <h6 class="card-title">
-                                            <i class="bi bi-box-seam text-primary"></i> Parcel Intake Agent
-                                        </h6>
-                                        <span class="badge bg-info">ACTIVE</span>
-                                    </div>
-                                    
-                                    <!-- Agent Metrics -->
-                                    {% set agent_metrics = namespace(found=false) %}
-                                    {% for agent in dashboard.agents %}
-                                        {% if 'Intake' in agent.name or 'Parcel Intake' in agent.name %}
-                                            {% set agent_metrics.found = true %}
-                                            <div class="row text-center mb-2 mt-2">
-                                                <div class="col-4">
-                                                    <small class="text-muted d-block">Decisions</small>
-                                                    <strong>{{ agent.total_decisions }}</strong>
-                                                </div>
-                                                <div class="col-4">
-                                                    <small class="text-muted d-block">Confidence</small>
-                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
-                                                </div>
-                                                <div class="col-4">
-                                                    <small class="text-muted d-block">Speed</small>
-                                                    <strong>{{ agent.avg_execution_ms|round(0)|int }}ms</strong>
-                                                </div>
-                                            </div>
-                                        {% endif %}
-                                    {% endfor %}
-                                    {% if not agent_metrics.found %}
-                                        <div class="alert alert-sm alert-info mb-2 mt-2 py-1 px-2">
-                                            <small><i class="bi bi-info-circle"></i> No usage data yet</small>
-                                        </div>
-                                    {% endif %}
-                                    
-                                    <p class="card-text small">
-                                        Validates parcels during registration with AI-powered insights.
-                                    </p>
-                                    <ul class="small mb-2">
-                                        <li>Service type recommendations</li>
-                                        <li>Address validation & corrections</li>
-                                        <li>Delivery complication detection</li>
-                                    </ul>
-                                    <div class="d-flex flex-wrap gap-1 mb-2">
-                                        <span class="badge bg-light text-dark">validate_address</span>
-                                        <span class="badge bg-light text-dark">suggest_service</span>
-                                        <span class="badge bg-light text-dark">detect_issues</span>
-                                    </div>
-                                    <a href="{{ url_for('register_parcel') }}" class="btn btn-sm btn-primary w-100 mt-auto">
-                                        <i class="bi bi-box-seam"></i> Register Parcel
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Optimization Agent -->
-                        <div class="col-md-4 mb-3">
-                            <div class="card h-100 border-primary shadow-sm">
-                                <div class="card-body d-flex flex-column">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <h6 class="card-title">
-                                            <i class="bi bi-graph-up text-primary"></i> Optimization Agent
-                                        </h6>
-                                        <span class="badge bg-info">ACTIVE</span>
-                                    </div>
-                                    
-                                    <!-- Agent Metrics -->
-                                    {% set agent_metrics = namespace(found=false) %}
-                                    {% for agent in dashboard.agents %}
-                                        {% if 'Optimization' in agent.name %}
-                                            {% set agent_metrics.found = true %}
-                                            <div class="row text-center mb-2 mt-2">
-                                                <div class="col-4">
-                                                    <small class="text-muted d-block">Decisions</small>
-                                                    <strong>{{ agent.total_decisions }}</strong>
-                                                </div>
-                                                <div class="col-4">
-                                                    <small class="text-muted d-block">Confidence</small>
-                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
-                                                </div>
-                                                <div class="col-4">
-                                                    <small class="text-muted d-block">Speed</small>
-                                                    <strong>{{ agent.avg_execution_ms|round(0)|int }}ms</strong>
-                                                </div>
-                                            </div>
-                                        {% endif %}
-                                    {% endfor %}
-                                    {% if not agent_metrics.found %}
-                                        <div class="alert alert-sm alert-info mb-2 mt-2 py-1 px-2">
-                                            <small><i class="bi bi-info-circle"></i> No usage data yet</small>
-                                        </div>
-                                    {% endif %}
-                                    
-                                    <p class="card-text small">
-                                        Network-wide performance analysis and AI-powered recommendations.
-                                    </p>
-                                    <ul class="small mb-2">
-                                        <li>Cost reduction insights</li>
-                                        <li>Resource allocation optimization</li>
-                                        <li>Predictive analytics</li>
-                                    </ul>
-                                    <div class="d-flex flex-wrap gap-1 mb-2">
-                                        <span class="badge bg-light text-dark">analyze_network</span>
-                                        <span class="badge bg-light text-dark">optimize_costs</span>
-                                    </div>
-                                    <a href="{{ url_for('ai_insights') }}" class="btn btn-sm btn-primary w-100 mt-auto">
-                                        <i class="bi bi-graph-up"></i> View Insights Dashboard
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Row 3: More Active Agents -->
-                    <div class="row">
-                        <!-- Sorting Facility Agent -->
-                        <div class="col-md-4 mb-3">
-                            <div class="card h-100 border-primary shadow-sm">
-                                <div class="card-body d-flex flex-column">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <h6 class="card-title">
-                                            <i class="bi bi-building text-info"></i> Sorting Facility Agent
-                                        </h6>
-                                        <span class="badge bg-info">ACTIVE</span>
-                                    </div>
-                                    
-                                    <!-- Agent Metrics -->
-                                    {% set agent_metrics = namespace(found=false) %}
-                                    {% for agent in dashboard.agents %}
-                                        {% if 'Sorting' in agent.name or 'Facility' in agent.name %}
-                                            {% set agent_metrics.found = true %}
-                                            <div class="row text-center mb-2 mt-2">
-                                                <div class="col-4">
-                                                    <small class="text-muted d-block">Decisions</small>
-                                                    <strong>{{ agent.total_decisions }}</strong>
-                                                </div>
-                                                <div class="col-4">
-                                                    <small class="text-muted d-block">Confidence</small>
-                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
-                                                </div>
-                                                <div class="col-4">
-                                                    <small class="text-muted d-block">Speed</small>
-                                                    <strong>{{ agent.avg_execution_ms|round(0)|int }}ms</strong>
-                                                </div>
-                                            </div>
-                                        {% endif %}
-                                    {% endfor %}
-                                    {% if not agent_metrics.found %}
-                                        <div class="alert alert-sm alert-info mb-2 mt-2 py-1 px-2">
-                                            <small><i class="bi bi-info-circle"></i> No usage data yet</small>
-                                        </div>
-                                    {% endif %}
-                                    
-                                    <p class="card-text small">
-                                        Real-time facility capacity monitoring and automated routing decisions.
-                                    </p>
-                                    <ul class="small mb-2">
-                                        <li>Optimize facility throughput</li>
-                                        <li>Load balancing across facilities</li>
-                                        <li>Priority-based routing</li>
-                                    </ul>
-                                    <div class="d-flex flex-wrap gap-1 mb-2">
-                                        <span class="badge bg-light text-dark">monitor_capacity</span>
-                                        <span class="badge bg-light text-dark">route_parcels</span>
-                                    </div>
-                                    <a href="{{ url_for('ai_insights') }}#sorting-facility" class="btn btn-sm btn-primary w-100 mt-auto">
-                                        <i class="bi bi-speedometer2"></i> View Facility Insights
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Delivery Coordination Agent -->
-                        <div class="col-md-4 mb-3">
-                            <div class="card h-100 border-primary shadow-sm">
-                                <div class="card-body d-flex flex-column">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <h6 class="card-title">
-                                            <i class="bi bi-calendar-check text-warning"></i> Delivery Coordination Agent
-                                        </h6>
-                                        <span class="badge bg-info">ACTIVE</span>
-                                    </div>
-                                    
-                                    <!-- Agent Metrics -->
-                                    {% set agent_metrics = namespace(found=false) %}
-                                    {% for agent in dashboard.agents %}
-                                        {% if 'Delivery' in agent.name or 'Coordination' in agent.name %}
-                                            {% set agent_metrics.found = true %}
-                                            <div class="row text-center mb-2 mt-2">
-                                                <div class="col-4">
-                                                    <small class="text-muted d-block">Decisions</small>
-                                                    <strong>{{ agent.total_decisions }}</strong>
-                                                </div>
-                                                <div class="col-4">
-                                                    <small class="text-muted d-block">Confidence</small>
-                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
-                                                </div>
-                                                <div class="col-4">
-                                                    <small class="text-muted d-block">Speed</small>
-                                                    <strong>{{ agent.avg_execution_ms|round(0)|int }}ms</strong>
-                                                </div>
-                                            </div>
-                                        {% endif %}
-                                    {% endfor %}
-                                    {% if not agent_metrics.found %}
-                                        <div class="alert alert-sm alert-info mb-2 mt-2 py-1 px-2">
-                                            <small><i class="bi bi-info-circle"></i> No usage data yet</small>
-                                        </div>
-                                    {% endif %}
-                                    
-                                    <p class="card-text small">
-                                        Multi-stop delivery sequencing with automated customer notifications.
-                                    </p>
-                                    <ul class="small mb-2">
-                                        <li>Dynamic route adjustments</li>
-                                        <li>Real-time customer communication</li>
-                                        <li>Delivery time window management</li>
-                                    </ul>
-                                    <div class="d-flex flex-wrap gap-1 mb-2">
-                                        <span class="badge bg-light text-dark">notify_customer</span>
-                                        <span class="badge bg-light text-dark">optimize_sequence</span>
-                                    </div>
-                                    <a href="{{ url_for('driver_manifest') }}" class="btn btn-sm btn-primary w-100 mt-auto">
-                                        <i class="bi bi-truck-front"></i> View Driver Manifest
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Agent Architecture Note -->
-                    <div class="alert alert-info mt-3 mb-0">
-                        <i class="fas fa-info-circle"></i> <strong>Architecture:</strong> All 9 agents are deployed as persistent Azure AI Foundry agents with dedicated agent IDs. Currently 7 agents are active in production. The Customer Service Agent includes Cosmos DB function calling tools for real-time parcel tracking across multiple identifier formats.
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Back to Dashboard -->
     <div class="row mb-4">
         <div class="col-12 text-center">
             <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
