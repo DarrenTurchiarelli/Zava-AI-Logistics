@@ -223,9 +223,12 @@ class StateManager:
         if total_decisions == 0:
             return {
                 "total_decisions": 0,
+                "overall_avg_confidence": 0,
+                "overall_avg_execution_ms": 0,
                 "agents": [],
                 "decision_types": {},
-                "recent_decisions": []
+                "recent_decisions": [],
+                "configured_active_agents": 8
             }
         
         # Calculate overall metrics
@@ -278,7 +281,8 @@ class StateManager:
             "overall_avg_execution_ms": avg_execution,
             "agents": agents,
             "decision_types": decision_types,
-            "recent_decisions": recent_decisions
+            "recent_decisions": recent_decisions,
+            "configured_active_agents": 8
         }
     
     def register_parcel(self, tracking_number: str) -> None:

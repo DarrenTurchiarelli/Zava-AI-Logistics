@@ -27,10 +27,10 @@
         </div>
         
         <div class="col-md-3">
-            <div class="card border-success">
+            <div class="card border-info">
                 <div class="card-body">
                     <h6 class="card-subtitle mb-2 text-muted">Average Confidence</h6>
-                    <h2 class="card-title text-success">
+                    <h2 class="card-title text-info">
                         {{ (dashboard.overall_avg_confidence * 100)|round(0)|int }}%
                     </h2>
                     <p class="card-text small">
@@ -55,10 +55,10 @@
         </div>
         
         <div class="col-md-3">
-            <div class="card border-warning">
+            <div class="card border-info">
                 <div class="card-body">
                     <h6 class="card-subtitle mb-2 text-muted">Active Agents</h6>
-                    <h2 class="card-title text-warning">{{ dashboard.agents|length }}</h2>
+                    <h2 class="card-title text-info">{{ dashboard.configured_active_agents }}</h2>
                     <p class="card-text small">
                         <i class="fas fa-brain"></i> Currently deployed
                     </p>
@@ -93,7 +93,7 @@
         
         <div class="col-lg-6">
             <div class="card">
-                <div class="card-header bg-success text-white">
+                <div class="card-header bg-primary text-white">
                     <h5 class="mb-0"><i class="fas fa-tasks"></i> Recent Decisions</h5>
                 </div>
                 <div class="card-body" style="max-height: 400px; overflow-y: auto;">
@@ -111,7 +111,7 @@
                             </p>
                             <div class="progress" style="height: 5px;">
                                 <div class="progress-bar 
-                                    {% if decision.confidence > 0.8 %}bg-success
+                                    {% if decision.confidence > 0.8 %}bg-info
                                     {% elif decision.confidence > 0.6 %}bg-warning
                                     {% else %}bg-danger{% endif %}"
                                     role="progressbar" 
@@ -137,7 +137,7 @@
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
-                <div class="card-header bg-dark text-white">
+                <div class="card-header bg-primary text-white">
                     <h5 class="mb-0"><i class="fas fa-robot"></i> Individual Agent Performance</h5>
                 </div>
                 <div class="card-body">
@@ -169,7 +169,7 @@
                                     <td>
                                         <div class="progress" style="height: 20px;">
                                             <div class="progress-bar 
-                                                {% if agent.success_rate > 0.9 %}bg-success
+                                                {% if agent.success_rate > 0.9 %}bg-info
                                                 {% elif agent.success_rate > 0.7 %}bg-warning
                                                 {% else %}bg-danger{% endif %}"
                                                 role="progressbar" 
@@ -180,7 +180,7 @@
                                     </td>
                                     <td>
                                         <span class="badge 
-                                            {% if agent.avg_confidence > 0.8 %}bg-success
+                                            {% if agent.avg_confidence > 0.8 %}bg-info
                                             {% elif agent.avg_confidence > 0.6 %}bg-warning
                                             {% else %}bg-danger{% endif %}">
                                             {{ (agent.avg_confidence * 100)|round(0)|int }}%
@@ -196,7 +196,7 @@
                                     </td>
                                     <td>
                                         {% if agent.last_execution %}
-                                        <span class="badge bg-success">
+                                        <span class="badge bg-info">
                                             <i class="fas fa-check-circle"></i> Active
                                         </span>
                                         {% else %}
@@ -224,31 +224,33 @@
     <!-- Agent Capabilities Reference -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="card border-success">
-                <div class="card-header bg-success text-white">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white">
                     <h5 class="mb-0"><i class="bi bi-cpu"></i> Azure AI Foundry Agents - System Status</h5>
                 </div>
                 <div class="card-body">
                     <p class="mb-3">
                         <i class="bi bi-info-circle"></i> <strong>9 Specialized AI Agents</strong> integrated with Azure AI Foundry for intelligent logistics automation.
-                        <span class="badge bg-success ms-2">5 Active</span>
-                        <span class="badge bg-secondary ms-1">4 Available</span>
+                        <span class="badge bg-info ms-2">8 Active</span>
+                        <span class="badge bg-secondary ms-1">1 Available</span>
                     </p>
 
                     <!-- Active Agents -->
-                    <h6 class="text-success mt-4 mb-3">
+                    <h6 class="text-info mt-4 mb-3">
                         <i class="bi bi-check-circle-fill"></i> Active Agents
                     </h6>
+                    
+                    <!-- Row 1: First 3 Active Agents -->
                     <div class="row">
                         <!-- Customer Service Agent -->
                         <div class="col-md-4 mb-3">
-                            <div class="card h-100 border-success">
-                                <div class="card-body">
+                            <div class="card h-100 border-primary shadow-sm">
+                                <div class="card-body d-flex flex-column">
                                     <div class="d-flex justify-content-between align-items-start">
                                         <h6 class="card-title">
-                                            <i class="bi bi-headset text-success"></i> Customer Service Agent
+                                            <i class="bi bi-headset text-info"></i> Customer Service Agent
                                         </h6>
-                                        <span class="badge bg-success">ACTIVE</span>
+                                        <span class="badge bg-info">ACTIVE</span>
                                     </div>
                                     
                                     <!-- Agent Metrics -->
@@ -263,7 +265,7 @@
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Confidence</small>
-                                                    <strong class="text-success">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Speed</small>
@@ -291,7 +293,7 @@
                                         <span class="badge bg-light text-dark">search_parcels</span>
                                         <span class="badge bg-light text-dark">get_statistics</span>
                                     </div>
-                                    <a href="{{ url_for('customer_service_chatbot') }}" class="btn btn-sm btn-success w-100">
+                                    <a href="{{ url_for('customer_service_chatbot') }}" class="btn btn-sm btn-primary w-100 mt-auto">
                                         <i class="bi bi-chat-dots"></i> Open Chatbot
                                     </a>
                                 </div>
@@ -300,13 +302,13 @@
                         
                         <!-- Fraud Detection Agent -->
                         <div class="col-md-4 mb-3">
-                            <div class="card h-100 border-success">
-                                <div class="card-body">
+                            <div class="card h-100 border-primary shadow-sm">
+                                <div class="card-body d-flex flex-column">
                                     <div class="d-flex justify-content-between align-items-start">
                                         <h6 class="card-title">
                                             <i class="bi bi-shield-exclamation text-danger"></i> Fraud Detection Agent
                                         </h6>
-                                        <span class="badge bg-success">ACTIVE</span>
+                                        <span class="badge bg-info">ACTIVE</span>
                                     </div>
                                     
                                     <!-- Agent Metrics -->
@@ -321,7 +323,7 @@
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Confidence</small>
-                                                    <strong class="text-success">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Speed</small>
@@ -348,7 +350,7 @@
                                         <span class="badge bg-light text-dark">check_frauds</span>
                                         <span class="badge bg-light text-dark">validate_sender</span>
                                     </div>
-                                    <a href="{{ url_for('report_fraud') }}" class="btn btn-sm btn-success w-100">
+                                    <a href="{{ url_for('report_fraud') }}" class="btn btn-sm btn-primary w-100 mt-auto">
                                         <i class="bi bi-shield-exclamation"></i> Report Fraud
                                     </a>
                                 </div>
@@ -357,13 +359,13 @@
                         
                         <!-- Identity Agent -->
                         <div class="col-md-4 mb-3">
-                            <div class="card h-100 border-success">
-                                <div class="card-body">
+                            <div class="card h-100 border-primary shadow-sm">
+                                <div class="card-body d-flex flex-column">
                                     <div class="d-flex justify-content-between align-items-start">
                                         <h6 class="card-title">
                                             <i class="bi bi-person-check text-info"></i> Identity Agent
                                         </h6>
-                                        <span class="badge bg-success">ACTIVE</span>
+                                        <span class="badge bg-info">ACTIVE</span>
                                     </div>
                                     
                                     <!-- Agent Metrics -->
@@ -378,7 +380,7 @@
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Confidence</small>
-                                                    <strong class="text-success">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Speed</small>
@@ -399,29 +401,31 @@
                                     <ul class="small mb-2">
                                         <li>Credential verification</li>
                                         <li>Employment status checks</li>
-                                        <li>Zone authorization validation</li>
+                                        <li>Customer authentication</li>
                                     </ul>
                                     <div class="d-flex flex-wrap gap-1 mb-2">
                                         <span class="badge bg-light text-dark">verify_customer</span>
                                         <span class="badge bg-light text-dark">check_identity</span>
                                     </div>
-                                    <span class="badge bg-info w-100">Auto-triggered by Fraud Workflow</span>
+                                    <button class="btn btn-sm btn-outline-primary w-100 mt-auto" disabled>
+                                        <i class="bi bi-lightning"></i> Auto-triggered by Fraud Workflow
+                                    </button>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Second row of active agents -->
+                    <!-- Row 2: Remaining Active Agents -->
                     <div class="row">
-                        <!-- Dispatcher Agent (NEW!) -->
+                        <!-- Dispatcher Agent -->
                         <div class="col-md-4 mb-3">
-                            <div class="card h-100 border-success">
-                                <div class="card-body">
+                            <div class="card h-100 border-primary shadow-sm">
+                                <div class="card-body d-flex flex-column">
                                     <div class="d-flex justify-content-between align-items-start">
                                         <h6 class="card-title">
                                             <i class="bi bi-diagram-3 text-warning"></i> Dispatcher Agent
                                         </h6>
-                                        <span class="badge bg-success">ACTIVE ⭐ NEW</span>
+                                        <span class="badge bg-info">ACTIVE</span>
                                     </div>
                                     
                                     <!-- Agent Metrics -->
@@ -436,7 +440,7 @@
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Confidence</small>
-                                                    <strong class="text-success">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Speed</small>
@@ -463,24 +467,22 @@
                                         <span class="badge bg-light text-dark">optimize_assignment</span>
                                         <span class="badge bg-light text-dark">balance_workload</span>
                                     </div>
-                                    <a href="{{ url_for('admin_manifests') }}" class="btn btn-sm btn-success w-100">
+                                    <a href="{{ url_for('admin_manifests') }}" class="btn btn-sm btn-primary w-100 mt-auto">
                                         <i class="bi bi-robot"></i> Auto-Assign Parcels
                                     </a>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Parcel Intake Agent - Now Active! -->
-                    <div class="row">
+                        <!-- Parcel Intake Agent -->
                         <div class="col-md-4 mb-3">
-                            <div class="card h-100 border-success">
-                                <div class="card-body">
+                            <div class="card h-100 border-primary shadow-sm">
+                                <div class="card-body d-flex flex-column">
                                     <div class="d-flex justify-content-between align-items-start">
                                         <h6 class="card-title">
                                             <i class="bi bi-box-seam text-primary"></i> Parcel Intake Agent
                                         </h6>
-                                        <span class="badge bg-success">ACTIVE ⭐ ENHANCED</span>
+                                        <span class="badge bg-info">ACTIVE</span>
                                     </div>
                                     
                                     <!-- Agent Metrics -->
@@ -495,7 +497,7 @@
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Confidence</small>
-                                                    <strong class="text-success">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
                                                 </div>
                                                 <div class="col-4">
                                                     <small class="text-muted d-block">Speed</small>
@@ -511,137 +513,195 @@
                                     {% endif %}
                                     
                                     <p class="card-text small">
-                                        <strong>Now Fully Integrated!</strong> Validates parcels during registration with AI-powered insights.
+                                        Validates parcels during registration with AI-powered insights.
                                     </p>
                                     <ul class="small mb-2">
                                         <li>Service type recommendations</li>
                                         <li>Address validation & corrections</li>
                                         <li>Delivery complication detection</li>
-                                        <li>Data quality verification</li>
                                     </ul>
                                     <div class="d-flex flex-wrap gap-1 mb-2">
                                         <span class="badge bg-light text-dark">validate_address</span>
                                         <span class="badge bg-light text-dark">suggest_service</span>
                                         <span class="badge bg-light text-dark">detect_issues</span>
                                     </div>
-                                    <a href="{{ url_for('register_parcel') }}" class="btn btn-sm btn-success w-100">
+                                    <a href="{{ url_for('register_parcel') }}" class="btn btn-sm btn-primary w-100 mt-auto">
                                         <i class="bi bi-box-seam"></i> Register Parcel
                                     </a>
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- Available for Integration -->
-                    <h6 class="text-secondary mt-4 mb-3">
-                        <i class="bi bi-circle"></i> Available for Integration
-                    </h6>
-                    <div class="row">
-                        <!-- Sorting Facility Agent -->
-                        <div class="col-md-6 mb-3">
-                            <div class="card h-100 border-secondary">
-                                <div class="card-body">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <h6 class="card-title">
-                                            <i class="bi bi-building text-secondary"></i> Sorting Facility Agent
-                                        </h6>
-                                        <span class="badge bg-secondary">AVAILABLE</span>
-                                    </div>
-                                    <p class="card-text small">
-                                        <strong>Potential Use:</strong> Automated routing decisions at sorting facilities
-                                    </p>
-                                    <ul class="small mb-2">
-                                        <li>Optimize facility throughput</li>
-                                        <li>Load balancing across facilities</li>
-                                        <li>Priority-based routing</li>
-                                    </ul>
-                                    <p class="text-muted small mb-0">
-                                        <i class="bi bi-lightbulb"></i> Could integrate with real-time facility capacity monitoring
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Delivery Coordination Agent -->
-                        <div class="col-md-6 mb-3">
-                            <div class="card h-100 border-secondary">
-                                <div class="card-body">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <h6 class="card-title">
-                                            <i class="bi bi-calendar-check text-secondary"></i> Delivery Coordination Agent
-                                        </h6>
-                                        <span class="badge bg-secondary">AVAILABLE</span>
-                                    </div>
-                                    <p class="card-text small">
-                                        <strong>Potential Use:</strong> Multi-stop delivery sequencing and time window management
-                                    </p>
-                                    <ul class="small mb-2">
-                                        <li>Dynamic route adjustments</li>
-                                        <li>Real-time exception handling</li>
-                                        <li>Customer communication</li>
-                                    </ul>
-                                    <p class="text-muted small mb-0">
-                                        <i class="bi bi-lightbulb"></i> Could enhance driver manifest with optimal delivery order
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <!-- Driver Agent -->
-                        <div class="col-md-6 mb-3">
-                            <div class="card h-100 border-secondary">
-                                <div class="card-body">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <h6 class="card-title">
-                                            <i class="bi bi-truck text-secondary"></i> Driver Agent
-                                        </h6>
-                                        <span class="badge bg-secondary">AVAILABLE</span>
-                                    </div>
-                                    <p class="card-text small">
-                                        <strong>Potential Use:</strong> Real-time driver assistance and problem resolution
-                                    </p>
-                                    <ul class="small mb-2">
-                                        <li>Navigation guidance</li>
-                                        <li>Address issue resolution</li>
-                                        <li>Status update assistance</li>
-                                    </ul>
-                                    <p class="text-muted small mb-0">
-                                        <i class="bi bi-lightbulb"></i> Could add chatbot to driver manifest page
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
 
                         <!-- Optimization Agent -->
-                        <div class="col-md-6 mb-3">
-                            <div class="card h-100 border-secondary">
-                                <div class="card-body">
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 border-primary shadow-sm">
+                                <div class="card-body d-flex flex-column">
                                     <div class="d-flex justify-content-between align-items-start">
                                         <h6 class="card-title">
-                                            <i class="bi bi-graph-up text-secondary"></i> Optimization Agent
+                                            <i class="bi bi-graph-up text-primary"></i> Optimization Agent
                                         </h6>
-                                        <span class="badge bg-secondary">AVAILABLE</span>
+                                        <span class="badge bg-info">ACTIVE</span>
                                     </div>
+                                    
+                                    <!-- Agent Metrics -->
+                                    {% set agent_metrics = namespace(found=false) %}
+                                    {% for agent in dashboard.agents %}
+                                        {% if 'Optimization' in agent.name %}
+                                            {% set agent_metrics.found = true %}
+                                            <div class="row text-center mb-2 mt-2">
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Decisions</small>
+                                                    <strong>{{ agent.total_decisions }}</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Confidence</small>
+                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Speed</small>
+                                                    <strong>{{ agent.avg_execution_ms|round(0)|int }}ms</strong>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if not agent_metrics.found %}
+                                        <div class="alert alert-sm alert-info mb-2 mt-2 py-1 px-2">
+                                            <small><i class="bi bi-info-circle"></i> No usage data yet</small>
+                                        </div>
+                                    {% endif %}
+                                    
                                     <p class="card-text small">
-                                        <strong>Potential Use:</strong> Network-wide performance analysis and recommendations
+                                        Network-wide performance analysis and AI-powered recommendations.
                                     </p>
                                     <ul class="small mb-2">
                                         <li>Cost reduction insights</li>
                                         <li>Resource allocation optimization</li>
                                         <li>Predictive analytics</li>
                                     </ul>
-                                    <p class="text-muted small mb-0">
-                                        <i class="bi bi-lightbulb"></i> Could power a dedicated insights/analytics dashboard
-                                    </p>
+                                    <div class="d-flex flex-wrap gap-1 mb-2">
+                                        <span class="badge bg-light text-dark">analyze_network</span>
+                                        <span class="badge bg-light text-dark">optimize_costs</span>
+                                    </div>
+                                    <a href="{{ url_for('ai_insights') }}" class="btn btn-sm btn-primary w-100 mt-auto">
+                                        <i class="bi bi-graph-up"></i> View Insights Dashboard
+                                    </a>
                                 </div>
                             </div>
                         </div>
                     </div>
-                                        <li>Zone authorization validation</li>
+
+                    <!-- Row 3: More Active Agents -->
+                    <div class="row">
+                        <!-- Sorting Facility Agent -->
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 border-primary shadow-sm">
+                                <div class="card-body d-flex flex-column">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <h6 class="card-title">
+                                            <i class="bi bi-building text-info"></i> Sorting Facility Agent
+                                        </h6>
+                                        <span class="badge bg-info">ACTIVE</span>
+                                    </div>
+                                    
+                                    <!-- Agent Metrics -->
+                                    {% set agent_metrics = namespace(found=false) %}
+                                    {% for agent in dashboard.agents %}
+                                        {% if 'Sorting' in agent.name or 'Facility' in agent.name %}
+                                            {% set agent_metrics.found = true %}
+                                            <div class="row text-center mb-2 mt-2">
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Decisions</small>
+                                                    <strong>{{ agent.total_decisions }}</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Confidence</small>
+                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Speed</small>
+                                                    <strong>{{ agent.avg_execution_ms|round(0)|int }}ms</strong>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if not agent_metrics.found %}
+                                        <div class="alert alert-sm alert-info mb-2 mt-2 py-1 px-2">
+                                            <small><i class="bi bi-info-circle"></i> No usage data yet</small>
+                                        </div>
+                                    {% endif %}
+                                    
+                                    <p class="card-text small">
+                                        Real-time facility capacity monitoring and automated routing decisions.
+                                    </p>
+                                    <ul class="small mb-2">
+                                        <li>Optimize facility throughput</li>
+                                        <li>Load balancing across facilities</li>
+                                        <li>Priority-based routing</li>
                                     </ul>
-                                    <span class="badge bg-info">Azure AI Foundry</span>
+                                    <div class="d-flex flex-wrap gap-1 mb-2">
+                                        <span class="badge bg-light text-dark">monitor_capacity</span>
+                                        <span class="badge bg-light text-dark">route_parcels</span>
+                                    </div>
+                                    <a href="{{ url_for('ai_insights') }}#sorting-facility" class="btn btn-sm btn-primary w-100 mt-auto">
+                                        <i class="bi bi-speedometer2"></i> View Facility Insights
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Delivery Coordination Agent -->
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 border-primary shadow-sm">
+                                <div class="card-body d-flex flex-column">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <h6 class="card-title">
+                                            <i class="bi bi-calendar-check text-warning"></i> Delivery Coordination Agent
+                                        </h6>
+                                        <span class="badge bg-info">ACTIVE</span>
+                                    </div>
+                                    
+                                    <!-- Agent Metrics -->
+                                    {% set agent_metrics = namespace(found=false) %}
+                                    {% for agent in dashboard.agents %}
+                                        {% if 'Delivery' in agent.name or 'Coordination' in agent.name %}
+                                            {% set agent_metrics.found = true %}
+                                            <div class="row text-center mb-2 mt-2">
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Decisions</small>
+                                                    <strong>{{ agent.total_decisions }}</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Confidence</small>
+                                                    <strong class="text-info">{{ (agent.avg_confidence * 100)|round(0)|int }}%</strong>
+                                                </div>
+                                                <div class="col-4">
+                                                    <small class="text-muted d-block">Speed</small>
+                                                    <strong>{{ agent.avg_execution_ms|round(0)|int }}ms</strong>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if not agent_metrics.found %}
+                                        <div class="alert alert-sm alert-info mb-2 mt-2 py-1 px-2">
+                                            <small><i class="bi bi-info-circle"></i> No usage data yet</small>
+                                        </div>
+                                    {% endif %}
+                                    
+                                    <p class="card-text small">
+                                        Multi-stop delivery sequencing with automated customer notifications.
+                                    </p>
+                                    <ul class="small mb-2">
+                                        <li>Dynamic route adjustments</li>
+                                        <li>Real-time customer communication</li>
+                                        <li>Delivery time window management</li>
+                                    </ul>
+                                    <div class="d-flex flex-wrap gap-1 mb-2">
+                                        <span class="badge bg-light text-dark">notify_customer</span>
+                                        <span class="badge bg-light text-dark">optimize_sequence</span>
+                                    </div>
+                                    <a href="{{ url_for('driver_manifest') }}" class="btn btn-sm btn-primary w-100 mt-auto">
+                                        <i class="bi bi-truck-front"></i> View Driver Manifest
+                                    </a>
                                 </div>
                             </div>
                         </div>
@@ -649,7 +709,7 @@
                     
                     <!-- Agent Architecture Note -->
                     <div class="alert alert-info mt-3 mb-0">
-                        <i class="fas fa-info-circle"></i> <strong>Architecture:</strong> All 9 agents are deployed as persistent Azure AI Foundry agents with dedicated agent IDs. The Customer Service Agent includes Cosmos DB function calling tools for real-time parcel tracking across multiple identifier formats.
+                        <i class="fas fa-info-circle"></i> <strong>Architecture:</strong> All 9 agents are deployed as persistent Azure AI Foundry agents with dedicated agent IDs. Currently 7 agents are active in production. The Customer Service Agent includes Cosmos DB function calling tools for real-time parcel tracking across multiple identifier formats.
                     </div>
                 </div>
             </div>

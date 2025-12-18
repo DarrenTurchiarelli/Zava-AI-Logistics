@@ -398,10 +398,14 @@
                                     </td>
                                     <td>
                                         {% if item.status != 'delivered' %}
+                                        <button type="button" class="btn btn-sm btn-info mb-1" 
+                                                onclick="notifyCustomer('{{ item.barcode }}', '{{ item.recipient_name }}', {{ loop.index }})">
+                                            <i class="bi bi-chat-dots"></i> Notify Customer
+                                        </button>
                                         <button type="button" class="btn btn-sm btn-success" 
                                                 data-bs-toggle="modal" 
                                                 data-bs-target="#completeModal{{ loop.index }}">
-                                            <i class="bi bi-check-circle"></i> Complete
+                                            <i class="bi bi-check-circle"></i> Mark as Complete
                                         </button>
                                         {% else %}
                                         <small class="text-muted">
@@ -858,6 +862,53 @@ function createToastContainer() {
         }
     });
 })();
+
+// Delivery Coordination Agent - Customer Notification Function
+function notifyCustomer(barcode, recipientName, itemIndex) {
+    const btn = event.target.closest('button');
+    const originalHtml = btn.innerHTML;
+    
+    // Disable button and show loading state
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Sending...';
+    
+    // Simulate sending notification (replace with actual API call)
+    fetch('/api/notify-customer', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            barcode: barcode,
+            recipient_name: recipientName,
+            notification_type: 'approaching'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Show success message
+        btn.innerHTML = '<i class="bi bi-check-circle"></i> Notified';
+        btn.classList.remove('btn-info');
+        btn.classList.add('btn-success');
+        
+        // Show toast notification
+        showToast(`✉️ ${recipientName} has been notified of imminent delivery`, 'success');
+        
+        // Reset button after 3 seconds
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-info');
+        }, 3000);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        showToast('Failed to send notification. Please try again.', 'error');
+    });
+}
 {% endif %}
 </script>
 {% endblock %}

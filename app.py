@@ -82,6 +82,10 @@ geocode_cache_lock = threading.Lock()
 optimization_locks = {}  # manifest_id -> threading.Lock()
 optimization_lock = threading.Lock()
 
+# Global: State Manager for agent decisions and performance tracking
+from logistics_state_manager import StateManager
+global_state_manager = StateManager()
+
 # Initialize warning suppression
 setup_warning_suppression()
 
@@ -1533,15 +1537,11 @@ def set_voice_persona():
 @login_required
 def agent_monitoring_dashboard():
     """AI Agent Performance Monitoring Dashboard"""
-    # Get state manager instance
-    from logistics_state_manager import StateManager
-    
-    # For now, create a demo instance
-    # In production, this should be a singleton shared across the app
-    state_manager = StateManager()
+    # Use global state manager instance
+    global global_state_manager
     
     # Get comprehensive agent performance data
-    dashboard_data = state_manager.get_agent_dashboard_data()
+    dashboard_data = global_state_manager.get_agent_dashboard_data()
     
     # Add some example decisions if none exist (for demo)
     if dashboard_data['total_decisions'] == 0:
@@ -1592,10 +1592,10 @@ def agent_monitoring_dashboard():
         ]
         
         for decision in sample_decisions:
-            state_manager.record_agent_decision(decision, success=True)
+            global_state_manager.record_agent_decision(decision, success=True)
         
         # Refresh dashboard data
-        dashboard_data = state_manager.get_agent_dashboard_data()
+        dashboard_data = global_state_manager.get_agent_dashboard_data()
     
     return render_template('agent_dashboard.html', dashboard=dashboard_data)
 
