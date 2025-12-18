@@ -424,7 +424,7 @@ def login():
                 if user['role'] == UserManager.ROLE_DRIVER:
                     return redirect(url_for('driver_manifest'))
                 else:
-                    return redirect(url_for('dashboard'))
+                    return redirect(url_for('ai_insights'))
             else:
                 flash('Invalid credentials', 'danger')
         except Exception as e:
