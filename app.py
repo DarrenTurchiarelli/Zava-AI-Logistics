@@ -518,6 +518,100 @@ def dashboard():
 
 # Parcel Operations
 
+@app.route('/api/validate-address', methods=['POST'])
+@login_required
+def validate_address():
+    """Validate address using Azure Maps Search API with strict matching"""
+    from services.maps import BingMapsRouter
+    import re
+    
+    data = request.get_json()
+    address = data.get('address', '').strip()
+    
+    if not address:
+        return jsonify({'valid': False, 'error': 'No address provided'}), 400
+    
+    try:
+        # Use Azure Maps to geocode and validate the address
+        router = BingMapsRouter()
+        result = router.geocode_address_strict(address)
+        
+        if result and result['valid']:
+            return jsonify({
+                'valid': True,
+                'formatted_address': result.get('formatted_address', address),
+                'latitude': result['coords'][0],
+                'longitude': result['coords'][1]
+            })
+        else:
+            return jsonify({
+                'valid': False,
+                'message': result.get('message', 'Address could not be validated')
+            })
+            
+    except Exception as e:
+        print(f"Address validation error: {e}")
+        return jsonify({
+            'valid': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/autocomplete-address', methods=['POST'])
+@login_required
+def autocomplete_address():
+    """Get address suggestions using Azure Maps Search API"""
+    import os
+    import requests
+    
+    data = request.get_json()
+    query = data.get('query', '').strip()
+    
+    if not query or len(query) < 3:
+        return jsonify({'suggestions': []})
+    
+    try:
+        subscription_key = os.getenv('AZURE_MAPS_SUBSCRIPTION_KEY', '')
+        
+        if not subscription_key:
+            return jsonify({'suggestions': []})
+        
+        # Use Azure Maps Search Address API
+        url = f"https://atlas.microsoft.com/search/address/json"
+        params = {
+            'api-version': '1.0',
+            'subscription-key': subscription_key,
+            'query': query,
+            'countrySet': 'AU',  # Australia only
+            'limit': 5,
+            'typeahead': True
+        }
+        
+        response = requests.get(url, params=params, timeout=5)
+        
+        if response.status_code == 200:
+            results = response.json()
+            suggestions = []
+            
+            if 'results' in results:
+                for result in results['results']:
+                    address = result.get('address', {})
+                    formatted = address.get('freeformAddress', '')
+                    
+                    if formatted:
+                        suggestions.append({
+                            'address': formatted,
+                            'type': result.get('type', ''),
+                            'position': result.get('position', {})
+                        })
+            
+            return jsonify({'suggestions': suggestions})
+        else:
+            return jsonify({'suggestions': []})
+            
+    except Exception as e:
+        print(f"Address autocomplete error: {e}")
+        return jsonify({'suggestions': []})
+
 @app.route('/parcels/register', methods=['GET', 'POST'])
 @login_required
 def register_parcel():
@@ -536,7 +630,15 @@ def register_parcel():
             recipient_name = request.form.get('recipient_name')
             recipient_address = request.form.get('recipient_address')
             recipient_phone = request.form.get('recipient_phone')
-            destination_postcode = request.form.get('destination_postcode')
+            
+            # Extract postcode from recipient address (Australian 4-digit postcodes)
+            destination_postcode = None
+            if recipient_address:
+                import re
+                postcode_match = re.search(r'\b(\d{4})\b', recipient_address)
+                if postcode_match:
+                    destination_postcode = postcode_match.group(1)
+            
             service_type = request.form.get('service_type', 'standard')
             weight = float(request.form.get('weight', 0))
             dimensions = request.form.get('dimensions', '')
@@ -544,7 +646,7 @@ def register_parcel():
             special_instructions = request.form.get('special_instructions', '')
             
             # Determine destination state from postcode
-            destination_state = get_state_from_postcode(destination_postcode)
+            destination_state = get_state_from_postcode(destination_postcode) if destination_postcode else "UNKNOWN"
             
             # Generate a tracking number and barcode
             tracking_number = f"DT{uuid.uuid4().hex[:10].upper()}"
@@ -1316,7 +1418,64 @@ def chatbot_query():
     
     try:
         result = run_async(process())
-        return jsonify(result)
+        response_text = result.get('response', '')
+        
+        # Check if response mentions delivery photos and attach photo data
+        delivery_photos = []
+        print(f"🔍 Checking response for photo keywords...")
+        print(f"   Response contains 'delivery photo': {'delivery photo' in response_text.lower()}")
+        print(f"   Response contains 'proof of delivery': {'proof of delivery' in response_text.lower()}")
+        if 'delivery photo' in response_text.lower() or 'proof of delivery' in response_text.lower():
+            # Extract tracking number from query, tracking_number param, response, or context
+            import re
+            tracking_pattern = r'\b(DTVIC\d+|DT\d+|[A-Z]{2}\d{8,}[A-Z]{2})\b'
+            
+            # Try multiple sources for tracking number
+            tracking_num = None
+            matches = re.findall(tracking_pattern, query, re.IGNORECASE)
+            if matches:
+                tracking_num = matches[0].upper()
+            elif tracking_number:
+                tracking_num = tracking_number.upper()
+            else:
+                # Try extracting from the AI response itself
+                response_matches = re.findall(tracking_pattern, response_text, re.IGNORECASE)
+                if response_matches:
+                    tracking_num = response_matches[0].upper()
+            
+            if tracking_num:
+                print(f"📸 Extracting delivery photos for: {tracking_num}")
+                try:
+                    async def get_photos():
+                        async with ParcelTrackingDB() as db:
+                            parcel = await db.get_parcel_by_tracking_number(tracking_num)
+                            if parcel:
+                                photos = parcel.get('delivery_photos', [])
+                                print(f"   📦 Found parcel, photos: {len(photos)}")
+                                return photos
+                            print(f"   ❌ Parcel not found: {tracking_num}")
+                            return []
+                    photos = run_async(get_photos())
+                    if photos:
+                        print(f"   ✅ Attaching {len(photos)} delivery photo(s) to response")
+                        delivery_photos = photos
+                    else:
+                        print(f"   ⚠️  No photos found for {tracking_num}")
+                except Exception as e:
+                    print(f"   ⚠️  Could not retrieve photos: {e}")
+                    import traceback
+                    traceback.print_exc()
+            else:
+                print(f"   ⚠️  No tracking number found in query or context")
+        
+        response_data = {'response': response_text}
+        if delivery_photos:
+            print(f"📸 Adding {len(delivery_photos)} photos to response")
+            response_data['delivery_photos'] = delivery_photos
+        else:
+            print(f"📸 No delivery photos to attach")
+        
+        return jsonify(response_data)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1353,8 +1512,8 @@ def public_chatbot():
             
             # Limited context - available to all users
             context = {
-                'customer_name': user.get('username') if is_logged_in else 'Guest',
-                'user_role': user.get('role') if is_logged_in else 'public',
+                'customer_name': user.get('username') if (is_logged_in and user) else 'Guest',
+                'user_role': user.get('role') if (is_logged_in and user) else 'public',
                 'public_mode': True,  # Flag to limit responses
                 'is_authenticated': is_logged_in
             }
@@ -1437,9 +1596,68 @@ def public_chatbot():
                 
                 # If we cleaned something and it's not empty, use the cleaned version
                 if cleaned_text and cleaned_text != response_text:
-                    return jsonify({'response': cleaned_text})
+                    response_text = cleaned_text
                 
-                return jsonify({'response': response_text})
+                # Check if response mentions delivery photos and attach photo data
+                delivery_photos = []
+                print(f"🔍 Checking response for photo keywords...")
+                print(f"   Response contains 'delivery photo': {'delivery photo' in response_text.lower()}")
+                print(f"   Response contains 'proof of delivery': {'proof of delivery' in response_text.lower()}")
+                if 'delivery photo' in response_text.lower() or 'proof of delivery' in response_text.lower():
+                    # Extract tracking number from query, tracking_number param, response, or context
+                    import re
+                    tracking_pattern = r'\b(DTVIC\d+|DT\d+|[A-Z]{2}\d{8,}[A-Z]{2})\b'
+                    
+                    # Try multiple sources for tracking number
+                    tracking_num = None
+                    matches = re.findall(tracking_pattern, query, re.IGNORECASE)
+                    if matches:
+                        tracking_num = matches[0].upper()
+                    elif tracking_number:
+                        tracking_num = tracking_number.upper()
+                    else:
+                        # Try extracting from the AI response itself
+                        response_matches = re.findall(tracking_pattern, response_text, re.IGNORECASE)
+                        if response_matches:
+                            tracking_num = response_matches[0].upper()
+                        elif context_data.get('tracking_number'):
+                            tracking_num = context_data['tracking_number'].upper()
+                    
+                    if tracking_num:
+                        print(f"📸 Extracting delivery photos for: {tracking_num}")
+                    if tracking_num:
+                        print(f"📸 Extracting delivery photos for: {tracking_num}")
+                        try:
+                            async def get_photos():
+                                async with ParcelTrackingDB() as db:
+                                    parcel = await db.get_parcel_by_tracking_number(tracking_num)
+                                    if parcel:
+                                        photos = parcel.get('delivery_photos', [])
+                                        print(f"   📦 Found parcel, photos: {len(photos)}")
+                                        return photos
+                                    print(f"   ❌ Parcel not found: {tracking_num}")
+                                    return []
+                            photos = run_async(get_photos())
+                            if photos:
+                                print(f"   ✅ Attaching {len(photos)} delivery photo(s) to response")
+                                delivery_photos = photos
+                            else:
+                                print(f"   ⚠️  No photos found for {tracking_num}")
+                        except Exception as e:
+                            print(f"   ⚠️  Could not retrieve photos: {e}")
+                            import traceback
+                            traceback.print_exc()
+                    else:
+                        print(f"   ⚠️  No tracking number found in query or context")
+                
+                response_data = {'response': response_text}
+                if delivery_photos:
+                    print(f"📸 Adding {len(delivery_photos)} photos to response")
+                    response_data['delivery_photos'] = delivery_photos
+                else:
+                    print(f"📸 No delivery photos to attach")
+                
+                return jsonify(response_data)
         
         # Fallback - return as-is
         return jsonify({'response': str(result)})

@@ -845,8 +845,34 @@ class BingMapsRouter:
             data = response.json()
             
             if 'results' in data and len(data['results']) > 0:
-                position = data['results'][0]['position']
+                result = data['results'][0]
+                position = result['position']
                 lat, lon = position['lat'], position['lon']
+                
+                # Debug: Print the full result structure
+                print(f"DEBUG - Azure Maps result for '{address}':")
+                print(f"  Entity Type: {result.get('entityType', 'N/A')}")
+                print(f"  Type: {result.get('type', 'N/A')}")
+                print(f"  Match Confidence: {result.get('matchConfidence', 'N/A')}")
+                print(f"  Score: {result.get('score', 'N/A')}")
+                
+                # Check confidence - Azure Maps uses 'score' not matchConfidence.score
+                score = result.get('score', 0)
+                entity_type = result.get('type', '')
+                
+                # Reject low confidence matches
+                # High confidence is typically > 0.8, but we'll accept 0.7+
+                if score < 0.7:
+                    print(f"⚠️ Low confidence match ({score}): {address}")
+                    return None
+                
+                # Reject if it's not a specific address type
+                # Common types: 'Point Address', 'Address Range', 'Street'
+                address_types = ['Point Address', 'Address Range', 'Street']
+                if entity_type not in address_types:
+                    print(f"⚠️ Not a specific street address ({entity_type}): {address}")
+                    # Don't reject, just warn - might be too strict
+                    pass
                 
                 # Validate coordinates are in Australia/Oceania range
                 # Australia: lat -44 to -10, lon 113 to 154
@@ -885,6 +911,105 @@ class BingMapsRouter:
         except Exception as e:
             print(f"❌ Error geocoding address '{address}': {e}")
             return None
+
+    def geocode_address_strict(self, address: str) -> dict:
+        """
+        Validate address with strict matching - checks if returned address matches input
+        Returns dict with 'valid' flag and details
+        """
+        import re
+        
+        if not self.subscription_key:
+            return {'valid': False, 'message': 'Azure Maps API key not configured'}
+        
+        try:
+            search_url = f"{self.base_url}/search/address/json"
+            params = {
+                'api-version': self.api_version,
+                'subscription-key': self.subscription_key,
+                'query': address,
+                'limit': 1,
+                'countrySet': 'AU'
+            }
+            
+            response = requests.get(search_url, params=params, timeout=5)
+            response.raise_for_status()
+            data = response.json()
+            
+            if 'results' not in data or len(data['results']) == 0:
+                return {'valid': False, 'message': 'No matching address found'}
+            
+            result = data['results'][0]
+            
+            # Extract user's input postcode
+            user_postcode = None
+            postcode_match = re.search(r'\b(\d{4})\b', address)
+            if postcode_match:
+                user_postcode = postcode_match.group(1)
+            
+            # Get returned address details
+            returned_address = result.get('address', {})
+            returned_postcode = returned_address.get('postalCode', '').strip()
+            returned_street = returned_address.get('streetName', '').strip()
+            returned_street_number = returned_address.get('streetNumber', '').strip()
+            
+            # Check confidence score
+            score = result.get('score', 0)
+            if score < 0.8:  # Require high confidence (80%+)
+                return {
+                    'valid': False,
+                    'message': f'Low confidence match (only {score*100:.0f}% confident)'
+                }
+            
+            # STRICT: If user provided postcode, it must match exactly
+            if user_postcode and returned_postcode:
+                if user_postcode != returned_postcode:
+                    return {
+                        'valid': False,
+                        'message': f'Postcode mismatch: You entered {user_postcode}, but Azure Maps found {returned_postcode}'
+                    }
+            
+            # Check if street name was actually found (not just suburb)
+            if not returned_street or not returned_street_number:
+                return {
+                    'valid': False,
+                    'message': 'Street address not found - only suburb/locality matched'
+                }
+            
+            # Validate coordinates are in Australia
+            position = result['position']
+            lat, lon = position['lat'], position['lon']
+            if not (-45 <= lat <= -9 and 110 <= lon <= 160):
+                return {
+                    'valid': False,
+                    'message': 'Geocoded location is not in Australia'
+                }
+            
+            # Build formatted address
+            formatted_parts = []
+            if returned_street_number:
+                formatted_parts.append(returned_street_number)
+            if returned_street:
+                formatted_parts.append(returned_street)
+            if returned_address.get('municipality'):
+                formatted_parts.append(returned_address['municipality'])
+            if returned_address.get('countrySubdivision'):
+                formatted_parts.append(returned_address['countrySubdivision'])
+            if returned_postcode:
+                formatted_parts.append(returned_postcode)
+            
+            formatted_address = ', '.join(formatted_parts)
+            
+            return {
+                'valid': True,
+                'coords': (lat, lon),
+                'formatted_address': formatted_address,
+                'message': 'Valid Australian address'
+            }
+            
+        except Exception as e:
+            print(f"❌ Error validating address '{address}': {e}")
+            return {'valid': False, 'message': f'Validation error: {str(e)}'}
 
     def generate_approximate_delivery_map(self, approximate_lat: float, approximate_lon: float,
                                          actual_lat: float, actual_lon: float, radius_km: float = 5,

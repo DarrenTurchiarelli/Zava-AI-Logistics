@@ -8,6 +8,7 @@ Update these values once and they will be applied throughout the application
 COMPANY_NAME = "Zava Logistics"
 COMPANY_NAME_SHORT = "Zava"
 COMPANY_TAGLINE = "Fast, Reliable, Trusted Delivery"
+BROWSER_TITLE = "Think Digital, Think Data"
 COMPANY_ABN = "12 345 678 901"
 
 # Contact Information
@@ -87,6 +88,7 @@ def get_company_info():
         'support_hours': SUPPORT_HOURS,
         'version': APP_VERSION,
         'copyright': APP_COPYRIGHT,
+        'browser_title': BROWSER_TITLE,
         'terms_url': TERMS_URL,
         'privacy_url': PRIVACY_URL,
         'abn': ABN,

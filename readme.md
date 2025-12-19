@@ -18,7 +18,7 @@ A cutting-edge parcel tracking system powered by **8 Active Azure AI Foundry Age
 ### **Web Application (Recommended)**
 
 ```powershell
-$env:FLASK_ENV='development'; py app.pycd c:\Workbench\dt_item_scanner
+$env:FLASK_ENV='development'; py app.py
 
 ```
 

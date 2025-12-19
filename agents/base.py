@@ -59,8 +59,13 @@ class AzureAIAgentClient:
                 # Running in Azure with managed identity
                 credential = ManagedIdentityCredential()
             else:
-                # Running locally - use AzureCliCredential since user is authenticated via Azure CLI
-                credential = AzureCliCredential()
+                # Running locally - use DefaultAzureCredential for better timeout handling
+                # It will try: Environment -> ManagedIdentity -> AzureCLI -> etc.
+                credential = DefaultAzureCredential(
+                    exclude_managed_identity_credential=True,  # Don't try managed identity locally
+                    exclude_visual_studio_code_credential=True,  # Skip VSCode auth
+                    additionally_allowed_tenants=['*']  # Allow any tenant
+                )
             
             self._client = AIProjectClient(
                 endpoint=AZURE_AI_PROJECT_ENDPOINT,

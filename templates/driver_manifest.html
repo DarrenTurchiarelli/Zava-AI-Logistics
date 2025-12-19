@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Driver Manifest - {{ company.name }}{% endblock %}
+{% block title %}Driver Manifest - {{ company.browser_title }}{% endblock %}
 
 {% block content %}
 <div class="container-fluid mt-4">
@@ -577,50 +577,33 @@
                                         </label>
                                         <div class="card">
                                             <div class="card-body p-2">
+                                                <!-- Hidden file input for camera -->
                                                 <input type="file" 
-                                                       class="form-control form-control-sm mb-2" 
+                                                       style="position: absolute; left: -9999px;" 
                                                        id="deliveryPhoto{{ loop.index }}" 
                                                        name="delivery_photo" 
                                                        accept="image/*" 
                                                        capture="environment"
                                                        onchange="previewDeliveryPhoto({{ loop.index }})">
-                                                <div id="photoPreview{{ loop.index }}" class="text-center" style="display: none;">
+                                                
+                                                <!-- Camera button -->
+                                                <button type="button" 
+                                                        class="btn btn-block w-100" 
+                                                        style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;"
+                                                        onclick="document.getElementById('deliveryPhoto{{ loop.index }}').click()">
+                                                    <i class="bi bi-camera-fill"></i> Take Photo with Camera
+                                                </button>
+                                                
+                                                <div id="photoPreview{{ loop.index }}" class="text-center mt-2" style="display: none;">
                                                     <img id="photoPreviewImg{{ loop.index }}" src="" alt="Preview" class="img-fluid" style="max-height: 200px; border-radius: 4px;">
-                                                    <button type="button" class="btn btn-sm btn-danger mt-2" onclick="clearDeliveryPhoto({{ loop.index }})">
-                                                        <i class="bi bi-x-circle"></i> Remove
+                                                    <button type="button" class="btn btn-sm mt-2" style="background-color: #f8f9fa; color: #dc3545; border: 1px solid #dee2e6;" onclick="clearDeliveryPhoto({{ loop.index }})">
+                                                        <i class="bi bi-x-circle"></i> Remove Photo
                                                     </button>
                                                 </div>
                                             </div>
                                         </div>
                                         <small class="text-muted">
-                                            <i class="bi bi-info-circle"></i> Take a photo of the delivered parcel at the door/location
-                                        </small>
-                                    </div>
-                                    
-                                    <!-- Photo Proof of Delivery -->
-                                    <div class="mb-3">
-                                        <label class="form-label">
-                                            <i class="bi bi-camera"></i> Photo Proof of Delivery (Optional)
-                                        </label>
-                                        <div class="card">
-                                            <div class="card-body p-2">
-                                                <input type="file" 
-                                                       class="form-control form-control-sm mb-2" 
-                                                       id="deliveryPhoto{{ loop.index }}" 
-                                                       name="delivery_photo" 
-                                                       accept="image/*" 
-                                                       capture="environment"
-                                                       onchange="previewDeliveryPhoto({{ loop.index }})">
-                                                <div id="photoPreview{{ loop.index }}" class="text-center" style="display: none;">
-                                                    <img id="photoPreviewImg{{ loop.index }}" src="" alt="Preview" class="img-fluid" style="max-height: 200px; border-radius: 4px;">
-                                                    <button type="button" class="btn btn-sm btn-danger mt-2" onclick="clearDeliveryPhoto({{ loop.index }})">
-                                                        <i class="bi bi-x-circle"></i> Remove
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <small class="text-muted">
-                                            <i class="bi bi-info-circle"></i> Take a photo of the delivered parcel at the door/location
+                                            <i class="bi bi-info-circle"></i> On mobile devices, this will open your camera to take a photo
                                         </small>
                                     </div>
                                     

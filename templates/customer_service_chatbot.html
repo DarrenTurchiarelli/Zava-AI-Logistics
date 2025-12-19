@@ -24,23 +24,57 @@
                     <i class="bi bi-lightning-charge-fill"></i> Quick Actions
                 </div>
                 <div class="list-group list-group-flush">
-                    <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Track parcel RG857954')">
-                        <i class="bi bi-search"></i> Track Parcel RG857954
-                    </button>
-                    <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Show me the full history for RG857954')">
-                        <i class="bi bi-clock-history"></i> Parcel History
-                    </button>
-                    <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Show recent fraud reports')">
-                        <i class="bi bi-shield-fill-exclamation"></i> Check Frauds
-                    </button>
-                    <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Show all parcels in transit')">
-                        <i class="bi bi-truck"></i> Parcels in Transit
-                    </button>
+                    <div class="list-group-item">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-camera me-2"></i> <strong>Proof of Delivery</strong>
+                        </div>
+                        <div class="input-group input-group-sm">
+                            <input type="text" class="form-control" id="proofTrackingNumber" placeholder="Enter tracking number" onkeypress="if(event.key==='Enter') getProofOfDelivery()">
+                            <button class="btn btn-primary" onclick="getProofOfDelivery()">
+                                <i class="bi bi-send"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="list-group-item">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-search me-2"></i> <strong>Track Parcel</strong>
+                        </div>
+                        <div class="input-group input-group-sm">
+                            <input type="text" class="form-control" id="quickTrackNumber" placeholder="Enter tracking number" onkeypress="if(event.key==='Enter') quickTrackParcel()">
+                            <button class="btn btn-primary" onclick="quickTrackParcel()">
+                                <i class="bi bi-send"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="list-group-item">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-shield-fill-exclamation me-2"></i> <strong>Check Frauds</strong>
+                        </div>
+                        <div class="input-group input-group-sm">
+                            <input type="text" class="form-control" id="fraudSearchQuery" placeholder="Name or email (optional)" onkeypress="if(event.key==='Enter') searchFraudReports()">
+                            <button class="btn btn-primary" onclick="searchFraudReports()">
+                                <i class="bi bi-send"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="list-group-item">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-truck me-2"></i> <strong>Parcels in Transit</strong>
+                        </div>
+                        <div class="input-group input-group-sm">
+                            <select class="form-select" id="driverSelect">
+                                <option value="">All Drivers</option>
+                                <option value="driver001">Driver 001</option>
+                                <option value="driver002">Driver 002</option>
+                                <option value="driver003">Driver 003</option>
+                            </select>
+                            <button class="btn btn-primary" onclick="getParcelsInTransit()">
+                                <i class="bi bi-send"></i>
+                            </button>
+                        </div>
+                    </div>
                     <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Show delivery statistics')">
                         <i class="bi bi-bar-chart-fill"></i> Delivery Statistics
-                    </button>
-                    <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Show parcels at distribution center')">
-                        <i class="bi bi-building"></i> At Distribution Center
                     </button>
                     <button class="list-group-item list-group-item-action" onclick="clearChat()">
                         <i class="bi bi-x-circle-fill"></i> End Chat
@@ -51,22 +85,9 @@
             <!-- Parcel Lookup Panel -->
             <div class="card">
                 <div class="card-header bg-primary text-white">
-                    <i class="bi bi-box-seam"></i> Quick Lookup
+                    <i class="bi bi-geo-alt-fill"></i> Address Quick Lookup
                 </div>
                 <div class="card-body">
-                    <div class="form-group mb-2">
-                        <label for="trackingNumber" class="small">Tracking/Barcode</label>
-                        <input type="text" class="form-control" id="trackingNumber" placeholder="Enter tracking/barcode">
-                    </div>
-                    <button class="btn btn-primary btn-block btn-sm" onclick="trackParcel()">
-                        <i class="bi bi-search"></i> Get Details
-                    </button>
-                    <button class="btn btn-secondary btn-block btn-sm mt-1" onclick="getParcelHistory()">
-                        <i class="bi bi-clock-history"></i> Get History
-                    </button>
-                    
-                    <hr class="my-3">
-                    
                     <div class="form-group mb-2">
                         <label for="recipientAddress" class="small">Street Address</label>
                         <input type="text" class="form-control form-control-sm" id="recipientAddress" placeholder="Enter address">
@@ -93,7 +114,7 @@
                         <label for="timeRange" class="small">Time Range</label>
                         <select class="form-control form-control-sm" id="timeRange">
                             <option value="7">Last 7 days</option>
-                            <option value="21" selected>Last 3 weeks</option>
+                            <option value="14" selected>Last 2 weeks</option>
                             <option value="30">Last month</option>
                             <option value="">All time</option>
                         </select>
@@ -157,7 +178,7 @@
                     <i class="bi bi-info-circle-fill"></i> Information
                 </div>
                 <div class="card-body" id="infoPanel">
-                    <p class="text-muted">Information will appear here when you track parcels or check fraud reports.</p>
+                    <p class="text-muted">Chat history will appear here when you end a conversation.</p>
                 </div>
             </div>
 
@@ -169,6 +190,7 @@
                     <p class="small mb-2"><strong>🎤 Try saying:</strong></p>
                     <ul class="small">
                         <li>"Track parcel RG857954"</li>
+                        <li>"Photo proof for parcel DT202512170037"</li>
                         <li>"Show me the full history for RG857954"</li>
                         <li>"Who sent parcel RG857954?"</li>
                         <li>"Find parcels for Dr. Emma Wilson"</li>
@@ -540,6 +562,26 @@ async function sendMessage() {
         if (response.ok) {
             const aiResponse = data.response || data.message || JSON.stringify(data, null, 2);
             addMessage(aiResponse);
+            
+            // Display delivery photos if included in response
+            if (data.delivery_photos && data.delivery_photos.length > 0) {
+                const photosHtml = '<div class="mt-2"><strong>📸 Delivery Photos:</strong></div>';
+                addMessage(photosHtml);
+                
+                data.delivery_photos.forEach((photo, index) => {
+                    const photoHtml = `
+                        <div class="card mt-2" style="max-width: 400px;">
+                            <div class="card-header bg-light">
+                                <small><strong>Photo ${index + 1}</strong> - Uploaded by ${photo.uploaded_by || 'unknown'} at ${photo.timestamp || 'unknown time'}</small>
+                            </div>
+                            <div class="card-body p-2">
+                                <img src="data:image/png;base64,${photo.photo_data}" class="img-fluid" alt="Delivery Photo ${index + 1}" style="max-width: 100%; border: 1px solid #ddd; border-radius: 4px;">
+                            </div>
+                        </div>
+                    `;
+                    addMessage(photoHtml);
+                });
+            }
         } else {
             addError(data.error || 'Failed to get response');
         }
@@ -584,6 +626,69 @@ async function trackParcel() {
         removeLoading();
         addError('Network error: ' + error.message);
     }
+}
+
+async function getProofOfDelivery() {
+    const trackingNumber = document.getElementById('proofTrackingNumber').value.trim();
+    
+    if (!trackingNumber) {
+        addError('Please enter a tracking number to get proof of delivery');
+        return;
+    }
+    
+    const query = `Can I get photo proof of delivery for parcel ${trackingNumber}?`;
+    document.getElementById('chatInput').value = query;
+    await sendMessage();
+    
+    // Clear the input after sending
+    document.getElementById('proofTrackingNumber').value = '';
+}
+
+async function quickTrackParcel() {
+    const trackingNumber = document.getElementById('quickTrackNumber').value.trim();
+    
+    if (!trackingNumber) {
+        addError('Please enter a tracking number to track');
+        return;
+    }
+    
+    const query = `Track parcel ${trackingNumber}`;
+    document.getElementById('chatInput').value = query;
+    await sendMessage();
+    
+    // Clear the input after sending
+    document.getElementById('quickTrackNumber').value = '';
+}
+
+async function searchFraudReports() {
+    const searchQuery = document.getElementById('fraudSearchQuery').value.trim();
+    
+    let query;
+    if (searchQuery) {
+        query = `Show fraud reports for ${searchQuery}`;
+    } else {
+        query = 'Show recent fraud reports';
+    }
+    
+    document.getElementById('chatInput').value = query;
+    await sendMessage();
+    
+    // Clear the input after sending
+    document.getElementById('fraudSearchQuery').value = '';
+}
+
+async function getParcelsInTransit() {
+    const driverSelect = document.getElementById('driverSelect').value;
+    
+    let query;
+    if (driverSelect) {
+        query = `Show parcels in transit for ${driverSelect}`;
+    } else {
+        query = 'Show all parcels in transit';
+    }
+    
+    document.getElementById('chatInput').value = query;
+    await sendMessage();
 }
 
 async function getParcelLocation() {
@@ -669,12 +774,46 @@ function searchByAddress() {
     askQuickQuestion(question);
 }
 
+// Store chat history
+let chatHistory = [];
+
 function clearChat() {
     // Stop any ongoing speech
     stopSpeaking();
     
-    // Clear chat messages
+    // Save current chat to history
     const chatMessages = document.getElementById('chatMessages');
+    const messages = chatMessages.querySelectorAll('.chat-message');
+    
+    if (messages.length > 1) { // More than just the welcome message
+        const timestamp = new Date().toLocaleString();
+        const messageCount = messages.length - 1; // Exclude welcome message
+        
+        // Extract text from messages for preview
+        const preview = [];
+        messages.forEach((msg, idx) => {
+            if (idx > 0 && idx < 4) { // Skip welcome, show first 3 messages
+                const text = msg.textContent.trim().substring(0, 100);
+                preview.push(text);
+            }
+        });
+        
+        chatHistory.unshift({
+            timestamp: timestamp,
+            messageCount: messageCount,
+            preview: preview.join(' ... ')
+        });
+        
+        // Keep only last 5 chats
+        if (chatHistory.length > 5) {
+            chatHistory = chatHistory.slice(0, 5);
+        }
+        
+        // Update info panel with chat history
+        updateChatHistory();
+    }
+    
+    // Clear chat messages
     chatMessages.innerHTML = `
         <div class="chat-message ai-message">
             <div class="message-content" style="background-color: transparent; border: 1px solid #dee2e6;">
@@ -684,35 +823,40 @@ function clearChat() {
     `;
 }
 
+function updateChatHistory() {
+    const infoPanel = document.getElementById('infoPanel');
+    
+    if (chatHistory.length === 0) {
+        infoPanel.innerHTML = '<p class="text-muted">Chat history will appear here when you end a conversation.</p>';
+        return;
+    }
+    
+    const historyHtml = `
+        <h6><i class="bi bi-clock-history"></i> Chat History (${chatHistory.length})</h6>
+        <div class="small">
+            ${chatHistory.map((chat, idx) => `
+                <div class="border-bottom pb-2 mb-2">
+                    <strong>Chat ${idx + 1}</strong><br>
+                    <small class="text-muted">${chat.timestamp}</small><br>
+                    <small>${chat.messageCount} messages</small>
+                </div>
+            `).join('')}
+        </div>
+    `;
+    
+    infoPanel.innerHTML = historyHtml;
+}
+
 function handleEnter(event) {
     if (event.key === 'Enter') {
         sendMessage();
     }
 }
 
-// Load fraud reports on page load
+// Initialize on page load
 window.addEventListener('load', async function() {
-    try {
-        const response = await fetch('/api/chatbot/frauds?limit=5');
-        const data = await response.json();
-        
-        if (data.frauds && data.frauds.length > 0) {
-            const fraudInfo = `
-                <h6><i class="fas fa-shield-alt"></i> Recent Frauds (${data.frauds.length})</h6>
-                <div class="small">
-                    ${data.frauds.map(f => `
-                        <div class="border-bottom pb-2 mb-2">
-                            <strong>${f.risk_level || 'Unknown'}</strong><br>
-                            <small>${f.timestamp || 'No date'}</small>
-                        </div>
-                    `).join('')}
-                </div>
-            `;
-            document.getElementById('infoPanel').innerHTML = fraudInfo;
-        }
-    } catch (error) {
-        console.error('Failed to load fraud reports:', error);
-    }
+    // Initialize chat history display
+    updateChatHistory();
 });
 </script>
 

@@ -175,6 +175,17 @@ class CustomerServiceChatbot:
         
         parts.append(f"Customer Question: {query}")
         
+        # Check if query mentions a tracking number that wasn't found in pre-lookup
+        if not parcel_data:
+            import re
+            tracking_pattern = r'\b([A-Z]{2}\d+|[A-Z]+\d+[A-Z]+)\b'
+            matches = re.findall(tracking_pattern, query)
+            if matches:
+                parts.append(f"\n**IMPORTANT**: Customer mentioned tracking number(s): {', '.join(matches)}")
+                parts.append("You MUST use the track_parcel function to look up this parcel information from the database.")
+                parts.append("Call track_parcel with the tracking number to get current status, delivery photos, and all parcel details.")
+                parts.append("")
+        
         # Add parcel data for AI reasoning - INCLUDE FOR PUBLIC USERS when tracking
         if parcel_data:
             parts.append("\n=== PARCEL DATA FROM DATABASE ===")
@@ -189,23 +200,35 @@ class CustomerServiceChatbot:
             if not is_public:
                 if parcel_data.get('sender'):
                     sender = parcel_data['sender']
-                    parts.append(f"Sender: {sender.get('name', 'N/A')} - {sender.get('address', 'N/A')}")
+                    if isinstance(sender, dict):
+                        parts.append(f"Sender: {sender.get('name', 'N/A')} - {sender.get('address', 'N/A')}")
+                    else:
+                        parts.append(f"Sender: {sender}")
                 
                 if parcel_data.get('recipient'):
                     recipient = parcel_data['recipient']
-                    parts.append(f"Recipient: {recipient.get('name', 'N/A')} - {recipient.get('address', 'N/A')}")
+                    if isinstance(recipient, dict):
+                        parts.append(f"Recipient: {recipient.get('name', 'N/A')} - {recipient.get('address', 'N/A')}")
+                    else:
+                        parts.append(f"Recipient: {recipient}")
                 
                 if parcel_data.get('weight'):
                     parts.append(f"Weight: {parcel_data.get('weight')} kg")
                 
                 if parcel_data.get('dimensions'):
                     dims = parcel_data['dimensions']
-                    parts.append(f"Dimensions: {dims.get('length')}x{dims.get('width')}x{dims.get('height')} cm")
+                    if isinstance(dims, dict):
+                        parts.append(f"Dimensions: {dims.get('length')}x{dims.get('width')}x{dims.get('height')} cm")
+                    else:
+                        parts.append(f"Dimensions: {dims}")
             else:
                 # For public users, include recipient name (but not full address for privacy)
                 if parcel_data.get('recipient'):
                     recipient = parcel_data['recipient']
-                    parts.append(f"Recipient: {recipient.get('name', 'N/A')}")
+                    if isinstance(recipient, dict):
+                        parts.append(f"Recipient: {recipient.get('name', 'N/A')}")
+                    else:
+                        parts.append(f"Recipient: {recipient}")
             
             # Add recent tracking events
             if parcel_data.get('recent_events'):
@@ -218,12 +241,12 @@ class CustomerServiceChatbot:
                 photos = parcel_data['delivery_photos']
                 if is_public:
                     parts.append(f"\nDelivery Photos: {len(photos)} photo(s) available for this parcel")
-                    parts.append("NOTE: Delivery proof photos were captured during delivery")
+                    parts.append("NOTE: Delivery proof photos were captured during delivery and will be displayed below")
                 else:
                     parts.append(f"\nDelivery Photos: {len(photos)} photo(s) available")
                     for idx, photo in enumerate(photos, 1):
                         parts.append(f"  Photo {idx}: Uploaded by {photo.get('uploaded_by', 'unknown')} at {photo.get('timestamp', 'unknown time')}")
-                    parts.append("NOTE: Photos can be viewed in the customer service interface")
+                    parts.append("IMPORTANT: Photos will be automatically displayed in the chat below your response. Do NOT tell the user to view them elsewhere - they are already visible in the chat.")
             
             parts.append("=== END PARCEL DATA ===\n")
         

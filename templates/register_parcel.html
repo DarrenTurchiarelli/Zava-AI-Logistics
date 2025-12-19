@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Register Parcel - {{ company.name }}{% endblock %}
+{% block title %}Register Parcel - {{ company.browser_title }}{% endblock %}
 
 {% block content %}
 <div class="container">
@@ -24,8 +24,11 @@
                                 <input type="tel" class="form-control" id="sender_phone" name="sender_phone" required>
                             </div>
                             <div class="col-12">
-                                <label for="sender_address" class="form-label">Address *</label>
+                                <label for="sender_address" class="form-label">Address *
+                                    <span id="sender_address_status" class="ms-2"></span>
+                                </label>
                                 <textarea class="form-control" id="sender_address" name="sender_address" rows="2" required></textarea>
+                                <small class="text-muted">Address will be validated using Azure Maps</small>
                             </div>
                         </div>
 
@@ -41,13 +44,11 @@
                                 <input type="tel" class="form-control" id="recipient_phone" name="recipient_phone" required>
                             </div>
                             <div class="col-12">
-                                <label for="recipient_address" class="form-label">Address *</label>
+                                <label for="recipient_address" class="form-label">Address *
+                                    <span id="recipient_address_status" class="ms-2"></span>
+                                </label>
                                 <textarea class="form-control" id="recipient_address" name="recipient_address" rows="2" required></textarea>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="destination_postcode" class="form-label">Postcode *</label>
-                                <input type="text" class="form-control" id="destination_postcode" name="destination_postcode" pattern="[0-9]{4}" required>
-                                <small class="text-muted">4-digit Australian postcode</small>
+                                <small class="text-muted">Address will be validated using Azure Maps</small>
                             </div>
                         </div>
 
@@ -86,8 +87,8 @@
                             <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
                                 <i class="bi bi-x-circle"></i> Cancel
                             </a>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-check-circle"></i> Register Parcel
+                            <button type="submit" class="btn btn-lg" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
+                                <i class="bi bi-check-circle" style="color: #eb2525;"></i> Register Parcel
                             </button>
                         </div>
                     </form>
@@ -98,8 +99,32 @@
 </div>
 
 <script>
-// Check if there's scanned data from camera scanner
+// Form validation and scanned data handling
 document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    
+    // Form validation before submit
+    form.addEventListener('submit', async function(e) {
+        const senderAddress = document.getElementById('sender_address').value.trim();
+        const recipientAddress = document.getElementById('recipient_address').value.trim();
+        
+        // If addresses haven't been validated yet, validate them now
+        if (senderAddress && !document.getElementById('sender_address_status').innerHTML.includes('Valid Address')) {
+            e.preventDefault();
+            alert('Please wait while we validate the sender address...');
+            await validateAddress('sender_address', 'sender_address_status');
+            return false;
+        }
+        
+        if (recipientAddress && !document.getElementById('recipient_address_status').innerHTML.includes('Valid Address')) {
+            e.preventDefault();
+            alert('Please wait while we validate the recipient address...');
+            await validateAddress('recipient_address', 'recipient_address_status');
+            return false;
+        }
+    });
+
+    // Check if there's scanned data from camera scanner
     const scannedData = sessionStorage.getItem('scannedData');
     
     if (scannedData) {
@@ -108,7 +133,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Show notification that data is being pre-filled
             const alert = document.createElement('div');
-            alert.className = 'alert alert-success alert-dismissible fade show';
+            alert.className = 'alert alert-secondary alert-dismissible fade show';
             alert.innerHTML = `
                 <i class="bi bi-check-circle"></i> 
                 <strong>Data from camera scanner loaded!</strong> Please verify and complete the remaining fields.
@@ -124,19 +149,8 @@ document.addEventListener('DOMContentLoaded', function() {
             // Pre-fill recipient address if detected
             if (data.address) {
                 document.getElementById('recipient_address').value = data.address;
-            }
-            
-            // Pre-fill postcode - prioritize the dedicated postcode field from bottom-right detection
-            if (data.postcode) {
-                document.getElementById('destination_postcode').value = data.postcode;
-                console.log('Postcode pre-filled from scanner:', data.postcode);
-            } else if (data.address) {
-                // Fallback: try to extract postcode from address (Australian 4-digit postcodes)
-                const postcodeMatch = data.address.match(/\b(\d{4})\b/);
-                if (postcodeMatch) {
-                    document.getElementById('destination_postcode').value = postcodeMatch[1];
-                    console.log('Postcode extracted from address:', postcodeMatch[1]);
-                }
+                // Trigger validation after populating
+                validateAddress('recipient_address', 'recipient_address_status');
             }
             
             // If barcode was detected, you might use it for special handling
@@ -164,6 +178,190 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error loading scanned data:', error);
         }
     }
+});
+
+// Address validation using Azure Maps
+let validationTimeout;
+
+async function validateAddress(addressField, statusElementId) {
+    const address = document.getElementById(addressField).value.trim();
+    const statusElement = document.getElementById(statusElementId);
+    
+    if (!address || address.length < 10) {
+        statusElement.innerHTML = '';
+        return;
+    }
+    
+    // Show validating status
+    statusElement.innerHTML = '<span class="badge bg-secondary"><i class="bi bi-hourglass-split"></i> Validating...</span>';
+    
+    try {
+        const response = await fetch('/api/validate-address', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ address: address })
+        });
+        
+        const data = await response.json();
+        
+        if (data.valid) {
+            statusElement.innerHTML = '<span class="badge bg-success"><i class="bi bi-check-circle-fill"></i> Valid Address</span>';
+            
+            // Update with formatted address if available
+            if (data.formatted_address && data.formatted_address !== address) {
+                const confirmation = confirm(`Azure Maps suggests this format:\n\n"${data.formatted_address}"\n\nUse this format?`);
+                if (confirmation) {
+                    document.getElementById(addressField).value = data.formatted_address;
+                }
+            }
+        } else {
+            statusElement.innerHTML = '<span class="badge bg-warning"><i class="bi bi-exclamation-triangle-fill"></i> Could not validate</span>';
+        }
+    } catch (error) {
+        console.error('Address validation error:', error);
+        statusElement.innerHTML = '<span class="badge bg-secondary"><i class="bi bi-info-circle"></i> Validation unavailable</span>';
+    }
+}
+
+// Address autocomplete
+let autocompleteTimeout;
+let currentFocusedField = null;
+
+async function getAddressSuggestions(fieldId, query) {
+    if (!query || query.length < 3) {
+        hideAutocomplete(fieldId);
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/autocomplete-address', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ query: query })
+        });
+        
+        const data = await response.json();
+        
+        if (data.suggestions && data.suggestions.length > 0) {
+            showAutocomplete(fieldId, data.suggestions);
+        } else {
+            hideAutocomplete(fieldId);
+        }
+    } catch (error) {
+        console.error('Autocomplete error:', error);
+        hideAutocomplete(fieldId);
+    }
+}
+
+function showAutocomplete(fieldId, suggestions) {
+    // Remove any existing dropdown
+    hideAutocomplete(fieldId);
+    
+    const field = document.getElementById(fieldId);
+    const dropdown = document.createElement('div');
+    dropdown.id = fieldId + '_autocomplete';
+    dropdown.className = 'autocomplete-dropdown';
+    dropdown.style.cssText = `
+        position: absolute;
+        background: white;
+        border: 1px solid #dee2e6;
+        border-top: none;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 1000;
+        width: 100%;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        top: 100%;
+        left: 0;
+        margin-top: -1px;
+    `;
+    
+    suggestions.forEach(suggestion => {
+        const item = document.createElement('div');
+        item.className = 'autocomplete-item';
+        item.style.cssText = `
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+        `;
+        item.textContent = suggestion.address;
+        
+        item.addEventListener('mouseenter', function() {
+            this.style.backgroundColor = '#f8f9fa';
+        });
+        
+        item.addEventListener('mouseleave', function() {
+            this.style.backgroundColor = 'white';
+        });
+        
+        item.addEventListener('click', function() {
+            field.value = suggestion.address;
+            hideAutocomplete(fieldId);
+            
+            // Trigger validation after selection
+            const statusId = fieldId + '_status';
+            validateAddress(fieldId, statusId);
+        });
+        
+        dropdown.appendChild(item);
+    });
+    
+    // Set parent to relative positioning and append dropdown
+    field.parentElement.style.position = 'relative';
+    field.parentElement.appendChild(dropdown);
+}
+
+function hideAutocomplete(fieldId) {
+    const dropdown = document.getElementById(fieldId + '_autocomplete');
+    if (dropdown) {
+        dropdown.remove();
+    }
+}
+
+// Add autocomplete listeners
+document.getElementById('sender_address').addEventListener('input', function(e) {
+    clearTimeout(autocompleteTimeout);
+    currentFocusedField = 'sender_address';
+    
+    autocompleteTimeout = setTimeout(() => {
+        getAddressSuggestions('sender_address', e.target.value);
+    }, 300);
+});
+
+document.getElementById('recipient_address').addEventListener('input', function(e) {
+    clearTimeout(autocompleteTimeout);
+    currentFocusedField = 'recipient_address';
+    
+    autocompleteTimeout = setTimeout(() => {
+        getAddressSuggestions('recipient_address', e.target.value);
+    }, 300);
+});
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('textarea')) {
+        hideAutocomplete('sender_address');
+        hideAutocomplete('recipient_address');
+    }
+});
+
+// Add debounced validation listeners
+document.getElementById('sender_address').addEventListener('input', function() {
+    clearTimeout(validationTimeout);
+    validationTimeout = setTimeout(() => {
+        validateAddress('sender_address', 'sender_address_status');
+    }, 1500);
+});
+
+document.getElementById('recipient_address').addEventListener('input', function() {
+    clearTimeout(validationTimeout);
+    validationTimeout = setTimeout(() => {
+        validateAddress('recipient_address', 'recipient_address_status');
+    }, 1500);
 });
 </script>
 {% endblock %}
