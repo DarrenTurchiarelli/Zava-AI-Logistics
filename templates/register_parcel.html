@@ -193,7 +193,7 @@ async function validateAddress(addressField, statusElementId) {
     }
     
     // Show validating status
-    statusElement.innerHTML = '<span class="badge bg-secondary"><i class="bi bi-hourglass-split"></i> Validating with AI...</span>';
+    statusElement.innerHTML = '<span class="badge bg-secondary"><i class="bi bi-hourglass-split"></i> Validating...</span>';
     
     try {
         const response = await fetch('/api/validate-address', {
@@ -207,55 +207,7 @@ async function validateAddress(addressField, statusElementId) {
         const data = await response.json();
         
         if (data.valid) {
-            let statusHtml = '<span class="badge bg-success"><i class="bi bi-check-circle-fill"></i> Valid Address</span>';
-            
-            // Show AI-powered badge
-            if (data.ai_powered) {
-                statusHtml += ' <span class="badge bg-info"><i class="bi bi-robot"></i> AI Verified</span>';
-            }
-            
-            // Show confidence level if available
-            if (data.confidence && data.ai_powered) {
-                const confidencePercent = Math.round(data.confidence * 100);
-                statusHtml += ` <small class="text-muted">(${confidencePercent}% confidence)</small>`;
-            }
-            
-            statusElement.innerHTML = statusHtml;
-            
-            // Show typo correction suggestion
-            if (data.typo_detected && data.suggested_correction) {
-                const correctionDiv = document.createElement('div');
-                correctionDiv.className = 'alert alert-warning alert-sm mt-2 mb-0';
-                correctionDiv.innerHTML = `
-                    <i class="bi bi-exclamation-triangle"></i> ${data.message}
-                    <button class="btn btn-sm btn-warning ms-2" onclick="document.getElementById('${addressField}').value='${data.suggested_correction}'; validateAddress('${addressField}', '${statusElementId}');">
-                        Use Suggested Address
-                    </button>
-                `;
-                statusElement.appendChild(correctionDiv);
-            }
-            
-            // Show delivery complications
-            if (data.complications && data.complications.length > 0) {
-                const complicationDiv = document.createElement('div');
-                complicationDiv.className = 'alert alert-info alert-sm mt-2 mb-0';
-                complicationDiv.innerHTML = `
-                    <i class="bi bi-info-circle"></i> <strong>Delivery Notes:</strong><br>
-                    ${data.complications.map(c => `• ${c}`).join('<br>')}
-                `;
-                statusElement.appendChild(complicationDiv);
-            }
-            
-            // Show recommendations
-            if (data.recommendations && data.recommendations.length > 0) {
-                const recoDiv = document.createElement('div');
-                recoDiv.className = 'alert alert-success alert-sm mt-2 mb-0';
-                recoDiv.innerHTML = `
-                    <i class="bi bi-lightbulb"></i> <strong>Recommendations:</strong><br>
-                    ${data.recommendations.map(r => `• ${r}`).join('<br>')}
-                `;
-                statusElement.appendChild(recoDiv);
-            }
+            statusElement.innerHTML = '<span class="badge bg-success"><i class="bi bi-check-circle-fill"></i> Valid Address</span>';
             
             // Update with formatted address if available
             if (data.formatted_address && data.formatted_address !== address) {

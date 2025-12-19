@@ -6,45 +6,35 @@
 <div class="container mt-5">
     <div class="row justify-content-center">
         <div class="col-md-8">
-            <!-- Tracking Number Entry Card -->
-            {% if not tracking_data %}
-            <div class="card shadow-lg">
-                <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0">
-                        <i class="bi bi-search"></i> Track Your Parcel
-                    </h4>
-                </div>
-                <div class="card-body p-5">
-                    <p class="lead mb-4">Enter your tracking number to see the latest status of your delivery.</p>
-                    
-                    <form method="POST" action="{{ url_for('track_parcel_public') }}">
-                        <div class="mb-4">
-                            <label for="tracking_number" class="form-label fs-5">Tracking Number(s)</label>
-                            <input type="text" class="form-control form-control-lg" id="tracking_number" 
-                                   name="tracking_number" placeholder="e.g., DT202512040001, DT202512040002" required>
-                            <div class="form-text">Enter one or more barcodes separated by commas (,) or semicolons (;). Barcodes can be found on your parcel labels or driver manifest.</div>
-                        </div>
-                        <button type="submit" class="btn btn-primary btn-lg w-100">
-                            <i class="bi bi-search"></i> Track Parcel
-                        </button>
-                    </form>
-                </div>
-            </div>
-            {% endif %}
+            <script>
+                // Pre-fill tracking number from URL and auto-submit if from registration
+                document.addEventListener('DOMContentLoaded', function() {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const trackingNumber = urlParams.get('tracking');
+                    if (trackingNumber) {
+                        const input = document.getElementById('tracking_number');
+                        const form = document.querySelector('form');
+                        if (input && form) {
+                            input.value = trackingNumber;
+                            // Auto-submit to show tracking results
+                            form.submit();
+                        }
+                    }
+                });
+            </script>
+            
+            <!-- Hidden form for auto-submit from registration -->
+            <form method="POST" action="{{ url_for('track_parcel_public') }}" style="display: none;">
+                <input type="text" id="tracking_number" name="tracking_number">
+            </form>
 
             <!-- Tracking Results -->
             {% if tracking_results %}
-            <!-- Track Another Button -->
-            <div class="mb-3 text-end">
-                <a href="{{ url_for('track_parcel_public') }}" class="btn btn-primary">
-                    <i class="bi bi-arrow-left"></i> Track More Parcels
-                </a>
-            </div>
             
             <!-- Loop through each tracking result -->
             {% for tracking_data in tracking_results %}
             <div class="card shadow-lg mb-4">
-                <div class="card-header {% if tracking_data.current_status == 'Delivered' %}bg-success{% elif tracking_data.current_status == 'Out for Delivery' %}bg-primary{% else %}bg-secondary{% endif %} text-white">
+                <div class="card-header text-white" style="background-color: #eb2525;">
                     <h4 class="mb-0">
                         <i class="bi bi-box-seam"></i> {{ tracking_data.barcode }}
                     </h4>
@@ -65,6 +55,10 @@
                                 <span class="badge bg-warning fs-4">
                                     <i class="bi bi-arrow-right-circle"></i> In Transit
                                 </span>
+                            {% elif tracking_data.current_status == 'Registered' %}
+                                <span class="badge bg-danger fs-4">
+                                    <i class="bi bi-hourglass-split"></i> Payment Pending
+                                </span>
                             {% else %}
                                 <span class="badge bg-secondary fs-4">
                                     <i class="bi bi-hourglass-split"></i> {{ tracking_data.current_status|title }}
@@ -74,15 +68,82 @@
                         <p class="text-muted mb-0">Last updated: {{ tracking_data.last_updated }}</p>
                     </div>
 
-                    <!-- Delivery Information -->
+                    <!-- Sender Information -->
+                    <h5 class="mb-3"><i class="bi bi-person"></i> Sender Information</h5>
                     <div class="row mb-4">
-                        <div class="col-md-6">
-                            <h6 class="text-muted">Recipient</h6>
+                        <div class="col-md-4">
+                            <h6 class="text-muted">Name</h6>
+                            <p class="mb-0"><strong>{{ tracking_data.sender_name }}</strong></p>
+                        </div>
+                        <div class="col-md-4">
+                            <h6 class="text-muted">Phone</h6>
+                            <p class="mb-0">{{ tracking_data.sender_phone }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <h6 class="text-muted">Address</h6>
+                            <p class="mb-0">{{ tracking_data.sender_address }}</p>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Recipient Information -->
+                    <h5 class="mb-3"><i class="bi bi-geo-alt"></i> Recipient Information</h5>
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <h6 class="text-muted">Name</h6>
                             <p class="mb-0"><strong>{{ tracking_data.recipient_name }}</strong></p>
                         </div>
+                        <div class="col-md-4">
+                            <h6 class="text-muted">Phone</h6>
+                            <p class="mb-0">{{ tracking_data.recipient_phone }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <h6 class="text-muted">Address</h6>
+                            <p class="mb-0">{{ tracking_data.recipient_address }}</p>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Parcel Details -->
+                    <h5 class="mb-3"><i class="bi bi-box-seam"></i> Parcel Details</h5>
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <h6 class="text-muted">Service Type</h6>
+                            <p class="mb-0"><span class="badge bg-primary">{{ tracking_data.service_type|upper }}</span></p>
+                        </div>
+                        <div class="col-md-3">
+                            <h6 class="text-muted">Weight</h6>
+                            <p class="mb-0">{{ tracking_data.weight }}kg</p>
+                        </div>
+                        <div class="col-md-3">
+                            <h6 class="text-muted">Dimensions</h6>
+                            <p class="mb-0">{{ tracking_data.dimensions or 'N/A' }}</p>
+                        </div>
+                        <div class="col-md-3">
+                            <h6 class="text-muted">Declared Value</h6>
+                            <p class="mb-0">${{ tracking_data.declared_value }}</p>
+                        </div>
+                    </div>
+                    
+                    {% if tracking_data.special_instructions %}
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h6 class="text-muted">Special Instructions</h6>
+                            <p class="mb-0">{{ tracking_data.special_instructions }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="row mb-4">
                         <div class="col-md-6">
                             <h6 class="text-muted">Expected Delivery</h6>
                             <p class="mb-0"><strong>{{ tracking_data.expected_delivery or 'TBD' }}</strong></p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-muted">Current Status</h6>
+                            <p class="mb-0"><strong>{{ tracking_data.current_status|title }}</strong></p>
                         </div>
                     </div>
 
@@ -149,6 +210,18 @@
                         </div>
                     </div>
                     {% endif %}
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="card-footer" style="background-color: #f8f9fa; border-top: 1px solid #dee2e6;">
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                        <button class="btn btn-dark btn-lg" style="background-color: #000; border-color: #000;" onclick="alert('Apple Pay integration would be implemented here.')">
+                            <i class="bi bi-apple"></i> Pay with Apple Pay
+                        </button>
+                        <a href="{{ url_for('register_parcel') }}" class="btn btn-lg" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
+                            <i class="bi bi-plus-circle" style="color: #eb2525;"></i> Register Another Parcel
+                        </a>
+                    </div>
                 </div>
             </div>
             {% endfor %}
