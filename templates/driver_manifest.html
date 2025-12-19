@@ -493,7 +493,7 @@
                                 </h5>
                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
-                            <form method="POST" action="{{ url_for('mark_delivery_complete', manifest_id=manifest.id, barcode=item.barcode) }}">
+                            <form method="POST" action="{{ url_for('mark_delivery_complete', manifest_id=manifest.id, barcode=item.barcode) }}" enctype="multipart/form-data" id="deliveryForm{{ loop.index }}">
                                 <div class="modal-body">
                                     <p><strong>Barcode:</strong> <code>{{ item.barcode }}</code></p>
                                     <p><strong>Recipient:</strong> {{ item.recipient_name }}</p>
@@ -568,6 +568,60 @@
                                                 <option value="Other">Other</option>
                                             </select>
                                         </div>
+                                    </div>
+                                    
+                                    <!-- Photo Proof of Delivery -->
+                                    <div class="mb-3">
+                                        <label class="form-label">
+                                            <i class="bi bi-camera"></i> Photo Proof of Delivery (Optional)
+                                        </label>
+                                        <div class="card">
+                                            <div class="card-body p-2">
+                                                <input type="file" 
+                                                       class="form-control form-control-sm mb-2" 
+                                                       id="deliveryPhoto{{ loop.index }}" 
+                                                       name="delivery_photo" 
+                                                       accept="image/*" 
+                                                       capture="environment"
+                                                       onchange="previewDeliveryPhoto({{ loop.index }})">
+                                                <div id="photoPreview{{ loop.index }}" class="text-center" style="display: none;">
+                                                    <img id="photoPreviewImg{{ loop.index }}" src="" alt="Preview" class="img-fluid" style="max-height: 200px; border-radius: 4px;">
+                                                    <button type="button" class="btn btn-sm btn-danger mt-2" onclick="clearDeliveryPhoto({{ loop.index }})">
+                                                        <i class="bi bi-x-circle"></i> Remove
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <small class="text-muted">
+                                            <i class="bi bi-info-circle"></i> Take a photo of the delivered parcel at the door/location
+                                        </small>
+                                    </div>
+                                    
+                                    <!-- Photo Proof of Delivery -->
+                                    <div class="mb-3">
+                                        <label class="form-label">
+                                            <i class="bi bi-camera"></i> Photo Proof of Delivery (Optional)
+                                        </label>
+                                        <div class="card">
+                                            <div class="card-body p-2">
+                                                <input type="file" 
+                                                       class="form-control form-control-sm mb-2" 
+                                                       id="deliveryPhoto{{ loop.index }}" 
+                                                       name="delivery_photo" 
+                                                       accept="image/*" 
+                                                       capture="environment"
+                                                       onchange="previewDeliveryPhoto({{ loop.index }})">
+                                                <div id="photoPreview{{ loop.index }}" class="text-center" style="display: none;">
+                                                    <img id="photoPreviewImg{{ loop.index }}" src="" alt="Preview" class="img-fluid" style="max-height: 200px; border-radius: 4px;">
+                                                    <button type="button" class="btn btn-sm btn-danger mt-2" onclick="clearDeliveryPhoto({{ loop.index }})">
+                                                        <i class="bi bi-x-circle"></i> Remove
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <small class="text-muted">
+                                            <i class="bi bi-info-circle"></i> Take a photo of the delivered parcel at the door/location
+                                        </small>
                                     </div>
                                     
                                     <div class="mb-3">
@@ -911,6 +965,32 @@ function notifyCustomer(barcode, recipientName, itemIndex) {
         btn.innerHTML = originalHtml;
         showToast('Failed to send notification. Please try again.', 'error');
     });
+}
+
+// Photo proof of delivery functions
+function previewDeliveryPhoto(index) {
+    const fileInput = document.getElementById(`deliveryPhoto${index}`);
+    const preview = document.getElementById(`photoPreview${index}`);
+    const previewImg = document.getElementById(`photoPreviewImg${index}`);
+    
+    if (fileInput.files && fileInput.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            previewImg.src = e.target.result;
+            preview.style.display = 'block';
+        };
+        reader.readAsDataURL(fileInput.files[0]);
+    }
+}
+
+function clearDeliveryPhoto(index) {
+    const fileInput = document.getElementById(`deliveryPhoto${index}`);
+    const preview = document.getElementById(`photoPreview${index}`);
+    const previewImg = document.getElementById(`photoPreviewImg${index}`);
+    
+    fileInput.value = '';
+    previewImg.src = '';
+    preview.style.display = 'none';
 }
 {% endif %}
 </script>

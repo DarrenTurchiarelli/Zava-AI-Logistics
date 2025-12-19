@@ -437,6 +437,55 @@ def login():
     
     return render_template('login.html')
 
+@app.route('/demo-login/<username>')
+def demo_login(username):
+    """Auto-login for demo users"""
+    # Define demo credentials
+    demo_credentials = {
+        'admin': 'admin123',
+        'support': 'support123',
+        'depot_mgr': 'depot123',
+        'driver001': 'driver123',
+        'driver002': 'driver123',
+        'driver003': 'driver123'
+    }
+    
+    if username not in demo_credentials:
+        flash('Invalid demo user', 'danger')
+        return redirect(url_for('index'))
+    
+    # Authenticate user
+    async def auth_demo_user():
+        async with ParcelTrackingDB() as db:
+            if not db.database:
+                await db.connect()
+            user_mgr = UserManager(db)
+            return await user_mgr.authenticate(username, demo_credentials[username])
+    
+    try:
+        user = run_async(auth_demo_user())
+        if user:
+            session.clear()
+            from flask import get_flashed_messages
+            get_flashed_messages()
+            session['user'] = user
+            session['logged_in'] = True
+            session['username'] = user['username']
+            session.modified = True
+            flash(f"Logged in as {user['full_name']} ({username})", 'success')
+            
+            # Redirect based on role
+            if user['role'] == UserManager.ROLE_DRIVER:
+                return redirect(url_for('driver_manifest'))
+            else:
+                return redirect(url_for('ai_insights'))
+        else:
+            flash('Demo login failed', 'danger')
+    except Exception as e:
+        flash(f'Demo login error: {str(e)}', 'danger')
+    
+    return redirect(url_for('index'))
+
 @app.route('/logout')
 def logout():
     """Logout"""
@@ -1285,8 +1334,11 @@ def public_chatbot():
     
     data = request.get_json()
     query = data.get('query', '')
+    tracking_number = data.get('tracking_number')  # Support explicit tracking number
     
     print(f"📝 Query: {query}")
+    if tracking_number:
+        print(f"📦 Tracking Number: {tracking_number}")
     if is_logged_in:
         print(f"👤 User: {user.get('username')} (Role: {user.get('role')})")
     else:
@@ -1306,6 +1358,10 @@ def public_chatbot():
                 'public_mode': True,  # Flag to limit responses
                 'is_authenticated': is_logged_in
             }
+            
+            # Add tracking number to context if provided
+            if tracking_number:
+                context['tracking_number'] = tracking_number
             
             # Process query with restricted access
             response = await chatbot.process_query(query, context)
@@ -1455,6 +1511,29 @@ def chatbot_parcel_location(tracking_number):
     try:
         result = run_async(get_location())
         return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/chatbot/delivery-photos/<tracking_number>')
+@login_required
+def get_delivery_photos(tracking_number):
+    """Get delivery proof photos for a parcel"""
+    user = session.get('user')
+    if not user or user.get('role') not in [UserManager.ROLE_CUSTOMER_SERVICE, UserManager.ROLE_ADMIN]:
+        return jsonify({'error': 'Access denied'}), 403
+    
+    async def get_photos():
+        async with ParcelTrackingDB() as db:
+            parcel = await db.get_parcel_by_barcode(tracking_number)
+            if not parcel:
+                return None
+            return parcel.get('delivery_photos', [])
+    
+    try:
+        photos = run_async(get_photos())
+        if photos is None:
+            return jsonify({'error': 'Parcel not found'}), 404
+        return jsonify({'photos': photos, 'count': len(photos)})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -2272,6 +2351,19 @@ def mark_delivery_complete(manifest_id, barcode):
         post_office = request.form.get('post_office', '').strip()
         card_reason = request.form.get('card_reason', 'No one home')
         
+        # Handle photo upload
+        delivery_photo_base64 = None
+        if 'delivery_photo' in request.files:
+            photo_file = request.files['delivery_photo']
+            if photo_file and photo_file.filename != '':
+                try:
+                    import base64
+                    photo_bytes = photo_file.read()
+                    delivery_photo_base64 = base64.b64encode(photo_bytes).decode('utf-8')
+                    print(f"📸 Photo captured for {barcode}, size: {len(photo_bytes)} bytes")
+                except Exception as e:
+                    print(f"❌ Error processing photo: {e}")
+        
         # Validate carded delivery requires post office
         if delivery_status == 'carded' and not post_office:
             flash('Post office selection is required for carded deliveries', 'danger')
@@ -2308,11 +2400,17 @@ def mark_delivery_complete(manifest_id, barcode):
                                 post_office,  # Location is now the post office
                                 user.get('username', 'driver')
                             )
+                            # Store photo if provided
+                            if delivery_photo_base64:
+                                await db.store_delivery_photo(barcode, delivery_photo_base64, user.get('username', 'driver'))
                     else:
                         # Normal delivery
                         success = await db.mark_delivery_complete(manifest_id, barcode, driver_note if driver_note else None)
                         if success and delivery_address:
                             await db.update_parcel_status(barcode, "delivered", delivery_address, user.get('username', 'driver'))
+                            # Store photo if provided
+                            if delivery_photo_base64:
+                                await db.store_delivery_photo(barcode, delivery_photo_base64, user.get('username', 'driver'))
                     
                     return success, None
             
@@ -2344,10 +2442,16 @@ def mark_delivery_complete(manifest_id, barcode):
                         success = await db.mark_delivery_complete(manifest_id, barcode, card_note)
                         if success and delivery_address:
                             await db.update_parcel_status(barcode, "carded", post_office, user.get('username', 'admin'))
+                            # Store photo if provided
+                            if delivery_photo_base64:
+                                await db.store_delivery_photo(barcode, delivery_photo_base64, user.get('username', 'admin'))
                     else:
                         success = await db.mark_delivery_complete(manifest_id, barcode, driver_note if driver_note else None)
                         if success and delivery_address:
                             await db.update_parcel_status(barcode, "delivered", delivery_address, user.get('username', 'admin'))
+                            # Store photo if provided
+                            if delivery_photo_base64:
+                                await db.store_delivery_photo(barcode, delivery_photo_base64, user.get('username', 'admin'))
                     
                     return success
             

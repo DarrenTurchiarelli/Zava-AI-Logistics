@@ -8,22 +8,10 @@
     <div class="hero-gradient text-white py-5 mb-4">
         <div class="row">
             <div class="col-12 text-center hero-content">
-                <h1 class="display-3 fw-bold mb-3">{{ company.name }}</h1>
+                <h1 class="display-3 fw-bold mb-3">Australia Post</h1>
                 <p class="display-6 fw-light mb-4">Think Digital. Think Data.</p>
                 <p class="lead mb-0">Experience the Future of AI-Powered Logistics</p>
             </div>
-        </div>
-    </div>
-
-    <!-- Welcome Message -->
-    <div class="row mb-5">
-        <div class="col-lg-8 mx-auto text-center">
-            <h2 class="mb-4">Welcome to Demo Day!</h2>
-            <p class="lead">
-                Explore our AI-powered logistics platform featuring <strong>9 Azure AI Foundry Agents</strong> 
-                working together to revolutionize last-mile delivery. Each demo is interactive - 
-                click on any tile to see the agent in action!
-            </p>
         </div>
     </div>
 
@@ -49,11 +37,19 @@
                     <div class="alert alert-light border alert-permanent mt-3">
                         <strong>What to observe:</strong> Natural conversation, real-time data lookup, helpful responses
                     </div>
-                </div>
-                <div class="card-footer">
-                    <a href="{{ url_for('customer_service_chatbot') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
-                        <i class="bi bi-box-arrow-up-right"></i> Open Full Chatbot
-                    </a>
+                    <div class="alert alert-secondary alert-permanent py-3 mt-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div style="font-size: 0.85rem;">
+                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong> 
+                                <a href="{{ url_for('demo_login', username='support') }}" class="text-dark fw-bold text-decoration-none">
+                                    <u>support</u>
+                                </a>
+                            </div>
+                            <a href="{{ url_for('demo_login', username='support') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
+                                <i class="bi bi-box-arrow-up-right"></i> Open Chatbot
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -77,11 +73,19 @@
                     <div class="alert alert-light border alert-permanent mt-3">
                         <strong>What to observe:</strong> Real-time risk scoring, threat patterns, security recommendations
                     </div>
-                </div>
-                <div class="card-footer">
-                    <a href="{{ url_for('report_fraud') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
-                        <i class="bi bi-shield-exclamation"></i> Try Fraud Detection
-                    </a>
+                    <div class="alert alert-secondary alert-permanent py-3 mt-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div style="font-size: 0.85rem;">
+                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong> 
+                                <a href="{{ url_for('demo_login', username='admin') }}" class="text-dark fw-bold text-decoration-none">
+                                    <u>admin</u>
+                                </a>
+                            </div>
+                            <a href="{{ url_for('demo_login', username='admin') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
+                                <i class="bi bi-shield-exclamation"></i> Report Fraud
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -105,11 +109,16 @@
                     <div class="alert alert-light border alert-permanent mt-3">
                         <strong>What to observe:</strong> Address validation, automatic barcode generation, route assignment
                     </div>
-                </div>
-                <div class="card-footer">
-                    <a href="{{ url_for('register_parcel') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
-                        <i class="bi bi-box-seam"></i> Register a Parcel
-                    </a>
+                    <div class="alert alert-secondary alert-permanent py-3 mt-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div style="font-size: 0.85rem;">
+                                <i class="bi bi-unlock"></i> <strong>Try it:</strong> No login required
+                            </div>
+                            <a href="{{ url_for('camera_scanner') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
+                                <i class="bi bi-camera"></i> Scan Parcel
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -133,11 +142,19 @@
                     <div class="alert alert-light border alert-permanent mt-3">
                         <strong>What to observe:</strong> Capacity metrics, routing decisions, facility load balancing
                     </div>
-                </div>
-                <div class="card-footer">
-                    <a href="{{ url_for('ai_insights') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
-                        <i class="bi bi-graph-up"></i> View AI Insights
-                    </a>
+                    <div class="alert alert-secondary alert-permanent py-3 mt-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div style="font-size: 0.85rem;">
+                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong> 
+                                <a href="{{ url_for('demo_login', username='admin') }}" class="text-dark fw-bold text-decoration-none">
+                                    <u>admin</u>
+                                </a>
+                            </div>
+                            <a href="{{ url_for('demo_login', username='admin') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
+                                <i class="bi bi-graph-up"></i> AI Insights
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -161,11 +178,19 @@
                     <div class="alert alert-light border alert-permanent mt-3">
                         <strong>What to observe:</strong> Route optimization, delivery sequencing, ETA calculations
                     </div>
-                </div>
-                <div class="card-footer">
-                    <a href="{{ url_for('driver_manifest') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
-                        <i class="bi bi-map"></i> View Driver Manifest
-                    </a>
+                    <div class="alert alert-secondary alert-permanent py-3 mt-2">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap">
+                            <div style="font-size: 0.85rem;" class="mb-2 mb-sm-0">
+                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong> 
+                                <a href="{{ url_for('demo_login', username='driver001') }}" class="text-dark fw-bold text-decoration-none"><u>driver001</u></a> | 
+                                <a href="{{ url_for('demo_login', username='driver002') }}" class="text-dark fw-bold text-decoration-none"><u>driver002</u></a> | 
+                                <a href="{{ url_for('demo_login', username='driver003') }}" class="text-dark fw-bold text-decoration-none"><u>driver003</u></a>
+                            </div>
+                            <a href="{{ url_for('demo_login', username='driver001') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
+                                <i class="bi bi-map"></i> Driver Manifest
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -189,11 +214,18 @@
                     <div class="alert alert-light border alert-permanent mt-3">
                         <strong>What to observe:</strong> Manifest generation, driver allocation, workload balancing
                     </div>
-                </div>
-                <div class="card-footer">
-                    <a href="{{ url_for('admin_manifests') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
-                        <i class="bi bi-clipboard-check"></i> View Manifests
-                    </a>
+                    <div class="alert alert-secondary alert-permanent py-3 mt-2">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap">
+                            <div style="font-size: 0.85rem;" class="mb-2 mb-sm-0">
+                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong> 
+                                <a href="{{ url_for('demo_login', username='admin') }}" class="text-dark fw-bold text-decoration-none"><u>admin</u></a> | 
+                                <a href="{{ url_for('demo_login', username='depot_mgr') }}" class="text-dark fw-bold text-decoration-none"><u>depot_mgr</u></a>
+                            </div>
+                            <a href="{{ url_for('demo_login', username='admin') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
+                                <i class="bi bi-clipboard-check"></i> View Manifests
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -217,11 +249,19 @@
                     <div class="alert alert-light border alert-permanent mt-3">
                         <strong>What to observe:</strong> Cost optimization, predictive analytics, efficiency metrics
                     </div>
-                </div>
-                <div class="card-footer">
-                    <a href="{{ url_for('ai_insights') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
-                        <i class="bi bi-speedometer2"></i> View Optimization
-                    </a>
+                    <div class="alert alert-secondary alert-permanent py-3 mt-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div style="font-size: 0.85rem;">
+                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong> 
+                                <a href="{{ url_for('demo_login', username='admin') }}" class="text-dark fw-bold text-decoration-none">
+                                    <u>admin</u>
+                                </a>
+                            </div>
+                            <a href="{{ url_for('demo_login', username='admin') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
+                                <i class="bi bi-speedometer2"></i> Optimization
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -240,16 +280,25 @@
                     <ol class="small">
                         <li>Open <strong>Driver Manifest</strong></li>
                         <li>Click "Mark as Complete" on any parcel</li>
-                        <li>Upload photo proof of delivery</li>
+                        <li>Take a photo proof of delivery</li>
+                        <li>Add delivery notes and select status</li>
                     </ol>
                     <div class="alert alert-light border alert-permanent mt-3">
-                        <strong>What to observe:</strong> Digital proof of delivery, status updates, customer notifications
+                        <strong>What to observe:</strong> Photo capture, delivery status updates, driver notes, customer notifications
                     </div>
-                </div>
-                <div class="card-footer">
-                    <a href="{{ url_for('driver_manifest') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
-                        <i class="bi bi-pin-map"></i> Driver Interface
-                    </a>
+                    <div class="alert alert-secondary alert-permanent py-3 mt-2">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap">
+                            <div style="font-size: 0.85rem;" class="mb-2 mb-sm-0">
+                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong> 
+                                <a href="{{ url_for('demo_login', username='driver001') }}" class="text-dark fw-bold text-decoration-none"><u>driver001</u></a> | 
+                                <a href="{{ url_for('demo_login', username='driver002') }}" class="text-dark fw-bold text-decoration-none"><u>driver002</u></a> | 
+                                <a href="{{ url_for('demo_login', username='driver003') }}" class="text-dark fw-bold text-decoration-none"><u>driver003</u></a>
+                            </div>
+                            <a href="{{ url_for('demo_login', username='driver001') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
+                                <i class="bi bi-pin-map"></i> Driver Interface
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -273,11 +322,19 @@
                     <div class="alert alert-light border alert-permanent mt-3">
                         <strong>What to observe:</strong> Secure login, role-based menus, access control
                     </div>
-                </div>
-                <div class="card-footer">
-                    <a href="{{ url_for('logout') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6;">
-                        <i class="bi bi-box-arrow-right"></i> Test Login Flow
-                    </a>
+                    <div class="alert alert-secondary alert-permanent py-3 mt-2">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap">
+                            <div style="font-size: 0.85rem;" class="mb-2 mb-sm-0">
+                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong> 
+                                <a href="{{ url_for('demo_login', username='admin') }}" class="text-dark fw-bold text-decoration-none"><u>admin</u></a> | 
+                                <a href="{{ url_for('demo_login', username='support') }}" class="text-dark fw-bold text-decoration-none"><u>support</u></a> | 
+                                <a href="{{ url_for('demo_login', username='driver001') }}" class="text-dark fw-bold text-decoration-none"><u>driver001</u></a>
+                            </div>
+                            <a href="{{ url_for('demo_login', username='admin') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6;">
+                                <i class="bi bi-box-arrow-right"></i> Test Login
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

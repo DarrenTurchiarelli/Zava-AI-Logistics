@@ -137,7 +137,8 @@ class CustomerServiceChatbot:
                 'dimensions': parcel.get('dimensions'),
                 'service_type': parcel.get('service_type'),
                 'recent_events': events[:10] if events else [],  # Last 10 events
-                'total_events': len(events)
+                'total_events': len(events),
+                'delivery_photos': parcel.get('delivery_photos', [])  # Include delivery photos
             }
             
             return parcel_data
@@ -166,10 +167,10 @@ class CustomerServiceChatbot:
         
         # Add public mode instruction for AI
         if is_public:
-            parts.append("IMPORTANT: This is a public customer inquiry via chat widget. Provide helpful, friendly, conversational responses about DT Logistics services, tracking, delivery times, and general questions. Use the company information above to answer questions. If the customer provides a tracking number or asks to track a parcel, use the parcel data provided below to give them detailed tracking information including current status, location, and estimated delivery. Be concise and natural - respond like a helpful customer service agent. Focus on what matters to the customer: where their parcel is, when it will arrive, and its current status.")
+            parts.append("IMPORTANT: This is a public customer inquiry via chat widget. Provide helpful, friendly, conversational responses about DT Logistics services, tracking, delivery times, and general questions. Use the company information above to answer questions. If the customer provides a tracking number or asks to track a parcel, use the parcel data provided below to give them detailed tracking information including current status, location, estimated delivery, and any delivery photos if available. If a customer asks about proof of delivery and photos are available, confirm that delivery photos were captured. Be concise and natural - respond like a helpful customer service agent. Focus on what matters to the customer: where their parcel is, when it will arrive, its current status, and proof of delivery.")
             parts.append("")
         else:
-            parts.append("IMPORTANT: This is an internal customer service representative inquiry. Provide detailed information including access to parcel tracking data and internal systems. Be professional and comprehensive. Respond in natural conversational language, not structured formats.")
+            parts.append("IMPORTANT: This is an internal customer service representative inquiry. Provide detailed information including access to parcel tracking data, delivery photos, and internal systems. Be professional and comprehensive. Respond in natural conversational language, not structured formats. If delivery photos are available, inform the agent so they can view them in the interface.")
             parts.append("")
         
         parts.append(f"Customer Question: {query}")
@@ -200,12 +201,29 @@ class CustomerServiceChatbot:
                 if parcel_data.get('dimensions'):
                     dims = parcel_data['dimensions']
                     parts.append(f"Dimensions: {dims.get('length')}x{dims.get('width')}x{dims.get('height')} cm")
+            else:
+                # For public users, include recipient name (but not full address for privacy)
+                if parcel_data.get('recipient'):
+                    recipient = parcel_data['recipient']
+                    parts.append(f"Recipient: {recipient.get('name', 'N/A')}")
             
             # Add recent tracking events
             if parcel_data.get('recent_events'):
                 parts.append(f"\nRecent Tracking Events (showing {len(parcel_data['recent_events'])} of {parcel_data.get('total_events', 0)}):")
                 for idx, event in enumerate(parcel_data['recent_events'][:5], 1):
                     parts.append(f"{idx}. [{event.get('timestamp')}] {event.get('status')} - {event.get('location')} - {event.get('description', 'N/A')}")
+            
+            # Add delivery photo information - AVAILABLE FOR PUBLIC USERS
+            if parcel_data.get('delivery_photos'):
+                photos = parcel_data['delivery_photos']
+                if is_public:
+                    parts.append(f"\nDelivery Photos: {len(photos)} photo(s) available for this parcel")
+                    parts.append("NOTE: Delivery proof photos were captured during delivery")
+                else:
+                    parts.append(f"\nDelivery Photos: {len(photos)} photo(s) available")
+                    for idx, photo in enumerate(photos, 1):
+                        parts.append(f"  Photo {idx}: Uploaded by {photo.get('uploaded_by', 'unknown')} at {photo.get('timestamp', 'unknown time')}")
+                    parts.append("NOTE: Photos can be viewed in the customer service interface")
             
             parts.append("=== END PARCEL DATA ===\n")
         

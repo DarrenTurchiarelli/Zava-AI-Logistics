@@ -11,8 +11,8 @@
             </h2>
 
             <!-- AI Auto-Assign Section -->
-            <div class="card mb-4 border-success">
-                <div class="card-header bg-success text-white">
+            <div class="card mb-4 border-primary">
+                <div class="card-header bg-primary text-white">
                     <h5 class="mb-0">
                         <i class="bi bi-robot"></i> AI Auto-Assign (DISPATCHER_AGENT)
                     </h5>
@@ -40,12 +40,12 @@
                             </select>
                         </div>
                         <div class="col-md-4 d-flex align-items-end">
-                            <button type="submit" class="btn btn-success w-100">
+                            <button type="submit" class="btn btn-sm w-100" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
                                 <i class="bi bi-robot"></i> AI Auto-Assign Parcels
                             </button>
                         </div>
                     </form>
-                    <div class="alert alert-info mt-3 mb-0">
+                    <div class="alert alert-info alert-permanent mt-3 mb-0">
                         <small>
                             <i class="bi bi-info-circle"></i> 
                             <strong>Note:</strong> Route optimization via Azure Maps is NOT performed automatically. 
@@ -84,7 +84,7 @@
                                 Enter up to 20 parcel barcodes separated by commas or line breaks.
                             </small>
                         </div>
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
                             <i class="bi bi-truck"></i> Create Manifest
                         </button>
                     </form>
@@ -202,7 +202,7 @@
                         </table>
                     </div>
                     {% else %}
-                    <div class="alert alert-info mb-0">
+                    <div class="alert alert-info alert-permanent mb-0">
                         <i class="bi bi-info-circle"></i> No active manifests for today.
                     </div>
                     {% endif %}
