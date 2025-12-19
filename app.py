@@ -529,9 +529,20 @@ def dashboard():
 @app.route('/api/validate-address', methods=['POST'])
 @login_required
 def validate_address():
-    """Validate address using Azure Maps Search API with strict matching"""
+    """
+    Validate address using AI-powered Address Intelligence Agent + Azure Maps
+    
+    Provides:
+    - Typo detection and correction suggestions
+    - Delivery complication prediction
+    - Missing component detection
+    - Risk assessment
+    - Smart recommendations
+    """
     from services.maps import BingMapsRouter
+    from agents.base import address_intelligence_agent
     import re
+    import asyncio
     
     data = request.get_json()
     address = data.get('address', '').strip()
@@ -540,25 +551,97 @@ def validate_address():
         return jsonify({'valid': False, 'error': 'No address provided'}), 400
     
     try:
-        # Use Azure Maps to geocode and validate the address
-        router = BingMapsRouter()
-        result = router.geocode_address_strict(address)
+        # Extract postcode from address for context
+        postcode_match = re.search(r'\\b(\\d{4})\\b', address)
+        postcode = postcode_match.group(1) if postcode_match else None
         
-        if result and result['valid']:
-            return jsonify({
-                'valid': True,
-                'formatted_address': result.get('formatted_address', address),
-                'latitude': result['coords'][0],
-                'longitude': result['coords'][1]
-            })
+        # Build context for AI agent
+        ai_context = {
+            'postcode': postcode,
+            'recipient_name': data.get('recipient_name', 'Unknown'),
+            'service_type': data.get('service_type', 'standard'),
+            'declared_value': data.get('declared_value', 0)
+        }
+        
+        # Call AI Address Intelligence Agent for comprehensive analysis
+        async def get_ai_validation():
+            return await address_intelligence_agent(address, ai_context)
+        
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        ai_result = loop.run_until_complete(get_ai_validation())
+        
+        # Always validate with Azure Maps as well for geocoding
+        router = BingMapsRouter()
+        maps_result = router.geocode_address_strict(address)
+        
+        # Combine AI intelligence with Maps validation
+        if ai_result.get('success'):
+            # AI analysis successful - use its recommendations
+            is_valid = ai_result.get('is_valid', False) and (maps_result and maps_result.get('valid', False))
+            confidence = ai_result.get('confidence', 0.5)
+            
+            response = {
+                'valid': is_valid,
+                'confidence': confidence,
+                'ai_powered': True
+            }
+            
+            # Add geocoding data if available
+            if maps_result and maps_result.get('valid'):
+                response['formatted_address'] = maps_result.get('formatted_address', address)
+                response['latitude'] = maps_result['coords'][0]
+                response['longitude'] = maps_result['coords'][1]
+            else:
+                response['formatted_address'] = address
+            
+            # Add AI-powered enhancements
+            if ai_result.get('typo_detected'):
+                response['typo_detected'] = True
+                response['suggested_correction'] = ai_result.get('suggested_correction')
+                response['message'] = f"Possible typo detected. Did you mean: {ai_result.get('suggested_correction')}?"
+            
+            if ai_result.get('complications'):
+                response['complications'] = ai_result['complications']
+                response['warning'] = f"Delivery complications: {', '.join(ai_result['complications'][:2])}"
+            
+            if ai_result.get('warnings'):
+                response['warnings'] = ai_result['warnings']
+            
+            if ai_result.get('recommendations'):
+                response['recommendations'] = ai_result['recommendations']
+            
+            response['risk_level'] = ai_result.get('risk_level', 'MEDIUM')
+            response['ai_analysis'] = ai_result.get('response', '')[:500]  # First 500 chars of AI analysis
+            
+            return jsonify(response)
+        
         else:
-            return jsonify({
-                'valid': False,
-                'message': result.get('message', 'Address could not be validated')
-            })
+            # AI agent failed - fall back to Maps-only validation
+            debug_print(f"[Address Validation] AI agent failed, using Maps only: {ai_result.get('error')}")
+            
+            if maps_result and maps_result['valid']:
+                return jsonify({
+                    'valid': True,
+                    'formatted_address': maps_result.get('formatted_address', address),
+                    'latitude': maps_result['coords'][0],
+                    'longitude': maps_result['coords'][1],
+                    'ai_powered': False,
+                    'message': 'Address validated (Maps only - AI unavailable)'
+                })
+            else:
+                return jsonify({
+                    'valid': False,
+                    'message': maps_result.get('message', 'Address could not be validated'),
+                    'ai_powered': False
+                })
             
     except Exception as e:
-        print(f"Address validation error: {e}")
+        debug_print(f"Address validation error: {e}")
         return jsonify({
             'valid': False,
             'error': str(e)

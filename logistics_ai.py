@@ -14,6 +14,14 @@ from enum import Enum
 from services.maps import BingMapsRouter
 from agents.base import optimization_agent, customer_service_agent, sorting_facility_agent, call_agent_sync
 
+# Debug print function
+DEBUG_MODE = os.getenv('DEBUG_MODE', 'false').lower() == 'true'
+
+def debug_print(message: str):
+    """Conditional print based on DEBUG_MODE environment variable"""
+    if DEBUG_MODE:
+        print(message)
+
 # ============================================================================
 # DATA CLASSES
 # ============================================================================
@@ -332,6 +340,52 @@ class ExceptionResolutionAgent:
             }
         }
     
+    def _format_customer_history(self, customer_history: Optional[Dict]) -> str:
+        """Format customer history for AI agent context"""
+        if not customer_history:
+            return "No previous history available"
+        
+        history_parts = []
+        if customer_history.get('safe_place_enabled'):
+            history_parts.append(f"Safe place delivery enabled: {customer_history.get('safe_place_location', 'not specified')}")
+        if customer_history.get('preferred_time'):
+            history_parts.append(f"Preferred delivery time: {customer_history['preferred_time']}")
+        if customer_history.get('exception_count', 0) > 0:
+            history_parts.append(f"Previous delivery exceptions: {customer_history['exception_count']}")
+        if customer_history.get('successful_deliveries', 0) > 0:
+            history_parts.append(f"Successful deliveries: {customer_history['successful_deliveries']}")
+        
+        return "\\n".join(history_parts) if history_parts else "First-time customer"
+    
+    def _format_weather_data(self, weather_data: Optional[Dict]) -> str:
+        """Format weather data for AI agent context"""
+        if not weather_data:
+            return "No weather data available"
+        
+        weather_parts = []
+        if weather_data.get('severe_weather'):
+            weather_parts.append(f"⚠️ Severe weather alert: {weather_data.get('condition', 'unknown')}")
+        if weather_data.get('temperature'):
+            weather_parts.append(f"Temperature: {weather_data['temperature']}°C")
+        if weather_data.get('precipitation'):
+            weather_parts.append(f"Precipitation: {weather_data['precipitation']}mm")
+        
+        return "\\n".join(weather_parts) if weather_parts else "Normal weather conditions"
+    
+    def _get_exception_description(self, exception_type: ExceptionType) -> str:
+        """Get detailed description of exception type for AI context"""
+        descriptions = {
+            ExceptionType.CUSTOMER_NOT_HOME: "Customer was not available to receive delivery at the scheduled time",
+            ExceptionType.WRONG_ADDRESS: "Delivery address appears to be incorrect or incomplete",
+            ExceptionType.ACCESS_ISSUE: "Driver unable to access delivery location (gate locked, restricted area, etc.)",
+            ExceptionType.DAMAGED_PACKAGE: "Package shows signs of damage that requires inspection",
+            ExceptionType.BUSINESS_CLOSED: "Business premises were closed during delivery attempt",
+            ExceptionType.WEATHER_DELAY: "Severe weather conditions preventing safe delivery",
+            ExceptionType.VEHICLE_ISSUE: "Delivery vehicle experiencing technical problems",
+            ExceptionType.RECIPIENT_REFUSED: "Recipient declined to accept the package"
+        }
+        return descriptions.get(exception_type, "Unknown exception type")
+    
     async def analyze_and_resolve(
         self,
         parcel_id: str,
@@ -340,6 +394,58 @@ class ExceptionResolutionAgent:
         weather_data: Optional[Dict] = None
     ) -> ExceptionResolution:
         """Analyze exception and recommend resolution using Azure AI Sorting Facility Agent"""
+        
+        # Build comprehensive context for AI agent
+        exception_context = f"""
+        DELIVERY EXCEPTION ANALYSIS REQUIRED
+        
+        Parcel ID: {parcel_id}
+        Exception Type: {exception_type.value.replace('_', ' ').title()}
+        
+        CUSTOMER HISTORY:
+        {self._format_customer_history(customer_history)}
+        
+        WEATHER CONDITIONS:
+        {self._format_weather_data(weather_data)}
+        
+        EXCEPTION DETAILS:
+        {self._get_exception_description(exception_type)}
+        
+        PLEASE PROVIDE A COMPREHENSIVE RESOLUTION RECOMMENDATION:
+        
+        1. RECOMMENDED ACTION (choose one):
+           - Auto Reschedule (for temporary issues like customer not home)
+           - Safe Place Delivery (leave in secure location with photo proof)
+           - Hold at Depot (customer can collect, or reschedule)
+           - Contact Customer (clarification needed before proceeding)
+           - Return to Sender (undeliverable, wrong address, refused)
+           - Escalate to Human (complex issue requiring supervisor)
+        
+        2. CONFIDENCE LEVEL (1-100%):
+           How confident are you in this recommendation?
+        
+        3. CUSTOMER MESSAGE:
+           Write a friendly, professional message to send to the customer explaining the situation and next steps.
+           Keep it concise (2-3 sentences) and empathetic.
+        
+        4. AUTO-EXECUTABLE:
+           Can this action be executed automatically without human approval? (YES/NO)
+           Consider: low risk, standard procedures, customer preferences
+        
+        5. ESTIMATED RESOLUTION TIME:
+           How many minutes until this is resolved? (e.g., 5, 30, 120)
+        
+        6. REASONING:
+           Brief explanation of why this action is recommended (1-2 sentences)
+        
+        FORMAT YOUR RESPONSE:
+        [Action: action name]
+        [Confidence: XX%]
+        [Auto-Executable: YES/NO]
+        [Resolution Time: XX minutes]
+        [Customer Message: your message here]
+        [Reasoning: your explanation here]
+        """
         
         # Prepare data for Azure AI Sorting Facility Agent
         parcel_info = {
@@ -351,10 +457,11 @@ class ExceptionResolutionAgent:
         }
         
         # Call Azure AI Foundry Sorting Facility Agent for intelligent exception resolution
-        agent_result = await sorting_facility_agent(parcel_info)
+        agent_result = await sorting_facility_agent(parcel_info, intake_results=exception_context)
         
         # Fallback to local rules if AI agent fails
         if not agent_result.get('success'):
+            debug_print(f"[Exception Resolution] AI agent failed: {agent_result.get('error')}")
             rule = self.resolution_rules.get(exception_type)
             if not rule:
                 return ExceptionResolution(
@@ -369,44 +476,89 @@ class ExceptionResolutionAgent:
                 )
             
             # Use local rule as fallback
+            debug_print(f"[Exception Resolution] Falling back to local rules for {exception_type.value}")
             return self._apply_local_rule(exception_type, rule, customer_history, weather_data)
         
-        # Parse AI agent response
+        # Parse AI agent response with enhanced extraction
         response_text = agent_result.get('response', '')
+        debug_print(f"[Exception Resolution] AI Response: {response_text[:200]}...")
+        
+        import re
+        
+        # Helper function to extract bracketed values
+        def extract_value(pattern, default=''):
+            match = re.search(pattern, response_text, re.IGNORECASE | re.DOTALL)
+            return match.group(1).strip() if match else default
         
         # Extract structured data from AI response
-        # AI agent returns format like: [Route Normally], [Request Special Handling], etc.
+        action_str = extract_value(r'\[Action:\s*([^\]]+)\]', '')
+        confidence_str = extract_value(r'\[Confidence:\s*(\d+)%?\]', '85')
+        auto_exec_str = extract_value(r'\[Auto-Executable:\s*(YES|NO)\]', 'NO')
+        resolution_time_str = extract_value(r'\[Resolution Time:\s*(\d+)\s*minutes?\]', '30')
+        customer_msg = extract_value(r'\[Customer Message:\s*([^\]]+)\]', '')
+        reasoning = extract_value(r'\[Reasoning:\s*([^\]]+)\]', '')
+        
+        # Map AI action to ResolutionAction enum
         action_mapping = {
-            "Route Normally": ResolutionAction.AUTO_RESCHEDULE,
-            "Request Special Handling": ResolutionAction.SAFE_PLACE_DELIVERY,
-            "Return to Sender": ResolutionAction.RETURN_TO_SENDER,
-            "Hold for Investigation": ResolutionAction.HOLD_AT_DEPOT,
-            "Contact Customer": ResolutionAction.CONTACT_CUSTOMER
+            "auto reschedule": ResolutionAction.AUTO_RESCHEDULE,
+            "reschedule": ResolutionAction.AUTO_RESCHEDULE,
+            "safe place": ResolutionAction.SAFE_PLACE_DELIVERY,
+            "leave in safe place": ResolutionAction.SAFE_PLACE_DELIVERY,
+            "hold at depot": ResolutionAction.HOLD_AT_DEPOT,
+            "hold for collection": ResolutionAction.HOLD_AT_DEPOT,
+            "contact customer": ResolutionAction.CONTACT_CUSTOMER,
+            "call customer": ResolutionAction.CONTACT_CUSTOMER,
+            "return to sender": ResolutionAction.RETURN_TO_SENDER,
+            "return": ResolutionAction.RETURN_TO_SENDER,
+            "escalate": ResolutionAction.ESCALATE_TO_HUMAN,
+            "human": ResolutionAction.ESCALATE_TO_HUMAN
         }
         
-        # Determine action from AI response
-        recommended_action = ResolutionAction.ESCALATE_TO_HUMAN
+        recommended_action = ResolutionAction.ESCALATE_TO_HUMAN  # Default safe option
+        action_str_lower = action_str.lower()
         for key, action in action_mapping.items():
-            if key.lower() in response_text.lower():
+            if key in action_str_lower:
                 recommended_action = action
                 break
         
-        # Determine if auto-executable based on AI recommendation
-        auto_executable = "Route Normally" in response_text or "Request Special Handling" in response_text
-        requires_approval = "Return to Sender" in response_text or "Hold for Investigation" in response_text
+        # Parse confidence (0-100% to 0-1.0)
+        try:
+            confidence_score = int(confidence_str.replace('%', '')) / 100.0
+            confidence_score = max(0.0, min(1.0, confidence_score))  # Clamp to 0-1
+        except ValueError:
+            confidence_score = 0.85  # Default if parsing fails
         
-        # Generate customer message
-        rule = self.resolution_rules.get(exception_type, {})
-        customer_message = rule.get("default_message", "We're processing your delivery exception. You'll receive updates shortly.")
+        # Parse auto-executable
+        auto_executable = auto_exec_str.upper() == 'YES'
+        
+        # Parse resolution time
+        try:
+            estimated_resolution_time = int(resolution_time_str)
+        except ValueError:
+            estimated_resolution_time = 30  # Default
+        
+        # Use AI-generated customer message or fall back to template
+        if not customer_msg or len(customer_msg) < 10:
+            rule = self.resolution_rules.get(exception_type, {})
+            customer_msg = rule.get("default_message", "We're processing your delivery exception. You'll receive updates shortly.")
+        
+        # Use AI reasoning or create one
+        if not reasoning:
+            reasoning = f"AI recommendation: {action_str} based on {exception_type.value.replace('_', ' ')}"
+        
+        # Requires approval if not auto-executable OR confidence is low
+        requires_approval = not auto_executable or confidence_score < 0.75
+        
+        debug_print(f"[Exception Resolution] Action: {recommended_action}, Confidence: {confidence_score:.0%}, Auto-exec: {auto_executable}")
         
         return ExceptionResolution(
             exception_type=exception_type,
             recommended_action=recommended_action,
-            confidence_score=0.92,  # AI-enhanced confidence
-            reasoning=f"Azure AI recommendation: {response_text[:200]}",
-            customer_message=customer_message,
+            confidence_score=confidence_score,
+            reasoning=reasoning,
+            customer_message=customer_msg,
             auto_executable=auto_executable,
-            estimated_resolution_time=rule.get("resolution_time", 30),
+            estimated_resolution_time=estimated_resolution_time,
             requires_approval=requires_approval
         )
     

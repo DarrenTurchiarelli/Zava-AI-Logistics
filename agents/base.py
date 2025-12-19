@@ -388,6 +388,136 @@ async def parcel_intake_agent(parcel_data: Dict[str, Any]) -> Dict[str, Any]:
     return await call_azure_agent(PARCEL_INTAKE_AGENT_ID, message, parcel_data)
 
 
+async def address_intelligence_agent(address: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """
+    Call Parcel Intake Agent to provide intelligent address validation and analysis
+    
+    Uses AI to:
+    - Detect common typos and suggest corrections
+    - Identify missing address components
+    - Predict delivery complications (rural, multi-tenant, restricted access)
+    - Recommend alternative delivery points
+    - Flag addresses with poor delivery history
+    - Provide delivery time estimates
+    
+    Args:
+        address: The address string to validate and analyze
+        context: Optional context including recipient name, postcode, service type
+        
+    Returns:
+        Dictionary with validation status, recommendations, warnings, and suggestions
+        {
+            'success': bool,
+            'response': str,  # Full AI analysis
+            'is_valid': bool,  # Overall validation status
+            'confidence': float,  # Confidence score 0-1
+            'typo_detected': bool,  # Whether typos were found
+            'suggested_correction': str,  # Corrected address if typo detected
+            'complications': List[str],  # List of delivery complications
+            'warnings': List[str],  # Warnings to show user
+            'recommendations': List[str]  # Recommendations for better delivery
+        }
+    """
+    context = context or {}
+    
+    message = f"""
+    Analyze this delivery address for validation and potential issues:
+    
+    ADDRESS TO VALIDATE: {address}
+    
+    CONTEXT:
+    Recipient Name: {context.get('recipient_name', 'Unknown')}
+    Expected Postcode: {context.get('postcode', 'Unknown')}
+    Service Type: {context.get('service_type', 'standard')}
+    Declared Value: ${context.get('declared_value', 0)}
+    
+    PLEASE ANALYZE AND PROVIDE:
+    
+    1. ADDRESS QUALITY (Score 1-10):
+       - Is the address complete with street number, street name, suburb, state, and postcode?
+       - Are there any obvious typos or misspellings (e.g., "Mellbourne" vs "Melbourne")?
+       - Does the postcode match the suburb?
+       - Is the format correct for Australian addresses?
+    
+    2. TYPO DETECTION:
+       - Check for common spelling mistakes in suburb names
+       - Check for swapped/transposed numbers in street addresses
+       - Detect missing punctuation or spacing issues
+       - If typo detected, provide CORRECTED ADDRESS
+    
+    3. DELIVERY COMPLICATIONS:
+       - Remote/rural area (outside metro delivery zones)
+       - Multi-tenant building (requires unit/apartment number)
+       - Restricted access area (gated community, secure building)
+       - Business address (delivery hours restricted)
+       - PO Box (requires special handling)
+       - Construction site or temporary location
+       - Known difficult delivery location
+    
+    4. RECOMMENDATIONS:
+       - Suggest adding missing components (unit number, building name)
+       - Recommend alternative delivery points if problematic
+       - Suggest delivery time windows based on location type
+       - Flag if signature required for this address type
+    
+    5. CONFIDENCE ASSESSMENT:
+       - Overall confidence in successful delivery (0-100%)
+       - Risk level: LOW, MEDIUM, HIGH
+    
+    FORMAT YOUR RESPONSE:
+    [Valid: YES/NO]
+    [Confidence: XX%]
+    [Typo Detected: YES/NO]
+    [Suggested Correction: corrected address if applicable]
+    [Complications: comma-separated list]
+    [Warnings: comma-separated list]
+    [Recommendations: comma-separated list]
+    [Risk Level: LOW/MEDIUM/HIGH]
+    
+    Then provide a brief friendly explanation for the customer.
+    """
+    
+    result = await call_azure_agent(PARCEL_INTAKE_AGENT_ID, message, {"address": address, **context})
+    
+    # Parse structured response
+    if result.get('success'):
+        response_text = result.get('response', '')
+        
+        # Extract structured data using regex patterns
+        import re
+        
+        # Helper function to extract bracketed values
+        def extract_value(pattern, text, default=''):
+            match = re.search(pattern, text, re.IGNORECASE)
+            return match.group(1).strip() if match else default
+        
+        is_valid = extract_value(r'\[Valid:\s*(YES|NO)\]', response_text, 'NO').upper() == 'YES'
+        confidence_str = extract_value(r'\[Confidence:\s*(\d+)%?\]', response_text, '50')
+        confidence = int(confidence_str.replace('%', '')) / 100.0
+        typo_detected = extract_value(r'\[Typo Detected:\s*(YES|NO)\]', response_text, 'NO').upper() == 'YES'
+        suggested_correction = extract_value(r'\[Suggested Correction:\s*([^\]]+)\]', response_text, '')
+        complications_str = extract_value(r'\[Complications:\s*([^\]]+)\]', response_text, '')
+        warnings_str = extract_value(r'\[Warnings:\s*([^\]]+)\]', response_text, '')
+        recommendations_str = extract_value(r'\[Recommendations:\s*([^\]]+)\]', response_text, '')
+        risk_level = extract_value(r'\[Risk Level:\s*(LOW|MEDIUM|HIGH)\]', response_text, 'MEDIUM')
+        
+        # Parse comma-separated lists
+        complications = [c.strip() for c in complications_str.split(',') if c.strip() and c.strip().lower() != 'none']
+        warnings = [w.strip() for w in warnings_str.split(',') if w.strip() and w.strip().lower() != 'none']
+        recommendations = [r.strip() for r in recommendations_str.split(',') if r.strip() and r.strip().lower() != 'none']
+        
+        result['is_valid'] = is_valid
+        result['confidence'] = confidence
+        result['typo_detected'] = typo_detected
+        result['suggested_correction'] = suggested_correction if typo_detected else None
+        result['complications'] = complications
+        result['warnings'] = warnings
+        result['recommendations'] = recommendations
+        result['risk_level'] = risk_level
+    
+    return result
+
+
 async def sorting_facility_agent(parcel_info: Dict[str, Any], intake_results: Optional[str] = None) -> Dict[str, Any]:
     """
     Call Sorting Facility Agent to determine parcel routing
