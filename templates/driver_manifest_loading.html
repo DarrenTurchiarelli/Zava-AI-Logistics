@@ -32,7 +32,7 @@
                     </div>
                     
                     <div class="alert alert-permanent alert-info">
-                        <strong><i class="bi bi-route"></i> Route Optimization</strong><br>
+                        <strong><i class="bi bi-route"></i> Route Optimisation</strong><br>
                         An initial route order has been created. Once loaded, you can:
                         <ul class="list-unstyled mt-2 mb-0">
                             <li>✓ Choose <strong>Fastest</strong> route (considers traffic)</li>
@@ -62,18 +62,18 @@
     let checkCount = 0;
     let completionCheckCount = 0;
     
-    // Start optimization immediately
-    fetch(`/api/driver/manifest/${manifestId}/optimize`, {
+    // Start Optimisation immediately
+    fetch(`/api/driver/manifest/${manifestId}/Optimise`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         }
     }).then(response => response.json())
       .then(data => {
-          console.log('Optimization started:', data);
+          console.log('Optimisation started:', data);
       })
       .catch(error => {
-          console.error('Error starting optimization:', error);
+          console.error('Error starting Optimisation:', error);
       });
     
     // Check status periodically and update real progress
@@ -97,13 +97,13 @@
                 if (realProgress >= 100) {
                     completionCheckCount++;
                     if (completionCheckCount > 5 && !data.ready) {
-                        loadingMessage.innerHTML = '<strong>Route optimization complete!</strong><br><a href="/driver/manifest" class="btn btn-primary mt-2">View Your Manifest</a>';
+                        loadingMessage.innerHTML = '<strong>Route Optimisation complete!</strong><br><a href="/driver/manifest" class="btn btn-primary mt-2">View Your Manifest</a>';
                         clearInterval(statusInterval);
                     }
                 }
                 
                 if (data.ready) {
-                    // Optimization complete!
+                    // Optimisation complete!
                     clearInterval(statusInterval);
                     
                     progressBar.style.width = '100%';
@@ -111,7 +111,7 @@
                     progressBar.classList.remove('progress-bar-animated');
                     progressBar.classList.add('bg-success');
                     
-                    loadingMessage.innerHTML = 'Route optimized successfully! Redirecting...<br><a href="/driver/manifest" class="btn btn-success btn-sm mt-2">Continue Now</a>';
+                    loadingMessage.innerHTML = 'Route Optimised successfully! Redirecting...<br><a href="/driver/manifest" class="btn btn-success btn-sm mt-2">Continue Now</a>';
                     
                     setTimeout(() => {
                         window.location.href = '/driver/manifest';
@@ -122,7 +122,7 @@
                     
                     progressBar.classList.remove('progress-bar-animated');
                     progressBar.classList.add('bg-danger');
-                    loadingMessage.innerHTML = '<strong>⚠️ Optimization Timeout</strong><br>The route optimization is taking longer than expected.<br><br>' +
+                    loadingMessage.innerHTML = '<strong>⚠️ Optimisation Timeout</strong><br>The route Optimisation is taking longer than expected.<br><br>' +
                         '<a href="/driver/manifest" class="btn btn-primary mt-2">Continue Anyway</a> ' +
                         '<a href="/logout" class="btn btn-outline-secondary mt-2">Logout</a>';
                 }

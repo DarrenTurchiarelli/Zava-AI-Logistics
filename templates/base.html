@@ -656,6 +656,58 @@
             }
             announcer.textContent = message;
         }
+        
+        // Language Translation Functions
+        function setLanguage(languageCode, languageName) {
+            console.log('setLanguage called:', languageCode, languageName);
+            
+            // Store language preference in session
+            fetch('/set-language', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ language: languageCode })
+            })
+            .then(response => {
+                console.log('Response status:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('Response data:', data);
+                if (data.success) {
+                    // Show loading indicator
+                    const loadingToast = document.createElement('div');
+                    loadingToast.className = 'toast align-items-center text-white bg-primary border-0';
+                    loadingToast.style.position = 'fixed';
+                    loadingToast.style.top = '20px';
+                    loadingToast.style.right = '20px';
+                    loadingToast.style.zIndex = '9999';
+                    loadingToast.innerHTML = `
+                        <div class="d-flex">
+                            <div class="toast-body">
+                                <i class="bi bi-translate me-2"></i>
+                                Switching to ${languageName}...
+                            </div>
+                        </div>
+                    `;
+                    document.body.appendChild(loadingToast);
+                    
+                    console.log('Reloading page in 500ms...');
+                    // Reload page to apply translations
+                    setTimeout(() => {
+                        location.reload();
+                    }, 500);
+                } else {
+                    console.error('Failed to set language:', data.error);
+                    alert('Failed to change language. Please try again.');
+                }
+            })
+            .catch(error => {
+                console.error('Error setting language:', error);
+                alert('Error changing language. Please try again.');
+            });
+        }
     </script>
     
     <!-- Accessibility CSS -->

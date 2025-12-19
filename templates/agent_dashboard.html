@@ -173,7 +173,7 @@
                                     {% endfor %}
                                     
                                     <p class="card-text small mt-2">
-                                        Analyzes messages for fraud risks with multi-category threat classification.
+                                        Analyses messages for fraud risks with multi-category threat classification.
                                     </p>
                                     <ul class="small mb-2">
                                         <li>Real-time threat analysis</li>
@@ -285,10 +285,10 @@
                                     <ul class="small mb-2">
                                         <li>Geographic clustering</li>
                                         <li>Priority-based assignment</li>
-                                        <li>Capacity optimization</li>
+                                        <li>Capacity Optimisation</li>
                                     </ul>
                                     <div class="d-flex flex-wrap gap-1 mb-2">
-                                        <span class="badge bg-light text-dark">optimize_assignment</span>
+                                        <span class="badge bg-light text-dark">Optimise_assignment</span>
                                         <span class="badge bg-light text-dark">balance_workload</span>
                                     </div>
                                     <a href="{{ url_for('admin_manifests') }}" class="btn btn-sm btn-primary w-100 mt-auto">
@@ -351,13 +351,13 @@
                             </div>
                         </div>
 
-                        <!-- Optimization Agent -->
+                        <!-- Optimisation Agent -->
                         <div class="col-md-4 mb-3">
                             <div class="card h-100 border-primary shadow-sm">
                                 <div class="card-body d-flex flex-column">
                                     <div class="d-flex justify-content-between align-items-start">
                                         <h6 class="card-title">
-                                            <i class="bi bi-graph-up text-primary"></i> Optimization Agent
+                                            <i class="bi bi-graph-up text-primary"></i> Optimisation Agent
                                         </h6>
                                         <span class="badge bg-success">ACTIVE</span>
                                     </div>
@@ -365,7 +365,7 @@
                                     <!-- Agent Metrics -->
                                     {% set agent_metrics = namespace(found=false) %}
                                     {% for agent in dashboard.agents %}
-                                        {% if 'Optimization' in agent.name %}
+                                        {% if 'Optimisation' in agent.name %}
                                             {% set agent_metrics.found = true %}
                                             <div class="row text-center mb-2 mt-2">
                                                 <div class="col-4">
@@ -389,12 +389,12 @@
                                     </p>
                                     <ul class="small mb-2">
                                         <li>Cost reduction insights</li>
-                                        <li>Resource allocation optimization</li>
+                                        <li>Resource allocation Optimisation</li>
                                         <li>Predictive analytics</li>
                                     </ul>
                                     <div class="d-flex flex-wrap gap-1 mb-2">
-                                        <span class="badge bg-light text-dark">analyze_network</span>
-                                        <span class="badge bg-light text-dark">optimize_costs</span>
+                                        <span class="badge bg-light text-dark">Analyse_network</span>
+                                        <span class="badge bg-light text-dark">Optimise_costs</span>
                                     </div>
                                     <a href="{{ url_for('ai_insights') }}" class="btn btn-sm btn-primary w-100 mt-auto">
                                         <i class="bi bi-graph-up"></i> View Insights Dashboard
@@ -443,7 +443,7 @@
                                         Real-time facility capacity monitoring and automated routing decisions.
                                     </p>
                                     <ul class="small mb-2">
-                                        <li>Optimize facility throughput</li>
+                                        <li>Optimise facility throughput</li>
                                         <li>Load balancing across facilities</li>
                                         <li>Priority-based routing</li>
                                     </ul>
@@ -501,7 +501,7 @@
                                     </ul>
                                     <div class="d-flex flex-wrap gap-1 mb-2">
                                         <span class="badge bg-light text-dark">notify_customer</span>
-                                        <span class="badge bg-light text-dark">optimize_sequence</span>
+                                        <span class="badge bg-light text-dark">Optimise_sequence</span>
                                     </div>
                                     <a href="{{ url_for('driver_manifest') }}" class="btn btn-sm btn-primary w-100 mt-auto">
                                         <i class="bi bi-truck-front"></i> View Driver Manifest

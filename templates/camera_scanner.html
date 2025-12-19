@@ -63,7 +63,7 @@
                                         <div class="spinner-border text-primary" role="status">
                                             <span class="visually-hidden">Processing...</span>
                                         </div>
-                                        <p class="mt-2">Analyzing image with Azure AI...</p>
+                                        <p class="mt-2">Analysing image with Azure AI...</p>
                                     </div>
 
                                     <div id="extractedData" style="display: none;">
@@ -185,7 +185,7 @@ document.getElementById('captureImage').addEventListener('click', async () => {
             }
             
         } catch (error) {
-            alert('Error analyzing image: ' + error.message);
+            alert('Error Analysing image: ' + error.message);
             document.getElementById('processingIndicator').style.display = 'none';
             document.getElementById('noDataMessage').style.display = 'block';
         }

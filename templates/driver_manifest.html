@@ -80,11 +80,11 @@
             </div>
 
             <!-- Route Map -->
-            {% if manifest.route_optimized and manifest.get('embed_url') %}
+            {% if manifest.route_Optimised and manifest.get('embed_url') %}
             <div class="card mb-4">
                 <div class="card-header bg-primary text-white">
                     <h5 class="mb-0">
-                        <i class="bi bi-map"></i> Optimized Route Map
+                        <i class="bi bi-map"></i> Optimised Route Map
                         {% if manifest.get('route_url') %}
                         <a href="{{ manifest.route_url }}" target="_blank" class="btn btn-sm btn-light float-end">
                             <i class="bi bi-box-arrow-up-right"></i> Open in Azure Maps
@@ -97,10 +97,10 @@
                 {% if manifest.get('multi_route_enabled') %}
                 <div class="card-body bg-light border-bottom">
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h6 class="mb-0"><i class="bi bi-signpost-split"></i> Choose Your Route Optimization</h6>
+                        <h6 class="mb-0"><i class="bi bi-signpost-split"></i> Choose Your Route Optimisation</h6>
                         {% if not manifest.get('selected_route_type') %}
                         <span class="badge bg-warning text-dark">
-                            <i class="bi bi-info-circle"></i> Initial Route - Select optimization below
+                            <i class="bi bi-info-circle"></i> Initial Route - Select Optimisation below
                         </span>
                         {% else %}
                         <span class="badge bg-success">
@@ -136,7 +136,7 @@
                                         {% endif %}
                                     </h5>
                                     <p class="card-text small text-muted">
-                                        Optimized for quickest delivery time
+                                        Optimised for quickest delivery time
                                     </p>
                                     <hr>
                                     <div class="row">
@@ -264,7 +264,7 @@
                                     </div>
                                     {% if route_options.safest.get('side_of_road_considered') %}
                                     <small class="text-success mt-2 d-block">
-                                        <i class="bi bi-shield-check"></i> Safety-optimized
+                                        <i class="bi bi-shield-check"></i> Safety-Optimised
                                     </small>
                                     {% endif %}
                                 </div>
@@ -314,13 +314,13 @@
                     <small class="text-muted">
                         <i class="bi bi-info-circle"></i> 
                         {% if manifest.get('selected_route_type') == 'fastest' %}
-                        Route optimized for speed with current traffic conditions
+                        Route Optimised for speed with current traffic conditions
                         {% elif manifest.get('selected_route_type') == 'shortest' %}
-                        Route optimized for minimum distance
+                        Route Optimised for minimum distance
                         {% elif manifest.get('selected_route_type') == 'safest' %}
-                        Route optimized for driver safety with minimal road crossings
+                        Route Optimised for driver safety with minimal road crossings
                         {% else %}
-                        Route optimized for current traffic conditions
+                        Route Optimised for current traffic conditions
                         {% endif %}
                     </small>
                 </div>
@@ -330,7 +330,7 @@
             <!-- Delivery Items List -->
             <div class="card">
                 <div class="card-header bg-secondary text-white">
-                    <h5 class="mb-0"><i class="bi bi-list-check"></i> Delivery Items (Optimized Order)</h5>
+                    <h5 class="mb-0"><i class="bi bi-list-check"></i> Delivery Items (Optimised Order)</h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -710,7 +710,7 @@ function toggleCardedFields(loopIndex, isCarded) {
 
 function calculateRoute(manifestId, routeType) {
     // Show confirmation popup
-    if (!confirm(`Calculate ${routeType} route?\n\nThis will take 10-20 seconds to optimize ${routeType === 'fastest' ? 'the quickest path' : 'the shortest distance'}.`)) {
+    if (!confirm(`Calculate ${routeType} route?\n\nThis will take 10-20 seconds to Optimise ${routeType === 'fastest' ? 'the quickest path' : 'the shortest distance'}.`)) {
         return;
     }
     
@@ -867,7 +867,7 @@ function createToastContainer() {
             console.log('🗺️ Route updated:', data);
             
             // Show toast notification
-            showToast(data.message || 'Background optimization complete! Refreshing map...', 'success');
+            showToast(data.message || 'Background Optimisation complete! Refreshing map...', 'success');
             
             // Reload the page to show the updated route
             setTimeout(() => {

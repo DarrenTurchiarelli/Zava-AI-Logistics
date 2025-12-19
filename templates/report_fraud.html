@@ -14,7 +14,7 @@
                     <div class="alert alert-permanent alert-light border" style="color: #000000 !important;">
                         <i class="bi bi-info-circle"></i>
                         <strong>Help us protect you and others!</strong><br>
-                        Our AI-powered fraud detection system analyzes suspicious messages to identify scams and phishing attempts.
+                        Our AI-powered fraud detection system Analyses suspicious messages to identify scams and phishing attempts.
                     </div>
 
                     <form method="POST" action="{{ url_for('report_fraud') }}" enctype="multipart/form-data" id="fraudForm">
@@ -97,7 +97,7 @@
 
                         <div class="d-grid">
                             <button type="submit" class="btn btn-primary btn-lg" id="analyzeBtn">
-                                <i class="bi bi-shield-check"></i> Analyze & Report Message
+                                <i class="bi bi-shield-check"></i> Analyse & Report Message
                             </button>
                         </div>
                     </form>
@@ -253,7 +253,7 @@
 </div>
 
 <script>
-// Add loading state to analyze button and redirect to results
+// Add loading state to Analyse button and redirect to results
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('fraudForm');
     const btn = document.getElementById('analyzeBtn');
@@ -261,7 +261,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (form && btn) {
         form.addEventListener('submit', function() {
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Analyzing...';
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Analysing...';
             
             // Add anchor to URL so page scrolls to results after reload
             form.action = '/fraud/report#analysisResults';
