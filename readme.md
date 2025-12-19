@@ -18,11 +18,16 @@ A cutting-edge parcel tracking system powered by **8 Active Azure AI Foundry Age
 ### **Web Application (Recommended)**
 
 ```powershell
-$env:FLASK_ENV='development'; py app.py
+# Production mode (debug OFF for best performance)
+py app.py
 
+# OR with development environment variable (debug still OFF)
+$env:FLASK_ENV='development'; py app.py
 ```
 
 Access at: **http://127.0.0.1:5000**
+
+**To enable debug mode**: `$env:DEBUG_MODE='true'; py app.py`
 
 **Default Login:**
 - Username: `admin`

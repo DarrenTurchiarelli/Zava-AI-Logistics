@@ -20,6 +20,14 @@ from functools import wraps
 from werkzeug.utils import secure_filename
 from pathlib import Path
 
+# Debug mode - set to False for production performance
+DEBUG_MODE = os.getenv('DEBUG_MODE', 'false').lower() == 'true'
+
+def debug_print(*args, **kwargs):
+    """Print only if DEBUG_MODE is enabled"""
+    if DEBUG_MODE:
+        print(*args, **kwargs)
+
 # Optional OCR support
 try:
     import pytesseract
@@ -2000,11 +2008,11 @@ def driver_manifest():
                         'total_distance_km': len(addresses) * 0.5,  # Estimate: 500m between stops
                         'optimized': False,
                         'traffic_considered': False,
-                        'route_type': 'nearest_neighbor'
+                        'route_type': 'safest'  # Use 'safest' as default initial route
                     }
                     
-                    # Save initial route
-                    all_routes = {'initial': initial_route}
+                    # Save initial route as 'safest' (default selection)
+                    all_routes = {'safest': initial_route}
                     success = await db.update_manifest_route(
                         manifest_id,
                         initial_route['waypoints'],
@@ -2012,7 +2020,7 @@ def driver_manifest():
                         initial_route['total_distance_km'],
                         True,  # Mark as optimized so page loads
                         False,
-                        route_type='initial',
+                        route_type='safest',  # Set as safest route initially
                         all_routes=all_routes
                     )
                     
@@ -2059,9 +2067,9 @@ def driver_manifest():
                         'total_distance_km': None
                     }
             
-            # Set selected route type (default to 'initial' if no optimization chosen yet)
-            if not manifest.get('selected_route_type') or manifest.get('selected_route_type') == 'initial':
-                manifest['selected_route_type'] = None  # No selection yet
+            # Set selected route type (default to 'safest' if not set)
+            if not manifest.get('selected_route_type'):
+                manifest['selected_route_type'] = 'safest'  # Default to safest route
                 manifest['route_type_display'] = 'Initial Nearest-Neighbor Route'
             else:
                 manifest['route_type_display'] = manifest.get('selected_route_type', '').capitalize() + ' Route'
@@ -3550,23 +3558,16 @@ def render_map(manifest_id):
     </style>
 </head>
 <body>
-    <div id="debug">Initializing map...</div>
     <div id="map"></div>
     <script>
-        var debugEl = document.getElementById('debug');
         function log(msg) {{
-            console.log(msg);
-            debugEl.innerHTML += '<br>' + msg;
+            // Debug logging disabled for performance
         }}
         
         var centerLon = {center_lon};
         var centerLat = {center_lat};
         var pins = [{pins_js}];
         var routeCoords = [{route_coords_js}];
-        
-        log('Map center: [' + centerLon.toFixed(4) + ', ' + centerLat.toFixed(4) + ']');
-        log('Waypoints: ' + pins.length);
-        log('Route points: ' + routeCoords.length);
         
         var map = new atlas.Map('map', {{
             center: [centerLon, centerLat],
@@ -3626,13 +3627,10 @@ def render_map(manifest_id):
                 }}
             }});
             map.layers.add(markerLayer);
-            log('✓ ' + pins.length + ' markers displayed');
-            
-            setTimeout(function() {{ debugEl.style.display = 'none'; }}, 4000);
         }});
         
         map.events.add('error', function(e) {{
-            log('ERROR: ' + e.error.message);
+            console.error('Map error:', e.error.message);
         }});
     </script>
 </body>
@@ -3644,4 +3642,7 @@ def render_map(manifest_id):
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=os.getenv('FLASK_ENV') == 'development')
+    # Debug mode disabled by default for better performance
+    # Only enable debug if DEBUG_MODE=true is explicitly set
+    # FLASK_ENV=development does NOT enable debug mode (for performance)
+    app.run(host='0.0.0.0', port=port, debug=DEBUG_MODE)

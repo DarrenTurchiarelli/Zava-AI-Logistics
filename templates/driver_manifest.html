@@ -46,26 +46,26 @@
                         <div class="col-md-3">
                             <strong><i class="bi bi-geo-alt"></i> Distance:</strong><br>
                             <span data-stat="distance">
-                            {% if manifest.get('selected_route_type') and manifest.estimated_distance_km %}
-                                {{ manifest.estimated_distance_km }} km
+                            {% if manifest.get('route_optimized') and manifest.estimated_distance_km %}
+                                {{ manifest.estimated_distance_km|round(1) }} km
                                 {% if manifest.get('split_into_runs') %}
                                 <br><small class="text-muted">({{ manifest.total_runs }} runs)</small>
                                 {% endif %}
                             {% else %}
-                                <span class="text-muted">Select route to calculate</span>
+                                <span class="text-muted">Calculating...</span>
                             {% endif %}
                             </span>
                         </div>
                         <div class="col-md-3">
                             <strong><i class="bi bi-clock"></i> Est. Time:</strong><br>
                             <span data-stat="time">
-                            {% if manifest.get('selected_route_type') and manifest.estimated_duration_minutes %}
+                            {% if manifest.get('route_optimized') and manifest.estimated_duration_minutes %}
                                 {{ (manifest.estimated_duration_minutes / 60)|round(1) }} hours
                                 {% if manifest.get('split_into_runs') %}
                                 <br><small class="text-muted">(across {{ manifest.total_runs }} runs)</small>
                                 {% endif %}
                             {% else %}
-                                <span class="text-muted">Select route to calculate</span>
+                                <span class="text-muted">Calculating...</span>
                             {% endif %}
                             </span>
                         </div>
@@ -80,7 +80,7 @@
             </div>
 
             <!-- Route Map -->
-            {% if manifest.route_Optimised and manifest.get('embed_url') %}
+            {% if manifest.get('route_optimized') and manifest.get('embed_url') %}
             <div class="card mb-4">
                 <div class="card-header bg-primary text-white">
                     <h5 class="mb-0">
