@@ -536,7 +536,6 @@ function removeLoading() {
 async function sendMessage() {
     const input = document.getElementById('chatInput');
     const query = input.value.trim();
-    const trackingNumber = document.getElementById('trackingNumber').value.trim();
     
     if (!query) return;
     
@@ -552,7 +551,7 @@ async function sendMessage() {
             },
             body: JSON.stringify({
                 query: query,
-                tracking_number: trackingNumber || null
+                tracking_number: null
             })
         });
         
