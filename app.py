@@ -340,8 +340,13 @@ def setup_users_now():
 
 @app.route('/')
 def index():
-    """Home page redirects to AI Insights dashboard"""
-    return redirect(url_for('ai_insights'))
+    """Demo Day Welcome Page"""
+    return render_template('demo_welcome.html')
+
+@app.route('/demo')
+def demo_welcome():
+    """Alternative route to demo welcome page"""
+    return render_template('demo_welcome.html')
 
 @app.after_request
 def add_header(response):

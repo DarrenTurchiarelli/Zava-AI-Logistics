@@ -163,12 +163,13 @@
             background-color: {{ company.brand_secondary_color }} !important;
         }
         
+        /* Card and modal headers with bg-primary use gradient */
         .card-header.bg-primary {
-            background-color: {{ company.brand_primary_color }} !important;
+            background: {{ company.brand_gradient }} !important;
         }
         
         .modal-header.bg-primary {
-            background-color: {{ company.brand_primary_color }} !important;
+            background: {{ company.brand_gradient }} !important;
         }
         
         /* Override Bootstrap success color classes for positive metrics */
@@ -269,13 +270,19 @@
             border-color: {{ company.brand_primary_color }} !important;
             color: #000000 !important;
         }
+        
+        /* Navbar gradient styling */
+        .navbar-gradient {
+            background: {{ company.brand_gradient }} !important;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
     </style>
     
     {% block extra_css %}{% endblock %}
 </head>
 <body>
     <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-gradient">
         <div class="container-fluid">
             <a class="navbar-brand" href="{{ url_for('index') }}">
                 <i class="bi bi-truck"></i> {{ company.name }}

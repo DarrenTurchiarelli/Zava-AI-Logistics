@@ -56,6 +56,12 @@ BRAND_DANGER_COLOR = "#eb2525"
 BRAND_SUCCESS_COLOR = "#198754"  # Green for positive metrics, Active status, success rates
 BRAND_ALERT_COLOR = "#fff3cd"  # Light yellow for alerts and warnings  
 
+# Gradient Configuration (for modern glassmorphism effects)
+BRAND_GRADIENT = "linear-gradient(135deg, #eb2525 0%, #c41e1e 50%, #9a1818 100%)"
+BRAND_GRADIENT_START = "#eb2525"  # Bright red
+BRAND_GRADIENT_MID = "#c41e1e"    # Medium red
+BRAND_GRADIENT_END = "#9a1818"    # Dark red  
+
 # Terms & Legal
 TERMS_URL = f"{COMPANY_WEBSITE}/terms"
 PRIVACY_URL = f"{COMPANY_WEBSITE}/privacy"
@@ -89,7 +95,11 @@ def get_company_info():
         'brand_accent_color': BRAND_ACCENT_COLOR,
         'brand_danger_color': BRAND_DANGER_COLOR,
         'brand_success_color': BRAND_SUCCESS_COLOR,
-        'brand_alert_color': BRAND_ALERT_COLOR
+        'brand_alert_color': BRAND_ALERT_COLOR,
+        'brand_gradient': BRAND_GRADIENT,
+        'brand_gradient_start': BRAND_GRADIENT_START,
+        'brand_gradient_mid': BRAND_GRADIENT_MID,
+        'brand_gradient_end': BRAND_GRADIENT_END
     }
 
 def get_contact_methods():

@@ -24,11 +24,11 @@
                     <i class="bi bi-lightning-charge-fill"></i> Quick Actions
                 </div>
                 <div class="list-group list-group-flush">
-                    <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Track parcel')">
-                        <i class="bi bi-search"></i> Track Parcel
+                    <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Track parcel RG857954')">
+                        <i class="bi bi-search"></i> Track Parcel RG857954
                     </button>
-                    <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Show parcels sent to 1 Constitution Avenue in the last 3 weeks')">
-                        <i class="bi bi-geo-alt-fill"></i> Recent Deliveries to Address
+                    <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Show me the full history for RG857954')">
+                        <i class="bi bi-clock-history"></i> Parcel History
                     </button>
                     <button class="list-group-item list-group-item-action" onclick="askQuickQuestion('Show recent fraud reports')">
                         <i class="bi bi-shield-fill-exclamation"></i> Check Frauds
@@ -56,7 +56,7 @@
                 <div class="card-body">
                     <div class="form-group mb-2">
                         <label for="trackingNumber" class="small">Tracking/Barcode</label>
-                        <input type="text" class="form-control" id="trackingNumber" placeholder="DT202512090001">
+                        <input type="text" class="form-control" id="trackingNumber" placeholder="Enter tracking/barcode">
                     </div>
                     <button class="btn btn-primary btn-block btn-sm" onclick="trackParcel()">
                         <i class="bi bi-search"></i> Get Details
@@ -69,25 +69,25 @@
                     
                     <div class="form-group mb-2">
                         <label for="recipientAddress" class="small">Street Address</label>
-                        <input type="text" class="form-control form-control-sm" id="recipientAddress" placeholder="147 Northbourne Avenue">
+                        <input type="text" class="form-control form-control-sm" id="recipientAddress" placeholder="Enter address">
                     </div>
                     <div class="form-group mb-2">
                         <label for="recipientState" class="small">State</label>
                         <select class="form-control form-control-sm" id="recipientState">
                             <option value="">All States</option>
-                            <option value="NSW">NSW</option>
+                            <option value="NSW" selected>NSW</option>
                             <option value="VIC">VIC</option>
                             <option value="QLD">QLD</option>
                             <option value="SA">SA</option>
                             <option value="WA">WA</option>
                             <option value="TAS">TAS</option>
                             <option value="NT">NT</option>
-                            <option value="ACT" selected>ACT</option>
+                            <option value="ACT">ACT</option>
                         </select>
                     </div>
                     <div class="form-group mb-2">
                         <label for="recipientPostcode" class="small">Postcode</label>
-                        <input type="text" class="form-control form-control-sm" id="recipientPostcode" placeholder="2600" maxlength="4" pattern="[0-9]{4}">
+                        <input type="text" class="form-control form-control-sm" id="recipientPostcode" placeholder="2000" maxlength="4" pattern="[0-9]{4}">
                     </div>
                     <div class="form-group mb-2">
                         <label for="timeRange" class="small">Time Range</label>
@@ -107,19 +107,16 @@
 
         <!-- Chat Panel -->
         <div class="col-md-6">
-            <div class="card" style="height: 700px;">
+            <div class="card" style="height: calc(100vh - 200px); min-height: 600px;">
                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                     <span><i class="bi bi-chat-dots-fill"></i> Chat with AI Assistant</span>
                     <span id="voiceStatus" class="badge badge-light text-dark" style="display:none;">
                         <i class="bi bi-mic-fill"></i> Listening...
                     </span>
                 </div>
-                <div class="card-body chat-container" id="chatMessages" style="overflow-y: auto; height: 550px; background-color: #fff; padding: 1.5rem;">
+                <div class="card-body chat-container" id="chatMessages" style="overflow-y: auto; height: calc(100vh - 380px); min-height: 450px; background-color: #fff; padding: 1.5rem;">
                     <div class="chat-message ai-message">
-                        <div class="message-content" style="background-color: transparent; border: 1px solid #dee2e6;">
-                            <i class="bi bi-info-circle-fill"></i> <strong>Welcome!</strong> I'm Alex, your customer service assistant. 
-                            <br><small>💬 Ask me anything about your parcels or 🎤 use voice input!</small>
-                        </div>
+                        <div class="message-content" style="background-color: transparent; border: 1px solid #dee2e6; padding-left: 0.5rem;"><i class="bi bi-info-circle-fill"></i><strong>Welcome!</strong> I'm Alex, your customer service assistant.<br><small>💬 Ask me anything about your parcels or 🎤 use voice input!</small></div>
                     </div>
                 </div>
                 <div class="card-footer">
@@ -171,11 +168,11 @@
                 <div class="card-body">
                     <p class="small mb-2"><strong>🎤 Try saying:</strong></p>
                     <ul class="small">
-                        <li>"What is the parcel history for DT202512090001?"</li>
-                        <li>"How many parcels sent to 147 Northbourne Avenue, ACT in the last 3 weeks?"</li>
-                        <li>"Confirm the recipient address for tracking number DTVIC123456"</li>
-                        <li>"Show me delivery statistics"</li>
-                        <li>"Search parcels in postcode 2600"</li>
+                        <li>"Track parcel RG857954"</li>
+                        <li>"Show me the full history for RG857954"</li>
+                        <li>"Who sent parcel RG857954?"</li>
+                        <li>"Find parcels for Dr. Emma Wilson"</li>
+                        <li>"Show me delivery statistics for Western Australia"</li>
                     </ul>
                     <p class="small text-muted mt-2">
                         <i class="bi bi-info-circle-fill"></i> Click the microphone button and speak naturally. Agent can search by tracking number, address, postcode, or date range.
@@ -465,6 +462,12 @@ function addMessage(message, isUser = false) {
     
     const messageContent = document.createElement('div');
     messageContent.className = 'message-content';
+    
+    // Convert markdown headers to HTML for AI messages
+    if (!isUser) {
+        message = message.replace(/### (.+)/g, '<h3>$1</h3>');
+    }
+    
     messageContent.innerHTML = message;
     
     messageWrapper.appendChild(messageContent);
@@ -714,6 +717,20 @@ window.addEventListener('load', async function() {
 </script>
 
 <style>
+.message-content {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    line-height: 1.4;
+}
+
+.message-content h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-top: 1rem;
+    margin-bottom: 0.3rem;
+    color: #333;
+}
+
 #chatMessages .alert {
     margin-bottom: 10px;
 }

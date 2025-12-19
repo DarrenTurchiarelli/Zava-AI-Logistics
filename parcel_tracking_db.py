@@ -500,15 +500,15 @@ class ParcelTrackingDB:
             parameters = []
             
             if recipient_name:
-                query_parts.append("CONTAINS(LOWER(c.recipient.name), @name)")
+                query_parts.append("CONTAINS(LOWER(c.recipient_name), @name)")
                 parameters.append({"name": "@name", "value": recipient_name.lower()})
             
             if postcode:
-                query_parts.append("c.recipient.postcode = @postcode")
+                query_parts.append("c.destination_postcode = @postcode")
                 parameters.append({"name": "@postcode", "value": postcode})
             
             if address:
-                query_parts.append("CONTAINS(LOWER(c.recipient.address), @address)")
+                query_parts.append("CONTAINS(LOWER(c.recipient_address), @address)")
                 parameters.append({"name": "@address", "value": address.lower()})
             
             # Add date filtering if days_back is provided

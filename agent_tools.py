@@ -146,18 +146,19 @@ async def search_parcels_by_recipient_tool(recipient_name: str = None, postcode:
         return json.dumps(error_result)
 
 
-async def get_delivery_statistics_tool(date_from: str = None, date_to: str = None) -> str:
+async def get_delivery_statistics_tool(state: str = None, date_from: str = None, date_to: str = None) -> str:
     """
-    Tool for AI agents to get delivery statistics.
+    Tool for AI agents to get delivery statistics, optionally filtered by state.
     
     Args:
+        state: Australian state (NSW, VIC, QLD, SA, WA, TAS, ACT, NT) - optional
         date_from: Start date (ISO format, optional)
         date_to: End date (ISO format, optional)
         
     Returns:
         JSON string with delivery statistics
     """
-    print(f"🔧 Agent Tool: get_delivery_statistics_tool called")
+    print(f"🔧 Agent Tool: get_delivery_statistics_tool called with state={state}")
     
     try:
         # Ensure environment variables are loaded
@@ -165,9 +166,15 @@ async def get_delivery_statistics_tool(date_from: str = None, date_to: str = Non
         
         # Use existing ParcelTrackingDB for consistent access
         async with ParcelTrackingDB() as db:
-            # Query for statistics - removed enable_cross_partition_query (not supported in async SDK)
-            query = "SELECT c.status FROM c"
-            parameters = []
+            # Build query with optional state filter
+            if state:
+                # Normalize state to uppercase
+                state = state.upper()
+                query = "SELECT c.current_status, c.destination_state FROM c WHERE c.destination_state = @state"
+                parameters = [{"name": "@state", "value": state}]
+            else:
+                query = "SELECT c.current_status, c.destination_state FROM c"
+                parameters = []
             
             container = db.database.get_container_client("parcels")
             parcels = []
@@ -181,7 +188,8 @@ async def get_delivery_statistics_tool(date_from: str = None, date_to: str = Non
             # Calculate statistics
             status_counts = {}
             for parcel in parcels:
-                status = parcel.get("status", "unknown")
+                # Use current_status field (the actual field in database)
+                status = parcel.get("current_status", "unknown")
                 status_counts[status] = status_counts.get(status, 0) + 1
             
             result = {
@@ -189,7 +197,10 @@ async def get_delivery_statistics_tool(date_from: str = None, date_to: str = Non
                 "status_breakdown": status_counts
             }
             
-            print(f"   ✅ Statistics - {len(parcels)} total parcels")
+            if state:
+                result["state_filter"] = state
+            
+            print(f"   ✅ Statistics - {len(parcels)} total parcels" + (f" in {state}" if state else ""))
             return json.dumps(result, indent=2)
         
     except Exception as e:
@@ -253,10 +264,14 @@ AGENT_TOOLS = [
         "type": "function",
         "function": {
             "name": "get_delivery_statistics",
-            "description": "Use this function when the user asks about delivery statistics, status breakdowns, or how many parcels are in different states. For example: 'how many parcels are in delivery?' or 'show me delivery stats'. Returns total parcel counts and status breakdown from Cosmos DB.",
+            "description": "Use this function when the user asks about delivery statistics, status breakdowns, or how many parcels are in different states/regions. For example: 'how many parcels are in delivery?', 'show me delivery stats', 'delivery statistics for Victoria', 'how many parcels in WA?'. Can filter by Australian state (NSW, VIC, QLD, SA, WA, TAS, ACT, NT). Returns total parcel counts and status breakdown from Cosmos DB.",
             "parameters": {
                 "type": "object",
                 "properties": {
+                    "state": {
+                        "type": "string",
+                        "description": "Australian state code to filter by: NSW, VIC, QLD, SA, WA, TAS, ACT, or NT. Extract from queries like 'Victoria' → 'VIC', 'Western Australia' → 'WA', etc. Optional."
+                    },
                     "date_from": {
                         "type": "string",
                         "description": "Optional start date in ISO format (YYYY-MM-DD)"
