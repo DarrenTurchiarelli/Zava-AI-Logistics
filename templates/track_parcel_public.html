@@ -215,7 +215,7 @@
                 <!-- Action Buttons -->
                 <div class="card-footer" style="background-color: #f8f9fa; border-top: 1px solid #dee2e6;">
                     <div class="d-grid gap-2 d-md-flex justify-content-md-center">
-                        <button class="btn btn-dark btn-lg" style="background-color: #000; border-color: #000;" onclick="alert('Apple Pay integration would be implemented here.')">
+                        <button class="btn btn-dark btn-lg" style="background-color: #000; border-color: #000;" onclick="showApplePayInfo()">
                             <i class="bi bi-apple"></i> Pay with Apple Pay
                         </button>
                         <a href="{{ url_for('register_parcel') }}" class="btn btn-lg" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
@@ -278,4 +278,73 @@
     border-left-color: var(--dt-primary);
 }
 </style>
+
+<script>
+function showApplePayInfo() {
+    // Show informational modal about Apple Pay integration
+    const modalHtml = `
+        <div class="modal fade" id="applePayInfoModal" tabindex="-1" aria-labelledby="applePayInfoModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header" style="background-color: #000; color: white;">
+                        <h5 class="modal-title" id="applePayInfoModalLabel">
+                            <i class="bi bi-apple"></i> Apple Pay Integration
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-info mb-3">
+                            <i class="bi bi-credit-card"></i> <strong>Payment Integration Point</strong>
+                        </div>
+                        <p>This is where you would integrate <strong>Apple Pay</strong> for seamless payment processing:</p>
+                        <ul class="list-unstyled">
+                            <li class="mb-2"><i class="bi bi-check-circle text-success"></i> One-tap payment authorization</li>
+                            <li class="mb-2"><i class="bi bi-shield-check text-primary"></i> Secure tokenized transactions</li>
+                            <li class="mb-2"><i class="bi bi-phone text-info"></i> Support for iPhone, iPad, Mac, and Apple Watch</li>
+                            <li class="mb-2"><i class="bi bi-lightning-charge text-warning"></i> Fast checkout experience</li>
+                        </ul>
+                        <hr>
+                        <h6><i class="bi bi-gear"></i> Integration Options:</h6>
+                        <ol class="small">
+                            <li><strong>Stripe + Apple Pay:</strong> Use Stripe's Apple Pay API for payment processing</li>
+                            <li><strong>Azure Payment Services:</strong> Integrate with Azure's payment gateway partners</li>
+                            <li><strong>Direct Apple Pay JS:</strong> Implement Apple Pay JS SDK for web payments</li>
+                        </ol>
+                        <div class="alert alert-dark mt-3 mb-0">
+                            <small><i class="bi bi-lightbulb"></i> <strong>Demo Mode:</strong> This feature requires merchant setup with Apple Developer Program and a payment service provider (PSP) like Stripe or Adyen.</small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <a href="https://developer.apple.com/apple-pay/" target="_blank" class="btn btn-dark btn-sm">
+                            <i class="bi bi-apple"></i> Apple Pay Docs
+                        </a>
+                        <a href="https://stripe.com/payments/apple-pay" target="_blank" class="btn btn-primary btn-sm">
+                            <i class="bi bi-credit-card"></i> Stripe Integration
+                        </a>
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if present
+    const existingModal = document.getElementById('applePayInfoModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('applePayInfoModal'));
+    modal.show();
+    
+    // Clean up modal after it's hidden
+    document.getElementById('applePayInfoModal').addEventListener('hidden.bs.modal', function () {
+        this.remove();
+    });
+}
+</script>
 {% endblock %}

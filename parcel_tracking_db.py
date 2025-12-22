@@ -351,6 +351,7 @@ class ParcelTrackingDB:
         recipient_phone: Optional[str],
         destination_postcode: str,
         destination_state: str,
+        destination_city: Optional[str] = None,
         service_type: str = "standard",
         weight: Optional[float] = None,
         dimensions: Optional[str] = None,
@@ -382,6 +383,7 @@ class ParcelTrackingDB:
             "recipient_phone": recipient_phone,
             "destination_postcode": destination_postcode,
             "destination_state": destination_state,
+            "destination_city": destination_city,
             "service_type": service_type,
             "weight": weight,
             "dimensions": dimensions,
@@ -536,6 +538,63 @@ class ParcelTrackingDB:
             
         except exceptions.CosmosHttpResponseError as e:
             print(f"❌ Error searching parcels by recipient: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+
+    async def search_parcels_by_driver(
+        self, 
+        driver_id: str = None,
+        driver_name: str = None,
+        status: str = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Search parcels assigned to a specific driver
+        
+        Args:
+            driver_id: Driver ID to search for (e.g., 'driver-001')
+            driver_name: Driver name to search for (optional)
+            status: Filter by parcel status (e.g., 'in_transit', 'out_for_delivery')
+            
+        Returns:
+            List of matching parcels
+        """
+        container = self.database.get_container_client(self.parcels_container)
+        
+        try:
+            query_parts = []
+            parameters = []
+            
+            if driver_id:
+                query_parts.append("c.assigned_driver = @driver_id")
+                parameters.append({"name": "@driver_id", "value": driver_id})
+            
+            if driver_name:
+                query_parts.append("CONTAINS(LOWER(c.driver_name), @driver_name)")
+                parameters.append({"name": "@driver_name", "value": driver_name.lower()})
+            
+            if status:
+                query_parts.append("c.current_status = @status")
+                parameters.append({"name": "@status", "value": status})
+            
+            if not query_parts:
+                return []
+            
+            where_clause = " AND ".join(query_parts)
+            query = f"""
+                SELECT * FROM c 
+                WHERE {where_clause}
+                ORDER BY c.assigned_timestamp DESC
+            """
+            
+            parcels = []
+            async for item in container.query_items(query=query, parameters=parameters):
+                parcels.append(item)
+            
+            return parcels
+            
+        except exceptions.CosmosHttpResponseError as e:
+            print(f"❌ Error searching parcels by driver: {e}")
             import traceback
             traceback.print_exc()
             return []
@@ -1012,8 +1071,7 @@ class ParcelTrackingDB:
             query = "SELECT * FROM c WHERE c.tracking_number = @tracking_number ORDER BY c.timestamp DESC"
             items = container.query_items(
                 query=query,
-                parameters=[("@tracking_number", tracking_number)],
-                enable_cross_partition_query=True
+                parameters=[("@tracking_number", tracking_number)]
             )
             
             return [item async for item in items]
@@ -1033,8 +1091,7 @@ class ParcelTrackingDB:
             query = "SELECT * FROM c WHERE c.timestamp >= @cutoff_date ORDER BY c.timestamp DESC"
             items = container.query_items(
                 query=query,
-                parameters=[("@cutoff_date", cutoff_iso)],
-                enable_cross_partition_query=True
+                parameters=[("@cutoff_date", cutoff_iso)]
             )
             
             return [item async for item in items]
@@ -1322,7 +1379,9 @@ class ParcelTrackingDB:
                                      parcel_barcodes: List[str], 
                                      manifest_date: str = None,
                                      driver_state: str = None,
-                                     max_items: int = 150) -> Optional[str]:
+                                     driver_location: str = None,
+                                     max_items: int = 150,
+                                     reason: str = None) -> Optional[str]:
         """Create a delivery manifest for a driver with configurable max parcels (default 150)"""
         try:
             if len(parcel_barcodes) > max_items:
@@ -1332,7 +1391,7 @@ class ParcelTrackingDB:
             manifest_id = f"manifest_{driver_id}_{uuid.uuid4().hex[:8]}"
             manifest_date = manifest_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
             
-            # Get parcel details for each barcode
+            # Get parcel details for each barcode and assign to driver
             parcels_container = self.database.get_container_client(self.parcels_container)
             manifest_items = []
             
@@ -1341,12 +1400,25 @@ class ParcelTrackingDB:
                 parameters = [{"name": "@barcode", "value": barcode}]
                 
                 async for parcel in parcels_container.query_items(query=query, parameters=parameters):
+                    # Update parcel with driver assignment and status
+                    parcel['assigned_driver'] = driver_id
+                    parcel['driver_name'] = driver_name
+                    parcel['current_status'] = 'in_transit'
+                    parcel['manifest_id'] = manifest_id
+                    parcel['assigned_timestamp'] = datetime.now(timezone.utc).isoformat()
+                    
+                    # Update the parcel in the database
+                    await parcels_container.upsert_item(body=parcel)
+                    
                     manifest_items.append({
                         "barcode": parcel.get("barcode"),
                         "recipient_name": parcel.get("recipient_name"),
                         "recipient_address": parcel.get("recipient_address"),
                         "recipient_phone": parcel.get("recipient_phone"),
-                        "status": parcel.get("status"),
+                        "destination_state": parcel.get("destination_state"),
+                        "destination_postcode": parcel.get("destination_postcode"),
+                        "destination_city": parcel.get("destination_city"),
+                        "status": parcel.get("current_status"),
                         "priority": parcel.get("priority", "normal"),
                         "delivery_notes": parcel.get("delivery_notes", "")
                     })
@@ -1357,7 +1429,9 @@ class ParcelTrackingDB:
                 "driver_id": driver_id,
                 "driver_name": driver_name,
                 "driver_state": driver_state or "NSW",
+                "driver_location": driver_location or driver_state or "NSW",
                 "manifest_date": manifest_date,
+                "reason": reason or "",
                 "items": manifest_items,
                 "total_items": len(manifest_items),
                 "completed_items": 0,
@@ -1681,11 +1755,13 @@ class ParcelTrackingDB:
         try:
             container = self.database.get_container_client("driver_manifests")
             
-            # Get all active manifests, not just today's (for demo purposes)
-            query = "SELECT * FROM c WHERE c.status = 'active' ORDER BY c.manifest_date DESC"
+            # Get only today's active manifests
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            query = "SELECT * FROM c WHERE c.status = 'active' AND c.manifest_date = @today ORDER BY c.created_timestamp DESC"
+            parameters = [{"name": "@today", "value": today}]
             
             manifests = []
-            async for manifest in container.query_items(query=query):
+            async for manifest in container.query_items(query=query, parameters=parameters):
                 manifests.append(manifest)
             
             return manifests
@@ -2504,7 +2580,7 @@ class ParcelTrackingDB:
             query = "SELECT * FROM c WHERE c.role = 'driver'"
             
             drivers = []
-            async for user in container.query_items(query=query, enable_cross_partition_query=True):
+            async for user in container.query_items(query=query):
                 driver_info = {
                     "driver_id": user.get("username"),
                     "name": user.get("full_name", user.get("username")),
@@ -2523,13 +2599,38 @@ class ParcelTrackingDB:
         except Exception as e:
             print(f"❌ Error getting available drivers: {e}")
             return []
+    
+    async def get_user_state(self, username: str) -> str:
+        """Get a user's state from the users container
+        
+        Args:
+            username: The username/driver_id to look up
+            
+        Returns:
+            The user's state (e.g., 'VIC', 'NSW') or 'NSW' as default
+        """
+        try:
+            container = self.database.get_container_client("users")
+            query = "SELECT c.state FROM c WHERE c.username = @username"
+            parameters = [{"name": "@username", "value": username}]
+            
+            async for user in container.query_items(query=query, parameters=parameters):
+                return user.get("state", "NSW")
+            
+            # If user not found, return default
+            return "NSW"
+            
+        except Exception as e:
+            print(f"❌ Error getting user state for {username}: {e}")
+            return "NSW"
 
-    async def get_pending_parcels(self, status: str = "At Depot", max_count: int = None) -> List[Dict[str, Any]]:
+    async def get_pending_parcels(self, status: str = "at_depot", max_count: int = None, state: str = None) -> List[Dict[str, Any]]:
         """Get parcels that are pending manifest assignment
         
         Args:
-            status: Parcel status to filter by (default: 'At Depot')
+            status: Parcel status to filter by (default: 'at_depot')
             max_count: Optional maximum number of parcels to return
+            state: Optional filter by delivery state (e.g., 'VIC', 'NSW')
             
         Returns:
             List of parcel dictionaries ready for manifest assignment
@@ -2537,18 +2638,37 @@ class ParcelTrackingDB:
         try:
             container = self.database.get_container_client(self.parcels_container)
             
-            # Query for parcels at depot waiting for delivery assignment
-            query = "SELECT * FROM c WHERE c.status = @status ORDER BY c.priority DESC, c.registered_date ASC"
-            parameters = [{"name": "@status", "value": status}]
+            # Build query with optional state filter
+            if state:
+                query = """
+                    SELECT * FROM c 
+                    WHERE LOWER(c.current_status) = LOWER(@status) 
+                    AND (NOT IS_DEFINED(c.assigned_driver) OR c.assigned_driver = null)
+                    AND c.recipient_state = @state
+                    ORDER BY c.registration_timestamp DESC
+                """
+                parameters = [
+                    {"name": "@status", "value": status},
+                    {"name": "@state", "value": state}
+                ]
+            else:
+                query = """
+                    SELECT * FROM c 
+                    WHERE LOWER(c.current_status) = LOWER(@status) 
+                    AND (NOT IS_DEFINED(c.assigned_driver) OR c.assigned_driver = null)
+                    ORDER BY c.registration_timestamp DESC
+                """
+                parameters = [{"name": "@status", "value": status}]
             
             parcels = []
-            async for parcel in container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True):
+            async for parcel in container.query_items(query=query, parameters=parameters):
                 parcels.append(parcel)
                 
                 if max_count and len(parcels) >= max_count:
                     break
             
-            print(f"✅ Found {len(parcels)} pending parcels with status '{status}'")
+            state_msg = f" in {state}" if state else ""
+            print(f"✅ Found {len(parcels)} pending parcels with status '{status}'{state_msg}")
             return parcels
             
         except Exception as e:

@@ -13,8 +13,15 @@ This guide demonstrates the complete AI-powered logistics system with **8 active
 - Natural language parcel tracking
 - Multi-format tracking support (DT, DTVIC, OV)
 - Real-time Cosmos DB queries via function calling
+- **Driver-based parcel search** - Query parcels assigned to specific drivers
 - Conversational AI with chat history
 - **Demo Metric**: 47 decisions with 91% average confidence
+
+**Available Tools:**
+1. `track_parcel` - Track individual parcels by tracking number/barcode
+2. `search_parcels_by_recipient` - Find parcels by recipient name/address/postcode
+3. **`search_parcels_by_driver`** - ⭐ NEW - Search parcels assigned to drivers
+4. `get_delivery_statistics` - Get delivery statistics by state
 
 ### 2. Fraud Detection Agent 🛡️
 **Status:** ✅ ACTIVE  
@@ -25,6 +32,7 @@ This guide demonstrates the complete AI-powered logistics system with **8 active
 - Educational content generation
 - Automated workflow triggering
 - **Demo Metric**: 32 decisions with 89% average confidence
+** It does a lightweight DNS check  but this could be tied into other MSFT services for DNS lookup checks. 
 
 ### 3. Identity Verification Agent 🔐
 **Status:** ✅ ACTIVE  
@@ -105,18 +113,135 @@ python generate_demo_manifests.py
 ```
 
 This creates:
-- **20 sample parcels** with realistic Sydney addresses
-- **3 driver manifests** distributed across drivers
+- **2,280 sample parcels** with realistic addresses across 6 Australian states
+- **57 driver manifests** with location-based assignment
+- **Geographic filtering**: Drivers only receive parcels for their city (Sydney drivers → Sydney parcels)
+- All parcels assigned to drivers with `in_transit` status
 - All data ready for immediate demonstration
 
-### Sample Drivers
+**Location-Based Assignment Logic:**
+1. Parcels assigned to drivers based on `destination_city` matching driver's `location`
+2. Sydney drivers (driver-001 to driver-025) receive only Sydney-area parcels
+3. Melbourne drivers receive only Melbourne parcels
+4. If insufficient city-specific parcels, falls back to state-level matching
+5. Ensures drivers don't cross state boundaries unnecessarily
 
-| Driver ID | Driver Name | Parcels |
-|-----------|-------------|---------|
-| `driver-001` | John Smith | 6 |
-| `driver-002` | Maria Garcia | 6 |
-| `driver-003` | David Wong | 8 |
-| `driver-004` | Mandy Musk | 16 |
+---
+
+## 🔄 Demo Preparation Scripts
+
+### Before Each Stakeholder Demo
+
+Run these scripts to prepare fresh demo data and ensure optimal demo experience:
+
+#### 1. Generate Fresh Parcels for Dispatcher Demo
+
+**Script:** `utils/generators/generate_dispatcher_demo_data.py`
+
+**Purpose:** Creates 100 unassigned parcels (50 for today + 50 for tomorrow) ready for AI auto-assignment
+
+**Usage:**
+```powershell
+python utils/generators/generate_dispatcher_demo_data.py
+```
+
+**What It Creates:**
+- **100 total parcels** with status `at_depot` (unassigned)
+  - **50 parcels for today's date** (2025-12-22)
+  - **50 parcels for tomorrow's date** (2025-12-23)
+- **Geographic distribution (per day):**
+  - Sydney: 20 parcels
+  - Melbourne: 15 parcels
+  - Brisbane: 10 parcels
+  - Adelaide: 5 parcels
+- All parcels have realistic recipient names, addresses, and tracking numbers
+- Parcels are immediately available for the Dispatcher Agent to assign
+- Unique barcodes ensure no duplicates across both days
+
+**When to Use:**
+- Before demonstrating the Dispatcher Agent
+- Between stakeholder demos to reset data
+- When you need fresh unassigned parcels for multi-day scenarios
+
+---
+
+#### 2. Reduce Driver Loads (Free Up Capacity)
+
+**Script:** `Scripts/reduce_driver_loads.py`
+
+**Purpose:** Removes 50% of parcels from each driver to demonstrate capacity-based assignment
+
+**Usage:**
+```powershell
+cd Scripts
+python reduce_driver_loads.py
+```
+
+**What It Does:**
+- Finds all drivers with assigned parcels
+- Removes **50% of parcels** from each driver
+- Resets removed parcels to:
+  - Status: `at_depot`
+  - `assigned_driver = None`
+  - Location: `Central Distribution Centre`
+- Makes parcels available for reassignment
+
+**When to Use:**
+- When all drivers are at maximum capacity (hard to demo)
+- Before showing how AI assigns based on driver availability
+- To demonstrate workload balancing
+
+**Example Output:**
+```
+🚚 Reducing Driver Parcel Loads
+📋 Found 57 drivers with assigned parcels
+
+🚗 driver-001: 50 parcels → Removing 25
+   ✅ Completed: driver-001 now has 25 parcels
+
+✅ Successfully unassigned 850 parcels
+   - Processed 57 drivers
+   - Freed up 850 parcels
+   - Parcels are now available for reassignment
+```
+
+---
+
+### Recommended Demo Setup Workflow
+
+**Before Your Demo:**
+```powershell
+# 1. Free up driver capacity (if needed)
+python Scripts/reduce_driver_loads.py
+
+# 2. Generate fresh parcels for assignment (today + tomorrow)
+python utils/generators/generate_dispatcher_demo_data.py
+
+# 3. Start the application
+$env:FLASK_ENV='development'; python app.py
+```
+
+**Result:** You now have:
+- Drivers with capacity to receive new parcels
+- **100 fresh unassigned parcels** ready for AI assignment (50 today + 50 tomorrow)
+- Multi-day scenario for demonstrating the Dispatcher Agent's planning capabilities
+- Optimal setup for demonstrating intelligent parcel assignment
+
+---
+
+### Sample Drivers (Location-Based Assignment)
+
+**Sydney Drivers (25 drivers):**
+| Driver ID | Driver Name | Location | Typical Parcels |
+|-----------|-------------|----------|-----------------|
+| `driver-001` | John Smith | Sydney, NSW | 30-50 Sydney parcels |
+| `driver-002` | Maria Garcia | Sydney, NSW | 30-50 Sydney parcels |
+| `driver-003` | David Wong | Sydney, NSW | 30-50 Sydney parcels |
+| `driver-026` | Charlotte Lee | Melbourne, VIC | 30-50 Melbourne parcels |
+| `driver-038` | Elizabeth Adams | Brisbane, QLD | 30-50 Brisbane parcels |
+| `driver-048` | Chloe Parker | Adelaide, SA | 30-50 Adelaide parcels |
+
+**Total: 57 drivers across 6 states** (NSW: 25, VIC: 12, QLD: 10, SA: 6, WA: 3, ACT: 1)
 
 ### Demo Workflow
 
@@ -172,7 +297,7 @@ This creates:
      - "Track parcel with barcode LP654321"
    - **Behind the Scenes**: Agent queries Cosmos DB in real-time with function calling
 
-#### 5. **Fraud Detection & Multi-Agent Workflow**
+#### 6. **Fraud Detection & Multi-Agent Workflow**
    - **URL**: http://127.0.0.1:5000/fraud/report
    - **Test Message**:
      ```
@@ -189,8 +314,9 @@ This creates:
      - Customer Service Agent sends warning
      - Multi-channel notifications (Email/SMS)
 
-#### 6. **AI Auto-Assign Manifests** ⭐ DISPATCHER AGENT
+#### 7. **AI Auto-Assign Manifests** ⭐ DISPATCHER AGENT
    - **URL**: http://127.0.0.1:5000/admin/manifests
+   - **Menu**: Drivers > Manage Manifests
    - **Steps**:
      - Scroll to "AI Auto-Assign (DISPATCHER_AGENT)" section
      - Set max parcels (default: 100)
@@ -203,7 +329,7 @@ This creates:
      - Creates optimized delivery routes
    - **Result**: View newly created manifests with driver assignments
 
-#### 7. **Driver Manifest & Delivery Coordination**
+#### 8. **Driver Manifest & Delivery Coordination**
    - **URL**: http://127.0.0.1:5000/driver/manifest
    - **Features**:
      - Embedded Azure Maps with route visualization
@@ -219,7 +345,7 @@ This creates:
      - Upload proof of delivery photo
      - Real-time progress updates
 
-#### 8. **Sorting Facility Optimization** ⭐ NEW
+#### 9. **Sorting Facility Optimization** ⭐ NEW
    - **URL**: http://127.0.0.1:5000/ai/insights (Scroll to Sorting Section)
    - **Real-Time Insights**:
      - Melbourne Facility: 78% capacity (Near Capacity)
@@ -230,7 +356,7 @@ This creates:
      - Predictive capacity warnings
      - Human approval workflows with modals
 
-#### 9. **Network Optimization Recommendations** ⭐ NEW
+#### 10. **Network Optimization Recommendations** ⭐ NEW
    - **URL**: http://127.0.0.1:5000/ai/insights (Optimization Section)
    - **Cost Reduction Insights**:
      - **Recommendation 1**: Consolidate Sydney-Canberra routes (Save $2,400/month)
@@ -269,6 +395,13 @@ Options:
    - "Track parcel DT1234567890"
    - "Show deliveries for [recipient name]"
    - "What's the status of DTVIC123?"
+   - **NEW:** "Show parcels in transit for driver001"
+   - **NEW:** "What deliveries does John Smith have?" (if driver name)
+   - **NEW:** "How many parcels for driver-002?"
+3. Verify:
+   - Driver queries return actual parcel lists from database
+   - Shows recipient names, addresses, barcodes, statuses
+   - No generic "check internal system" responses
 
 ### Test Fraud Detection Workflow
 1. Go to: http://127.0.0.1:5000/fraud/report
@@ -477,6 +610,10 @@ DEPOT_ADDRESS=Your Warehouse Address
    - Ask: "Where is my parcel DT1234567890?"
    - Show natural language processing
    - Demonstrate Cosmos DB function calling
+   - **NEW Driver Query**: "Show parcels in transit for driver001"
+     - Agent calls `search_parcels_by_driver` tool
+     - Returns 30-50 Sydney parcels with full details
+     - Shows recipient names, addresses, barcodes, statuses
 
 #### **Part 3: Fraud Detection Workflow (4 minutes)**
 6. **Report Suspicious Message** (http://127.0.0.1:5000/fraud/report)
@@ -550,7 +687,9 @@ DEPOT_ADDRESS=Your Warehouse Address
 ✅ **"Complete end-to-end automation from intake to delivery"**  
 ✅ **"Azure AI Foundry provides full telemetry and monitoring"**  
 ✅ **"Each agent specialized in specific domain with function calling"**  
-✅ **"Seamless integration: Cosmos DB, Azure Maps, Azure Speech"**
+✅ **"Seamless integration: Cosmos DB, Azure Maps, Azure Speech"**  
+✅ **"Location-based assignment: Sydney drivers only get Sydney parcels"** ⭐ NEW  
+✅ **"Driver-aware AI: Query parcels by driver ID or driver name"** ⭐ NEW
 
 ## Troubleshooting
 

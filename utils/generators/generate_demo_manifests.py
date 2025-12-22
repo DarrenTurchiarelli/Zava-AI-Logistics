@@ -222,77 +222,77 @@ SAMPLE_ADDRESSES_ACT = [
     {"recipient": "Alexander King", "address": "45 Northbourne Avenue, Canberra ACT 2600", "phone": "+61 2 6248 5678", "priority": "normal", "notes": "Civic area"},
 ]
 
-# Sample drivers - 57 drivers distributed across Australian states
-# NSW: 25 drivers, VIC: 12 drivers, QLD: 10 drivers, SA: 6 drivers, WA: 3 drivers, ACT: 1 driver
+# Sample drivers - 57 drivers distributed across Australian states and cities
+# NSW: 25 drivers (Sydney), VIC: 12 drivers (Melbourne), QLD: 10 drivers (Brisbane), SA: 6 drivers (Adelaide), WA: 3 drivers (Perth), ACT: 1 driver (Canberra)
 SAMPLE_DRIVERS = [
-    # NSW Drivers (25)
-    {"id": "driver-001", "name": "John Smith", "state": "NSW"},
-    {"id": "driver-002", "name": "Maria Garcia", "state": "NSW"},
-    {"id": "driver-003", "name": "David Wong", "state": "NSW"},
-    {"id": "driver-004", "name": "Emily Thompson", "state": "NSW"},
-    {"id": "driver-005", "name": "Robert Kumar", "state": "NSW"},
-    {"id": "driver-006", "name": "Jessica O'Brien", "state": "NSW"},
-    {"id": "driver-007", "name": "Michael Nguyen", "state": "NSW"},
-    {"id": "driver-008", "name": "Sarah Mitchell", "state": "NSW"},
-    {"id": "driver-009", "name": "Christopher Lee", "state": "NSW"},
-    {"id": "driver-010", "name": "Amanda Roberts", "state": "NSW"},
-    {"id": "driver-011", "name": "Daniel Foster", "state": "NSW"},
-    {"id": "driver-012", "name": "Rachel Hughes", "state": "NSW"},
-    {"id": "driver-013", "name": "Matthew Singh", "state": "NSW"},
-    {"id": "driver-014", "name": "Lauren Edwards", "state": "NSW"},
-    {"id": "driver-015", "name": "Andrew Campbell", "state": "NSW"},
-    {"id": "driver-016", "name": "Nicole Zhang", "state": "NSW"},
-    {"id": "driver-017", "name": "Patrick Walsh", "state": "NSW"},
-    {"id": "driver-018", "name": "Victoria Chen", "state": "NSW"},
-    {"id": "driver-019", "name": "Thomas Anderson", "state": "NSW"},
-    {"id": "driver-020", "name": "Sophia Martinez", "state": "NSW"},
-    {"id": "driver-021", "name": "James Wilson", "state": "NSW"},
-    {"id": "driver-022", "name": "Isabella Taylor", "state": "NSW"},
-    {"id": "driver-023", "name": "Benjamin Moore", "state": "NSW"},
-    {"id": "driver-024", "name": "Mia Jackson", "state": "NSW"},
-    {"id": "driver-025", "name": "Lucas Martin", "state": "NSW"},
+    # NSW Drivers (25) - Sydney
+    {"id": "driver-001", "name": "John Smith", "state": "NSW", "location": "Sydney"},
+    {"id": "driver-002", "name": "Maria Garcia", "state": "NSW", "location": "Sydney"},
+    {"id": "driver-003", "name": "David Wong", "state": "NSW", "location": "Sydney"},
+    {"id": "driver-004", "name": "Emily Thompson", "state": "NSW", "location": "Sydney"},
+    {"id": "driver-005", "name": "Robert Kumar", "state": "NSW", "location": "Sydney"},
+    {"id": "driver-006", "name": "Jessica O'Brien", "state": "NSW", "location": "Sydney"},
+    {"id": "driver-007", "name": "Michael Nguyen", "state": "NSW", "location": "Sydney"},
+    {"id": "driver-008", "name": "Sarah Mitchell", "state": "NSW", "location": "Sydney"},
+    {"id": "driver-009", "name": "Christopher Lee", "state": "NSW", "location": "Sydney"},
+    {"id": "driver-010", "name": "Amanda Roberts", "state": "NSW", "location": "Sydney"},
+    {"id": "driver-011", "name": "Daniel Foster", "state": "NSW", "location": "Sydney"},
+    {"id": "driver-012", "name": "Rachel Hughes", "state": "NSW", "location": "Sydney"},
+    {"id": "driver-013", "name": "Matthew Singh", "state": "NSW", "location": "Sydney"},
+    {"id": "driver-014", "name": "Lauren Edwards", "state": "NSW", "location": "Sydney"},
+    {"id": "driver-015", "name": "Andrew Campbell", "state": "NSW", "location": "Sydney"},
+    {"id": "driver-016", "name": "Nicole Zhang", "state": "NSW", "location": "Sydney"},
+    {"id": "driver-017", "name": "Patrick Walsh", "state": "NSW", "location": "Sydney"},
+    {"id": "driver-018", "name": "Victoria Chen", "state": "NSW", "location": "Sydney"},
+    {"id": "driver-019", "name": "Thomas Anderson", "state": "NSW", "location": "Sydney"},
+    {"id": "driver-020", "name": "Sophia Martinez", "state": "NSW", "location": "Sydney"},
+    {"id": "driver-021", "name": "James Wilson", "state": "NSW", "location": "Sydney"},
+    {"id": "driver-022", "name": "Isabella Taylor", "state": "NSW", "location": "Sydney"},
+    {"id": "driver-023", "name": "Benjamin Moore", "state": "NSW", "location": "Sydney"},
+    {"id": "driver-024", "name": "Mia Jackson", "state": "NSW", "location": "Sydney"},
+    {"id": "driver-025", "name": "Lucas Martin", "state": "NSW", "location": "Sydney"},
     
-    # VIC Drivers (12)
-    {"id": "driver-026", "name": "Charlotte Lee", "state": "VIC"},
-    {"id": "driver-027", "name": "Mason Harris", "state": "VIC"},
-    {"id": "driver-028", "name": "Amelia Clark", "state": "VIC"},
-    {"id": "driver-029", "name": "Ethan Lewis", "state": "VIC"},
-    {"id": "driver-030", "name": "Harper Walker", "state": "VIC"},
-    {"id": "driver-031", "name": "Alexander Young", "state": "VIC"},
-    {"id": "driver-032", "name": "Evelyn Hall", "state": "VIC"},
-    {"id": "driver-033", "name": "Daniel Allen", "state": "VIC"},
-    {"id": "driver-034", "name": "Abigail King", "state": "VIC"},
-    {"id": "driver-035", "name": "Matthew Wright", "state": "VIC"},
-    {"id": "driver-036", "name": "Emily Scott", "state": "VIC"},
-    {"id": "driver-037", "name": "Joseph Green", "state": "VIC"},
+    # VIC Drivers (12) - Melbourne
+    {"id": "driver-026", "name": "Charlotte Lee", "state": "VIC", "location": "Melbourne"},
+    {"id": "driver-027", "name": "Mason Harris", "state": "VIC", "location": "Melbourne"},
+    {"id": "driver-028", "name": "Amelia Clark", "state": "VIC", "location": "Melbourne"},
+    {"id": "driver-029", "name": "Ethan Lewis", "state": "VIC", "location": "Melbourne"},
+    {"id": "driver-030", "name": "Harper Walker", "state": "VIC", "location": "Melbourne"},
+    {"id": "driver-031", "name": "Alexander Young", "state": "VIC", "location": "Melbourne"},
+    {"id": "driver-032", "name": "Evelyn Hall", "state": "VIC", "location": "Melbourne"},
+    {"id": "driver-033", "name": "Daniel Allen", "state": "VIC", "location": "Melbourne"},
+    {"id": "driver-034", "name": "Abigail King", "state": "VIC", "location": "Melbourne"},
+    {"id": "driver-035", "name": "Matthew Wright", "state": "VIC", "location": "Melbourne"},
+    {"id": "driver-036", "name": "Emily Scott", "state": "VIC", "location": "Melbourne"},
+    {"id": "driver-037", "name": "Joseph Green", "state": "VIC", "location": "Melbourne"},
     
-    # QLD Drivers (10)
-    {"id": "driver-038", "name": "Elizabeth Adams", "state": "QLD"},
-    {"id": "driver-039", "name": "David Baker", "state": "QLD"},
-    {"id": "driver-040", "name": "Sofia Nelson", "state": "QLD"},
-    {"id": "driver-041", "name": "Samuel Carter", "state": "QLD"},
-    {"id": "driver-042", "name": "Avery Mitchell", "state": "QLD"},
-    {"id": "driver-043", "name": "Henry Perez", "state": "QLD"},
-    {"id": "driver-044", "name": "Scarlett Roberts", "state": "QLD"},
-    {"id": "driver-045", "name": "Sebastian Turner", "state": "QLD"},
-    {"id": "driver-046", "name": "Grace Phillips", "state": "QLD"},
-    {"id": "driver-047", "name": "Jack Campbell", "state": "QLD"},
+    # QLD Drivers (10) - Brisbane
+    {"id": "driver-038", "name": "Elizabeth Adams", "state": "QLD", "location": "Brisbane"},
+    {"id": "driver-039", "name": "David Baker", "state": "QLD", "location": "Brisbane"},
+    {"id": "driver-040", "name": "Sofia Nelson", "state": "QLD", "location": "Brisbane"},
+    {"id": "driver-041", "name": "Samuel Carter", "state": "QLD", "location": "Brisbane"},
+    {"id": "driver-042", "name": "Avery Mitchell", "state": "QLD", "location": "Brisbane"},
+    {"id": "driver-043", "name": "Henry Perez", "state": "QLD", "location": "Brisbane"},
+    {"id": "driver-044", "name": "Scarlett Roberts", "state": "QLD", "location": "Brisbane"},
+    {"id": "driver-045", "name": "Sebastian Turner", "state": "QLD", "location": "Brisbane"},
+    {"id": "driver-046", "name": "Grace Phillips", "state": "QLD", "location": "Brisbane"},
+    {"id": "driver-047", "name": "Jack Campbell", "state": "QLD", "location": "Brisbane"},
     
-    # SA Drivers (6)
-    {"id": "driver-048", "name": "Chloe Parker", "state": "SA"},
-    {"id": "driver-049", "name": "Owen Evans", "state": "SA"},
-    {"id": "driver-050", "name": "Lily Edwards", "state": "SA"},
-    {"id": "driver-051", "name": "Ryan Collins", "state": "SA"},
-    {"id": "driver-052", "name": "Zoe Stewart", "state": "SA"},
-    {"id": "driver-053", "name": "Nathan Sanchez", "state": "SA"},
+    # SA Drivers (6) - Adelaide
+    {"id": "driver-048", "name": "Chloe Parker", "state": "SA", "location": "Adelaide"},
+    {"id": "driver-049", "name": "Owen Evans", "state": "SA", "location": "Adelaide"},
+    {"id": "driver-050", "name": "Lily Edwards", "state": "SA", "location": "Adelaide"},
+    {"id": "driver-051", "name": "Ryan Collins", "state": "SA", "location": "Adelaide"},
+    {"id": "driver-052", "name": "Zoe Stewart", "state": "SA", "location": "Adelaide"},
+    {"id": "driver-053", "name": "Nathan Sanchez", "state": "SA", "location": "Adelaide"},
     
-    # WA Drivers (3)
-    {"id": "driver-054", "name": "Hannah Morris", "state": "WA"},
-    {"id": "driver-055", "name": "Caleb Rogers", "state": "WA"},
-    {"id": "driver-056", "name": "Aria Reed", "state": "WA"},
+    # WA Drivers (3) - Perth
+    {"id": "driver-054", "name": "Hannah Morris", "state": "WA", "location": "Perth"},
+    {"id": "driver-055", "name": "Caleb Rogers", "state": "WA", "location": "Perth"},
+    {"id": "driver-056", "name": "Aria Reed", "state": "WA", "location": "Perth"},
     
-    # ACT Driver (1)
-    {"id": "driver-057", "name": "Isaac Cook", "state": "ACT"},
+    # ACT Driver (1) - Canberra
+    {"id": "driver-057", "name": "Isaac Cook", "state": "ACT", "location": "Canberra"},
 ]
 
 # Map states to their address pools
@@ -401,11 +401,16 @@ async def create_sample_parcels_by_state(db: ParcelTrackingDB):
             # Cycle through addresses for this state
             addr_info = address_pool[i % len(address_pool)]
             
-            # Extract postcode and state from address
+            # Extract postcode, state, and city from address
             address_parts = addr_info["address"].split(",")
             state_postcode = address_parts[-1].strip()
             actual_state = state_postcode.split()[0] if state_postcode else state
             postcode = state_postcode.split()[1] if len(state_postcode.split()) > 1 else "0000"
+            
+            # Extract city (second-to-last part of address before state/postcode)
+            destination_city = address_parts[-2].strip() if len(address_parts) > 2 else state
+            # Clean up city name by removing state abbreviations
+            destination_city = destination_city.replace(' NSW', '').replace(' VIC', '').replace(' QLD', '').replace(' SA', '').replace(' WA', '').replace(' ACT', '').strip()
             
             try:
                 await db.register_parcel(
@@ -418,6 +423,7 @@ async def create_sample_parcels_by_state(db: ParcelTrackingDB):
                     recipient_phone=addr_info["phone"],
                     destination_postcode=postcode,
                     destination_state=actual_state,
+                    destination_city=destination_city,
                     service_type=addr_info["priority"],
                     weight=round(0.5 + ((parcel_counter % 50) * 0.3), 2),
                     dimensions=f"{20+(parcel_counter%30)}x{15+(parcel_counter%25)}x{10+(parcel_counter%20)}cm",
@@ -484,6 +490,7 @@ async def delete_all_manifests(db: ParcelTrackingDB):
 
 async def create_driver_manifests(db: ParcelTrackingDB, state_barcodes: dict):
     """Create manifests for sample drivers with varied parcel counts (30-50 each)
+    Filters parcels by driver's city/location for geographic accuracy
     
     Args:
         state_barcodes: Dictionary mapping state codes to lists of barcodes
@@ -499,29 +506,63 @@ async def create_driver_manifests(db: ParcelTrackingDB, state_barcodes: dict):
     
     for driver in SAMPLE_DRIVERS:
         driver_state = driver.get('state', 'NSW')
+        driver_location = driver.get('location', driver_state)
         
-        # Get available barcodes for this driver's state
-        available_barcodes = state_barcodes.get(driver_state, [])
+        # Query parcels by destination city matching driver's location
+        parcels_container = db.database.get_container_client(db.parcels_container)
+        
+        # First try to get parcels for driver's specific city
+        query = """
+            SELECT c.barcode FROM c 
+            WHERE c.destination_city = @location 
+            AND c.current_status = 'registered'
+            AND (NOT IS_DEFINED(c.assigned_driver) OR c.assigned_driver = null)
+        """
+        parameters = [{"name": "@location", "value": driver_location}]
+        
+        city_barcodes = []
+        async for item in parcels_container.query_items(query=query, parameters=parameters):
+            city_barcodes.append(item['barcode'])
+        
+        # If not enough city-specific parcels, fall back to state
+        if len(city_barcodes) < 30:
+            query = """
+                SELECT c.barcode FROM c 
+                WHERE c.destination_state = @state 
+                AND c.current_status = 'registered'
+                AND (NOT IS_DEFINED(c.assigned_driver) OR c.assigned_driver = null)
+            """
+            parameters = [{"name": "@state", "value": driver_state}]
+            
+            state_barcodes_list = []
+            async for item in parcels_container.query_items(query=query, parameters=parameters):
+                if item['barcode'] not in city_barcodes:
+                    state_barcodes_list.append(item['barcode'])
+            
+            # Combine city and state parcels, prioritizing city
+            available_barcodes = city_barcodes + state_barcodes_list
+        else:
+            available_barcodes = city_barcodes
         
         if not available_barcodes:
-            print(f"\n   ⚠️  No parcels available for {driver['name']} in {driver_state}")
+            print(f"\n   ⚠️  No parcels available for {driver['name']} in {driver_location}, {driver_state}")
             continue
         
         # Random number of parcels between 30 and 50
         num_parcels = min(random.randint(30, 50), len(available_barcodes))
         
-        # Get parcels for this driver and remove from pool
+        # Get parcels for this driver
         driver_barcodes = available_barcodes[:num_parcels]
-        state_barcodes[driver_state] = available_barcodes[num_parcels:]
         
-        print(f"\n   Driver: {driver['name']} ({driver['id']}) [{driver_state}] - {len(driver_barcodes)} parcels")
+        print(f"\n   Driver: {driver['name']} ({driver['id']}) [{driver_location}, {driver_state}] - {len(driver_barcodes)} parcels")
         
         try:
             manifest_id = await db.create_driver_manifest(
                 driver_id=driver['id'],
                 driver_name=driver['name'],
                 parcel_barcodes=driver_barcodes,
-                driver_state=driver_state
+                driver_state=driver_state,
+                driver_location=driver_location
             )
             
             if manifest_id:

@@ -26,17 +26,20 @@
                         <div class="col-md-4">
                             <label for="max_parcels" class="form-label">Max Parcels to Assign</label>
                             <input type="number" class="form-control" id="max_parcels" name="max_parcels" 
-                                   value="100" min="1" max="500">
+                                   value="20" min="1" max="500">
                         </div>
                         <div class="col-md-4">
                             <label for="state_filter" class="form-label">State Filter (Optional)</label>
                             <select class="form-select" id="state_filter" name="state_filter">
                                 <option value="">All States</option>
-                                <option value="VIC">Victoria</option>
                                 <option value="NSW">New South Wales</option>
+                                <option value="VIC">Victoria</option>
                                 <option value="QLD">Queensland</option>
                                 <option value="SA">South Australia</option>
                                 <option value="WA">Western Australia</option>
+                                <option value="TAS">Tasmania</option>
+                                <option value="ACT">Australian Capital Territory</option>
+                                <option value="NT">Northern Territory</option>
                             </select>
                         </div>
                         <div class="col-md-4 d-flex align-items-end">
@@ -75,6 +78,21 @@
                                     <input type="text" class="form-control" id="driver_name" name="driver_name" required>
                                 </div>
                             </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="manifest_reason" class="form-label">Reason (Optional)</label>
+                                    <select class="form-select" id="manifest_reason" name="manifest_reason">
+                                        <option value="">Standard Delivery</option>
+                                        <option value="sensitive">Sensitive Items</option>
+                                        <option value="temperature_controlled">Temperature Controlled</option>
+                                        <option value="fragile">Fragile Items</option>
+                                        <option value="high_value">High Value</option>
+                                        <option value="express">Express Delivery</option>
+                                        <option value="medical">Medical Supplies</option>
+                                        <option value="hazardous">Hazardous Materials</option>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
                         <div class="mb-3">
                             <label for="barcodes" class="form-label">Parcel Barcodes (comma or newline separated, max 20)</label>
@@ -98,7 +116,7 @@
                         <div class="col">
                             <h5 class="mb-0">
                                 <i class="bi bi-list-ul"></i> Active Manifests Today
-                                <span class="badge bg-light text-dark">{{ manifests|length }}</span>
+                                <span id="manifestCount" class="badge bg-light text-dark">{{ manifests|length }}</span>
                             </h5>
                         </div>
                         <div class="col-auto">
@@ -213,22 +231,82 @@
 </div>
 
 <script>
-// State filter functionality
-document.getElementById('stateFilter').addEventListener('change', function() {
-    const selectedState = this.value;
-    const table = document.getElementById('manifestTable');
-    const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+// State filter functionality - v2
+(function() {
+    'use strict';
     
-    for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        const rowState = row.getAttribute('data-state');
+    console.log('[DEBUG] State filter script loading...');
+    
+    function initStateFilter() {
+        console.log('[DEBUG] Initializing state filter');
         
-        if (selectedState === '' || rowState === selectedState) {
-            row.style.display = '';
-        } else {
-            row.style.display = 'none';
+        const stateFilter = document.getElementById('stateFilter');
+        const manifestTable = document.getElementById('manifestTable');
+        const manifestCount = document.getElementById('manifestCount');
+        
+        console.log('[DEBUG] stateFilter found:', !!stateFilter);
+        console.log('[DEBUG] manifestTable found:', !!manifestTable);
+        console.log('[DEBUG] manifestCount found:', !!manifestCount);
+        
+        if (!stateFilter) {
+            console.error('[ERROR] stateFilter element not found!');
+            return;
         }
+        
+        if (!manifestTable) {
+            console.warn('[WARN] manifestTable not found - no manifests to filter');
+            return;
+        }
+        
+        if (!manifestCount) {
+            console.error('[ERROR] manifestCount element not found!');
+            return;
+        }
+        
+        console.log('[DEBUG] Adding change listener to state filter');
+        
+        stateFilter.addEventListener('change', function(e) {
+            const selectedState = e.target.value;
+            console.log('[FILTER] Selected state:', selectedState || 'ALL');
+            
+            const tbody = manifestTable.querySelector('tbody');
+            if (!tbody) {
+                console.error('[ERROR] tbody not found in manifestTable');
+                return;
+            }
+            
+            const rows = tbody.querySelectorAll('tr');
+            console.log('[FILTER] Total rows:', rows.length);
+            
+            let visibleCount = 0;
+            
+            rows.forEach(function(row, index) {
+                const rowState = row.getAttribute('data-state');
+                const shouldShow = !selectedState || rowState === selectedState;
+                
+                row.style.display = shouldShow ? '' : 'none';
+                
+                if (shouldShow) {
+                    visibleCount++;
+                }
+                
+                if (index < 5) { // Log first 5 rows for debugging
+                    console.log(`[FILTER] Row ${index}: state="${rowState}", show=${shouldShow}`);
+                }
+            });
+            
+            console.log('[FILTER] Visible rows:', visibleCount);
+            manifestCount.textContent = visibleCount;
+        });
+        
+        console.log('[DEBUG] State filter initialized successfully');
     }
-});
+    
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initStateFilter);
+    } else {
+        initStateFilter();
+    }
+})();
 </script>
 {% endblock %}

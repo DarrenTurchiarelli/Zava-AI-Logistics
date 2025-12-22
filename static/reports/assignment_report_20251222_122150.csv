@@ -1,0 +1,3 @@
+driver_id,driver_name,manifest_id,barcode,tracking_number,recipient,address,destination_city,destination_state
+driver001,John Smith,manifest_driver001_34b31f02,DT202512222187,EX08546992UG,Benjamin Clark #2188,"125 St Georges Terrace, Perth WA 6000",WA,Perth
+driver002,Maria Garcia,manifest_driver002_32844d1e,DT202512222186,OV98024163ZP,Ethan Walker #2187,"108 Hay Street, Perth WA 6000",WA,Perth

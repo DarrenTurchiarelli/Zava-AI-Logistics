@@ -154,6 +154,58 @@ async def search_parcels_by_recipient_tool(recipient_name: str = None, postcode:
         return json.dumps(error_result)
 
 
+async def search_parcels_by_driver_tool(driver_id: str = None, driver_name: str = None, status: str = None) -> str:
+    """
+    Tool for AI agents to search parcels assigned to a specific driver.
+    
+    Args:
+        driver_id: Driver ID (e.g., 'driver-001') - optional
+        driver_name: Driver name to search for (optional)
+        status: Parcel status filter (e.g., 'in_transit', 'out_for_delivery') - optional
+        
+    Returns:
+        JSON string with list of parcels assigned to the driver
+    """
+    print(f"🔧 Agent Tool: search_parcels_by_driver_tool called - driver_id={driver_id}, driver_name={driver_name}, status={status}")
+    
+    try:
+        # Ensure environment variables are loaded
+        load_dotenv(override=True)
+        
+        # Use existing ParcelTrackingDB for consistent access
+        async with ParcelTrackingDB() as db:
+            # Use the search_parcels_by_driver method
+            parcels = await db.search_parcels_by_driver(
+                driver_id=driver_id,
+                driver_name=driver_name,
+                status=status
+            )
+            
+            result = {
+                "found": len(parcels) > 0,
+                "count": len(parcels),
+                "parcels": parcels,
+                "search_criteria": {
+                    "driver_id": driver_id,
+                    "driver_name": driver_name,
+                    "status": status
+                }
+            }
+            
+            print(f"   ✅ Found {len(parcels)} parcels for driver")
+            return json.dumps(result, indent=2)
+        
+    except Exception as e:
+        error_result = {
+            "found": False,
+            "error": str(e)
+        }
+        print(f"   ❌ Agent Tool Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return json.dumps(error_result)
+
+
 async def get_delivery_statistics_tool(state: str = None, date_from: str = None, date_to: str = None) -> str:
     """
     Tool for AI agents to get delivery statistics, optionally filtered by state.
@@ -271,6 +323,30 @@ AGENT_TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "search_parcels_by_driver",
+            "description": "**CRITICAL: ALWAYS call this function when user asks about parcels for a specific driver.** Use this when the user mentions driver names (e.g., 'driver001', 'John Smith') or asks questions like: 'show parcels for driver001', 'what parcels does John Smith have', 'parcels in transit for driver-002', 'how many deliveries for this driver'. Can filter by status (in_transit, out_for_delivery, delivered). Returns list of parcels assigned to the driver with full details including barcode, recipient, address, status, and assigned timestamp.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "driver_id": {
+                        "type": "string",
+                        "description": "The driver ID (e.g., 'driver-001', 'driver-002'). Extract from queries like 'driver001' → 'driver-001'"
+                    },
+                    "driver_name": {
+                        "type": "string",
+                        "description": "The driver's name to search for (e.g., 'John Smith', 'Maria Garcia')"
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "Filter by parcel status: 'in_transit', 'out_for_delivery', 'delivered', or leave empty for all statuses"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_delivery_statistics",
             "description": "Use this function when the user asks about delivery statistics, status breakdowns, or how many parcels are in different states/regions. For example: 'how many parcels are in delivery?', 'show me delivery stats', 'delivery statistics for Victoria', 'how many parcels in WA?'. Can filter by Australian state (NSW, VIC, QLD, SA, WA, TAS, ACT, NT). Returns total parcel counts and status breakdown from Cosmos DB.",
             "parameters": {
@@ -299,5 +375,6 @@ AGENT_TOOLS = [
 TOOL_FUNCTIONS = {
     "track_parcel": track_parcel_tool,
     "search_parcels_by_recipient": search_parcels_by_recipient_tool,
+    "search_parcels_by_driver": search_parcels_by_driver_tool,
     "get_delivery_statistics": get_delivery_statistics_tool
 }

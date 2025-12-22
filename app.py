@@ -482,6 +482,11 @@ def demo_login(username):
             session.modified = True
             flash(f"Logged in as {user['full_name']} ({username})", 'success')
             
+            # Check for redirect parameter
+            next_page = request.args.get('next')
+            if next_page:
+                return redirect(next_page)
+            
             # Redirect based on role
             if user['role'] == UserManager.ROLE_DRIVER:
                 return redirect(url_for('driver_manifest'))
@@ -1986,6 +1991,28 @@ def driver_manifest():
             flash(f'No active manifest for driver {driver_id}. Contact dispatch for assignment.', 'info')
             return render_template('driver_manifest.html', manifest=None)
         
+        # Filter manifest items to only include parcels matching driver's location (city)
+        driver_location = manifest.get('driver_location', manifest.get('driver_state', 'NSW'))
+        driver_state = manifest.get('driver_state', 'NSW')
+        
+        if manifest.get('items'):
+            original_count = len(manifest['items'])
+            
+            # Filter by city/location (preferred) or fall back to state
+            # Safely handle None values - convert to empty string
+            manifest['items'] = [
+                item for item in manifest['items']
+                if (driver_location and (item.get('destination_city') or '').lower() == str(driver_location).lower()) or 
+                   (not item.get('destination_city') and item.get('destination_state') == driver_state)
+            ]
+            filtered_count = len(manifest['items'])
+            
+            # Update total_items count after filtering
+            manifest['total_items'] = filtered_count
+            
+            if filtered_count < original_count:
+                print(f"🔍 Filtered manifest for {driver_id}: {original_count} → {filtered_count} parcels (keeping only {driver_location} deliveries)")
+        
         # Check if initial nearest-neighbor route exists  
         needs_initial_route = (not manifest.get('route_optimized')) and bool(manifest.get('items'))
         
@@ -2822,6 +2849,7 @@ def create_manifest():
     try:
         driver_id = request.form.get('driver_id')
         driver_name = request.form.get('driver_name')
+        manifest_reason = request.form.get('manifest_reason', '')
         barcode_list = request.form.get('barcodes', '').strip()
         
         # Parse barcodes (comma or newline separated)
@@ -2833,7 +2861,15 @@ def create_manifest():
         
         async def create():
             async with ParcelTrackingDB() as db:
-                return await db.create_driver_manifest(driver_id, driver_name, barcodes)
+                # Look up driver's state from users database
+                driver_state = await db.get_user_state(driver_id)
+                return await db.create_driver_manifest(
+                    driver_id, 
+                    driver_name, 
+                    barcodes, 
+                    reason=manifest_reason,
+                    driver_state=driver_state
+                )
         
         manifest_id = run_async(create())
         
@@ -2848,6 +2884,34 @@ def create_manifest():
         flash(f'Error: {str(e)}', 'danger')
         return redirect(url_for('admin_manifests'))
 
+async def _generate_assignment_report(assignments: List[Dict[str, Any]]) -> str:
+    """Generate a CSV report of parcel assignments"""
+    from datetime import datetime
+    import csv
+    import os
+    
+    # Create reports directory if it doesn't exist
+    reports_dir = os.path.join(os.path.dirname(__file__), 'static', 'reports')
+    os.makedirs(reports_dir, exist_ok=True)
+    
+    # Generate filename with timestamp
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f'assignment_report_{timestamp}.csv'
+    filepath = os.path.join(reports_dir, filename)
+    
+    # Write CSV report
+    with open(filepath, 'w', newline='', encoding='utf-8') as f:
+        fieldnames = ['driver_id', 'driver_name', 'manifest_id', 'barcode', 'tracking_number', 
+                      'recipient', 'address', 'destination_city', 'destination_state']
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        
+        writer.writeheader()
+        for assignment in assignments:
+            writer.writerow(assignment)
+    
+    print(f"✅ Generated assignment report: {filename}")
+    return filename
+
 @app.route('/auto_assign_manifests', methods=['POST'])
 def auto_assign_manifests():
     """AI-powered automatic manifest creation using DISPATCHER_AGENT
@@ -2858,16 +2922,21 @@ def auto_assign_manifests():
     try:
         from agents.base import dispatcher_agent
         
-        max_parcels = int(request.form.get('max_parcels', 100))
+        max_parcels = int(request.form.get('max_parcels', 20))
         state_filter = request.form.get('state_filter', '')
         
         async def auto_assign():
             async with ParcelTrackingDB() as db:
-                # Get pending parcels
-                pending_parcels = await db.get_pending_parcels(status="At Depot", max_count=max_parcels)
+                # Get pending parcels (filtered by state if specified)
+                pending_parcels = await db.get_pending_parcels(
+                    status="at_depot", 
+                    max_count=max_parcels,
+                    state=state_filter if state_filter else None
+                )
                 
                 if not pending_parcels:
-                    return {"success": False, "message": "No pending parcels found"}
+                    state_msg = f" in {state_filter}" if state_filter else ""
+                    return {"success": False, "message": f"No pending parcels found{state_msg}"}
                 
                 # Get available drivers
                 drivers = await db.get_available_drivers(state=state_filter if state_filter else None)
@@ -2875,12 +2944,51 @@ def auto_assign_manifests():
                 if not drivers:
                     return {"success": False, "message": "No available drivers found"}
                 
-                print(f"\n🤖 Auto-Assign: {len(pending_parcels)} parcels → {len(drivers)} drivers")
+                # Check for drivers with existing manifests and their capacity
+                from datetime import datetime
+                today = datetime.now().strftime("%Y-%m-%d")
+                
+                manifests_container = db.database.get_container_client("driver_manifests")
+                drivers_with_unfilled_manifests = set()
+                
+                # Get all active manifests for today with their parcel counts
+                query = "SELECT c.driver_id, c.id, c.items FROM c WHERE c.manifest_date = @today AND c.status = 'active'"
+                parameters = [{"name": "@today", "value": today}]
+                
+                driver_manifests = {}
+                async for manifest in manifests_container.query_items(query=query, parameters=parameters):
+                    driver_id = manifest['driver_id']
+                    parcel_count = len(manifest.get('items', []))
+                    
+                    if driver_id not in driver_manifests:
+                        driver_manifests[driver_id] = []
+                    driver_manifests[driver_id].append({'id': manifest['id'], 'count': parcel_count})
+                
+                # Identify drivers who have unfilled manifests (should be skipped)
+                MAX_PARCELS_PER_MANIFEST = 20
+                for driver_id, manifests in driver_manifests.items():
+                    # If driver has any manifest that's not full, skip them
+                    has_unfilled_manifest = any(m['count'] < MAX_PARCELS_PER_MANIFEST for m in manifests)
+                    if has_unfilled_manifest:
+                        drivers_with_unfilled_manifests.add(driver_id)
+                        parcel_counts = [m['count'] for m in manifests]
+                        print(f"ℹ️ Skipping {driver_id}: has {len(manifests)} manifest(s) with {parcel_counts} parcels")
+                
+                # Filter out drivers with unfilled manifests
+                available_drivers = [d for d in drivers if d['driver_id'] not in drivers_with_unfilled_manifests]
+                
+                if not available_drivers:
+                    return {"success": False, "message": f"All {len(drivers)} drivers already have active manifests for today"}
+                
+                if len(drivers_with_unfilled_manifests) > 0:
+                    print(f"ℹ️ Skipped {len(drivers_with_unfilled_manifests)} driver(s) with existing unfilled manifests")
+                
+                print(f"\n🤖 Auto-Assign: {len(pending_parcels)} parcels → {len(available_drivers)} available drivers")
                 
                 # Prepare data for DISPATCHER_AGENT
                 route_request = {
                     "parcel_count": len(pending_parcels),
-                    "available_drivers": [d['driver_id'] for d in drivers],
+                    "available_drivers": [d['driver_id'] for d in available_drivers],
                     "service_level": "standard",
                     "delivery_window": "08:00 - 18:00",
                     "zone": state_filter or "ALL",
@@ -2904,7 +3012,7 @@ def auto_assign_manifests():
                 if not agent_result.get('success'):
                     print(f"⚠️ Agent returned error: {agent_result.get('error')}")
                     # Fallback to simple round-robin assignment
-                    return await _fallback_round_robin_assignment(db, pending_parcels, drivers)
+                    return await _fallback_round_robin_assignment(db, pending_parcels, available_drivers)
                 
                 # Parse AI recommendations
                 ai_response = agent_result.get('response', '')
@@ -2918,6 +3026,7 @@ def auto_assign_manifests():
                 manifest_ids = []
                 manifests_created = 0
                 total_assigned = 0
+                assignment_report = []  # Track assignments for report
                 
                 for driver_id, assigned_parcels in assignments.items():
                     if assigned_parcels:
@@ -2927,7 +3036,8 @@ def auto_assign_manifests():
                             manifest_id = await db.create_driver_manifest(
                                 driver_id=driver_id,
                                 driver_name=driver['name'],
-                                parcel_barcodes=barcodes
+                                parcel_barcodes=barcodes,
+                                driver_state=driver.get('location', 'NSW')
                             )
                             
                             if manifest_id:
@@ -2935,20 +3045,51 @@ def auto_assign_manifests():
                                 manifests_created += 1
                                 total_assigned += len(barcodes)
                                 print(f"✅ Created manifest {manifest_id} for {driver['name']}: {len(barcodes)} parcels")
+                                
+                                # Add to report
+                                for parcel in assigned_parcels:
+                                    assignment_report.append({
+                                        'driver_id': driver_id,
+                                        'driver_name': driver['name'],
+                                        'manifest_id': manifest_id,
+                                        'barcode': parcel['barcode'],
+                                        'tracking_number': parcel.get('tracking_number', parcel['barcode']),
+                                        'recipient': parcel.get('recipient_name', 'N/A'),
+                                        'address': parcel.get('recipient_address', 'N/A'),
+                                        'destination_city': parcel.get('destination_city', 'N/A'),
+                                        'destination_state': parcel.get('destination_state', 'N/A')
+                                    })
+                
+                # Generate assignment report file
+                report_filename = None
+                if assignment_report:
+                    report_filename = await _generate_assignment_report(assignment_report)
                 
                 return {
                     "success": True,
                     "manifests_created": manifests_created,
                     "parcels_assigned": total_assigned,
                     "manifest_ids": manifest_ids,
-                    "ai_recommendation": ai_response[:300]  # First 300 chars
+                    "ai_recommendation": ai_response[:300],  # First 300 chars
+                    "report_file": report_filename
                 }
         
         result = run_async(auto_assign())
         
         if result.get('success'):
-            flash(f"🤖 AI Auto-Assign Complete! Created {result['manifests_created']} manifests, "
-                  f"assigned {result['parcels_assigned']} parcels", 'success')
+            from markupsafe import Markup
+            
+            message = (f"🤖 <strong>AI Auto-Assign Complete!</strong> Successfully created "
+                      f"<strong>{result['manifests_created']} manifests</strong> and assigned "
+                      f"<strong>{result['parcels_assigned']} parcels</strong> to drivers.")
+            
+            if result.get('report_file'):
+                message += (f"<br><br>📊 "
+                          f"<a href='/static/reports/{result['report_file']}' "
+                          f"target='_blank' class='btn btn-primary btn-sm mt-2'>"
+                          f"<i class='bi bi-download'></i> Download Assignment Report (CSV)</a>")
+            
+            flash(Markup(message), 'success')
         else:
             flash(f"⚠️ {result.get('message', 'Auto-assign failed')}", 'warning')
             
@@ -2985,7 +3126,8 @@ async def _fallback_round_robin_assignment(db, parcels, drivers):
             manifest_id = await db.create_driver_manifest(
                 driver_id=driver_id,
                 driver_name=driver['name'],
-                parcel_barcodes=barcodes
+                parcel_barcodes=barcodes,
+                driver_state=driver.get('location', 'NSW')
             )
             
             if manifest_id:
