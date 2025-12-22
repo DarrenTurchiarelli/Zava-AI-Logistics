@@ -1146,9 +1146,9 @@
             
             // Toggle chat window
             toggleBtn.addEventListener('click', function() {
-                // On mobile, open chatbot page in new tab instead of popup
+                // On mobile, open public chat page in new tab instead of popup
                 if (isMobileDevice()) {
-                    window.open('{{ url_for("customer_service_chatbot") }}', '_blank');
+                    window.open('{{ url_for("public_chat") }}', '_blank');
                     return;
                 }
                 

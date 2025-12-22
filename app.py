@@ -1493,6 +1493,11 @@ def chatbot_query():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/chat')
+def public_chat():
+    """Public chat page - No login required"""
+    return render_template('public_chat.html')
+
 @app.route('/api/public/chatbot', methods=['POST'])
 def public_chatbot():
     """Public chatbot for all users - Limited access, no internal data"""
