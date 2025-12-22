@@ -1,144 +1,295 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Chat with AI Copilot - {{ company.browser_title }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            overflow: hidden;
+            position: fixed;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .chat-container {
+            height: 100vh;
+            height: -webkit-fill-available;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        
+        .chat-header {
+            background: linear-gradient(135deg, #0078d4 0%, #0053a0 100%);
+            color: white;
+            padding: 12px 16px;
+            flex-shrink: 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            min-height: 60px;
+        }
+        
+        .chat-header h4 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .chat-header small {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 16px;
+            background-color: #f8f9fa;
+            -webkit-overflow-scrolling: touch;
+            min-height: 0;
+        }
+        
+        .chat-input-area {
+            border-top: 1px solid #dee2e6;
+            padding: 12px 16px;
+            background-color: white;
+            flex-shrink: 0;
+            min-height: auto;
+        }
+        
+        .message {
+            margin-bottom: 16px;
+            display: flex;
+            align-items: flex-start;
+            animation: fadeIn 0.3s ease-in;
+        }
 
-{% block title %}Chat with AI Copilot - {{ company.browser_title }}{% endblock %}
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
 
-{% block content %}
-<div class="container-fluid mt-4" style="max-width: 800px;">
-    <div class="card shadow-lg">
-        <div class="card-header text-white" style="background: linear-gradient(135deg, #0078d4 0%, #0053a0 100%);">
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        .message-content {
+            max-width: 75%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            word-wrap: break-word;
+            line-height: 1.4;
+        }
+
+        .message.bot .message-content {
+            background-color: white;
+            border: 1px solid #dee2e6;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, #0078d4 0%, #0053a0 100%);
+            color: white;
+        }
+
+        .message-avatar {
+            width: 36px;
+            height: 36px;
+            margin: 0 10px;
+            flex-shrink: 0;
+        }
+
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            background-color: white;
+            border: 1px solid #dee2e6;
+            border-radius: 18px;
+            max-width: 70px;
+        }
+
+        .typing-indicator span {
+            height: 8px;
+            width: 8px;
+            background-color: #0078d4;
+            border-radius: 50%;
+            display: inline-block;
+            margin: 0 2px;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-8px); }
+        }
+        
+        .welcome-section {
+            text-align: center;
+            padding: 30px 16px;
+        }
+        
+        .welcome-section img {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 12px;
+            opacity: 0.9;
+        }
+        
+        .welcome-section h5 {
+            color: #0078d4;
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-size: 20px;
+        }
+        
+        .welcome-section p {
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        
+        .capability-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            justify-content: center;
+            margin-top: 12px;
+        }
+        
+        .capability-badges .badge {
+            font-size: 11px;
+            padding: 5px 10px;
+        }
+        
+        /* Mobile specific adjustments */
+        @media (max-width: 768px) {
+            .chat-header {
+                padding: 10px 12px;
+                min-height: 56px;
+            }
+            
+            .chat-header h4 {
+                font-size: 15px;
+            }
+            
+            .chat-header small {
+                font-size: 11px;
+            }
+            
+            .chat-messages {
+                padding: 12px;
+            }
+            
+            .chat-input-area {
+                padding: 10px 12px;
+            }
+            
+            .welcome-section {
+                padding: 20px 12px;
+            }
+            
+            .welcome-section img {
+                width: 56px;
+                height: 56px;
+            }
+            
+            .welcome-section h5 {
+                font-size: 18px;
+            }
+            
+            .message-avatar {
+                width: 32px;
+                height: 32px;
+                margin: 0 8px;
+            }
+            
+            .message-content {
+                font-size: 14px;
+                padding: 10px 14px;
+            }
+        }
+        
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
             <div class="d-flex align-items-center">
-                <img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot" style="width: 32px; height: 32px; margin-right: 12px;">
+                <img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot" style="width: 28px; height: 28px; margin-right: 12px; border-radius: 50%;">
                 <div>
-                    <h4 class="mb-0">AI Copilot Chat</h4>
+                    <h4>AI Copilot Chat</h4>
                     <small>Ask about deliveries, tracking, or general inquiries</small>
                 </div>
             </div>
         </div>
         
-        <div class="card-body p-0" style="height: calc(100vh - 280px); min-height: 400px; max-height: 600px; display: flex; flex-direction: column;">
-            <!-- Chat Messages -->
-            <div id="chatMessages" style="flex: 1; overflow-y: auto; padding: 20px; background-color: #f8f9fa;">
-                <div class="text-center" style="padding: 40px 20px;">
-                    <img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot" style="width: 80px; height: 80px; margin-bottom: 16px; opacity: 0.8;">
-                    <h5 style="color: #0078d4;">Welcome to DT Logistics AI Copilot!</h5>
-                    <p class="text-muted">I can help you with:</p>
-                    <div class="d-flex flex-wrap gap-2 justify-content-center mt-3">
-                        <span class="badge bg-primary">Parcel Tracking</span>
-                        <span class="badge bg-primary">Delivery Status</span>
-                        <span class="badge bg-primary">General Inquiries</span>
-                        <span class="badge bg-primary">Service Information</span>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Chat Input -->
-            <div class="border-top p-3" style="background-color: white;">
-                <div class="d-flex gap-2">
-                    <input 
-                        type="text" 
-                        id="chatInput" 
-                        class="form-control" 
-                        placeholder="Type your message here..."
-                        autocomplete="off"
-                    />
-                    <button id="voiceBtn" class="btn btn-outline-primary" title="Voice Input">
-                        <i class="bi bi-mic-fill"></i>
-                    </button>
-                    <button id="sendBtn" class="btn btn-primary" style="min-width: 80px;">
-                        <i class="bi bi-send-fill"></i> Send
-                    </button>
-                </div>
-                <div class="mt-2 d-flex justify-content-between align-items-center">
-                    <label class="small text-muted mb-0">
-                        <input type="checkbox" id="autoSpeak" style="margin-right: 4px;">
-                        Auto-speak responses
-                    </label>
-                    <button id="clearBtn" class="btn btn-sm btn-outline-secondary">
-                        <i class="bi bi-x-circle"></i> Clear Chat
-                    </button>
+        <div class="chat-messages" id="chatMessages">
+            <div class="welcome-section">
+                <img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot">
+                <h5>Imagine the Possibilities</h5>
+                <p class="text-muted">I can help you with:</p>
+                <div class="capability-badges">
+                    <span class="badge bg-primary">Parcel Tracking</span>
+                    <span class="badge bg-primary">Delivery Status</span>
+                    <span class="badge bg-primary">General Inquiries</span>
+                    <span class="badge bg-primary">Service Information</span>
                 </div>
             </div>
         </div>
+        
+        <div class="chat-input-area">
+            <div class="d-flex gap-2 mb-2">
+                <input 
+                    type="text" 
+                    id="chatInput" 
+                    class="form-control" 
+                    placeholder="Type your message here..."
+                    autocomplete="off"
+                />
+                <button id="voiceBtn" class="btn btn-outline-primary" title="Voice Input">
+                    <i class="bi bi-mic-fill"></i>
+                </button>
+                <button id="sendBtn" class="btn btn-primary" style="min-width: 70px;">
+                    <i class="bi bi-send-fill"></i>
+                </button>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+                <label class="small text-muted mb-0" style="font-size: 12px;">
+                    <input type="checkbox" id="autoSpeak" style="margin-right: 4px;">
+                    Auto-speak responses
+                </label>
+                <button id="clearBtn" class="btn btn-sm btn-outline-secondary" style="font-size: 11px; padding: 4px 10px;">
+                    <i class="bi bi-x-circle"></i> Clear Chat
+                </button>
+            </div>
+        </div>
     </div>
-</div>
 
-<style>
-.message {
-    margin-bottom: 16px;
-    display: flex;
-    align-items: flex-start;
-    animation: fadeIn 0.3s ease-in;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.message.user {
-    flex-direction: row-reverse;
-}
-
-.message-content {
-    max-width: 70%;
-    padding: 12px 16px;
-    border-radius: 12px;
-    word-wrap: break-word;
-}
-
-.message.bot .message-content {
-    background-color: white;
-    border: 1px solid #dee2e6;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-}
-
-.message.user .message-content {
-    background: linear-gradient(135deg, #0078d4 0%, #0053a0 100%);
-    color: white;
-}
-
-.message-avatar {
-    width: 36px;
-    height: 36px;
-    margin: 0 8px;
-    flex-shrink: 0;
-}
-
-.typing-indicator {
-    display: flex;
-    align-items: center;
-    padding: 12px 16px;
-    background-color: white;
-    border: 1px solid #dee2e6;
-    border-radius: 12px;
-    max-width: 80px;
-}
-
-.typing-indicator span {
-    height: 8px;
-    width: 8px;
-    background-color: #0078d4;
-    border-radius: 50%;
-    display: inline-block;
-    margin: 0 2px;
-    animation: typing 1.4s infinite;
-}
-
-.typing-indicator span:nth-child(2) {
-    animation-delay: 0.2s;
-}
-
-.typing-indicator span:nth-child(3) {
-    animation-delay: 0.4s;
-}
-
-@keyframes typing {
-    0%, 60%, 100% { transform: translateY(0); }
-    30% { transform: translateY(-8px); }
-}
-</style>
-
-<script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
 // Public Chat JavaScript
 (function() {
     const messagesContainer = document.getElementById('chatMessages');
@@ -261,53 +412,67 @@
     
     // Voice input
     function startVoiceInput() {
-        if (!('webkitSpeechRecognition' in window)) {
-            alert('Voice input is not supported in your browser. Please use Chrome or Edge.');
+        // Check for Speech Recognition API support
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (!SpeechRecognition) {
+            // Show user-friendly alert for unsupported browsers (mainly Safari on iOS)
+            alert('Voice input is not available on this device. Please type your message instead.\n\nNote: Voice input works on Chrome and Edge browsers.');
             return;
         }
         
         if (isListening) return;
         
-        const recognition = new webkitSpeechRecognition();
-        recognition.lang = 'en-AU';
-        recognition.continuous = false;
-        recognition.interimResults = false;
-        
-        recognition.onstart = function() {
-            isListening = true;
-            voiceBtn.classList.add('btn-danger');
-            voiceBtn.classList.remove('btn-outline-primary');
-        };
-        
-        recognition.onresult = function(event) {
-            const transcript = event.results[0][0].transcript;
-            input.value = transcript;
-        };
-        
-        recognition.onend = function() {
-            isListening = false;
-            voiceBtn.classList.remove('btn-danger');
-            voiceBtn.classList.add('btn-outline-primary');
-        };
-        
-        recognition.onerror = function(event) {
-            console.error('Speech recognition error:', event.error);
-            isListening = false;
-            voiceBtn.classList.remove('btn-danger');
-            voiceBtn.classList.add('btn-outline-primary');
-        };
-        
-        recognition.start();
+        try {
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'en-AU';
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            
+            recognition.onstart = function() {
+                isListening = true;
+                voiceBtn.classList.add('btn-danger');
+                voiceBtn.classList.remove('btn-outline-primary');
+                voiceBtn.innerHTML = '<i class="bi bi-mic-fill"></i>';
+            };
+            
+            recognition.onresult = function(event) {
+                const transcript = event.results[0][0].transcript;
+                input.value = transcript;
+            };
+            
+            recognition.onend = function() {
+                isListening = false;
+                voiceBtn.classList.remove('btn-danger');
+                voiceBtn.classList.add('btn-outline-primary');
+            };
+            
+            recognition.onerror = function(event) {
+                console.error('Speech recognition error:', event.error);
+                isListening = false;
+                voiceBtn.classList.remove('btn-danger');
+                voiceBtn.classList.add('btn-outline-primary');
+                
+                if (event.error === 'not-allowed') {
+                    alert('Microphone access denied. Please allow microphone access in your browser settings.');
+                }
+            };
+            
+            recognition.start();
+        } catch (error) {
+            console.error('Speech recognition error:', error);
+            alert('Voice input could not be started. Please type your message instead.');
+        }
     }
     
     // Clear chat
     function clearChat() {
         messagesContainer.innerHTML = `
-            <div class="text-center" style="padding: 40px 20px;">
-                <img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot" style="width: 80px; height: 80px; margin-bottom: 16px; opacity: 0.8;">
-                <h5 style="color: #0078d4;">Welcome to DT Logistics AI Copilot!</h5>
+            <div class="welcome-section">
+                <img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot">
+                <h5>Imagine the Possibilities</h5>
                 <p class="text-muted">I can help you with:</p>
-                <div class="d-flex flex-wrap gap-2 justify-content-center mt-3">
+                <div class="capability-badges">
                     <span class="badge bg-primary">Parcel Tracking</span>
                     <span class="badge bg-primary">Delivery Status</span>
                     <span class="badge bg-primary">General Inquiries</span>
@@ -331,4 +496,5 @@
     input.focus();
 })();
 </script>
-{% endblock %}
+</body>
+</html>
