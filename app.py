@@ -265,7 +265,7 @@ def login_required(f):
     def decorated_function(*args, **kwargs):
         if not session.get('user'):
             flash('Please log in to access this page.', 'warning')
-            return redirect(url_for('login'))
+            return redirect(url_for('login', next=request.url))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -432,6 +432,11 @@ def login():
                     flash(f"Welcome back, {user['full_name']}! [AI Verified]", 'success')
                 else:
                     flash(f"Welcome back, {user['full_name']}!", 'success')
+                
+                # Check if there's a next URL to redirect to
+                next_page = request.args.get('next')
+                if next_page:
+                    return redirect(next_page)
                 
                 # Redirect based on role
                 if user['role'] == UserManager.ROLE_DRIVER:
