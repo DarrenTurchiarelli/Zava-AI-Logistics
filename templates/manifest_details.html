@@ -51,7 +51,7 @@
                             <h6 class="text-muted">Progress</h6>
                             <div class="progress" style="height: 25px;">
                                 <div class="progress-bar bg-success" role="progressbar" 
-                                     style="width: {{ (manifest.completed_items / manifest.total_items * 100)|int }}%">
+                                     style="width: {{ (manifest.completed_items / manifest.total_items * 100)|int if manifest.total_items > 0 else 0 }}%">
                                     {{ manifest.completed_items }}/{{ manifest.total_items }}
                                 </div>
                             </div>

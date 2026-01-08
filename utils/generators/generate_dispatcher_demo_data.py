@@ -20,8 +20,8 @@ import sys
 import os
 from datetime import datetime, timezone, timedelta
 
-# Add parent directory to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Add root directory to path (go up 2 levels from utils/generators)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 from parcel_tracking_db import ParcelTrackingDB
 

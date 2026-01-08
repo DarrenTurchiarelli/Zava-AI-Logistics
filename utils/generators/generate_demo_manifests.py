@@ -407,10 +407,17 @@ async def create_sample_parcels_by_state(db: ParcelTrackingDB):
             actual_state = state_postcode.split()[0] if state_postcode else state
             postcode = state_postcode.split()[1] if len(state_postcode.split()) > 1 else "0000"
             
-            # Extract city (second-to-last part of address before state/postcode)
-            destination_city = address_parts[-2].strip() if len(address_parts) > 2 else state
-            # Clean up city name by removing state abbreviations
-            destination_city = destination_city.replace(' NSW', '').replace(' VIC', '').replace(' QLD', '').replace(' SA', '').replace(' WA', '').replace(' ACT', '').strip()
+            # Extract city from address
+            # Format: "123 Street Name, City STATE POSTCODE" (2 parts after split)
+            # or "123 Street, Suburb, City STATE POSTCODE" (3+ parts)
+            if len(address_parts) >= 2:
+                # Get the last part which contains "City STATE POSTCODE"
+                last_part = address_parts[-1].strip()
+                # Extract just the city name (first word before STATE)
+                city_state_postcode = last_part.split()
+                destination_city = city_state_postcode[0] if city_state_postcode else state
+            else:
+                destination_city = state
             
             try:
                 await db.register_parcel(

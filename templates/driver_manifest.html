@@ -27,11 +27,11 @@
                             </h6>
                             <div class="progress mt-2" style="height: 25px;">
                                 <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" 
-                                     style="width: {{ (manifest.completed_items / manifest.total_items * 100)|int }}%"
+                                     style="width: {{ (manifest.completed_items / manifest.total_items * 100)|int if manifest.total_items > 0 else 0 }}%"
                                      aria-valuenow="{{ manifest.completed_items }}" 
                                      aria-valuemin="0" 
                                      aria-valuemax="{{ manifest.total_items }}">
-                                    <strong>{{ (manifest.completed_items / manifest.total_items * 100)|int }}%</strong>
+                                    <strong>{{ (manifest.completed_items / manifest.total_items * 100)|int if manifest.total_items > 0 else 0 }}%</strong>
                                 </div>
                             </div>
                         </div>
@@ -98,15 +98,20 @@
                 <div class="card-body bg-light border-bottom">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h6 class="mb-0"><i class="bi bi-signpost-split"></i> Choose Your Route Optimisation</h6>
-                        {% if not manifest.get('selected_route_type') %}
-                        <span class="badge bg-warning text-dark">
-                            <i class="bi bi-info-circle"></i> Initial Route - Select Optimisation below
-                        </span>
-                        {% else %}
-                        <span class="badge bg-success">
-                            <i class="bi bi-check-circle"></i> Using {{ manifest.route_type_display }}
-                        </span>
-                        {% endif %}
+                        <div class="d-flex gap-2 align-items-center">
+                            {% if not manifest.get('selected_route_type') %}
+                            <span class="badge bg-warning text-dark">
+                                <i class="bi bi-info-circle"></i> Initial Route - Select Optimisation below
+                            </span>
+                            {% else %}
+                            <span class="badge bg-success">
+                                <i class="bi bi-check-circle"></i> Using {{ manifest.route_type_display }}
+                            </span>
+                            {% endif %}
+                            <button class="btn btn-sm btn-outline-primary" onclick="recalculateAllRoutes('{{ manifest.id }}')" title="Recalculate all three route types with current Azure Maps data">
+                                <i class="bi bi-arrow-clockwise"></i> Recalculate Routes
+                            </button>
+                        </div>
                     </div>
                     
                     {% if manifest.get('split_into_runs') %}
@@ -782,6 +787,48 @@ function calculateRoute(manifestId, routeType) {
         if (spinner) {
             spinner.classList.add('d-none');
         }
+    });
+}
+
+function recalculateAllRoutes(manifestId) {
+    if (!confirm('This will recalculate all three route types (fastest, shortest, safest) using current Azure Maps data. This may take a moment. Continue?')) {
+        return;
+    }
+    
+    // Show loading indicator
+    showToast('Recalculating all routes with Azure Maps...', 'info');
+    
+    // Disable the recalculate button
+    const btn = event.target.closest('button');
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Calculating...';
+    
+    fetch(`/driver/manifest/${manifestId}/recalculate-routes`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(`✓ All routes recalculated successfully!`, 'success');
+            // Reload page to show updated routes
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+        } else {
+            showToast(`Error: ${data.error}`, 'danger');
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    })
+    .catch(error => {
+        console.error('Error recalculating routes:', error);
+        showToast('Failed to recalculate routes. Please try again.', 'danger');
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
     });
 }
 

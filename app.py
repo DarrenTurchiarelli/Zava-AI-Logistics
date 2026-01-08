@@ -2029,7 +2029,10 @@ def driver_manifest():
             flash(f'No active manifest for driver {driver_id}. Contact dispatch for assignment.', 'info')
             return render_template('driver_manifest.html', manifest=None)
         
-        # Filter manifest items to only include parcels matching driver's location (city)
+        # TEMPORARILY DISABLED: Filter manifest items to only include parcels matching driver's location (city)
+        # This filter was removing all parcels because destination_city values don't match
+        # TODO: Re-enable after fixing parcel destination_city values
+        """
         driver_location = manifest.get('driver_location', manifest.get('driver_state', 'NSW'))
         driver_state = manifest.get('driver_state', 'NSW')
         
@@ -2050,6 +2053,7 @@ def driver_manifest():
             
             if filtered_count < original_count:
                 print(f"🔍 Filtered manifest for {driver_id}: {original_count} → {filtered_count} parcels (keeping only {driver_location} deliveries)")
+        """
         
         # Check if initial nearest-neighbor route exists  
         needs_initial_route = (not manifest.get('route_optimized')) and bool(manifest.get('items'))
@@ -2058,26 +2062,33 @@ def driver_manifest():
         if needs_initial_route:
             manifest_id = manifest['id']
             
-            # Create initial nearest-neighbor route immediately
+            # Create initial safest route only (other routes calculated on-demand)
             async def create_initial_route_sync():
                 async with ParcelTrackingDB() as db:
                     # Get unique addresses from manifest items
                     addresses = list(set([item['recipient_address'] for item in manifest['items']]))
                     
-                    # Simple nearest-neighbor ordering (fast, no API calls)
-                    ordered_addresses = addresses  # Already in a reasonable order
+                    # Get depot location for route calculation
+                    from config.depots import get_depot_manager
+                    depot_mgr = get_depot_manager()
+                    start_location = depot_mgr.get_closest_depot_to_address(addresses[0])
                     
-                    # Create basic route structure
-                    initial_route = {
-                        'waypoints': ordered_addresses,
-                        'total_duration_minutes': len(addresses) * 3,  # Estimate: 3 min per stop
-                        'total_distance_km': len(addresses) * 0.5,  # Estimate: 500m between stops
-                        'optimized': False,
-                        'traffic_considered': False,
-                        'route_type': 'safest'  # Use 'safest' as default initial route
-                    }
+                    # Calculate ONLY the safest route using Azure Maps (others on-demand)
+                    from services.maps import BingMapsRouter
+                    router = BingMapsRouter()
                     
-                    # Save initial route as 'safest' (default selection)
+                    print(f"🗺️  Calculating safest route for manifest {manifest_id}...")
+                    safest_route = router.optimize_route(addresses, start_location, route_type='safest')
+                    
+                    # MUST use actual Azure Maps data - no placeholder estimates
+                    if not safest_route:
+                        print(f"   ❌ Azure Maps route calculation failed - cannot create manifest")
+                        return False
+                    
+                    initial_route = safest_route
+                    print(f"   ✓ Safest route calculated: {initial_route['total_duration_minutes']} min, {initial_route['total_distance_km']} km")
+                    
+                    # Save only the safest route (fastest/shortest calculated on-demand)
                     all_routes = {'safest': initial_route}
                     success = await db.update_manifest_route(
                         manifest_id,
@@ -2085,7 +2096,7 @@ def driver_manifest():
                         initial_route['total_duration_minutes'],
                         initial_route['total_distance_km'],
                         True,  # Mark as optimized so page loads
-                        False,
+                        initial_route.get('traffic_considered', False),
                         route_type='safest',  # Set as safest route initially
                         all_routes=all_routes
                     )
@@ -2560,6 +2571,147 @@ def calculate_additional_route(manifest_id, route_type):
         
     except Exception as e:
         print(f"❌ Error calculating route: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/driver/manifest/<manifest_id>/recalculate-routes', methods=['POST'])
+@login_required
+def recalculate_routes(manifest_id):
+    """Recalculate all three route types with current Azure Maps data"""
+    user = session.get('user', {})
+    
+    try:
+        # Verify driver can only modify their own manifest
+        if user.get('role') == UserManager.ROLE_DRIVER:
+            async def verify_and_recalculate():
+                async with ParcelTrackingDB() as db:
+                    manifest = await db.get_manifest_by_id(manifest_id)
+                    if not manifest or manifest.get('driver_id') != user.get('driver_id'):
+                        return False, "You can only modify your own manifest"
+                    
+                    # Get addresses from manifest
+                    addresses = list(set([item['recipient_address'] for item in manifest.get('items', [])]))
+                    
+                    if not addresses:
+                        return False, "No addresses found in manifest"
+                    
+                    # Get depot location
+                    from config.depots import get_depot_manager
+                    depot_mgr = get_depot_manager()
+                    start_location = depot_mgr.get_closest_depot_to_address(addresses[0])
+                    
+                    # Calculate ALL THREE route types using Azure Maps
+                    from services.maps import BingMapsRouter
+                    router = BingMapsRouter()
+                    
+                    print(f"🔄 Recalculating all route types for manifest {manifest_id}...")
+                    all_routes = router.optimize_all_route_types(addresses, start_location)
+                    
+                    if not all_routes or len(all_routes) < 3:
+                        return False, "Failed to calculate routes with Azure Maps"
+                    
+                    # Update manifest with all three routes
+                    # Keep current selected route or default to safest
+                    current_route_type = manifest.get('selected_route_type', 'safest')
+                    if current_route_type not in all_routes:
+                        current_route_type = 'safest'
+                    
+                    selected_route = all_routes[current_route_type]
+                    
+                    success = await db.update_manifest_route(
+                        manifest_id,
+                        selected_route['waypoints'],
+                        selected_route['total_duration_minutes'],
+                        selected_route['total_distance_km'],
+                        True,
+                        selected_route.get('traffic_considered', False),
+                        route_type=current_route_type,
+                        all_routes=all_routes
+                    )
+                    
+                    if success:
+                        return True, {
+                            'fastest': f"{all_routes['fastest']['total_duration_minutes']} min, {all_routes['fastest']['total_distance_km']} km",
+                            'shortest': f"{all_routes['shortest']['total_duration_minutes']} min, {all_routes['shortest']['total_distance_km']} km",
+                            'safest': f"{all_routes['safest']['total_duration_minutes']} min, {all_routes['safest']['total_distance_km']} km"
+                        }
+                    return False, "Failed to update manifest"
+            
+            success, result = run_async(verify_and_recalculate())
+            
+            if success:
+                return jsonify({
+                    'success': True,
+                    'routes': result
+                })
+            else:
+                return jsonify({'success': False, 'error': result}), 403
+        
+        # Admin/Depot Manager can recalculate any manifest
+        async def recalculate():
+            async with ParcelTrackingDB() as db:
+                manifest = await db.get_manifest_by_id(manifest_id)
+                if not manifest:
+                    return False, "Manifest not found"
+                
+                # Get addresses from manifest
+                addresses = list(set([item['recipient_address'] for item in manifest.get('items', [])]))
+                
+                if not addresses:
+                    return False, "No addresses found in manifest"
+                
+                # Get depot location
+                from config.depots import get_depot_manager
+                depot_mgr = get_depot_manager()
+                start_location = depot_mgr.get_closest_depot_to_address(addresses[0])
+                
+                # Calculate ALL THREE route types using Azure Maps
+                from services.maps import BingMapsRouter
+                router = BingMapsRouter()
+                
+                print(f"🔄 Recalculating all route types for manifest {manifest_id}...")
+                all_routes = router.optimize_all_route_types(addresses, start_location)
+                
+                if not all_routes or len(all_routes) < 3:
+                    return False, "Failed to calculate routes with Azure Maps"
+                
+                # Update manifest with all three routes
+                current_route_type = manifest.get('selected_route_type', 'safest')
+                if current_route_type not in all_routes:
+                    current_route_type = 'safest'
+                
+                selected_route = all_routes[current_route_type]
+                
+                success = await db.update_manifest_route(
+                    manifest_id,
+                    selected_route['waypoints'],
+                    selected_route['total_duration_minutes'],
+                    selected_route['total_distance_km'],
+                    True,
+                    selected_route.get('traffic_considered', False),
+                    route_type=current_route_type,
+                    all_routes=all_routes
+                )
+                
+                if success:
+                    return True, {
+                        'fastest': f"{all_routes['fastest']['total_duration_minutes']} min, {all_routes['fastest']['total_distance_km']} km",
+                        'shortest': f"{all_routes['shortest']['total_duration_minutes']} min, {all_routes['shortest']['total_distance_km']} km",
+                        'safest': f"{all_routes['safest']['total_duration_minutes']} min, {all_routes['safest']['total_distance_km']} km"
+                    }
+                return False, "Failed to update manifest"
+        
+        success, result = run_async(recalculate())
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'routes': result
+            })
+        else:
+            return jsonify({'success': False, 'error': result}), 500
+            
+    except Exception as e:
+        print(f"❌ Error recalculating routes: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/driver/manifest/<manifest_id>/switch-route', methods=['POST'])
