@@ -37,6 +37,17 @@
                     </div>
                     <div class="list-group-item">
                         <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-camera-fill me-2"></i> <strong>Proof of Lodgement</strong>
+                        </div>
+                        <div class="input-group input-group-sm">
+                            <input type="text" class="form-control" id="lodgementTrackingNumber" placeholder="Enter tracking number" onkeypress="if(event.key==='Enter') getProofOfLodgement()">
+                            <button class="btn btn-primary" onclick="getProofOfLodgement()">
+                                <i class="bi bi-send"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="list-group-item">
+                        <div class="d-flex align-items-center mb-2">
                             <i class="bi bi-search me-2"></i> <strong>Track Parcel</strong>
                         </div>
                         <div class="input-group input-group-sm">
@@ -562,6 +573,26 @@ async function sendMessage() {
             const aiResponse = data.response || data.message || JSON.stringify(data, null, 2);
             addMessage(aiResponse);
             
+            // Display lodgement photos if included in response
+            if (data.lodgement_photos && data.lodgement_photos.length > 0) {
+                const photosHtml = '<div class="mt-2"><strong>📸 Lodgement Photos:</strong></div>';
+                addMessage(photosHtml);
+                
+                data.lodgement_photos.forEach((photo, index) => {
+                    const photoHtml = `
+                        <div class="card mt-2" style="max-width: 400px;">
+                            <div class="card-header bg-info text-white">
+                                <small><strong>Lodgement Photo ${index + 1}</strong> - Uploaded by ${photo.uploaded_by || 'unknown'} at ${photo.timestamp || 'unknown time'}</small>
+                            </div>
+                            <div class="card-body p-2">
+                                <img src="data:image/png;base64,${photo.photo_data}" class="img-fluid" alt="Lodgement Photo ${index + 1}" style="max-width: 100%; border: 1px solid #ddd; border-radius: 4px;">
+                            </div>
+                        </div>
+                    `;
+                    addMessage(photoHtml);
+                });
+            }
+            
             // Display delivery photos if included in response
             if (data.delivery_photos && data.delivery_photos.length > 0) {
                 const photosHtml = '<div class="mt-2"><strong>📸 Delivery Photos:</strong></div>';
@@ -570,8 +601,8 @@ async function sendMessage() {
                 data.delivery_photos.forEach((photo, index) => {
                     const photoHtml = `
                         <div class="card mt-2" style="max-width: 400px;">
-                            <div class="card-header bg-light">
-                                <small><strong>Photo ${index + 1}</strong> - Uploaded by ${photo.uploaded_by || 'unknown'} at ${photo.timestamp || 'unknown time'}</small>
+                            <div class="card-header bg-success text-white">
+                                <small><strong>Delivery Photo ${index + 1}</strong> - Uploaded by ${photo.uploaded_by || 'unknown'} at ${photo.timestamp || 'unknown time'}</small>
                             </div>
                             <div class="card-body p-2">
                                 <img src="data:image/png;base64,${photo.photo_data}" class="img-fluid" alt="Delivery Photo ${index + 1}" style="max-width: 100%; border: 1px solid #ddd; border-radius: 4px;">
@@ -641,6 +672,22 @@ async function getProofOfDelivery() {
     
     // Clear the input after sending
     document.getElementById('proofTrackingNumber').value = '';
+}
+
+async function getProofOfLodgement() {
+    const trackingNumber = document.getElementById('lodgementTrackingNumber').value.trim();
+    
+    if (!trackingNumber) {
+        addError('Please enter a tracking number to get proof of lodgement');
+        return;
+    }
+    
+    const query = `Can I get photo proof of lodgement for parcel ${trackingNumber}?`;
+    document.getElementById('chatInput').value = query;
+    await sendMessage();
+    
+    // Clear the input after sending
+    document.getElementById('lodgementTrackingNumber').value = '';
 }
 
 async function quickTrackParcel() {

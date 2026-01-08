@@ -157,6 +157,16 @@ document.getElementById('captureImage').addEventListener('click', async () => {
         const formData = new FormData();
         formData.append('image', blob, 'capture.jpg');
         
+        // Store the captured image in sessionStorage for the registration form
+        // Convert blob to base64 for storage
+        const reader = new FileReader();
+        reader.onloadend = function() {
+            const base64data = reader.result;
+            sessionStorage.setItem('capturedPhotoBase64', base64data);
+            console.log('📸 Photo stored in sessionStorage for registration');
+        };
+        reader.readAsDataURL(blob);
+        
         // Show processing indicator
         document.getElementById('processingIndicator').style.display = 'block';
         document.getElementById('extractedData').style.display = 'none';

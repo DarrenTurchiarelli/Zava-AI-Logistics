@@ -637,6 +637,7 @@ def register_parcel():
             from agents.base import parcel_intake_agent
             import uuid
             from datetime import datetime
+            import base64
             
             # Get form data
             sender_name = request.form.get('sender_name')
@@ -659,6 +660,15 @@ def register_parcel():
             dimensions = request.form.get('dimensions', '')
             declared_value = float(request.form.get('declared_value', 0))
             special_instructions = request.form.get('special_instructions', '')
+            
+            # Handle lodgement photo upload
+            lodgement_photo_base64 = None
+            if 'lodgement_photo' in request.files:
+                photo_file = request.files['lodgement_photo']
+                if photo_file and photo_file.filename:
+                    photo_bytes = photo_file.read()
+                    lodgement_photo_base64 = base64.b64encode(photo_bytes).decode('utf-8')
+                    print(f"📸 Lodgement photo captured ({len(lodgement_photo_base64)} bytes)")
             
             # Determine destination state from postcode
             destination_state = get_state_from_postcode(destination_postcode) if destination_postcode else "UNKNOWN"
@@ -712,6 +722,16 @@ def register_parcel():
                         special_instructions=special_instructions,
                         store_location=session.get('store_location', 'WebPortal')
                     )
+                    
+                    # Store lodgement photo if provided
+                    if lodgement_photo_base64:
+                        await db.store_lodgement_photo(
+                            barcode=barcode,
+                            photo_base64=lodgement_photo_base64,
+                            uploaded_by=session.get('username', 'customer')
+                        )
+                        print(f"✅ Lodgement photo stored for {barcode}")
+                    
                     return result['tracking_number'], validation_result
             
             final_tracking, validation = run_async(validate_and_register())
@@ -1439,12 +1459,15 @@ def chatbot_query():
         result = run_async(process())
         response_text = result.get('response', '')
         
-        # Check if response mentions delivery photos and attach photo data
+        # Check if response mentions photos and attach photo data
         delivery_photos = []
+        lodgement_photos = []
         print(f"🔍 Checking response for photo keywords...")
         print(f"   Response contains 'delivery photo': {'delivery photo' in response_text.lower()}")
         print(f"   Response contains 'proof of delivery': {'proof of delivery' in response_text.lower()}")
-        if 'delivery photo' in response_text.lower() or 'proof of delivery' in response_text.lower():
+        print(f"   Response contains 'lodgement photo': {'lodgement photo' in response_text.lower()}")
+        print(f"   Response contains 'proof of lodgement': {'proof of lodgement' in response_text.lower()}")
+        if 'delivery photo' in response_text.lower() or 'proof of delivery' in response_text.lower() or 'lodgement photo' in response_text.lower() or 'proof of lodgement' in response_text.lower() or 'photo' in response_text.lower():
             # Extract tracking number from query, tracking_number param, response, or context
             import re
             tracking_pattern = r'\b(DTVIC\d+|DT\d+|[A-Z]{2}\d{8,}[A-Z]{2})\b'
@@ -1463,22 +1486,24 @@ def chatbot_query():
                     tracking_num = response_matches[0].upper()
             
             if tracking_num:
-                print(f"📸 Extracting delivery photos for: {tracking_num}")
+                print(f"📸 Extracting photos for: {tracking_num}")
                 try:
                     async def get_photos():
                         async with ParcelTrackingDB() as db:
                             parcel = await db.get_parcel_by_tracking_number(tracking_num)
                             if parcel:
-                                photos = parcel.get('delivery_photos', [])
-                                print(f"   📦 Found parcel, photos: {len(photos)}")
-                                return photos
+                                d_photos = parcel.get('delivery_photos', [])
+                                l_photos = parcel.get('lodgement_photos', [])
+                                print(f"   📦 Found parcel, delivery photos: {len(d_photos)}, lodgement photos: {len(l_photos)}")
+                                return d_photos, l_photos
                             print(f"   ❌ Parcel not found: {tracking_num}")
-                            return []
-                    photos = run_async(get_photos())
-                    if photos:
-                        print(f"   ✅ Attaching {len(photos)} delivery photo(s) to response")
-                        delivery_photos = photos
-                    else:
+                            return [], []
+                    delivery_photos, lodgement_photos = run_async(get_photos())
+                    if delivery_photos:
+                        print(f"   ✅ Attaching {len(delivery_photos)} delivery photo(s) to response")
+                    if lodgement_photos:
+                        print(f"   ✅ Attaching {len(lodgement_photos)} lodgement photo(s) to response")
+                    if not delivery_photos and not lodgement_photos:
                         print(f"   ⚠️  No photos found for {tracking_num}")
                 except Exception as e:
                     print(f"   ⚠️  Could not retrieve photos: {e}")
@@ -1489,10 +1514,13 @@ def chatbot_query():
         
         response_data = {'response': response_text}
         if delivery_photos:
-            print(f"📸 Adding {len(delivery_photos)} photos to response")
+            print(f"📸 Adding {len(delivery_photos)} delivery photos to response")
             response_data['delivery_photos'] = delivery_photos
-        else:
-            print(f"📸 No delivery photos to attach")
+        if lodgement_photos:
+            print(f"📸 Adding {len(lodgement_photos)} lodgement photos to response")
+            response_data['lodgement_photos'] = lodgement_photos
+        if not delivery_photos and not lodgement_photos:
+            print(f"📸 No photos to attach")
         
         return jsonify(response_data)
     except Exception as e:
@@ -3307,7 +3335,9 @@ def track_parcel_public():
                     'last_updated': last_updated,
                     'events': events[::-1] if events else [],  # Reverse to show newest first
                     'delivery_map_url': delivery_map_url,
-                    'deliveries_away': deliveries_away
+                    'deliveries_away': deliveries_away,
+                    'lodgement_photos': parcel.get('lodgement_photos', []),
+                    'delivery_photos': parcel.get('delivery_photos', [])
                 }
         
         # Get tracking info for all barcodes

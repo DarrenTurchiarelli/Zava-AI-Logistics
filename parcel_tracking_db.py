@@ -669,6 +669,38 @@ class ParcelTrackingDB:
             print(f"❌ Error storing delivery photo: {e}")
             return False
 
+    async def store_lodgement_photo(self, barcode: str, photo_base64: str, uploaded_by: str = "customer") -> bool:
+        """Store lodgement photo (initial registration) in parcel record"""
+        container = self.database.get_container_client(self.parcels_container)
+        
+        try:
+            # Find the parcel first
+            parcel = await self.get_parcel_by_barcode(barcode)
+            if not parcel:
+                print(f"❌ Parcel not found: {barcode}")
+                return False
+            
+            # Add lodgement photo to parcel
+            if 'lodgement_photos' not in parcel:
+                parcel['lodgement_photos'] = []
+            
+            parcel['lodgement_photos'].append({
+                'photo_data': photo_base64,
+                'uploaded_by': uploaded_by,
+                'timestamp': datetime.now(timezone.utc).isoformat()
+            })
+            
+            parcel["last_updated"] = datetime.now(timezone.utc).isoformat()
+            
+            await container.replace_item(item=parcel, body=parcel)
+            
+            print(f"✅ Lodgement photo stored for: {barcode}")
+            return True
+            
+        except exceptions.CosmosHttpResponseError as e:
+            print(f"❌ Error storing lodgement photo: {e}")
+            return False
+
     async def scan_parcel_at_location(
         self, 
         barcode: str, 
