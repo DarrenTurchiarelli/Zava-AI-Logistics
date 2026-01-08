@@ -484,7 +484,7 @@
                 </div>
 
                 <!-- Complete Delivery Modal -->
-                <div class="modal fade" id="completeModal{{ loop.index }}" tabindex="-1" aria-labelledby="completeModalLabel{{ loop.index }}" aria-hidden="true">
+                <div class="modal fade" id="completeModal{{ loop.index }}" tabindex="-1" aria-labelledby="completeModalLabel{{ loop.index }}" aria-hidden="true" data-bs-backdrop="static">
                     <div class="modal-dialog">
                         <div class="modal-content">
                             <div class="modal-header bg-success text-white">
@@ -528,6 +528,9 @@
                                             <label class="form-check-label" for="statusCarded{{ loop.index }}">
                                                 <strong>Carded</strong> - Card left, awaiting collection
                                             </label>
+                                        </div>
+                                        <div class="invalid-feedback" id="statusError{{ loop.index }}" style="display: none;">
+                                            Please select a delivery status
                                         </div>
                                     </div>
                                     
@@ -706,6 +709,18 @@ function toggleCardedFields(loopIndex, isCarded) {
         postOfficeSelect.removeAttribute('required');
         submitText.textContent = 'Mark as Delivered';
     }
+}
+
+function validatePostOffice(loopIndex) {
+    // Just validate that post office is selected when carded is chosen
+    const cardedRadio = document.getElementById('statusCarded' + loopIndex);
+    const postOfficeSelect = document.getElementById('postOffice' + loopIndex);
+    
+    if (cardedRadio && cardedRadio.checked && postOfficeSelect && !postOfficeSelect.value) {
+        alert('Please select a post office for collection');
+        return false;
+    }
+    return true;
 }
 
 function calculateRoute(manifestId, routeType) {
@@ -993,6 +1008,54 @@ function clearDeliveryPhoto(index) {
     previewImg.src = '';
     preview.style.display = 'none';
 }
+
+// Initialize modals - ensure forms work properly
+document.addEventListener('DOMContentLoaded', function() {
+    // Get all complete delivery modals
+    const modals = document.querySelectorAll('[id^="completeModal"]');
+    
+    modals.forEach(function(modalEl) {
+        modalEl.addEventListener('show.bs.modal', function() {
+            // Extract index from modal id
+            const index = this.id.replace('completeModal', '');
+            
+            // Ensure delivered radio is checked
+            const deliveredRadio = document.getElementById('statusDelivered' + index);
+            if (deliveredRadio) {
+                deliveredRadio.checked = true;
+            }
+            
+            // Ensure carded fields are hidden and post office not required
+            const cardedFields = document.getElementById('cardedFields' + index);
+            const postOfficeSelect = document.getElementById('postOffice' + index);
+            
+            if (cardedFields) {
+                cardedFields.style.display = 'none';
+            }
+            if (postOfficeSelect) {
+                postOfficeSelect.removeAttribute('required');
+            }
+            
+            console.log('✅ Modal ' + index + ' opened and initialized');
+        });
+    });
+    
+    // Add form submission logging
+    const forms = document.querySelectorAll('[id^="deliveryForm"]');
+    forms.forEach(function(form) {
+        form.addEventListener('submit', function(e) {
+            console.log('📤 Form submitting:', form.id);
+            
+            // Check for photo
+            const index = form.id.replace('deliveryForm', '');
+            const photoInput = document.getElementById('deliveryPhoto' + index);
+            if (photoInput && photoInput.files.length > 0) {
+                console.log('  📸 Photo attached: ' + photoInput.files[0].name);
+            }
+        });
+    });
+});
+
 {% endif %}
 </script>
 {% endblock %}
