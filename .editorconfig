@@ -1,0 +1,87 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# Top-most EditorConfig file
+root = true
+
+# Unix-style newlines with a newline ending every file
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Python files
+[*.py]
+indent_style = space
+indent_size = 4
+max_line_length = 120
+
+# YAML files
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# JSON files
+[*.json]
+indent_style = space
+indent_size = 2
+
+# Markdown files
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = off
+
+# HTML files
+[*.html]
+indent_style = space
+indent_size = 2
+
+# CSS files
+[*.css]
+indent_style = space
+indent_size = 2
+
+# JavaScript files
+[*.js]
+indent_style = space
+indent_size = 2
+
+# PowerShell files
+[*.ps1]
+indent_style = space
+indent_size = 4
+end_of_line = crlf  # PowerShell on Windows
+
+# Shell scripts
+[*.sh]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+
+# Makefile
+[Makefile]
+indent_style = tab
+
+# Config files
+[*.{ini,cfg,toml}]
+indent_style = space
+indent_size = 2
+
+# SQL files
+[*.sql]
+indent_style = space
+indent_size = 2
+
+# Batch files
+[*.{cmd,bat}]
+end_of_line = crlf
+
+# Azure Bicep files
+[*.bicep]
+indent_style = space
+indent_size = 2
+
+# Requirements files
+[requirements*.txt]
+trim_trailing_whitespace = true
+insert_final_newline = true

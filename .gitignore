@@ -100,3 +100,7 @@ settings.local.json
 *.temp
 temp/
 tmp/
+
+# Generated reports and CSV files
+static/reports/*.csv
+*.csv

@@ -1,4 +1,4 @@
-/* DT Logistics Custom Styles */
+/* Zava Custom Styles */
 
 /* Note: Primary brand color is now set dynamically in base.html from company config */
 /* Note: Info/secondary color is now set dynamically in base.html from company config */
@@ -201,11 +201,11 @@ body {
     .display-3 {
         font-size: 2.5rem;
     }
-    
+
     .display-5 {
         font-size: 2rem;
     }
-    
+
     .card-body {
         padding: 1rem;
     }
@@ -269,56 +269,56 @@ body {
         border-radius: 0.5rem;
         margin-top: 0.5rem;
     }
-    
+
     /* Larger touch targets for mobile */
     .btn {
         padding: 0.75rem 1.5rem;
         font-size: 1rem;
     }
-    
+
     /* Full width cards on mobile */
     .card {
         margin-bottom: 1rem;
     }
-    
+
     /* Reduce padding on mobile */
     .container {
         padding-left: 1rem;
         padding-right: 1rem;
     }
-    
+
     /* Hero section text size */
     .display-3 {
         font-size: 2.5rem;
     }
-    
+
     .lead {
         font-size: 1.1rem;
     }
-    
+
     /* Feature icons slightly smaller on mobile */
     .feature-icon {
         width: 60px !important;
         height: 60px !important;
         font-size: 1.5rem !important;
     }
-    
+
     /* Card titles */
     .card-title {
         font-size: 1.25rem;
     }
-    
+
     /* Table responsiveness */
     .table-responsive {
         border: none;
     }
-    
+
     /* Camera scanner video full width */
     #cameraFeed, #capturedCanvas {
         width: 100% !important;
         height: auto !important;
     }
-    
+
     /* Map iframes responsive */
     iframe {
         width: 100%;
@@ -331,7 +331,7 @@ body {
     .display-3 {
         font-size: 3rem;
     }
-    
+
     /* 2 columns on tablets */
     .col-md-4 {
         flex: 0 0 50%;
@@ -365,18 +365,18 @@ a:focus, button:focus, input:focus, select:focus, textarea:focus {
     .g-4 {
         --bs-gutter-y: 1.5rem;
     }
-    
+
     /* Larger click areas for dropdowns */
     .dropdown-item {
         padding: 0.75rem 1rem;
     }
-    
+
     /* Better spacing for forms */
     .form-control, .form-select {
         padding: 0.75rem;
         font-size: 1rem;
     }
-    
+
     /* Alert improvements */
     .alert {
         font-size: 0.95rem;

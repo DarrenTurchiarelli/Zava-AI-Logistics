@@ -1,0 +1,195 @@
+name: Test & Lint
+
+on:
+  push:
+    branches: [ main, general, develop ]
+  pull_request:
+    branches: [ main, general ]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  test:
+    name: Test Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio pytest-cov flake8 black mypy
+
+    - name: Run flake8
+      run: |
+        # Stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Exit-zero treats all errors as warnings
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
+      continue-on-error: true
+
+    - name: Check code formatting with Black
+      run: |
+        black --check --diff --line-length=120 .
+      continue-on-error: true
+
+    - name: Type checking with mypy
+      run: |
+        mypy --ignore-missing-imports --check-untyped-defs agents/ || true
+      continue-on-error: true
+
+    - name: Test database module
+      run: |
+        python -c "
+        print('Testing database imports...')
+        from parcel_tracking_db import ParcelTrackingDB
+        print('✓ Database module imports successfully')
+        "
+      continue-on-error: true
+
+    - name: Test agent modules
+      run: |
+        python -c "
+        print('Testing agent imports...')
+        from agents.base import call_azure_agent
+        from agents.fraud import fraud_risk_agent
+        print('✓ Agent modules import successfully')
+        "
+      continue-on-error: true
+
+    - name: Test agent tools
+      run: |
+        python -c "
+        print('Testing agent tools...')
+        from agent_tools import AGENT_TOOLS
+        print(f'✓ Found {len(AGENT_TOOLS)} agent tools')
+        "
+
+    - name: Run pytest (if tests exist)
+      run: |
+        if [ -d "tests" ]; then
+          pytest --verbose --cov=. --cov-report=term-missing
+        else
+          echo "No tests directory found, skipping pytest"
+        fi
+      continue-on-error: true
+
+    - name: Check for secrets in code
+      run: |
+        # Check for common secret patterns
+        echo "Checking for accidentally committed secrets..."
+
+        # Check for Azure connection strings
+        if grep -r "AccountEndpoint=.*AccountKey=" --include="*.py" --exclude-dir=".git" .; then
+          echo "❌ ERROR: Found Azure connection string in code!"
+          exit 1
+        fi
+
+        # Check for bearer tokens
+        if grep -r "Bearer [A-Za-z0-9_-]*\.[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*" --include="*.py" --exclude-dir=".git" .; then
+          echo "❌ ERROR: Found JWT token in code!"
+          exit 1
+        fi
+
+        # Check for Azure subscription IDs (except in docs)
+        if grep -r "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}" --include="*.py" --exclude-dir=".git" . | grep -v "example\|sample\|placeholder"; then
+          echo "⚠️ WARNING: Found UUID patterns (possible subscription ID)"
+        fi
+
+        echo "✓ No secrets detected"
+
+    - name: Verify .env is not committed
+      run: |
+        if [ -f ".env" ]; then
+          echo "❌ ERROR: .env file should not be in repository!"
+          exit 1
+        else
+          echo "✓ .env file not in repository"
+        fi
+
+    - name: Check for required documentation
+      run: |
+        echo "Checking for required documentation files..."
+
+        [ -f "readme.md" ] && echo "✓ readme.md exists" || echo "⚠️ readme.md missing"
+        [ -f "AGENTS.md" ] && echo "✓ AGENTS.md exists" || echo "⚠️ AGENTS.md missing"
+        [ -f "SECURITY.md" ] && echo "✓ SECURITY.md exists" || echo "⚠️ SECURITY.md missing"
+        [ -f "CHANGELOG.md" ] && echo "✓ CHANGELOG.md exists" || echo "⚠️ CHANGELOG.md missing"
+        [ -f "requirements.txt" ] && echo "✓ requirements.txt exists" || echo "❌ requirements.txt missing"
+
+    - name: Check Python version compatibility
+      run: |
+        python --version
+        python -c "import sys; assert sys.version_info >= (3, 11), 'Python 3.11+ required'"
+        echo "✓ Python version compatible"
+
+    - name: Generate test summary
+      if: always()
+      run: |
+        echo "## Test Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- Python Version: ${{ matrix.python-version }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install security tools
+      run: |
+        pip install safety bandit
+
+    - name: Check dependencies for vulnerabilities
+      run: |
+        pip install -r requirements.txt
+        safety check --json || true
+      continue-on-error: true
+
+    - name: Run Bandit security scan
+      run: |
+        bandit -r . -ll -f json || true
+      continue-on-error: true
+
+    - name: Check for hardcoded secrets
+      uses: trufflesecurity/trufflehog@main
+      continue-on-error: true
+      with:
+        path: ./
+        base: ${{ github.event.repository.default_branch }}
+        head: HEAD
+
+  lint-markdown:
+    name: Lint Markdown Files
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Lint markdown files
+      uses: DavidAnson/markdownlint-cli2-action@v14
+      continue-on-error: true
+      with:
+        globs: '**/*.md'

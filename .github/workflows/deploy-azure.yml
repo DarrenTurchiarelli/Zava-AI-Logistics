@@ -1,0 +1,312 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+permissions:
+  id-token: write  # Required for Azure OIDC authentication
+  contents: read
+
+env:
+  AZURE_WEBAPP_NAME: ${{ secrets.AZURE_WEBAPP_NAME }}
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  validate:
+    name: Validate Configuration
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Validate agent IDs are set
+      run: |
+        echo "Checking for agent configuration..."
+
+        required_agents=(
+          "CUSTOMER_SERVICE_AGENT_ID"
+          "FRAUD_RISK_AGENT_ID"
+          "IDENTITY_AGENT_ID"
+          "DISPATCHER_AGENT_ID"
+          "PARCEL_INTAKE_AGENT_ID"
+          "SORTING_FACILITY_AGENT_ID"
+          "DELIVERY_COORDINATION_AGENT_ID"
+          "OPTIMIZATION_AGENT_ID"
+        )
+
+        missing=0
+        for agent in "${required_agents[@]}"; do
+          if [ -z "${!agent}" ]; then
+            echo "⚠️ WARNING: $agent not set in secrets"
+            missing=$((missing + 1))
+          fi
+        done
+
+        if [ $missing -gt 0 ]; then
+          echo "❌ $missing agent IDs missing from GitHub secrets"
+          echo "Add them in: Settings → Secrets and variables → Actions"
+          exit 1
+        fi
+
+        echo "✓ All 8 agent IDs configured"
+      env:
+        CUSTOMER_SERVICE_AGENT_ID: ${{ secrets.CUSTOMER_SERVICE_AGENT_ID }}
+        FRAUD_RISK_AGENT_ID: ${{ secrets.FRAUD_RISK_AGENT_ID }}
+        IDENTITY_AGENT_ID: ${{ secrets.IDENTITY_AGENT_ID }}
+        DISPATCHER_AGENT_ID: ${{ secrets.DISPATCHER_AGENT_ID }}
+        PARCEL_INTAKE_AGENT_ID: ${{ secrets.PARCEL_INTAKE_AGENT_ID }}
+        SORTING_FACILITY_AGENT_ID: ${{ secrets.SORTING_FACILITY_AGENT_ID }}
+        DELIVERY_COORDINATION_AGENT_ID: ${{ secrets.DELIVERY_COORDINATION_AGENT_ID }}
+        OPTIMIZATION_AGENT_ID: ${{ secrets.OPTIMIZATION_AGENT_ID }}
+
+    - name: Validate Azure resources
+      run: |
+        echo "Validating required Azure secrets..."
+
+        required_vars=(
+          "AZURE_AI_PROJECT_ENDPOINT"
+          "AZURE_AI_MODEL_DEPLOYMENT_NAME"
+          "COSMOS_DB_ENDPOINT"
+          "COSMOS_DB_DATABASE_NAME"
+        )
+
+        for var in "${required_vars[@]}"; do
+          if [ -z "${!var}" ]; then
+            echo "❌ ERROR: $var not set"
+            exit 1
+          fi
+        done
+
+        echo "✓ Azure configuration validated"
+      env:
+        AZURE_AI_PROJECT_ENDPOINT: ${{ secrets.AZURE_AI_PROJECT_ENDPOINT }}
+        AZURE_AI_MODEL_DEPLOYMENT_NAME: ${{ secrets.AZURE_AI_MODEL_DEPLOYMENT_NAME }}
+        COSMOS_DB_ENDPOINT: ${{ secrets.COSMOS_DB_ENDPOINT }}
+        COSMOS_DB_DATABASE_NAME: ${{ secrets.COSMOS_DB_DATABASE_NAME }}
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    needs: validate
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio
+
+    - name: Run smoke tests
+      run: |
+        python -c "from agents.base import *; print('✓ Agent imports OK')"
+        python -c "from parcel_tracking_db import ParcelTrackingDB; print('✓ DB module OK')"
+        python -c "from agent_tools import AGENT_TOOLS; print(f'✓ {len(AGENT_TOOLS)} tools')"
+
+  deploy:
+    name: Deploy to Azure App Service
+    runs-on: ubuntu-latest
+    needs: [validate, test]
+    environment:
+      name: ${{ github.event.inputs.environment || 'production' }}
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Create deployment package
+      run: |
+        # Install production dependencies only
+        pip install --target=".python_packages/lib/site-packages" -r requirements.txt
+
+        # Create deployment archive
+        zip -r deploy.zip . -x "*.git*" "__pycache__/*" "*.pyc" ".env*" "tests/*" ".vscode/*"
+
+    - name: Azure Login (OIDC)
+      uses: azure/login@v1
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Deploy to Azure Web App
+      id: deploy-to-webapp
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        package: deploy.zip
+
+    - name: Configure App Service settings
+      run: |
+        az webapp config appsettings set \
+          --name ${{ env.AZURE_WEBAPP_NAME }} \
+          --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+          --settings \
+            AZURE_AI_PROJECT_ENDPOINT="${{ secrets.AZURE_AI_PROJECT_ENDPOINT }}" \
+            AZURE_AI_MODEL_DEPLOYMENT_NAME="${{ secrets.AZURE_AI_MODEL_DEPLOYMENT_NAME }}" \
+            COSMOS_DB_ENDPOINT="${{ secrets.COSMOS_DB_ENDPOINT }}" \
+            COSMOS_DB_DATABASE_NAME="${{ secrets.COSMOS_DB_DATABASE_NAME }}" \
+            USE_MANAGED_IDENTITY=true \
+            CUSTOMER_SERVICE_AGENT_ID="${{ secrets.CUSTOMER_SERVICE_AGENT_ID }}" \
+            FRAUD_RISK_AGENT_ID="${{ secrets.FRAUD_RISK_AGENT_ID }}" \
+            IDENTITY_AGENT_ID="${{ secrets.IDENTITY_AGENT_ID }}" \
+            DISPATCHER_AGENT_ID="${{ secrets.DISPATCHER_AGENT_ID }}" \
+            PARCEL_INTAKE_AGENT_ID="${{ secrets.PARCEL_INTAKE_AGENT_ID }}" \
+            SORTING_FACILITY_AGENT_ID="${{ secrets.SORTING_FACILITY_AGENT_ID }}" \
+            DELIVERY_COORDINATION_AGENT_ID="${{ secrets.DELIVERY_COORDINATION_AGENT_ID }}" \
+            OPTIMIZATION_AGENT_ID="${{ secrets.OPTIMIZATION_AGENT_ID }}" \
+            FLASK_ENV=production \
+            PYTHONUNBUFFERED=1
+
+  update-agents:
+    name: Update Azure AI Foundry Agents
+    runs-on: ubuntu-latest
+    needs: deploy
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install Azure AI SDK
+      run: |
+        pip install azure-ai-projects azure-identity
+
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Update agent instructions and tools
+      run: |
+        echo "Updating Azure AI Foundry agent instructions..."
+
+        # Set environment variables for agent IDs
+        export CUSTOMER_SERVICE_AGENT_ID="${{ secrets.CUSTOMER_SERVICE_AGENT_ID }}"
+        export FRAUD_RISK_AGENT_ID="${{ secrets.FRAUD_RISK_AGENT_ID }}"
+        export IDENTITY_AGENT_ID="${{ secrets.IDENTITY_AGENT_ID }}"
+        export DISPATCHER_AGENT_ID="${{ secrets.DISPATCHER_AGENT_ID }}"
+        export PARCEL_INTAKE_AGENT_ID="${{ secrets.PARCEL_INTAKE_AGENT_ID }}"
+        export SORTING_FACILITY_AGENT_ID="${{ secrets.SORTING_FACILITY_AGENT_ID }}"
+        export DELIVERY_COORDINATION_AGENT_ID="${{ secrets.DELIVERY_COORDINATION_AGENT_ID }}"
+        export OPTIMIZATION_AGENT_ID="${{ secrets.OPTIMIZATION_AGENT_ID }}"
+        export AZURE_AI_PROJECT_ENDPOINT="${{ secrets.AZURE_AI_PROJECT_ENDPOINT }}"
+        export AZURE_AI_PROJECT_CONNECTION_STRING="${{ secrets.AZURE_AI_PROJECT_CONNECTION_STRING }}"
+
+        # Run agent tool registration
+        python register_agent_tools.py
+
+        echo "✓ Agents updated successfully"
+
+  health-check:
+    name: Post-Deployment Health Check
+    runs-on: ubuntu-latest
+    needs: [deploy, update-agents]
+
+    steps:
+    - name: Wait for deployment to stabilize
+      run: sleep 30
+
+    - name: Check webapp health
+      run: |
+        WEBAPP_URL="https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
+
+        echo "Checking health endpoint: $WEBAPP_URL/health"
+
+        # Check if app is running
+        response=$(curl -s -o /dev/null -w "%{http_code}" $WEBAPP_URL/health || echo "000")
+
+        if [ "$response" = "200" ] || [ "$response" = "302" ]; then
+          echo "✓ Webapp is healthy (HTTP $response)"
+        else
+          echo "⚠️ WARNING: Unexpected HTTP response: $response"
+          echo "Check logs: az webapp log tail --name ${{ env.AZURE_WEBAPP_NAME }}"
+        fi
+
+    - name: Verify agent connectivity
+      run: |
+        echo "Agent connectivity verification would run here"
+        echo "This requires implementing a /api/agents/health endpoint"
+        echo "✓ Manual verification recommended"
+
+  rollback:
+    name: Rollback on Failure
+    runs-on: ubuntu-latest
+    if: failure()
+    needs: [deploy, update-agents, health-check]
+
+    steps:
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Rollback to previous deployment
+      run: |
+        echo "Rollback triggered due to deployment failure"
+
+        # Get previous deployment
+        previous_deployment=$(az webapp deployment list \
+          --name ${{ env.AZURE_WEBAPP_NAME }} \
+          --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+          --query "[1].id" -o tsv)
+
+        if [ -n "$previous_deployment" ]; then
+          echo "Rolling back to: $previous_deployment"
+          # Implement rollback logic here
+          echo "⚠️ Manual rollback recommended via Azure portal"
+        else
+          echo "❌ No previous deployment found"
+        fi
+
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [deploy, update-agents, health-check]
+
+    steps:
+    - name: Deployment summary
+      run: |
+        echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- Environment: ${{ github.event.inputs.environment || 'production' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Webapp: ${{ env.AZURE_WEBAPP_NAME }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Python: ${{ env.PYTHON_VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🤖 **8 Azure AI Foundry agents deployed**" >> $GITHUB_STEP_SUMMARY

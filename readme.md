@@ -1,10 +1,11 @@
-# 📦 DT Logistics - AI-Powered Last Mile Delivery Platform
+# 📦 Zava - AI-Powered Last Mile Delivery Platform
 
 A cutting-edge parcel tracking system powered by **8 Active Azure AI Foundry Agents** providing end-to-end intelligent automation for last-mile logistics. Built with Azure Cosmos DB, Azure Maps, Azure Speech Services, and the Microsoft Agent Framework.
 
 ## ⭐ **Latest Updates** ⭐
 
 **December 18, 2025**
+
 - ✅ **8 Active AI Agents**: All core agents deployed and operational
 - ✅ **Agent Performance Dashboard**: Real-time monitoring with 344+ decisions tracked
 - ✅ **Optimization Agent**: Network-wide cost reduction and predictive analytics
@@ -25,11 +26,12 @@ py app.py
 $env:FLASK_ENV='development'; py app.py
 ```
 
-Access at: **http://127.0.0.1:5000**
+Access at: **<http://127.0.0.1:5000>**
 
 **To enable debug mode**: `$env:DEBUG_MODE='true'; py app.py`
 
 **Default Login:**
+
 - Username: `admin`
 - Password: `admin123`
 
@@ -44,6 +46,7 @@ python main.py
 ## 🌐 Web Application Features
 
 ### **📊 AI Insights Dashboard** (Main Dashboard)
+
 - **Landing Page**: First screen upon login
 - **Performance Metrics**: Real-time parcel statistics with drill-down links
 - **8 Active AI Agents**: Status cards showing all Azure AI Foundry agents
@@ -54,12 +57,14 @@ python main.py
 - **Human-in-the-Loop**: Interactive approval modals for critical decisions
 
 ### **📦 Parcel Management**
+
 - **Register New Parcels**: Multi-section form with complete details
 - **Track Parcels**: Search by tracking number with full history
 - **View All Parcels**: Comprehensive listing with sorting/filtering
 - **Real-time Updates**: Live tracking information
 
 ### **🚗 Driver Manifest System**
+
 - **Azure Maps Route Optimization**: Real-time traffic analysis
 - **Automated Route Planning**: Up to 20 parcels per driver with optimized sequence
 - **Interactive Maps**: Embedded Azure Maps with route visualization
@@ -67,12 +72,14 @@ python main.py
 - **Admin Dashboard**: View all active manifests with progress tracking
 
 ### **🎙️ Voice-Enabled Customer Service**
+
 - **Azure Speech Services Integration**: Voice input and output
 - **AI-Powered Chatbot**: Customer service agent assistance
 - **Public Chat Widget**: Available on all pages for visitors
 - **Multi-modal Input**: Type or speak your questions
 
 ### **🛡️ Intelligent Fraud Detection**
+
 - **AI Risk Analysis**: Azure AI Foundry fraud detection
 - **Automated Workflows**: High-risk fraud → Customer Service escalation
 - **Multi-Channel Notifications**: Email, SMS, phone warnings
@@ -82,6 +89,7 @@ python main.py
 - **Automatic Parcel Holds**: Critical fraud cases (≥90% risk score)
 
 ### **📱 Responsive Design**
+
 - Mobile-friendly interface
 - Touch-optimized controls
 - Works on tablets and smartphones
@@ -125,10 +133,12 @@ dt_item_scanner/
 ### **Core Application Modules**
 
 **Entry Points:**
+
 - `app.py` - Flask web application with all routes
 - `main.py` - Command-line interface with menu system
 
 **Logistics Operations:**
+
 - `logistics_core.py` - Parcel registration, tracking, scanning
 - `logistics_customer.py` - Customer experience features
 - `logistics_driver.py` - Driver operations and proof of delivery
@@ -138,6 +148,7 @@ dt_item_scanner/
 - `logistics_common.py` - Shared utilities and helpers
 
 ### **Key Benefits**
+
 - **Modular Design**: Clear separation of concerns
 - **Easy Maintenance**: Changes isolated to specific packages
 - **Scalable**: Add new agents/workflows without affecting existing code
@@ -153,24 +164,28 @@ dt_item_scanner/
 All agents deployed with full Azure AI Foundry telemetry and real-time performance monitoring.
 
 #### **1. Customer Service Agent** 🎧
+
 - Real-time parcel tracking via natural language queries
 - Cosmos DB function calling for live data access
 - Multi-format tracking support (DT, DTVIC, OV formats)
 - **Access**: Customer Service Chatbot page
 
 #### **2. Fraud Detection Agent** 🛡️
+
 - Multi-category threat analysis (phishing, impersonation, payment fraud)
 - Risk score calculation with confidence metrics
 - Educational content generation for customer awareness
 - **Access**: Report Fraud page
 
 #### **3. Identity Verification Agent** 🔐
+
 - Customer identity verification for high-risk fraud cases
 - Employment status validation and credential verification
 - Auto-triggered when fraud risk ≥85%
 - **Access**: Auto-triggered by fraud workflow
 
 #### **4. Dispatcher Agent** 📋
+
 - Intelligent parcel-to-driver assignment
 - Geographic clustering and workload balancing
 - Priority-based distribution algorithms
@@ -178,6 +193,7 @@ All agents deployed with full Azure AI Foundry telemetry and real-time performan
 - **Access**: Admin Manifests - AI Auto-Assign
 
 #### **5. Parcel Intake Agent** 📦
+
 - Service type recommendations based on weight, value, dimensions
 - Address validation and automatic corrections
 - Deli📊 AI Agent Performance Dashboard**
@@ -202,6 +218,7 @@ All agents deployed with full Azure AI Foundry telemetry and real-time performan
 - **Access**: AI Insights Dashboard
 
 #### **7. Sorting Facility Agent** 🏭
+
 - Real-time facility capacity monitoring
 - Automated routing decisions across facilities
 - Load balancing and throughput optimization
@@ -209,6 +226,7 @@ All agents deployed with full Azure AI Foundry telemetry and real-time performan
 - **Access**: AI Insights Dashboard - Sorting Section
 
 #### **8. Delivery Coordination Agent** 🚚
+
 - Multi-stop delivery sequencing
 - Automated customer notifications (SMS/Email)
 - Dynamic route adjustments
@@ -218,6 +236,7 @@ All agents deployed with full Azure AI Foundry telemetry and real-time performan
 ### **🔄 Multi-Agent Workflows**
 
 **Fraud Detection → Identity Verification → Customer Notification**
+
 - Automatic high-risk fraud detection (score ≥70%)
 - Identity verification for very high risk (≥85%)
 - Personalized customer warnings via Customer Service Agent
@@ -226,18 +245,13 @@ All agents deployed with full Azure AI Foundry telemetry and real-time performan
 - Complete audit trail and workflow logging
 
 ### **View Telemetry**
-1. Visit: https://ai.azure.com
+
+1. Visit: <https://ai.azure.com>
 2. Select your Azure AI Foundry project
 3. Navigate to: Tracing / Monitoring
 4. View: Agent invocations, thread IDs, and performance metrics
 
 ---
-
-
-
-
-
-
 
 ## 📦 Logistics Workflow
 
@@ -266,6 +280,7 @@ python main.py
 ```
 
 Menu-driven interface for:
+
 - Parcel registration and tracking
 - Location-aware scanning
 - AI agent workflows
@@ -280,13 +295,15 @@ Menu-driven interface for:
 
 ### Containers & Partition Strategy
 
-#### 1. Parcels Container (Partition Key: `/store_location`) 
+#### 1. Parcels Container (Partition Key: `/store_location`)
+
 - Comprehensive parcel data with sender/recipient details
 - Tracking numbers, barcodes, and status information
 - Service types (standard, express, overnight, registered)
 - Special handling requirements
 
 #### 2. Tracking Events Container (Partition Key: `/barcode`)
+
 ```json
 {
   "id": "abc123-def456",
@@ -320,6 +337,7 @@ Menu-driven interface for:
 - Scanner operations and timestamps
 
 #### 3. Approvals Container (Partition Key: `/barcode`)
+
 - Human approval workflows
 - Exception handling requests
 - Priority-based processing
@@ -385,6 +403,7 @@ pip install -r requirements.txt
 ```
 
 **Key Dependencies:**
+
 - `flask>=3.0.0` - Web framework
 - `gunicorn>=21.2.0` - Production WSGI server
 - `azure-cosmos>=4.5.0` - Cosmos DB client
@@ -413,6 +432,7 @@ python generate_demo_manifests.py --large 200
 ```
 
 **What this creates:**
+
 - ✅ Sample parcels distributed across Australian states (NSW, VIC, QLD, SA, WA, ACT)
 - ✅ Driver manifests for 57 drivers (driver-001 through driver-057)
 - ✅ Realistic Sydney addresses and delivery details
@@ -428,6 +448,7 @@ python parcel_tracking_db.py
 ```
 
 This will:
+
 - ✅ Create the `agent_workflow_db` database
 - ✅ Create required containers with proper partitioning
 - ✅ Add sample test data for demonstration
@@ -436,11 +457,13 @@ This will:
 ### 8. Start the Application
 
 **Web Interface:**
+
 ```powershell
 $env:FLASK_ENV='development'; py app.py
 ```
 
 **CLI Interface:**
+
 ```bash
 python main.py
 ```
@@ -456,8 +479,6 @@ az cosmosdb sql role assignment create \
     --principal-id your-user-object-id \
     --role-definition-name "Cosmos DB Built-in Data Contributor"
 ```
-
-
 
 ## 💻 Usage Examples
 
@@ -476,6 +497,7 @@ python main.py
 ```
 
 Menu-driven interface for:
+
 - Parcel registration and tracking
 - Location-aware scanning
 - AI agent workflows
@@ -485,12 +507,14 @@ Menu-driven interface for:
 ## 📋 Service Types & Status Tracking
 
 ### Service Types
+
 - **standard** - 5 business day delivery
 - **express** - 2 business day delivery  
 - **overnight** - Next business day delivery
 - **registered** - 3 business day delivery with signature required
 
 ### Parcel Statuses
+
 - `registered` - Initial registration at store
 - `in_transit` - Moving between facilities
 - `at_depot` - Arrived at sorting/distribution facility
@@ -499,6 +523,7 @@ Menu-driven interface for:
 - `exception` - Issue requiring attention
 
 ### Event Types
+
 - `registered` - Parcel entered system
 - `in_transit` - Moving between locations
 - `at_depot` - Arrived at facility
@@ -510,6 +535,7 @@ Menu-driven interface for:
 ## 🔧 API Reference
 
 ### Core Parcel Operations
+
 ```python
 from parcel_tracking_db import ParcelTrackingDB
 
@@ -546,6 +572,7 @@ async with ParcelTrackingDB() as db:
 ```
 
 ### Tracking Operations
+
 ```python
 async with ParcelTrackingDB() as db:
     # Create tracking event
@@ -559,12 +586,13 @@ async with ParcelTrackingDB() as db:
 
     # Filter parcels by store
     store_parcels = await db.get_parcels_by_store("Store_Melbourne_CBD")
-    
+
     # Get store statistics
     stats = await db.get_store_statistics("Store_Melbourne_CBD")
 ```
 
 ### Approval Operations
+
 ```python
 async with ParcelTrackingDB() as db:
     # Request approval
@@ -584,6 +612,7 @@ async with ParcelTrackingDB() as db:
 ```
 
 ### Synchronous Wrappers (for backwards compatibility)
+
 ```python
 # Initialize database
 db = ParcelTrackingDB()
@@ -601,6 +630,7 @@ success = db.approve_request_sync(request_id, "supervisor_001")
 ## 🚦 Exception Handling & Supervisor Approvals
 
 ### Approval Request Types
+
 - `exception_handling` - Process delivery exceptions
 - `return_to_sender` - Return undeliverable packages
 - `delivery_redirect` - Change delivery address
@@ -609,6 +639,7 @@ success = db.approve_request_sync(request_id, "supervisor_001")
 - `special_handling` - Special handling requirements
 
 ### Priority Levels
+
 - `low` - Standard processing
 - `medium` - Normal priority
 - `high` - Expedited processing
@@ -617,16 +648,19 @@ success = db.approve_request_sync(request_id, "supervisor_001")
 ## 📈 Performance & Optimization
 
 ### Partitioning Strategy
+
 - **Parcels**: Partitioned by store location for operational efficiency
 - **Tracking Events**: Partitioned by barcode for query optimization
 - **Delivery Attempts**: Partitioned by barcode for approval workflows
 
 ### Cost Optimization
+
 - **Development**: Serverless tier for variable workloads
 - **Production**: Provisioned throughput with autoscale
 - **Indexing**: Optimized for frequently queried fields
 
 ### Monitoring Key Metrics
+
 - Request Unit (RU) consumption
 - Query performance and latency
 - Storage usage and growth patterns
@@ -635,11 +669,13 @@ success = db.approve_request_sync(request_id, "supervisor_001")
 ## 🔐 Security & Compliance
 
 ### Authentication Options
+
 - **Key-based**: Primary/secondary keys (development)
 - **Azure AD**: RBAC with built-in data roles (production recommended)
 - **Connection security**: TLS encryption for all communications
 
 ### Data Protection
+
 - Customer PII encryption at rest and in transit
 - Audit trail logging for all operations
 - GDPR compliance features
@@ -701,10 +737,12 @@ dt_item_scanner/
 ### Common Issues
 
 #### "Cannot run the event loop while another loop is running"
+
 This error occurs when AI agents try to use sync database methods within async context.
 **Solution**: The current system uses mock agent tools to avoid this issue. Real database operations happen at the workflow level.
 
 #### Authentication Errors
+
 ```bash
 # Error: "Local Authorization is disabled"
 # Solution: Use Azure AD authentication or enable key-based auth
@@ -712,15 +750,18 @@ az cosmosdb update --name your-account --resource-group your-rg --disable-local-
 ```
 
 #### Partition Key Errors
+
 - Ensure store_location is provided for parcel operations
 - Use barcode for tracking events and delivery attempts
 
 #### Performance Issues
+
 - Monitor RU consumption in Azure Portal
 - Optimize query patterns to avoid cross-partition queries
 - Consider increasing provisioned throughput
 
 ### Debug Tools
+
 ```bash
 # Test database connectivity and setup
 python Identity_Test_CosmosDB_connection.py
@@ -735,13 +776,16 @@ export AZURE_LOG_LEVEL=DEBUG
 ## 🔄 Migration & Integration
 
 ### Consolidated Architecture
+
 The system now uses a single consolidated database interface (`parcel_tracking_db.py`) that combines:
+
 - All Cosmos DB operations
 - Setup and testing utilities  
 - Synchronous wrappers for backwards compatibility
 - Australian localization features
 
 ### External System Integration
+
 - REST APIs for real-time tracking
 - Webhook notifications for status changes
 - Bulk upload APIs for batch operations
@@ -750,12 +794,14 @@ The system now uses a single consolidated database interface (`parcel_tracking_d
 ## 📊 Service Types & Status Tracking
 
 ### **Service Types**
+
 - **Standard** - 5 business day delivery
 - **Express** - 2 business day delivery
 - **Overnight** - Next business day delivery
 - **Registered** - 3 business day delivery with signature required
 
 ### **Parcel Statuses**
+
 - `registered` - Initial registration at store
 - `in_transit` - Moving between facilities
 - `at_depot` - At sorting/distribution facility
@@ -784,10 +830,10 @@ async with ParcelTrackingDB() as db:
         weight=1.5,
         store_location="Store_Melbourne_CBD"
     )
-    
+
     # Track parcel
     tracking_history = await db.get_parcel_tracking_history("LP123456")
-    
+
     # Update status
     await db.update_parcel_status(
         barcode="LP123456",
@@ -840,6 +886,7 @@ az webapp up --runtime PYTHON:3.11 --sku B1 --name dt-logistics-web
 ```
 
 See `Guides/DEPLOYMENT.md` for complete instructions including:
+
 - Environment variable configuration
 - CI/CD setup
 - Monitoring and logging
@@ -852,12 +899,14 @@ See `Guides/DEPLOYMENT.md` for complete instructions including:
 ### **Common Issues**
 
 **Database Connection Errors**
+
 ```bash
 # Test Cosmos DB connectivity
 python parcel_tracking_db.py
 ```
 
 **Agent Not Responding**
+
 ```bash
 # Verify Azure credentials
 az login
@@ -867,11 +916,13 @@ cat .env | Select-String "AZURE"
 ```
 
 **Speech/Voice Features Not Working**
+
 - Verify `AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION` in `.env`
 - Check microphone permissions in browser
 - Test with `services/speech.py`
 
 **Azure Maps Not Optimizing Routes**
+
 - Validate `AZURE_MAPS_SUBSCRIPTION_KEY`
 - Run `Test Scripts/test_azure_maps.py`
 - Check API quota limits
@@ -894,9 +945,10 @@ This project uses Azure AI services and follows Microsoft licensing terms.
 ---
 
 **🚀 Get Started Now:**
+
 1. Configure `.env` with Azure credentials
 2. Run `python parcel_tracking_db.py` to initialize database
 3. Start web app: `$env:FLASK_ENV='development'; py app.py`
-4. Access http://127.0.0.1:5000 (Login: admin/admin123)
+4. Access <http://127.0.0.1:5000> (Login: admin/admin123)
 
-Experience the complete AI-powered logistics system with voice features, fraud detection workflows, and real-time route optimization! 
+Experience the complete AI-powered logistics system with voice features, fraud detection workflows, and real-time route optimization!

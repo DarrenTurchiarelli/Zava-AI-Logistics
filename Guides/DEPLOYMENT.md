@@ -1,4 +1,4 @@
-# DT Logistics - Azure App Service Deployment Guide
+# Zava - Azure App Service Deployment Guide
 
 ## Prerequisites
 
@@ -111,6 +111,7 @@ Set these in Azure Portal → App Service → Configuration → Application Sett
 After enabling managed identity, grant the following Azure RBAC roles to the App Service's managed identity:
 
 ### 1. Cosmos DB Access
+
 ```bash
 # Get the managed identity principal ID
 PRINCIPAL_ID=$(az webapp identity show \
@@ -128,6 +129,7 @@ az cosmosdb sql role assignment create \
 ```
 
 ### 2. Azure AI Foundry Access
+
 ```bash
 # Get subscription ID
 SUBSCRIPTION_ID=$(az account show --query id -o tsv)
@@ -184,6 +186,7 @@ az role assignment create \
 ```
 
 ### 3. Verify Role Assignments
+
 ```bash
 # List all role assignments for the managed identity
 az role assignment list \
@@ -209,6 +212,7 @@ az role assignment list \
 **⚠️ CRITICAL**: The `agents/read` permission requires roles assigned directly to the AI Hub **resource**, not just the resource group. Without this, chatbot and fraud detection will fail with permission errors.
 
 **Important**: Role assignments can take up to 5 minutes to propagate. Restart the App Service after granting permissions:
+
 ```bash
 az webapp restart --name dt-logistics-web --resource-group dt-logistics-rg
 ```
@@ -221,12 +225,14 @@ After your first deployment, populate the database with sample parcels and drive
 
 **Automatic (via deploy_to_azure.ps1):**
 The deployment script automatically runs post-deployment tasks that create:
+
 - ✅ Default user accounts (admin, support, drivers, depot_mgr)
 - ✅ 57 driver manifests (driver-001 through driver-057)
 - ✅ Sample parcels distributed across Australian states
 - ✅ Ready-to-use demo environment
 
 **Manual (if needed):**
+
 ```bash
 # If automatic setup failed or you need to regenerate data
 
@@ -242,12 +248,14 @@ python generate_demo_manifests.py --large 200
 ```
 
 **What this creates:**
+
 - Sample parcels across NSW, VIC, QLD, SA, WA, ACT
 - Driver manifests with 30-50 parcels each
 - Realistic Sydney addresses and delivery details
 - Immediate testing capability for all features
 
 ### 2. Enable Always On
+
 ```bash
 az webapp config set \
   --name dt-logistics-web \
@@ -256,6 +264,7 @@ az webapp config set \
 ```
 
 ### 3. Configure Logging
+
 ```bash
 az webapp log config \
   --name dt-logistics-web \
@@ -266,6 +275,7 @@ az webapp log config \
 ```
 
 ### 4. View Logs
+
 ```bash
 az webapp log tail \
   --name dt-logistics-web \
@@ -328,16 +338,19 @@ az webapp config appsettings set \
 ## Troubleshooting
 
 ### Check Application Logs
+
 ```bash
 az webapp log tail --name dt-logistics-web --resource-group dt-logistics-rg
 ```
 
 ### SSH into Container
+
 ```bash
 az webapp ssh --name dt-logistics-web --resource-group dt-logistics-rg
 ```
 
 ### Restart App
+
 ```bash
 az webapp restart --name dt-logistics-web --resource-group dt-logistics-rg
 ```
@@ -371,6 +384,7 @@ az webapp restart --name dt-logistics-web --resource-group dt-logistics-rg
 ## Support
 
 For issues or questions:
+
 - Check Azure Portal → App Service → Diagnose and solve problems
 - Review application logs
 - Contact Azure Support

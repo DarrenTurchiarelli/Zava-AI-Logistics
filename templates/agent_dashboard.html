@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}AI Agent Monitoring - DT Logistics{% endblock %}
+{% block title %}AI Agent Monitoring - Zava{% endblock %}
 
 {% block content %}
 <div class="container-fluid mt-4">
@@ -25,7 +25,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="col-md-3">
             <div class="card border-primary">
                 <div class="card-body">
@@ -39,7 +39,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="col-md-3">
             <div class="card border-primary">
                 <div class="card-body">
@@ -53,7 +53,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="col-md-3">
             <div class="card border-primary">
                 <div class="card-body">
@@ -83,7 +83,7 @@
                     <h6 class="text-primary mt-4 mb-3">
                         <i class="bi bi-check-circle-fill"></i> Active Agents
                     </h6>
-                    
+
                     <!-- Row 1: First 3 Active Agents -->
                     <div class="row">
                         <!-- Customer Service Agent -->
@@ -96,7 +96,7 @@
                                         </h6>
                                         <span class="badge bg-success">ACTIVE</span>
                                     </div>
-                                    
+
                                     <!-- Agent Metrics -->
                                     {% set agent_metrics = namespace(found=false) %}
                                     {% for agent in dashboard.agents %}
@@ -118,7 +118,7 @@
                                             </div>
                                         {% endif %}
                                     {% endfor %}
-                                    
+
                                     <p class="card-text small mt-2">
                                         AI-powered customer support with real-time Cosmos DB queries.
                                     </p>
@@ -138,7 +138,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Fraud Detection Agent -->
                         <div class="col-md-4 mb-3">
                             <div class="card h-100 border-primary shadow-sm">
@@ -149,7 +149,7 @@
                                         </h6>
                                         <span class="badge bg-success">ACTIVE</span>
                                     </div>
-                                    
+
                                     <!-- Agent Metrics -->
                                     {% set agent_metrics = namespace(found=false) %}
                                     {% for agent in dashboard.agents %}
@@ -171,7 +171,7 @@
                                             </div>
                                         {% endif %}
                                     {% endfor %}
-                                    
+
                                     <p class="card-text small mt-2">
                                         Analyses messages for fraud risks with multi-category threat classification.
                                     </p>
@@ -190,7 +190,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Identity Agent -->
                         <div class="col-md-4 mb-3">
                             <div class="card h-100 border-primary shadow-sm">
@@ -201,7 +201,7 @@
                                         </h6>
                                         <span class="badge bg-success">ACTIVE</span>
                                     </div>
-                                    
+
                                     <!-- Agent Metrics -->
                                     {% set agent_metrics = namespace(found=false) %}
                                     {% for agent in dashboard.agents %}
@@ -223,7 +223,7 @@
                                             </div>
                                         {% endif %}
                                     {% endfor %}
-                                    
+
                                     <p class="card-text small mt-2">
                                         Verifies customer identity for high-risk fraud cases (≥85% risk score).
                                     </p>
@@ -256,7 +256,7 @@
                                         </h6>
                                         <span class="badge bg-success">ACTIVE</span>
                                     </div>
-                                    
+
                                     <!-- Agent Metrics -->
                                     {% set agent_metrics = namespace(found=false) %}
                                     {% for agent in dashboard.agents %}
@@ -278,7 +278,7 @@
                                             </div>
                                         {% endif %}
                                     {% endfor %}
-                                    
+
                                     <p class="card-text small mt-2">
                                         Intelligent parcel-to-driver assignment with workload balancing.
                                     </p>
@@ -308,7 +308,7 @@
                                         </h6>
                                         <span class="badge bg-success">ACTIVE</span>
                                     </div>
-                                    
+
                                     <!-- Agent Metrics -->
                                     {% set agent_metrics = namespace(found=false) %}
                                     {% for agent in dashboard.agents %}
@@ -330,7 +330,7 @@
                                             </div>
                                         {% endif %}
                                     {% endfor %}
-                                    
+
                                     <p class="card-text small mt-2">
                                         Validates parcels during registration with AI-powered insights.
                                     </p>
@@ -361,7 +361,7 @@
                                         </h6>
                                         <span class="badge bg-success">ACTIVE</span>
                                     </div>
-                                    
+
                                     <!-- Agent Metrics -->
                                     {% set agent_metrics = namespace(found=false) %}
                                     {% for agent in dashboard.agents %}
@@ -383,7 +383,7 @@
                                             </div>
                                         {% endif %}
                                     {% endfor %}
-                                    
+
                                     <p class="card-text small mt-2">
                                         Network-wide performance analysis and AI-powered recommendations.
                                     </p>
@@ -416,7 +416,7 @@
                                         </h6>
                                         <span class="badge bg-success">ACTIVE</span>
                                     </div>
-                                    
+
                                     <!-- Agent Metrics -->
                                     {% set agent_metrics = namespace(found=false) %}
                                     {% for agent in dashboard.agents %}
@@ -438,7 +438,7 @@
                                             </div>
                                         {% endif %}
                                     {% endfor %}
-                                    
+
                                     <p class="card-text small mt-2">
                                         Real-time facility capacity monitoring and automated routing decisions.
                                     </p>
@@ -468,7 +468,7 @@
                                         </h6>
                                         <span class="badge bg-success">ACTIVE</span>
                                     </div>
-                                    
+
                                     <!-- Agent Metrics -->
                                     {% set agent_metrics = namespace(found=false) %}
                                     {% for agent in dashboard.agents %}
@@ -490,7 +490,7 @@
                                             </div>
                                         {% endif %}
                                     {% endfor %}
-                                    
+
                                     <p class="card-text small mt-2">
                                         Multi-stop delivery sequencing with automated customer notifications.
                                     </p>
@@ -550,18 +550,18 @@
                                     <td>{{ agent.total_decisions }}</td>
                                     <td>
                                         <div class="progress" style="height: 20px;">
-                                            <div class="progress-bar 
+                                            <div class="progress-bar
                                                 {% if agent.success_rate > 0.7 %}bg-success
                                                 {% elif agent.success_rate > 0.3 %}bg-warning
                                                 {% else %}bg-danger{% endif %}"
-                                                role="progressbar" 
+                                                role="progressbar"
                                                 style="width: {{ (agent.success_rate * 100)|int }}%">
                                                 {{ (agent.success_rate * 100)|round(0)|int }}%
                                             </div>
                                         </div>
                                     </td>
                                     <td>
-                                        <span class="badge 
+                                        <span class="badge
                                             {% if agent.avg_confidence > 0.8 %}bg-success
                                             {% elif agent.avg_confidence > 0.6 %}bg-warning
                                             {% else %}bg-danger{% endif %}">

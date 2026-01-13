@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Startup script for Azure App Service
-echo "Starting DT Logistics Web Application..."
+echo "Starting Zava Web Application..."
 
 # Install dependencies
 echo "Installing Python dependencies..."

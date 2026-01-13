@@ -1,10 +1,11 @@
 # Azure Deployment Guide
 
-This guide covers deploying the DT Logistics application to Azure App Service.
+This guide covers deploying the Zava application to Azure App Service.
 
 ## Prerequisites
 
 1. **Azure CLI** installed and logged in
+
    ```powershell
    az login
    ```
@@ -24,6 +25,7 @@ Run the automated deployment script:
 ```
 
 This script will:
+
 1. Create an Azure Resource Group
 2. Create an App Service Plan (B2 tier)
 3. Create a Web App with Python 3.11 runtime
@@ -85,10 +87,11 @@ If your Cosmos DB has key-based auth disabled (`disableLocalAuth: true`):
    - **Cosmos DB Built-in Data Contributor**
 
 2. If automatic granting fails, grant manually:
+
    ```powershell
    # Get the managed identity principal ID
    $principalId = az webapp identity show --name YOUR_WEBAPP_NAME --resource-group YOUR_RG --query principalId -o tsv
-   
+
    # Grant Cosmos DB permissions
    az cosmosdb sql role assignment create `
      --account-name YOUR_COSMOS_ACCOUNT `
@@ -101,6 +104,7 @@ If your Cosmos DB has key-based auth disabled (`disableLocalAuth: true`):
 3. **Wait 2-5 minutes** for RBAC permissions to propagate
 
 4. Restart the web app:
+
    ```powershell
    az webapp restart --name YOUR_WEBAPP_NAME --resource-group YOUR_RG
    ```
@@ -117,6 +121,7 @@ python setup_users.py
 ```
 
 This creates default accounts:
+
 - **admin** / admin123 (Administrator)
 - **support** / support123 (Customer Service)
 - **driver001, driver002, driver003** / driver123 (Drivers)
@@ -145,22 +150,27 @@ az webapp log download --name YOUR_WEBAPP_NAME --resource-group YOUR_RG --log-fi
 **Error:** Authentication fails or returns to login page
 
 **Solution:**
+
 1. Check if Cosmos DB permissions are granted:
+
    ```powershell
    az cosmosdb sql role assignment list --account-name YOUR_COSMOS_ACCOUNT --resource-group YOUR_COSMOS_RG
    ```
 
 2. Verify managed identity exists:
+
    ```powershell
    az webapp identity show --name YOUR_WEBAPP_NAME --resource-group YOUR_RG
    ```
 
 3. Check application logs for permission errors:
+
    ```powershell
    az webapp log tail --name YOUR_WEBAPP_NAME --resource-group YOUR_RG
    ```
 
 4. If you see "Request blocked by Auth" errors, wait 5 minutes for RBAC propagation, then restart:
+
    ```powershell
    az webapp restart --name YOUR_WEBAPP_NAME --resource-group YOUR_RG
    ```
@@ -170,12 +180,15 @@ az webapp log download --name YOUR_WEBAPP_NAME --resource-group YOUR_RG --log-fi
 **Error:** Application can't find configuration
 
 **Solution:**
+
 1. Verify environment variables in Azure Portal or:
+
    ```powershell
    az webapp config appsettings list --name YOUR_WEBAPP_NAME --resource-group YOUR_RG
    ```
 
 2. Re-run deployment to update settings:
+
    ```powershell
    .\deploy_to_azure.ps1
    ```
@@ -185,6 +198,7 @@ az webapp log download --name YOUR_WEBAPP_NAME --resource-group YOUR_RG --log-fi
 **Error:** "Failed to connect to Cosmos DB"
 
 **Solution:**
+
 1. Check if your IP is allowed in Cosmos DB firewall
 2. Verify Cosmos DB endpoint and key are correct
 3. For Azure AD auth, ensure RBAC role is assigned
@@ -198,6 +212,7 @@ To deploy code changes:
 ```
 
 The script will:
+
 - Detect existing resources and reuse them
 - Update environment variables from `.env`
 - Deploy new application code
@@ -215,6 +230,7 @@ The script will:
 ```
 
 ### SKU Options
+
 - **F1** - Free tier (limited, no Always On)
 - **B1, B2, B3** - Basic tier
 - **S1, S2, S3** - Standard tier
@@ -240,6 +256,7 @@ The script will:
 ## Support
 
 For issues or questions:
+
 1. Check application logs
 2. Review this deployment guide
 3. Verify all environment variables are set

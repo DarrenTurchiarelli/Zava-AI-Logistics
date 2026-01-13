@@ -6,10 +6,10 @@ Creates realistic delivery data with Sydney addresses
 Usage:
     # Generate regular demo manifests for all drivers (driver-001 through driver-057)
     python generate_demo_manifests.py
-    
+
     # Generate large scalability test manifest for driver-004 with 120 parcels
     python generate_demo_manifests.py --large-default
-    
+
     # Generate large manifest with custom parcel count
     python generate_demo_manifests.py --large 150
     python generate_demo_manifests.py --large 200
@@ -19,9 +19,10 @@ Note: Use 'python' instead of 'py' launcher - Faker env may not be picked up wit
 
 import asyncio
 import os
-import sys
 import random
+import sys
 from datetime import datetime
+
 from dotenv import load_dotenv
 
 # Add parent directory to path to find parcel_tracking_db
@@ -35,8 +36,9 @@ from parcel_tracking_db import ParcelTrackingDB
 # Try to import Faker, set flag if available
 try:
     from faker import Faker
+
     FAKER_AVAILABLE = True
-    fake = Faker('en_AU')
+    fake = Faker("en_AU")
 except ImportError:
     FAKER_AVAILABLE = False
     fake = None
@@ -50,176 +52,290 @@ SAMPLE_ADDRESSES = [
         "address": "1 Macquarie Street, Sydney NSW 2000",
         "phone": "+61 2 9250 7111",
         "priority": "normal",
-        "notes": "Office building - reception on ground floor"
+        "notes": "Office building - reception on ground floor",
     },
     {
         "recipient": "Michael Chen",
         "address": "88 Cumberland Street, The Rocks NSW 2000",
         "phone": "+61 2 9240 8500",
         "priority": "urgent",
-        "notes": "Leave with concierge if not home"
+        "notes": "Leave with concierge if not home",
     },
     {
         "recipient": "Emma Wilson",
         "address": "483 George Street, Sydney NSW 2000",
         "phone": "+61 2 9265 9000",
         "priority": "normal",
-        "notes": "Call before delivery"
+        "notes": "Call before delivery",
     },
     {
         "recipient": "James Martinez",
         "address": "201 Kent Street, Sydney NSW 2000",
         "phone": "+61 2 9320 6000",
         "priority": "normal",
-        "notes": "Signature required"
+        "notes": "Signature required",
     },
     {
         "recipient": "Olivia Brown",
         "address": "100 Market Street, Sydney NSW 2000",
         "phone": "+61 2 9267 3000",
         "priority": "urgent",
-        "notes": "Fragile items - handle with care"
+        "notes": "Fragile items - handle with care",
     },
     {
         "recipient": "William Taylor",
         "address": "456 Kent Street, Sydney NSW 2000",
         "phone": "+61 2 9286 3000",
         "priority": "normal",
-        "notes": "Apartment 12B - use intercom"
+        "notes": "Apartment 12B - use intercom",
     },
     {
         "recipient": "Sophia Anderson",
         "address": "200 Barangaroo Avenue, Barangaroo NSW 2000",
         "phone": "+61 2 8871 3000",
         "priority": "normal",
-        "notes": "Security check required at entrance"
+        "notes": "Security check required at entrance",
     },
     {
         "recipient": "Benjamin Lee",
         "address": "1 Bligh Street, Sydney NSW 2000",
         "phone": "+61 2 8223 0000",
         "priority": "urgent",
-        "notes": "Time-sensitive delivery"
+        "notes": "Time-sensitive delivery",
     },
     {
         "recipient": "Charlotte Harris",
         "address": "680 George Street, Sydney NSW 2000",
         "phone": "+61 2 9265 8888",
         "priority": "normal",
-        "notes": "Leave at front desk"
+        "notes": "Leave at front desk",
     },
     {
         "recipient": "Daniel Kim",
         "address": "1 O'Connell Street, Sydney NSW 2000",
         "phone": "+61 2 8247 7000",
         "priority": "normal",
-        "notes": "Ring doorbell twice"
+        "notes": "Ring doorbell twice",
     },
     {
         "recipient": "Amelia White",
         "address": "111 Harrington Street, The Rocks NSW 2000",
         "phone": "+61 2 9252 0524",
         "priority": "normal",
-        "notes": "Historic building - use main entrance"
+        "notes": "Historic building - use main entrance",
     },
     {
         "recipient": "Lucas Thompson",
         "address": "52 Martin Place, Sydney NSW 2000",
         "phone": "+61 2 9551 8911",
         "priority": "urgent",
-        "notes": "Perishable goods - priority delivery"
+        "notes": "Perishable goods - priority delivery",
     },
     {
         "recipient": "Mia Garcia",
         "address": "135 King Street, Sydney NSW 2000",
         "phone": "+61 2 9231 9700",
         "priority": "normal",
-        "notes": "Commercial property - business hours only"
+        "notes": "Commercial property - business hours only",
     },
     {
         "recipient": "Ethan Rodriguez",
         "address": "388 George Street, Sydney NSW 2000",
         "phone": "+61 2 9265 8888",
         "priority": "normal",
-        "notes": "Leave with building manager"
+        "notes": "Leave with building manager",
     },
     {
         "recipient": "Isabella Martinez",
         "address": "181 Miller Street, North Sydney NSW 2060",
         "phone": "+61 2 9922 1211",
         "priority": "normal",
-        "notes": "Cross harbour bridge for delivery"
+        "notes": "Cross harbour bridge for delivery",
     },
     {
         "recipient": "Mason Davis",
         "address": "1 Denison Street, North Sydney NSW 2060",
         "phone": "+61 2 9922 8888",
         "priority": "urgent",
-        "notes": "Medical supplies - handle carefully"
+        "notes": "Medical supplies - handle carefully",
     },
     {
         "recipient": "Harper Wilson",
         "address": "33 Saunders Street, Pyrmont NSW 2009",
         "phone": "+61 2 9692 0222",
         "priority": "normal",
-        "notes": "Waterfront apartment - parking in visitor bay"
+        "notes": "Waterfront apartment - parking in visitor bay",
     },
     {
         "recipient": "Alexander Moore",
         "address": "35 Clarence Street, Sydney NSW 2000",
         "phone": "+61 2 9241 1888",
         "priority": "normal",
-        "notes": "Requires ID verification"
+        "notes": "Requires ID verification",
     },
     {
         "recipient": "Evelyn Jackson",
         "address": "70 Castlereagh Street, Sydney NSW 2000",
         "phone": "+61 2 9265 6000",
         "priority": "normal",
-        "notes": "Department store - deliver to loading dock"
+        "notes": "Department store - deliver to loading dock",
     },
     {
         "recipient": "Sebastian Clark",
         "address": "225 George Street, Sydney NSW 2000",
         "phone": "+61 2 9240 1234",
         "priority": "urgent",
-        "notes": "Electronics - do not leave unattended"
-    }
+        "notes": "Electronics - do not leave unattended",
+    },
 ]
 
 # Additional addresses for other Australian states
 SAMPLE_ADDRESSES_VIC = [
-    {"recipient": "Oliver Thompson", "address": "120 Collins Street, Melbourne VIC 3000", "phone": "+61 3 9654 1234", "priority": "normal", "notes": "CBD office building"},
-    {"recipient": "Emma Wilson", "address": "1 Flinders Street, Melbourne VIC 3000", "phone": "+61 3 9619 5000", "priority": "normal", "notes": "Near Flinders Street Station"},
-    {"recipient": "Noah Brown", "address": "8 Exhibition Street, Melbourne VIC 3000", "phone": "+61 3 9639 8888", "priority": "urgent", "notes": "Parliament precinct"},
-    {"recipient": "Sophia Martin", "address": "501 Swanston Street, Melbourne VIC 3000", "phone": "+61 3 9347 2000", "priority": "normal", "notes": "University area"},
-    {"recipient": "Liam Davis", "address": "181 William Street, Melbourne VIC 3000", "phone": "+61 3 9320 5000", "priority": "normal", "notes": "Legal district"},
+    {
+        "recipient": "Oliver Thompson",
+        "address": "120 Collins Street, Melbourne VIC 3000",
+        "phone": "+61 3 9654 1234",
+        "priority": "normal",
+        "notes": "CBD office building",
+    },
+    {
+        "recipient": "Emma Wilson",
+        "address": "1 Flinders Street, Melbourne VIC 3000",
+        "phone": "+61 3 9619 5000",
+        "priority": "normal",
+        "notes": "Near Flinders Street Station",
+    },
+    {
+        "recipient": "Noah Brown",
+        "address": "8 Exhibition Street, Melbourne VIC 3000",
+        "phone": "+61 3 9639 8888",
+        "priority": "urgent",
+        "notes": "Parliament precinct",
+    },
+    {
+        "recipient": "Sophia Martin",
+        "address": "501 Swanston Street, Melbourne VIC 3000",
+        "phone": "+61 3 9347 2000",
+        "priority": "normal",
+        "notes": "University area",
+    },
+    {
+        "recipient": "Liam Davis",
+        "address": "181 William Street, Melbourne VIC 3000",
+        "phone": "+61 3 9320 5000",
+        "priority": "normal",
+        "notes": "Legal district",
+    },
 ]
 
 SAMPLE_ADDRESSES_QLD = [
-    {"recipient": "Ava Johnson", "address": "100 Queen Street, Brisbane QLD 4000", "phone": "+61 7 3229 9111", "priority": "normal", "notes": "Brisbane CBD"},
-    {"recipient": "William Taylor", "address": "12 Creek Street, Brisbane QLD 4000", "phone": "+61 7 3221 6111", "priority": "urgent", "notes": "Financial district"},
-    {"recipient": "Isabella White", "address": "45 Eagle Street, Brisbane QLD 4000", "phone": "+61 7 3221 2333", "priority": "normal", "notes": "Riverside area"},
-    {"recipient": "James Anderson", "address": "111 George Street, Brisbane QLD 4000", "phone": "+61 7 3229 8111", "priority": "normal", "notes": "Treasury building area"},
-    {"recipient": "Mia Thompson", "address": "320 Adelaide Street, Brisbane QLD 4000", "phone": "+61 7 3222 1234", "priority": "normal", "notes": "Central Brisbane"},
+    {
+        "recipient": "Ava Johnson",
+        "address": "100 Queen Street, Brisbane QLD 4000",
+        "phone": "+61 7 3229 9111",
+        "priority": "normal",
+        "notes": "Brisbane CBD",
+    },
+    {
+        "recipient": "William Taylor",
+        "address": "12 Creek Street, Brisbane QLD 4000",
+        "phone": "+61 7 3221 6111",
+        "priority": "urgent",
+        "notes": "Financial district",
+    },
+    {
+        "recipient": "Isabella White",
+        "address": "45 Eagle Street, Brisbane QLD 4000",
+        "phone": "+61 7 3221 2333",
+        "priority": "normal",
+        "notes": "Riverside area",
+    },
+    {
+        "recipient": "James Anderson",
+        "address": "111 George Street, Brisbane QLD 4000",
+        "phone": "+61 7 3229 8111",
+        "priority": "normal",
+        "notes": "Treasury building area",
+    },
+    {
+        "recipient": "Mia Thompson",
+        "address": "320 Adelaide Street, Brisbane QLD 4000",
+        "phone": "+61 7 3222 1234",
+        "priority": "normal",
+        "notes": "Central Brisbane",
+    },
 ]
 
 SAMPLE_ADDRESSES_SA = [
-    {"recipient": "Lucas Harris", "address": "91 King William Street, Adelaide SA 5000", "phone": "+61 8 8223 1234", "priority": "normal", "notes": "Adelaide CBD"},
-    {"recipient": "Charlotte Miller", "address": "45 Grenfell Street, Adelaide SA 5000", "phone": "+61 8 8212 3456", "priority": "normal", "notes": "City center"},
-    {"recipient": "Henry Wilson", "address": "136 North Terrace, Adelaide SA 5000", "phone": "+61 8 8207 1234", "priority": "urgent", "notes": "Cultural precinct"},
-    {"recipient": "Amelia Jones", "address": "25 Pirie Street, Adelaide SA 5000", "phone": "+61 8 8223 5678", "priority": "normal", "notes": "Retail district"},
+    {
+        "recipient": "Lucas Harris",
+        "address": "91 King William Street, Adelaide SA 5000",
+        "phone": "+61 8 8223 1234",
+        "priority": "normal",
+        "notes": "Adelaide CBD",
+    },
+    {
+        "recipient": "Charlotte Miller",
+        "address": "45 Grenfell Street, Adelaide SA 5000",
+        "phone": "+61 8 8212 3456",
+        "priority": "normal",
+        "notes": "City center",
+    },
+    {
+        "recipient": "Henry Wilson",
+        "address": "136 North Terrace, Adelaide SA 5000",
+        "phone": "+61 8 8207 1234",
+        "priority": "urgent",
+        "notes": "Cultural precinct",
+    },
+    {
+        "recipient": "Amelia Jones",
+        "address": "25 Pirie Street, Adelaide SA 5000",
+        "phone": "+61 8 8223 5678",
+        "priority": "normal",
+        "notes": "Retail district",
+    },
 ]
 
 SAMPLE_ADDRESSES_WA = [
-    {"recipient": "Benjamin Clark", "address": "125 St Georges Terrace, Perth WA 6000", "phone": "+61 8 9220 1234", "priority": "normal", "notes": "Perth CBD"},
-    {"recipient": "Harper Lewis", "address": "200 Murray Street, Perth WA 6000", "phone": "+61 8 9321 5678", "priority": "normal", "notes": "City center"},
-    {"recipient": "Ethan Walker", "address": "108 Hay Street, Perth WA 6000", "phone": "+61 8 9321 8888", "priority": "urgent", "notes": "Shopping district"},
+    {
+        "recipient": "Benjamin Clark",
+        "address": "125 St Georges Terrace, Perth WA 6000",
+        "phone": "+61 8 9220 1234",
+        "priority": "normal",
+        "notes": "Perth CBD",
+    },
+    {
+        "recipient": "Harper Lewis",
+        "address": "200 Murray Street, Perth WA 6000",
+        "phone": "+61 8 9321 5678",
+        "priority": "normal",
+        "notes": "City center",
+    },
+    {
+        "recipient": "Ethan Walker",
+        "address": "108 Hay Street, Perth WA 6000",
+        "phone": "+61 8 9321 8888",
+        "priority": "urgent",
+        "notes": "Shopping district",
+    },
 ]
 
 SAMPLE_ADDRESSES_ACT = [
-    {"recipient": "Olivia Robinson", "address": "1 Constitution Avenue, Canberra ACT 2600", "phone": "+61 2 6270 1234", "priority": "urgent", "notes": "Government precinct"},
-    {"recipient": "Alexander King", "address": "45 Northbourne Avenue, Canberra ACT 2600", "phone": "+61 2 6248 5678", "priority": "normal", "notes": "Civic area"},
+    {
+        "recipient": "Olivia Robinson",
+        "address": "1 Constitution Avenue, Canberra ACT 2600",
+        "phone": "+61 2 6270 1234",
+        "priority": "urgent",
+        "notes": "Government precinct",
+    },
+    {
+        "recipient": "Alexander King",
+        "address": "45 Northbourne Avenue, Canberra ACT 2600",
+        "phone": "+61 2 6248 5678",
+        "priority": "normal",
+        "notes": "Civic area",
+    },
 ]
 
 # Sample drivers - 57 drivers distributed across Australian states and cities
@@ -251,7 +367,6 @@ SAMPLE_DRIVERS = [
     {"id": "driver-023", "name": "Benjamin Moore", "state": "NSW", "location": "Sydney"},
     {"id": "driver-024", "name": "Mia Jackson", "state": "NSW", "location": "Sydney"},
     {"id": "driver-025", "name": "Lucas Martin", "state": "NSW", "location": "Sydney"},
-    
     # VIC Drivers (12) - Melbourne
     {"id": "driver-026", "name": "Charlotte Lee", "state": "VIC", "location": "Melbourne"},
     {"id": "driver-027", "name": "Mason Harris", "state": "VIC", "location": "Melbourne"},
@@ -265,7 +380,6 @@ SAMPLE_DRIVERS = [
     {"id": "driver-035", "name": "Matthew Wright", "state": "VIC", "location": "Melbourne"},
     {"id": "driver-036", "name": "Emily Scott", "state": "VIC", "location": "Melbourne"},
     {"id": "driver-037", "name": "Joseph Green", "state": "VIC", "location": "Melbourne"},
-    
     # QLD Drivers (10) - Brisbane
     {"id": "driver-038", "name": "Elizabeth Adams", "state": "QLD", "location": "Brisbane"},
     {"id": "driver-039", "name": "David Baker", "state": "QLD", "location": "Brisbane"},
@@ -277,7 +391,6 @@ SAMPLE_DRIVERS = [
     {"id": "driver-045", "name": "Sebastian Turner", "state": "QLD", "location": "Brisbane"},
     {"id": "driver-046", "name": "Grace Phillips", "state": "QLD", "location": "Brisbane"},
     {"id": "driver-047", "name": "Jack Campbell", "state": "QLD", "location": "Brisbane"},
-    
     # SA Drivers (6) - Adelaide
     {"id": "driver-048", "name": "Chloe Parker", "state": "SA", "location": "Adelaide"},
     {"id": "driver-049", "name": "Owen Evans", "state": "SA", "location": "Adelaide"},
@@ -285,12 +398,10 @@ SAMPLE_DRIVERS = [
     {"id": "driver-051", "name": "Ryan Collins", "state": "SA", "location": "Adelaide"},
     {"id": "driver-052", "name": "Zoe Stewart", "state": "SA", "location": "Adelaide"},
     {"id": "driver-053", "name": "Nathan Sanchez", "state": "SA", "location": "Adelaide"},
-    
     # WA Drivers (3) - Perth
     {"id": "driver-054", "name": "Hannah Morris", "state": "WA", "location": "Perth"},
     {"id": "driver-055", "name": "Caleb Rogers", "state": "WA", "location": "Perth"},
     {"id": "driver-056", "name": "Aria Reed", "state": "WA", "location": "Perth"},
-    
     # ACT Driver (1) - Canberra
     {"id": "driver-057", "name": "Isaac Cook", "state": "ACT", "location": "Canberra"},
 ]
@@ -305,33 +416,34 @@ STATE_ADDRESS_POOLS = {
     "ACT": SAMPLE_ADDRESSES_ACT,
 }
 
+
 async def create_sample_parcels(db: ParcelTrackingDB, num_parcels: int = 2500):
     """Create sample parcels in the database
-    
+
     Args:
         num_parcels: Number of parcels to create (default 2500 for 57 drivers × ~44 parcels)
     """
-    
+
     print(f"Creating {num_parcels} sample parcels...")
     barcodes = []
-    
+
     # Cycle through sample addresses to generate more parcels
     for i in range(1, num_parcels + 1):
         barcode = f"DT{datetime.now().strftime('%Y%m%d')}{i:04d}"
-        
+
         # Cycle through sample addresses
         addr_info = SAMPLE_ADDRESSES[(i - 1) % len(SAMPLE_ADDRESSES)]
-        
+
         # Extract postcode and state from address
         address_parts = addr_info["address"].split(",")
         state_postcode = address_parts[-1].strip() if len(address_parts) > 0 else "NSW 2000"
         state = state_postcode.split()[0] if state_postcode else "NSW"
         postcode = state_postcode.split()[1] if len(state_postcode.split()) > 1 else "2000"
-        
+
         try:
             await db.register_parcel(
                 barcode=barcode,
-                sender_name="DT Logistics Warehouse",
+                sender_name="Zava Warehouse",
                 sender_address="1 Homebush Bay Drive, Rhodes NSW 2138",
                 sender_phone="+61 2 9999 0000",
                 recipient_name=f"{addr_info['recipient']} #{i}",  # Add number to make unique
@@ -342,10 +454,10 @@ async def create_sample_parcels(db: ParcelTrackingDB, num_parcels: int = 2500):
                 service_type=addr_info["priority"],
                 weight=round(0.5 + ((i % 50) * 0.3), 2),
                 dimensions=f"{20+(i%30)}x{15+(i%25)}x{10+(i%20)}cm",
-                special_instructions=addr_info["notes"]
+                special_instructions=addr_info["notes"],
             )
             barcodes.append(barcode)
-            
+
             # Progress indicator
             if i % 50 == 0:
                 print(f"   Created {i}/{num_parcels} parcels...")
@@ -356,57 +468,59 @@ async def create_sample_parcels(db: ParcelTrackingDB, num_parcels: int = 2500):
                     print(f"   ⚠️  Parcel {barcode} already exists - reusing")
             else:
                 print(f"   ❌ Error creating parcel {barcode}: {e}")
-    
+
     print(f"   ✅ Total parcels ready: {len(barcodes)}")
     return barcodes
 
+
 async def create_sample_parcels_by_state(db: ParcelTrackingDB):
     """Create sample parcels distributed across different Australian states
-    
+
     Returns:
         Dictionary mapping state codes to lists of barcodes
     """
     from config.depots import get_depot_manager
+
     depot_mgr = get_depot_manager()
-    
+
     print(f"Creating parcels across Australian states...")
     state_barcodes = {state: [] for state in STATE_ADDRESS_POOLS.keys()}
-    
+
     # Calculate parcels per state based on number of drivers
     state_driver_counts = {}
     for driver in SAMPLE_DRIVERS:
-        state = driver.get('state', 'NSW')
+        state = driver.get("state", "NSW")
         state_driver_counts[state] = state_driver_counts.get(state, 0) + 1
-    
+
     parcel_counter = 1
-    
+
     for state, address_pool in STATE_ADDRESS_POOLS.items():
         num_drivers = state_driver_counts.get(state, 0)
         if num_drivers == 0:
             continue
-            
+
         # ~40 parcels per driver average
         num_parcels = num_drivers * 40
-        
+
         # Get depot for this state
         depot_address = depot_mgr.get_depot(state) or depot_mgr.get_default_depot()
-        
+
         print(f"\n   {state}: Creating {num_parcels} parcels for {num_drivers} drivers")
         print(f"      Depot: {depot_address}")
-        
+
         for i in range(num_parcels):
             barcode = f"DT{datetime.now().strftime('%Y%m%d')}{parcel_counter:04d}"
             parcel_counter += 1
-            
+
             # Cycle through addresses for this state
             addr_info = address_pool[i % len(address_pool)]
-            
+
             # Extract postcode, state, and city from address
             address_parts = addr_info["address"].split(",")
             state_postcode = address_parts[-1].strip()
             actual_state = state_postcode.split()[0] if state_postcode else state
             postcode = state_postcode.split()[1] if len(state_postcode.split()) > 1 else "0000"
-            
+
             # Extract city from address
             # Format: "123 Street Name, City STATE POSTCODE" (2 parts after split)
             # or "123 Street, Suburb, City STATE POSTCODE" (3+ parts)
@@ -418,11 +532,11 @@ async def create_sample_parcels_by_state(db: ParcelTrackingDB):
                 destination_city = city_state_postcode[0] if city_state_postcode else state
             else:
                 destination_city = state
-            
+
             try:
                 await db.register_parcel(
                     barcode=barcode,
-                    sender_name="DT Logistics Warehouse",
+                    sender_name="Zava Warehouse",
                     sender_address=depot_address,
                     sender_phone="+61 2 9999 0000",
                     recipient_name=f"{addr_info['recipient']} #{parcel_counter}",
@@ -434,7 +548,7 @@ async def create_sample_parcels_by_state(db: ParcelTrackingDB):
                     service_type=addr_info["priority"],
                     weight=round(0.5 + ((parcel_counter % 50) * 0.3), 2),
                     dimensions=f"{20+(parcel_counter%30)}x{15+(parcel_counter%25)}x{10+(parcel_counter%20)}cm",
-                    special_instructions=addr_info["notes"]
+                    special_instructions=addr_info["notes"],
                 )
                 state_barcodes[state].append(barcode)
             except Exception as e:
@@ -442,212 +556,213 @@ async def create_sample_parcels_by_state(db: ParcelTrackingDB):
                     state_barcodes[state].append(barcode)
                 else:
                     print(f"      ❌ Error creating parcel {barcode}: {e}")
-        
+
         print(f"      ✅ Created {len(state_barcodes[state])} parcels for {state}")
-    
+
     return state_barcodes
+
 
 async def delete_all_manifests(db: ParcelTrackingDB):
     """Delete all existing driver manifests"""
-    
+
     print("\n🗑️  Deleting existing manifests...")
-    
+
     try:
         container = db.database.get_container_client("driver_manifests")
-        
+
         # Query all manifests - remove the problematic parameter
         query = "SELECT c.id, c.driver_id FROM c"
         manifests_to_delete = []
-        
+
         # Use query_items without enable_cross_partition_query parameter
         # The SDK handles cross-partition queries automatically
         query_iterable = container.query_items(query=query)
-        
+
         async for item in query_iterable:
-            manifests_to_delete.append({
-                'id': item['id'],
-                'driver_id': item['driver_id']
-            })
-        
+            manifests_to_delete.append({"id": item["id"], "driver_id": item["driver_id"]})
+
         print(f"   Found {len(manifests_to_delete)} manifests to delete")
-        
+
         # Delete each manifest using correct partition key
         deleted_count = 0
         for manifest in manifests_to_delete:
             try:
                 # Use driver_id as partition key (as per create_driver_manifest)
-                await container.delete_item(
-                    item=manifest['id'], 
-                    partition_key=manifest['driver_id']
-                )
+                await container.delete_item(item=manifest["id"], partition_key=manifest["driver_id"])
                 deleted_count += 1
                 if deleted_count % 10 == 0:
                     print(f"   Deleted {deleted_count}/{len(manifests_to_delete)} manifests...")
             except Exception as e:
                 print(f"   ⚠️  Error deleting {manifest['id']}: {e}")
-        
+
         print(f"   ✅ Deleted {deleted_count} manifests")
         return deleted_count
-        
+
     except Exception as e:
         print(f"   ❌ Error deleting manifests: {e}")
         import traceback
+
         traceback.print_exc()
         return 0
+
 
 async def create_driver_manifests(db: ParcelTrackingDB, state_barcodes: dict):
     """Create manifests for sample drivers with varied parcel counts (30-50 each)
     Filters parcels by driver's city/location for geographic accuracy
-    
+
     Args:
         state_barcodes: Dictionary mapping state codes to lists of barcodes
     """
-    
+
     import random
     from datetime import datetime
-    
+
     print(f"\n🚚 Creating driver manifests for {len(SAMPLE_DRIVERS)} drivers across states...")
-    
+
     # Distribute parcels with variation (30-50 per driver)
     manifests_created = 0
-    
+
     for driver in SAMPLE_DRIVERS:
-        driver_state = driver.get('state', 'NSW')
-        driver_location = driver.get('location', driver_state)
-        
+        driver_state = driver.get("state", "NSW")
+        driver_location = driver.get("location", driver_state)
+
         # Query parcels by destination city matching driver's location
         parcels_container = db.database.get_container_client(db.parcels_container)
-        
+
         # First try to get parcels for driver's specific city
         query = """
-            SELECT c.barcode FROM c 
-            WHERE c.destination_city = @location 
+            SELECT c.barcode FROM c
+            WHERE c.destination_city = @location
             AND c.current_status = 'registered'
             AND (NOT IS_DEFINED(c.assigned_driver) OR c.assigned_driver = null)
         """
         parameters = [{"name": "@location", "value": driver_location}]
-        
+
         city_barcodes = []
         async for item in parcels_container.query_items(query=query, parameters=parameters):
-            city_barcodes.append(item['barcode'])
-        
+            city_barcodes.append(item["barcode"])
+
         # If not enough city-specific parcels, fall back to state
         if len(city_barcodes) < 30:
             query = """
-                SELECT c.barcode FROM c 
-                WHERE c.destination_state = @state 
+                SELECT c.barcode FROM c
+                WHERE c.destination_state = @state
                 AND c.current_status = 'registered'
                 AND (NOT IS_DEFINED(c.assigned_driver) OR c.assigned_driver = null)
             """
             parameters = [{"name": "@state", "value": driver_state}]
-            
+
             state_barcodes_list = []
             async for item in parcels_container.query_items(query=query, parameters=parameters):
-                if item['barcode'] not in city_barcodes:
-                    state_barcodes_list.append(item['barcode'])
-            
+                if item["barcode"] not in city_barcodes:
+                    state_barcodes_list.append(item["barcode"])
+
             # Combine city and state parcels, prioritizing city
             available_barcodes = city_barcodes + state_barcodes_list
         else:
             available_barcodes = city_barcodes
-        
+
         if not available_barcodes:
             print(f"\n   ⚠️  No parcels available for {driver['name']} in {driver_location}, {driver_state}")
             continue
-        
+
         # Random number of parcels between 30 and 50
         num_parcels = min(random.randint(30, 50), len(available_barcodes))
-        
+
         # Get parcels for this driver
         driver_barcodes = available_barcodes[:num_parcels]
-        
-        print(f"\n   Driver: {driver['name']} ({driver['id']}) [{driver_location}, {driver_state}] - {len(driver_barcodes)} parcels")
-        
+
+        print(
+            f"\n   Driver: {driver['name']} ({driver['id']}) [{driver_location}, {driver_state}] - {len(driver_barcodes)} parcels"
+        )
+
         try:
             manifest_id = await db.create_driver_manifest(
-                driver_id=driver['id'],
-                driver_name=driver['name'],
+                driver_id=driver["id"],
+                driver_name=driver["name"],
                 parcel_barcodes=driver_barcodes,
                 driver_state=driver_state,
-                driver_location=driver_location
+                driver_location=driver_location,
             )
-            
+
             if manifest_id:
                 manifests_created += 1
                 # Fetch the created manifest to display details
-                manifest = await db.get_driver_manifest(driver['id'])
-                
+                manifest = await db.get_driver_manifest(driver["id"])
+
                 print(f"      ✅ Manifest: {manifest_id}")
                 if manifest:
                     print(f"         Total items: {manifest['total_items']}")
                     print(f"         Status: {manifest['status']}")
-                    
+
                     # Display first 2 addresses
-                    for item in manifest['items'][:2]:
+                    for item in manifest["items"][:2]:
                         print(f"         • {item['recipient_name']} - {item['recipient_address'][:50]}...")
-                    
-                    if len(manifest['items']) > 2:
+
+                    if len(manifest["items"]) > 2:
                         print(f"         ... and {len(manifest['items']) - 2} more")
             else:
                 print(f"      ❌ Failed to create manifest")
-                
+
         except Exception as e:
             print(f"      ❌ Error: {e}")
-    
+
     # Calculate total parcels distributed
     total_distributed = len(SAMPLE_DRIVERS) * 40  # approximate
-    
+
     print(f"\n   📊 Summary:")
     print(f"      Created: {manifests_created} manifests")
     print(f"      Total drivers: {len(SAMPLE_DRIVERS)}")
-    
+
     # Show breakdown by state
     state_counts = {}
     for driver in SAMPLE_DRIVERS:
-        state = driver.get('state', 'NSW')
+        state = driver.get("state", "NSW")
         state_counts[state] = state_counts.get(state, 0) + 1
-    
+
     print(f"\n   🗺️  Distribution by state:")
     for state, count in sorted(state_counts.items()):
         print(f"      {state}: {count} drivers")
 
+
 async def main():
     """Main demonstration setup"""
-    
+
     print("=" * 70)
     print("Driver Manifest Demo Data Generator")
     print("=" * 70)
     print()
-    
+
     from config.depots import get_depot_manager
+
     depot_mgr = get_depot_manager()
-    
+
     print("Configured Depots:")
     for state, depot_address in depot_mgr.list_depots().items():
         print(f"   {state}: {depot_address}")
-    
+
     depot = depot_mgr.get_default_depot()
     print(f"\nDefault Depot: {depot}")
     print(f"Date: {datetime.now().strftime('%A, %B %d, %Y')}")
     print()
-    
+
     async with ParcelTrackingDB() as db:
         # Delete existing manifests
         await delete_all_manifests(db)
-        
+
         # Create sample parcels by state
         state_barcodes = await create_sample_parcels_by_state(db)
-        
+
         total_parcels = sum(len(barcodes) for barcodes in state_barcodes.values())
         if total_parcels == 0:
             print("\n❌ No parcels were created. Cannot generate manifests.")
             return
-        
+
         print(f"\n✅ Created {total_parcels} sample parcels across {len(state_barcodes)} states")
-        
+
         # Create driver manifests
         await create_driver_manifests(db, state_barcodes)
-    
+
     print("\n" + "=" * 70)
     print("✅ Demo Data Generation Complete!")
     print("=" * 70)
@@ -670,126 +785,148 @@ async def main():
     print("💡 Tip: Add AZURE_MAPS_SUBSCRIPTION_KEY to .env for route optimization")
     print()
 
+
 async def generate_large_manifest(num_parcels=120):
     """Generate a single driver manifest with 100+ parcels for scalability testing"""
-    
+
     if not FAKER_AVAILABLE:
         print("❌ ERROR: Faker library is required for large manifest generation")
         print("   Install it with: pip install faker")
         return
-    
+
     async with ParcelTrackingDB() as db:
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print(f"🔄 GENERATING {num_parcels} PARCELS FOR DRIVER-004 (SCALABILITY TEST)")
-        print("="*80)
-        
+        print("=" * 80)
+
         # Delete existing manifest for driver-004
-        manifest_container = db.database.get_container_client('driver_manifests')
+        manifest_container = db.database.get_container_client("driver_manifests")
         query = 'SELECT * FROM c WHERE c.driver_id = "driver-004"'
-        
+
         async for manifest in manifest_container.query_items(query=query):
-            await manifest_container.delete_item(item=manifest['id'], partition_key=manifest['driver_id'])
+            await manifest_container.delete_item(item=manifest["id"], partition_key=manifest["driver_id"])
             print(f"   Deleted existing manifest: {manifest['id']}")
-        
+
         # Delete old parcels for this test
-        parcels_container = db.database.get_container_client('parcels')
+        parcels_container = db.database.get_container_client("parcels")
         query = "SELECT * FROM c WHERE STARTSWITH(c.barcode, 'DT20251215TEST')"
-        
+
         deleted_count = 0
         async for parcel in parcels_container.query_items(query=query):
             try:
-                await parcels_container.delete_item(item=parcel['id'], partition_key=parcel['barcode'])
+                await parcels_container.delete_item(item=parcel["id"], partition_key=parcel["barcode"])
                 deleted_count += 1
             except Exception:
                 pass
-        
+
         print(f"   Deleted {deleted_count} old test parcels")
-        
+
         print(f"\n📍 Generating {num_parcels} Sydney addresses...")
-        
+
         # Generate addresses
         addresses = []
         recipients = []
         used_addresses = set()
-        
-        sydney_postcodes = ['2000', '2007', '2008', '2009', '2010', '2021', '2026', '2028', 
-                           '2037', '2040', '2042', '2048', '2060', '2061', '2065', '2088',
-                           '2090', '2095', '2096', '2100', '2101', '2110', '2111', '2113']
-        
+
+        sydney_postcodes = [
+            "2000",
+            "2007",
+            "2008",
+            "2009",
+            "2010",
+            "2021",
+            "2026",
+            "2028",
+            "2037",
+            "2040",
+            "2042",
+            "2048",
+            "2060",
+            "2061",
+            "2065",
+            "2088",
+            "2090",
+            "2095",
+            "2096",
+            "2100",
+            "2101",
+            "2110",
+            "2111",
+            "2113",
+        ]
+
         while len(addresses) < num_parcels:
             street_address = fake.street_address()
             suburb = fake.city()
             postcode = random.choice(sydney_postcodes)
             address = f"{street_address}, {suburb} NSW {postcode}"
-            
+
             if address not in used_addresses:
                 used_addresses.add(address)
                 addresses.append(address)
                 recipients.append(fake.name())
-        
+
         print(f"   ✅ Generated {len(addresses)} unique addresses")
-        
+
         print(f"\n📦 Creating {num_parcels} parcels...")
-        
+
         parcel_counter = 1
         all_parcels = []
         parcels_to_create = []
-        
+
         for i in range(num_parcels):
             barcode = f"DT20251215TEST{parcel_counter:04d}"
             parcel_counter += 1
-            
+
             address = addresses[i]
             recipient = recipients[i]
             phone = f"+61 4{random.randint(10, 99)} {random.randint(100, 999)} {random.randint(100, 999)}"
-            priority = random.choice(['normal', 'normal', 'normal', 'urgent'])
-            
-            parcels_to_create.append({
-                'barcode': barcode,
-                'sender_name': "DT Logistics Warehouse",
-                'sender_address': "1 Homebush Bay Drive, Rhodes NSW 2138",
-                'sender_phone': "+61 2 9999 0000",
-                'recipient_name': recipient,
-                'recipient_address': address,
-                'recipient_phone': phone,
-                'destination_postcode': address.split()[-1],
-                'destination_state': "NSW",
-                'service_type': priority,
-                'special_instructions': random.choice([
-                    "Leave with reception",
-                    "Call before delivery",
-                    "Signature required",
-                    "Leave at front door",
-                    "Ring doorbell twice",
-                    "Contact on arrival"
-                ])
-            })
-            
-            all_parcels.append({
-                'barcode': barcode,
-                'address': address,
-                'recipient': recipient
-            })
-        
+            priority = random.choice(["normal", "normal", "normal", "urgent"])
+
+            parcels_to_create.append(
+                {
+                    "barcode": barcode,
+                    "sender_name": "Zava Warehouse",
+                    "sender_address": "1 Homebush Bay Drive, Rhodes NSW 2138",
+                    "sender_phone": "+61 2 9999 0000",
+                    "recipient_name": recipient,
+                    "recipient_address": address,
+                    "recipient_phone": phone,
+                    "destination_postcode": address.split()[-1],
+                    "destination_state": "NSW",
+                    "service_type": priority,
+                    "special_instructions": random.choice(
+                        [
+                            "Leave with reception",
+                            "Call before delivery",
+                            "Signature required",
+                            "Leave at front door",
+                            "Ring doorbell twice",
+                            "Contact on arrival",
+                        ]
+                    ),
+                }
+            )
+
+            all_parcels.append({"barcode": barcode, "address": address, "recipient": recipient})
+
         # Create parcels in parallel batches
         batch_size = 50
         for i in range(0, len(parcels_to_create), batch_size):
-            batch = parcels_to_create[i:i + batch_size]
+            batch = parcels_to_create[i : i + batch_size]
             tasks = [db.register_parcel(**parcel_data) for parcel_data in batch]
             await asyncio.gather(*tasks)
             print(f"   Created {min(i + batch_size, len(parcels_to_create))}/{num_parcels} parcels...")
-        
+
         print(f"   ✅ Created {num_parcels} parcels")
-        
+
         print(f"\n🚚 Creating driver manifest for Driver 004...")
-        
+
         # Create manifest
         manifest_id = await db.create_driver_manifest(
-            driver_id="driver-004",
-            driver_name="Scale Test Driver",
-            parcel_barcodes=[p['barcode'] for p in all_parcels]
+            driver_id="driver-004", driver_name="Scale Test Driver", parcel_barcodes=[p["barcode"] for p in all_parcels]
         )
-        
+
         print(f"   ✅ Created manifest: {manifest_id}")
         print(f"\n{'='*80}")
         print(f"✅ COMPLETE! Test with driver004 / Password123!")
@@ -797,17 +934,23 @@ async def generate_large_manifest(num_parcels=120):
         print(f"   Parcels: {num_parcels}")
         print(f"{'='*80}\n")
 
+
 if __name__ == "__main__":
     import argparse
-    
-    parser = argparse.ArgumentParser(description='Generate demo manifests or large scalability test')
-    parser.add_argument('--large', type=int, metavar='NUM_PARCELS', 
-                       help='Generate large manifest for driver-004 with specified number of parcels (default: 120)')
-    parser.add_argument('--large-default', action='store_true',
-                       help='Generate large manifest for driver-004 with 120 parcels')
-    
+
+    parser = argparse.ArgumentParser(description="Generate demo manifests or large scalability test")
+    parser.add_argument(
+        "--large",
+        type=int,
+        metavar="NUM_PARCELS",
+        help="Generate large manifest for driver-004 with specified number of parcels (default: 120)",
+    )
+    parser.add_argument(
+        "--large-default", action="store_true", help="Generate large manifest for driver-004 with 120 parcels"
+    )
+
     args = parser.parse_args()
-    
+
     if args.large is not None:
         # Generate large manifest with custom parcel count
         asyncio.run(generate_large_manifest(args.large))

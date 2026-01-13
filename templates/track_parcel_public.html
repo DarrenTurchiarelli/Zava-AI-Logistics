@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Track Your Parcel - DT Logistics{% endblock %}
+{% block title %}Track Your Parcel - Zava{% endblock %}
 
 {% block content %}
 <div class="container mt-5">
@@ -22,7 +22,7 @@
                     }
                 });
             </script>
-            
+
             <!-- Hidden form for auto-submit from registration -->
             <form method="POST" action="{{ url_for('track_parcel_public') }}" style="display: none;">
                 <input type="text" id="tracking_number" name="tracking_number">
@@ -30,7 +30,7 @@
 
             <!-- Tracking Results -->
             {% if tracking_results %}
-            
+
             <!-- Loop through each tracking result -->
             {% for tracking_data in tracking_results %}
             <div class="card shadow-lg mb-4">
@@ -126,7 +126,7 @@
                             <p class="mb-0">${{ tracking_data.declared_value }}</p>
                         </div>
                     </div>
-                    
+
                     {% if tracking_data.special_instructions %}
                     <div class="row mb-4">
                         <div class="col-12">
@@ -151,7 +151,7 @@
 
                     <!-- Tracking Timeline -->
                     <h5 class="mb-4"><i class="bi bi-clock-history"></i> Tracking History</h5>
-                    
+
                     <!-- Lodgement Photos (if available) -->
                     {% if tracking_data.lodgement_photos %}
                     <div class="card border-info mb-4">
@@ -163,8 +163,8 @@
                                 {% for photo in tracking_data.lodgement_photos %}
                                 <div class="col-md-4 mb-3">
                                     <div class="card">
-                                        <img src="data:image/jpeg;base64,{{ photo.photo_data }}" 
-                                             class="card-img-top" 
+                                        <img src="data:image/jpeg;base64,{{ photo.photo_data }}"
+                                             class="card-img-top"
                                              alt="Lodgement Photo"
                                              style="cursor: pointer; max-height: 200px; object-fit: cover;"
                                              onclick="showPhotoModal(this.src, 'Lodgement Photo {{ loop.index }}', '{{ photo.uploaded_by }}', '{{ photo.timestamp }}')">
@@ -181,7 +181,7 @@
                         </div>
                     </div>
                     {% endif %}
-                    
+
                     <div class="timeline">
                         {% for event in tracking_data.events %}
                         <div class="timeline-item {% if loop.first %}active{% endif %}">
@@ -216,32 +216,32 @@
                         </div>
                         <div class="card-body">
                             <div class="alert alert-permanent alert-info mb-3">
-                                <i class="bi bi-info-circle"></i> 
+                                <i class="bi bi-info-circle"></i>
                                 Your parcel is approximately <strong>{{ tracking_data.deliveries_away }}</strong> deliveries away.
                                 The driver is within <strong>5km</strong> of your delivery address.
                             </div>
-                            
+
                             <!-- Map showing approximate area -->
                             <div class="map-container" style="height: 400px; border-radius: 8px; overflow: hidden;">
-                                <iframe src="{{ tracking_data.delivery_map_url }}" 
-                                        width="100%" 
-                                        height="400" 
-                                        frameborder="0" 
+                                <iframe src="{{ tracking_data.delivery_map_url }}"
+                                        width="100%"
+                                        height="400"
+                                        frameborder="0"
                                         style="border:0;"
                                         allowfullscreen>
                                 </iframe>
                             </div>
-                            
+
                             <p class="text-muted mt-3 mb-0">
                                 <small>
-                                    <i class="bi bi-shield-check"></i> 
+                                    <i class="bi bi-shield-check"></i>
                                     For driver safety, the exact location is not shown. The map displays an approximate delivery area.
                                 </small>
                             </p>
                         </div>
                     </div>
                     {% endif %}
-                    
+
                     <!-- Delivery Photos (if delivered) -->
                     {% if tracking_data.current_status == 'Delivered' and tracking_data.delivery_photos %}
                     <hr class="my-4">
@@ -254,8 +254,8 @@
                                 {% for photo in tracking_data.delivery_photos %}
                                 <div class="col-md-4 mb-3">
                                     <div class="card">
-                                        <img src="data:image/jpeg;base64,{{ photo.photo_data }}" 
-                                             class="card-img-top" 
+                                        <img src="data:image/jpeg;base64,{{ photo.photo_data }}"
+                                             class="card-img-top"
                                              alt="Delivery Photo"
                                              style="cursor: pointer; max-height: 200px; object-fit: cover;"
                                              onclick="showPhotoModal(this.src, 'Delivery Photo {{ loop.index }}', '{{ photo.uploaded_by }}', '{{ photo.timestamp }}')">
@@ -273,7 +273,7 @@
                     </div>
                     {% endif %}
                 </div>
-                
+
                 <!-- Action Buttons -->
                 <div class="card-footer" style="background-color: #f8f9fa; border-top: 1px solid #dee2e6;">
                     <div class="d-grid gap-2 d-md-flex justify-content-md-center">
@@ -389,20 +389,20 @@ function showApplePayInfo() {
             </div>
         </div>
     `;
-    
+
     // Remove existing modal if present
     const existingModal = document.getElementById('applePayInfoModal');
     if (existingModal) {
         existingModal.remove();
     }
-    
+
     // Add modal to body
     document.body.insertAdjacentHTML('beforeend', modalHtml);
-    
+
     // Show modal
     const modal = new bootstrap.Modal(document.getElementById('applePayInfoModal'));
     modal.show();
-    
+
     // Clean up modal after it's hidden
     document.getElementById('applePayInfoModal').addEventListener('hidden.bs.modal', function () {
         this.remove();
@@ -434,20 +434,20 @@ function showPhotoModal(imageSrc, title, uploadedBy, timestamp) {
             </div>
         </div>
     `;
-    
+
     // Remove existing modal if present
     const existingModal = document.getElementById('photoModal');
     if (existingModal) {
         existingModal.remove();
     }
-    
+
     // Add modal to body
     document.body.insertAdjacentHTML('beforeend', modalHtml);
-    
+
     // Show modal
     const modal = new bootstrap.Modal(document.getElementById('photoModal'));
     modal.show();
-    
+
     // Clean up modal after it's hidden
     document.getElementById('photoModal').addEventListener('hidden.bs.modal', function () {
         this.remove();

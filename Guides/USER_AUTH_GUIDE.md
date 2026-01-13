@@ -2,7 +2,7 @@
 
 ## Overview
 
-The DT Logistics system now includes a comprehensive role-based authentication system with support for multiple user types:
+The Zava system now includes a comprehensive role-based authentication system with support for multiple user types:
 
 - **Admin** - Full system access
 - **Driver** - Access to their own manifests and deliveries
@@ -21,28 +21,33 @@ python setup_users.py
 ```
 
 This will create:
+
 - `users` container in Cosmos DB
 - Default user accounts with secure password hashing
 
 ### 2. Default Login Credentials
 
 #### Admin Access
+
 - **Username**: `admin`
 - **Password**: `admin123`
 - **Permissions**: Full system access
 
 #### Driver Accounts
+
 - **Username**: `driver001`, `driver002`, `driver003`
 - **Password**: `driver123`
 - **Permissions**: View own manifests, mark deliveries complete
 - **Driver IDs**: `driver-001`, `driver-002`, `driver-003`
 
 #### Depot Manager
+
 - **Username**: `depot_mgr`
 - **Password**: `depot123`
 - **Permissions**: View all manifests, create manifests, approve requests
 
 #### Customer Service
+
 - **Username**: `support`
 - **Password**: `support123`
 - **Permissions**: View parcels, handle customer inquiries
@@ -60,7 +65,7 @@ from user_manager import UserManager
 async def create_new_driver():
     async with ParcelTrackingDB() as db:
         user_mgr = UserManager(db)
-        
+
         await user_mgr.create_user(
             username='driver004',
             password='secure_password_here',
@@ -149,16 +154,19 @@ else:
 ## Security Features
 
 ### Password Security
+
 - **PBKDF2-HMAC-SHA256** hashing with 100,000 iterations
 - **Random salt** per user (16 bytes)
 - Passwords never stored in plain text
 
 ### Session Management
+
 - Secure session cookies
 - User info stored in session after login
 - Role-based redirect after authentication
 
 ### Authorization
+
 - Decorator-based route protection
 - Role-based access control
 - Per-resource permission checks
@@ -195,7 +203,7 @@ Drivers can only mark their own deliveries complete:
 @login_required
 def mark_delivery_complete(manifest_id, barcode):
     user = session.get('user')
-    
+
     if user.get('role') == UserManager.ROLE_DRIVER:
         # Verify manifest belongs to this driver
         manifest = await db.get_manifest_by_id(manifest_id)
@@ -208,7 +216,7 @@ def mark_delivery_complete(manifest_id, barcode):
 ### Test Driver Login
 
 1. Start Flask app: `$env:FLASK_ENV='development'; python app.py`
-2. Navigate to: http://127.0.0.1:5000/login
+2. Navigate to: <http://127.0.0.1:5000/login>
 3. Login as driver:
    - Username: `driver001`
    - Password: `driver123`

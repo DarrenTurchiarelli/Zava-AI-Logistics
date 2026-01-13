@@ -1,4 +1,4 @@
-// DT Logistics Web Application JavaScript
+// Zava Web Application JavaScript
 
 // Auto-dismiss alerts after 5 seconds
 document.addEventListener('DOMContentLoaded', function() {
@@ -34,7 +34,7 @@ function searchParcels(query) {
 function validateForm(formId) {
     const form = document.getElementById(formId);
     if (!form) return true;
-    
+
     if (!form.checkValidity()) {
         form.classList.add('was-validated');
         return false;
@@ -67,7 +67,7 @@ function updateStats() {
             if (totalParcels) {
                 totalParcels.textContent = data.total_parcels;
             }
-            
+
             const pendingApprovals = document.getElementById('pendingApprovals');
             if (pendingApprovals) {
                 pendingApprovals.textContent = data.pending_approvals;
@@ -98,7 +98,7 @@ function copyToClipboard(text, buttonElement) {
         const originalText = buttonElement.innerHTML;
         buttonElement.innerHTML = '<i class="bi bi-check"></i> Copied!';
         buttonElement.classList.add('btn-success');
-        
+
         setTimeout(() => {
             buttonElement.innerHTML = originalText;
             buttonElement.classList.remove('btn-success');
@@ -159,6 +159,6 @@ function exportData(data, filename) {
 
 // Console welcome message
 const brandColor = getComputedStyle(document.documentElement).getPropertyValue('--dt-primary').trim();
-console.log('%cDT Logistics', `font-size: 24px; font-weight: bold; color: ${brandColor};`);
+console.log('%cZava', `font-size: 24px; font-weight: bold; color: ${brandColor};`);
 console.log('%cAI-Powered Last-Mile Delivery Management System', 'font-size: 14px; color: #6c757d;');
 console.log('Version: 1.0.0');

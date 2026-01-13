@@ -2,12 +2,14 @@
 
 ## Overview
 
-The **DISPATCHER_AGENT** is now integrated into the DT Logistics system to provide intelligent, AI-powered parcel assignment to drivers. This agent makes autonomous decisions about which driver should receive which parcels based on multiple factors.
+The **DISPATCHER_AGENT** is now integrated into the Zava system to provide intelligent, AI-powered parcel assignment to drivers. This agent makes autonomous decisions about which driver should receive which parcels based on multiple factors.
 
 ## What the DISPATCHER_AGENT Does
 
 ### Intelligent Decision Making
+
 The agent analyzes and optimizes:
+
 - **Driver Workload**: Balances parcels across available drivers
 - **Geographic Clustering**: Groups nearby deliveries together
 - **Priority Handling**: Ensures urgent parcels are prioritized
@@ -15,6 +17,7 @@ The agent analyzes and optimizes:
 - **Service Levels**: Considers express, standard, and economy services
 
 ### What It Does NOT Do
+
 ❌ **Does NOT auto-generate Azure Maps routes** - Route optimization is driver-initiated only to avoid performance issues
 
 ## How to Use
@@ -47,6 +50,7 @@ python Scripts/test_dispatcher_agent.py
 ```
 
 Or for full demonstration:
+
 ```powershell
 python Scripts/test_dispatcher_agent.py
 
@@ -54,6 +58,7 @@ python Scripts/test_dispatcher_agent.py
 ```
 
 The full test will:
+
 1. Create 25 sample parcels at depot
 2. Get available drivers from database
 3. Call DISPATCHER_AGENT for assignment recommendations
@@ -65,6 +70,7 @@ The full test will:
 ### New Endpoints
 
 **`POST /auto_assign_manifests`**
+
 - Uses DISPATCHER_AGENT for intelligent assignment
 - Parameters:
   - `max_parcels`: Maximum parcels to assign (1-500)
@@ -74,11 +80,13 @@ The full test will:
 ### New Database Methods
 
 **`get_available_drivers(state: str = None)`**
+
 - Returns list of drivers from users database
 - Filters by state if provided
 - Returns: List[Dict] with driver_id, name, location, capacity
 
 **`get_pending_parcels(status: str = "At Depot", max_count: int = None)`**
+
 - Returns parcels ready for assignment
 - Default status: "At Depot"
 - Returns: List[Dict] of parcel data
@@ -86,6 +94,7 @@ The full test will:
 ### Agent Integration
 
 The DISPATCHER_AGENT is called via:
+
 ```python
 from agents.base import dispatcher_agent
 
@@ -93,6 +102,7 @@ result = await dispatcher_agent(route_request)
 ```
 
 **Input Format:**
+
 ```python
 route_request = {
     "parcel_count": 25,
@@ -113,6 +123,7 @@ route_request = {
 ```
 
 **Output Format:**
+
 ```python
 {
     "success": True,
@@ -125,6 +136,7 @@ route_request = {
 ### Fallback Behavior
 
 If DISPATCHER_AGENT fails (auth issues, timeout, etc.), the system automatically falls back to **round-robin distribution**:
+
 - Distributes parcels evenly across drivers
 - Respects capacity limits
 - Still creates manifests successfully
@@ -139,14 +151,15 @@ If DISPATCHER_AGENT fails (auth issues, timeout, etc.), the system automatically
    - Locations: VIC postcodes 3000-3054
 
 2. **DISPATCHER_AGENT Analysis:**
+
    ```
    Analyzing 25 parcels across 3 drivers in VIC zone...
-   
+
    Recommendations:
    - driver001: 10 parcels (geographic cluster: 3000-3002, includes 2 urgent)
    - driver002: 9 parcels (geographic cluster: 3003-3050, includes 3 urgent)  
    - driver003: 6 parcels (geographic cluster: 3051-3054, economy deliveries)
-   
+
    Workload balance: 83% average utilization
    Priority coverage: All urgent parcels assigned to experienced drivers
    ```
@@ -161,6 +174,7 @@ If DISPATCHER_AGENT fails (auth issues, timeout, etc.), the system automatically
 ### Required Environment Variables
 
 In `.env` file:
+
 ```bash
 # DISPATCHER_AGENT (Required for auto-assign feature)
 DISPATCHER_AGENT_ID=asst_xxxxxxxxxxxxx
@@ -173,6 +187,7 @@ AZURE_AI_CONNECTION_STRING=xxxxx
 ### Check Agent Status
 
 Verify DISPATCHER_AGENT is configured:
+
 ```python
 python Scripts/test_dispatcher_agent.py
 # Select option: 1 (Quick test)
@@ -183,11 +198,13 @@ python Scripts/test_dispatcher_agent.py
 ### Issue: "DISPATCHER_AGENT failed"
 
 **Possible Causes:**
+
 1. `DISPATCHER_AGENT_ID` not set in `.env`
 2. Azure authentication issues
 3. Agent not created in Azure AI Foundry
 
 **Solution:**
+
 ```powershell
 # 1. Check environment variable
 $env:DISPATCHER_AGENT_ID
@@ -201,6 +218,7 @@ az account show
 ### Issue: "No available drivers found"
 
 **Solution:**
+
 ```powershell
 # Create default users (includes drivers)
 python utils/setup/setup_users.py
@@ -209,6 +227,7 @@ python utils/setup/setup_users.py
 ### Issue: "No pending parcels found"
 
 **Solution:**
+
 ```powershell
 # Create sample parcels
 python utils/generators/generate_sample_parcels.py
@@ -221,11 +240,13 @@ python utils/generators/generate_sample_parcels.py
 ### Why No Auto-Route Optimization?
 
 Azure Maps API calls for route optimization can take **3-10 seconds per manifest**. With multiple manifests, this becomes:
+
 - Slow page load times
 - Poor user experience
 - Timeout issues
 
 **Solution:** Route optimization is **driver-initiated only**:
+
 1. Admin creates manifests (fast, AI-powered assignment)
 2. Driver views manifest
 3. Driver clicks "Optimize Route" when ready
@@ -233,6 +254,7 @@ Azure Maps API calls for route optimization can take **3-10 seconds per manifest
 5. Cached for that driver's session
 
 This approach:
+
 - ✅ Keeps admin interface responsive
 - ✅ Allows drivers to control when optimization happens
 - ✅ Prevents timeout issues with bulk operations
@@ -241,6 +263,7 @@ This approach:
 ## Future Enhancements
 
 Potential improvements:
+
 1. **Real-time workload tracking**: Track driver current load from active manifests
 2. **Historical performance**: Use driver performance scores in assignment
 3. **Time window constraints**: Consider customer delivery time preferences
@@ -250,6 +273,7 @@ Potential improvements:
 ## Summary
 
 The DISPATCHER_AGENT brings true **agentic AI** to manifest creation:
+
 - 🤖 Autonomous decision-making (not just API calls)
 - 🎯 Intelligent workload balancing
 - 📍 Geographic optimization
