@@ -134,7 +134,7 @@ repos:
     hooks:
       - id: markdownlint
         name: Lint Markdown files
-        args: ['--fix']
+        args: ['--fix', '--config', '.markdownlint.json']
 
   # YAML linting
   - repo: https://github.com/adrienverge/yamllint
