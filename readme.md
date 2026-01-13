@@ -159,6 +159,8 @@ dt_item_scanner/
 
 ## 🤖 AI-Powered Intelligent Logistics
 
+> **📚 For Developers:** See [AGENTS.md](AGENTS.md) for technical documentation, environment setup, code examples, troubleshooting, and agent architecture details.
+
 ### **8 Active Azure AI Foundry Agents**
 
 All agents deployed with full Azure AI Foundry telemetry and real-time performance monitoring.
