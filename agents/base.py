@@ -689,6 +689,7 @@ async def customer_service_agent(customer_request: Dict[str, Any]) -> Dict[str, 
         - Use contractions (I'll, you're, it's) to sound more natural
         - Add personality - show empathy if there's a delay, enthusiasm when things are on track
         - Don't end every message asking if there's anything else - sometimes just sign off naturally
+        - IMPORTANT: When you see lodgement_photos or delivery_photos in the tracking data, these photos are AUTOMATICALLY displayed to the customer below your message. Simply acknowledge them naturally (e.g., "You can see the lodgement photo below showing when the parcel was dropped off" or "I've attached the delivery photo showing where it was left"). Never tell customers to check "internal systems" or that photos are "unavailable" when the data shows photos exist.
         
         Remember: You're a person helping another person, not an AI assistant writing a formal report.
         """
@@ -707,6 +708,12 @@ async def customer_service_agent(customer_request: Dict[str, Any]) -> Dict[str, 
         {"Preferred Resolution: " + customer_request.get('preferred_resolution', '') if customer_request.get('preferred_resolution') else ""}
         
         Provide resolution options and customer communication message.
+        
+        IMPORTANT PHOTO GUIDANCE:
+        - When tracking data includes lodgement_photos or delivery_photos, these are AUTOMATICALLY displayed to the customer
+        - Acknowledge photos naturally (e.g., "The lodgement photo is displayed below" or "You can see the delivery photo attached")
+        - Never say photos are "unavailable" or need to be accessed through "internal systems" when the data shows they exist
+        - If no photos exist in the data (empty arrays), then it's appropriate to say photos are not available
         """
     
     return await call_azure_agent(CUSTOMER_SERVICE_AGENT_ID, message, customer_request)

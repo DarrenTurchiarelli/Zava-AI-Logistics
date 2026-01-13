@@ -1,0 +1,584 @@
+# AGENTS.md
+
+Technical documentation for AI coding agents working with the Zava Azure AI-powered parcel tracking system.
+
+## Project Overview
+
+Zava is a last-mile delivery platform powered by **8 Azure AI Foundry agents** with end-to-end intelligent automation. Built with Flask, Azure Cosmos DB, Azure Maps, and the Microsoft Agent Framework.
+
+**Tech Stack:**
+- Python 3.11+
+- Flask 3.0+ (web framework)
+- Azure Cosmos DB (NoSQL database)
+- Azure AI Foundry (persistent agents)
+- Azure Maps (route optimization)
+- Azure Speech Services (voice features)
+- Azure Vision (OCR/image analysis)
+
+## Setup Commands
+
+### Initial Setup
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment
+cp .env.example .env  # Then edit with your Azure credentials
+
+# Initialize database
+python parcel_tracking_db.py
+
+# Generate demo data (first time only)
+python utils/generators/generate_demo_manifests.py --all
+```
+
+### Development
+```bash
+# Start web app (development)
+$env:FLASK_ENV='development'; py app.py
+
+# Start with debug mode
+$env:DEBUG_MODE='true'; py app.py
+
+# Start CLI interface
+python main.py
+```
+
+### Production
+```bash
+# Start web app (production)
+py app.py
+
+# Deploy to Azure
+.\deploy_to_azure.ps1
+
+# Redeploy to existing instance
+.\deploy_to_azure.ps1  # Automatically detects .azure-deployment.json
+```
+
+## Azure AI Foundry Agents
+
+### Quick Reference
+
+| Agent | Env Var | File | Tools | Status |
+|-------|---------|------|-------|--------|
+| Customer Service | `CUSTOMER_SERVICE_AGENT_ID` | agents/base.py:662 | track_parcel, search_parcels | ✅ Active |
+| Fraud Detection | `FRAUD_RISK_AGENT_ID` | agents/fraud.py:35 | None | ✅ Active |
+| Identity Verification | `IDENTITY_AGENT_ID` | agents/base.py:770 | None | ✅ Active |
+| Dispatcher | `DISPATCHER_AGENT_ID` | agents/base.py:588 | None | ✅ Active |
+| Parcel Intake | `PARCEL_INTAKE_AGENT_ID` | agents/base.py:333 | None | ✅ Active |
+| Sorting Facility | `SORTING_FACILITY_AGENT_ID` | agents/base.py:427 | None | ✅ Active |
+| Delivery Coordination | `DELIVERY_COORDINATION_AGENT_ID` | agents/base.py:473 | None | ✅ Active |
+| Optimization | `OPTIMIZATION_AGENT_ID` | agents/base.py:521 | None | ✅ Active |
+
+### 1. Customer Service Agent 🎧
+**Purpose:** Real-time customer inquiries and parcel tracking
+
+**Environment Variables:**
+- `CUSTOMER_SERVICE_AGENT_ID` - Azure AI Foundry agent ID (asst_XXX)
+
+**Tools:** (Cosmos DB function calling)
+- `track_parcel_tool` - Real-time parcel tracking by tracking number
+- `search_parcels_by_recipient_tool` - Search by name/postcode/address
+- `search_parcels_by_driver_tool` - Search by driver assignment
+
+**Prompt Locations:**
+- Base instructions: Azure AI Foundry portal or register_agent_tools.py:67-100
+- Runtime prompt: agents/base.py:662-730
+- ⚠️ **IMPORTANT**: Photos (lodgement_photos/delivery_photos) auto-display to customers. Agent must acknowledge them naturally, never say "check internal systems" when photos exist.
+
+**Code Example:**
+```python
+from agents.base import customer_service_agent
+
+result = await customer_service_agent({
+    'details': 'Where is my parcel LP123456?',
+    'public_mode': True  # For conversational chat
+})
+```
+
+**Known Issues:**
+- ✅ Fixed v1.2.3: Lodgement photos now included in agent tool response (agent_tools.py:66-75)
+
+### 2. Fraud Detection Agent 🛡️
+**Purpose:** Security threat analysis and scam detection
+
+**Environment Variables:**
+- `FRAUD_RISK_AGENT_ID` - Azure AI Foundry agent ID
+
+**Features:**
+- Multi-category threat analysis (phishing, impersonation, payment fraud)
+- Risk score calculation (0-100%)
+- Automatic workflow triggering at ≥70% risk score
+
+**Code Example:**
+```python
+from agents.fraud import fraud_risk_agent
+
+result = await fraud_risk_agent({
+    'message_content': 'Suspicious SMS text',
+    'sender_email': 'unknown@example.com',
+    'activity_type': 'message'
+})
+```
+
+**Workflow Integration:**
+- High risk (≥70%): Triggers customer notification via Customer Service Agent
+- Very high risk (≥85%): Triggers Identity Verification Agent
+- Critical (≥90%): Automatic parcel hold
+
+### 3. Identity Verification Agent 🔐
+**Purpose:** Customer identity verification for high-risk cases
+
+**Environment Variables:**
+- `IDENTITY_AGENT_ID` - Azure AI Foundry agent ID
+
+**Auto-Triggered:** When fraud risk ≥85%
+
+**Code Example:**
+```python
+from agents.base import identity_agent
+
+result = await identity_agent({
+    'customer_name': 'John Smith',
+    'verification_request': 'Verify employment status',
+    'verification_reason': 'High-risk fraud detection'
+})
+```
+
+### 4. Dispatcher Agent 📋
+**Purpose:** Intelligent parcel-to-driver assignment
+
+**Environment Variables:**
+- `DISPATCHER_AGENT_ID` - Azure AI Foundry agent ID
+
+**Features:**
+- Geographic clustering
+- Workload balancing
+- Priority-based distribution
+- Capacity optimization
+
+**Access:** Admin Manifests → AI Auto-Assign
+
+### 5. Parcel Intake Agent 📦
+**Purpose:** New parcel validation and recommendations
+
+**Environment Variables:**
+- `PARCEL_INTAKE_AGENT_ID` - Azure AI Foundry agent ID
+
+**Features:**
+- Service type recommendations
+- Address validation
+- Delivery complication predictions
+- Weight/dimension verification
+
+**Code Example:**
+```python
+from agents.base import parcel_intake_agent
+
+result = await parcel_intake_agent({
+    'tracking_number': 'DT123456',
+    'sender_name': 'John Smith',
+    'recipient_address': '123 Main St, Sydney NSW 2000',
+    'weight_kg': 1.5,
+    'service_type': 'express'
+})
+```
+
+### 6. Sorting Facility Agent 🏭
+**Purpose:** Facility capacity monitoring and routing decisions
+
+**Environment Variables:**
+- `SORTING_FACILITY_AGENT_ID` - Azure AI Foundry agent ID
+
+**Features:**
+- Real-time capacity monitoring
+- Automated routing decisions
+- Load balancing
+- Priority-based routing
+
+### 7. Delivery Coordination Agent 🚚
+**Purpose:** Multi-stop delivery sequencing and customer notifications
+
+**Environment Variables:**
+- `DELIVERY_COORDINATION_AGENT_ID` - Azure AI Foundry agent ID
+
+**Features:**
+- Delivery route sequencing
+- Automated SMS/email notifications
+- Dynamic route adjustments
+- Time window management
+
+### 8. Optimization Agent 📊
+**Purpose:** Network-wide performance analysis and cost reduction
+
+**Environment Variables:**
+- `OPTIMIZATION_AGENT_ID` - Azure AI Foundry agent ID
+
+**Features:**
+- Cost reduction insights
+- Resource allocation optimization
+- Predictive analytics
+- Performance recommendations
+
+## Environment Variables
+
+### Required Core Variables
+```bash
+# Azure AI Foundry
+AZURE_AI_PROJECT_ENDPOINT=https://your-project.services.ai.azure.com
+AZURE_AI_PROJECT_CONNECTION_STRING=<connection-string>
+AZURE_AI_MODEL_DEPLOYMENT_NAME=gpt-4o
+
+# Azure Cosmos DB
+COSMOS_DB_ENDPOINT=https://your-account.documents.azure.com:443/
+COSMOS_DB_DATABASE_NAME=logisticstracking
+
+# For local development (use connection string)
+COSMOS_CONNECTION_STRING=AccountEndpoint=...;AccountKey=...
+
+# For Azure deployment (use managed identity)
+USE_MANAGED_IDENTITY=true
+
+# Flask
+FLASK_SECRET_KEY=<random-32-char-string>
+FLASK_ENV=production
+PORT=5000
+```
+
+### Agent IDs (All Required)
+```bash
+CUSTOMER_SERVICE_AGENT_ID=asst_XXX
+FRAUD_RISK_AGENT_ID=asst_XXX
+IDENTITY_AGENT_ID=asst_XXX
+DISPATCHER_AGENT_ID=asst_XXX
+PARCEL_INTAKE_AGENT_ID=asst_XXX
+SORTING_FACILITY_AGENT_ID=asst_XXX
+DELIVERY_COORDINATION_AGENT_ID=asst_XXX
+OPTIMIZATION_AGENT_ID=asst_XXX
+```
+
+### Optional Services
+```bash
+# Azure Maps (route optimization)
+AZURE_MAPS_SUBSCRIPTION_KEY=your-key
+
+# Azure Speech (voice features)
+AZURE_SPEECH_KEY=your-key
+AZURE_SPEECH_REGION=australiaeast
+
+# Azure Vision (OCR/image analysis)
+AZURE_VISION_ENDPOINT=https://your-account.cognitiveservices.azure.com
+AZURE_VISION_KEY=your-key
+```
+
+## Testing
+
+### Run Application Tests
+```bash
+# Test database connection
+python parcel_tracking_db.py
+
+# Test Azure Maps integration
+python services/maps.py
+
+# Test agent workflow
+python Scripts/W01_Sequential_Workflow_Human_Approval.py
+```
+
+### Manual Testing
+```bash
+# Test Customer Service Agent with tools
+python register_agent_tools.py
+
+# Generate test parcels
+python Scripts/check_demo_parcel.py
+
+# Test driver manifest generation
+python utils/generators/generate_demo_manifests.py
+```
+
+### View Logs
+```bash
+# Local development
+# Logs print to console
+
+# Azure App Service
+az webapp log tail --name <webapp-name> --resource-group dt-logistics-rg
+
+# View in portal
+# https://portal.azure.com → App Service → Log stream
+```
+
+## Code Style & Conventions
+
+### Python
+- Follow PEP 8 style guide
+- Use type hints for function parameters and returns
+- Use async/await for database and agent operations
+- Prefix internal functions with underscore: `_helper_function()`
+
+### Agent Functions
+```python
+async def agent_name(request_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Brief description of agent purpose
+    
+    Args:
+        request_data: Description of expected input
+        
+    Returns:
+        Dictionary with success, response, and metadata
+    """
+    message = f"""
+    Structured prompt for agent...
+    """
+    return await call_azure_agent(AGENT_ID, message, request_data)
+```
+
+### Database Operations
+```python
+async with ParcelTrackingDB() as db:
+    result = await db.operation()
+```
+
+### Naming Conventions
+- Files: `snake_case.py`
+- Classes: `PascalCase`
+- Functions: `snake_case()`
+- Constants: `UPPER_SNAKE_CASE`
+- Agent env vars: `AGENT_NAME_AGENT_ID`
+
+## Deployment
+
+### Deploy to Azure App Service
+```powershell
+# First deployment
+.\deploy_to_azure.ps1
+
+# Redeploy (updates code only)
+.\deploy_to_azure.ps1
+
+# Force new deployment
+.\deploy_to_azure.ps1 -Force
+
+# Custom configuration
+.\deploy_to_azure.ps1 -ResourceGroup "my-rg" -Location "australiaeast" -Sku "B2"
+```
+
+### Post-Deployment Steps
+1. Wait 2-5 minutes for RBAC permissions to propagate
+2. Verify agents are accessible (deployment script tests connectivity)
+3. Check logs: `az webapp log tail --name <webapp-name> --resource-group dt-logistics-rg`
+4. Test application at: `https://<webapp-name>.azurewebsites.net`
+
+### Deployment Script Actions
+The deployment script automatically:
+1. ✅ Creates/updates Azure resources (App Service, Resource Group, Plan)
+2. ✅ Enables managed identity
+3. ✅ Configures RBAC permissions (Cosmos DB, Azure AI)
+4. ✅ Deploys application code
+5. ✅ Sets environment variables
+6. ✅ Initializes default users
+7. ✅ Generates demo manifests
+8. ✅ **Updates agent instructions** (runs register_agent_tools.py)
+
+### Authentication Methods
+
+**Local Development:**
+- Uses Azure CLI credentials (`az login`)
+- Requires `.env` file with connection strings
+
+**Azure App Service:**
+- Uses Managed Identity (no keys stored)
+- RBAC roles automatically assigned by deployment script
+- Environment variables configured in App Service settings
+
+## Troubleshooting
+
+### Agent Not Responding
+```bash
+# Verify agent ID is set
+$env:CUSTOMER_SERVICE_AGENT_ID
+
+# Test Azure connection
+az account show
+
+# Check agent in portal
+# Visit: https://ai.azure.com → Your Project → Agents
+```
+
+### Database Connection Errors
+```bash
+# Test connection
+python parcel_tracking_db.py
+
+# Verify Cosmos DB endpoint
+echo $env:COSMOS_DB_ENDPOINT
+
+# Check RBAC permissions (Azure deployment)
+az role assignment list --assignee <principal-id> --scope <cosmos-resource-id>
+```
+
+### Photo Display Issues
+- ✅ **Fixed v1.2.3**: Lodgement photos now included in track_parcel_tool response
+- Verify photos exist in database: Check `lodgement_photos` array in parcel document
+- Agent instructions updated to acknowledge auto-displayed photos
+- Never tell customers to check "internal systems" when photos exist in data
+
+### Import Errors
+```bash
+# Set PYTHONPATH for local testing
+$env:PYTHONPATH="$PWD;$PWD\utils\setup"
+
+# Verify all dependencies installed
+pip install -r requirements.txt
+```
+
+### RBAC Permission Errors (Azure)
+```bash
+# Wait 2-5 minutes after deployment for propagation
+# Manually assign roles if needed:
+az role assignment create \
+  --assignee-object-id <managed-identity-id> \
+  --role "Cognitive Services OpenAI Contributor" \
+  --scope <ai-hub-resource-id>
+```
+
+## Workflows
+
+### Multi-Agent Workflow: Fraud Detection → Customer Notification
+Located: `workflows/fraud_to_customer_service.py`
+
+**Sequence:**
+1. Fraud Detection Agent analyzes suspicious activity
+2. If risk ≥70%: Customer Service Agent generates warning
+3. If risk ≥85%: Identity Verification Agent triggered
+4. If risk ≥90%: Parcel automatically held
+5. Customer notified via SMS/email
+6. Complete audit trail logged
+
+**Trigger:**
+```python
+from workflows.fraud_to_customer_service import fraud_detection_to_customer_service_workflow
+
+result = await fraud_detection_to_customer_service_workflow(
+    message_content="Suspicious delivery request",
+    customer_name="John Smith",
+    customer_email="john@example.com",
+    customer_phone="+61400000000"
+)
+```
+
+## Updating Agents
+
+### Update Agent Instructions
+```bash
+# Method 1: Update base.py (immediate effect)
+# Edit: agents/base.py:662-730 (Customer Service example)
+
+# Method 2: Update Azure AI Foundry (persistent)
+python register_agent_tools.py
+
+# Method 3: Update in Azure portal
+# Visit: https://ai.azure.com → Your Project → Agents → Edit
+```
+
+### Add New Agent Tools
+```bash
+# 1. Define tool in agent_tools.py
+async def new_tool(param: str) -> str:
+    # Implementation
+    pass
+
+# 2. Add to AGENT_TOOLS list
+AGENT_TOOLS = [
+    existing_tools,
+    {
+        "type": "function",
+        "function": {
+            "name": "new_tool",
+            "description": "Tool description",
+            "parameters": {...}
+        }
+    }
+]
+
+# 3. Register with agent
+python register_agent_tools.py
+```
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `agents/base.py` | Core agent implementations (8 agents) |
+| `agents/fraud.py` | Fraud detection agent |
+| `agent_tools.py` | Cosmos DB function tools for agents |
+| `register_agent_tools.py` | Register tools with Azure AI agents |
+| `parcel_tracking_db.py` | Cosmos DB operations |
+| `app.py` | Flask web application (main entry) |
+| `main.py` | CLI interface |
+| `deploy_to_azure.ps1` | Azure deployment automation |
+| `workflows/fraud_to_customer_service.py` | Multi-agent workflow |
+
+## Documentation
+
+- `readme.md` - User-focused overview
+- `AGENTS.md` - This file (developer/agent focused)
+- `Guides/DEMO_GUIDE.md` - Demo walkthrough
+- `Guides/AZURE_DEPLOYMENT.md` - Deployment details
+- `Guides/DISPATCHER_AGENT_GUIDE.md` - Dispatcher integration
+- `Guides/AGENT_COMMUNICATION_OPPORTUNITIES.md` - Workflow opportunities
+
+## Security Considerations
+
+### Never Commit
+- `.env` file with secrets
+- Azure connection strings
+- API keys
+- Agent IDs (except as examples)
+
+### Use Managed Identity
+- Preferred for Azure deployments
+- Set `USE_MANAGED_IDENTITY=true`
+- No keys stored in environment variables
+- RBAC roles automatically configured
+
+### Sensitive Data
+- Customer PII encrypted at rest
+- Audit trail for all operations
+- GDPR compliance features
+- Photo data stored as base64 in Cosmos DB
+
+## Performance Tips
+
+### Database Optimization
+- Use partition keys correctly (`store_location` for parcels, `barcode` for events)
+- Batch operations when possible
+- Avoid cross-partition queries
+
+### Agent Optimization
+- Keep prompts concise and focused
+- Use context parameter for additional data
+- Cache agent responses when appropriate
+- Monitor RU consumption in Cosmos DB
+
+### Azure App Service
+- Use B2 or higher SKU for production
+- Enable "Always On" for consistent performance
+- Monitor Application Insights for bottlenecks
+- Scale workers based on load
+
+## Version History
+
+- **v1.2.3** (2026-01-13): Fixed lodgement photo display in Customer Service Agent
+- **v1.2.0** (2025-12-18): Added 8 active AI agents with performance dashboard
+- **v1.1.0** (2025-12): Multi-agent workflows and fraud detection
+- **v1.0.0** (2025-11): Initial release with core tracking features
+
+---
+
+**Last Updated:** January 13, 2026  
+**Agent Framework:** Azure AI Foundry (Microsoft Agent Framework)  
+**Maintained By:** Darren Turchiarelli (Microsoft Australia)

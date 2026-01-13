@@ -1,5 +1,5 @@
 # =============================================================================
-# Deploy DT Logistics to Azure App Service
+# Deploy Zava to Azure App Service
 # =============================================================================
 
 param(
@@ -14,7 +14,7 @@ param(
 $deploymentConfigFile = ".azure-deployment.json"
 
 Write-Host "======================================================================" -ForegroundColor Cyan
-Write-Host " DT Logistics - Azure App Service Deployment" -ForegroundColor Cyan
+Write-Host " Zava - Azure App Service Deployment" -ForegroundColor Cyan
 Write-Host "======================================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -566,6 +566,20 @@ if (Test-Path "utils\generators\generate_demo_manifests.py") {
     }
 } else {
     Write-Host "  ⚠ utils\generators\generate_demo_manifests.py not found, skipping manifest generation" -ForegroundColor Yellow
+}
+
+# Task 3: Update Azure AI Foundry agent instructions
+Write-Host "  🤖 Updating Azure AI Foundry agent instructions..." -ForegroundColor Cyan
+if (Test-Path "register_agent_tools.py") {
+    try {
+        python register_agent_tools.py
+        Write-Host "  ✓ Agent instructions updated in Azure AI Foundry" -ForegroundColor Green
+    } catch {
+        Write-Host "  ⚠ Agent update failed: $_" -ForegroundColor Yellow
+        Write-Host "  You can update agents manually by running: python register_agent_tools.py" -ForegroundColor Gray
+    }
+} else {
+    Write-Host "  ⚠ register_agent_tools.py not found, skipping agent update" -ForegroundColor Yellow
 }
 
 Write-Host "  ✓ Post-deployment tasks completed" -ForegroundColor Green
