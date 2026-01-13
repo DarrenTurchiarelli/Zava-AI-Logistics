@@ -11,6 +11,9 @@ repos:
         name: Format Python code with Black
         args: ['--line-length=120']
         language_version: python3.11
+        types: [python]
+        # Only runs when Python files are staged
+        stages: [pre-commit]
 
   # Python linting
   - repo: https://github.com/pycqa/flake8
@@ -20,6 +23,9 @@ repos:
         name: Lint Python code with Flake8
         args: ['--max-line-length=120', '--extend-ignore=E203,W503']
         additional_dependencies: [flake8-docstrings]
+        types: [python]
+        # Only runs when Python files are staged
+        stages: [pre-commit]
 
   # Python import sorting
   - repo: https://github.com/pycqa/isort
@@ -28,6 +34,9 @@ repos:
       - id: isort
         name: Sort Python imports
         args: ['--profile', 'black', '--line-length', '120']
+        types: [python]
+        # Only runs when Python files are staged
+        stages: [pre-commit]
 
   # General file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
