@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{{ company.browser_title }}{% endblock %}</title>
-    
+
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
@@ -13,7 +13,7 @@
     <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    
+
     <!-- Dynamic Brand Colors -->
     <style>
         :root {
@@ -26,17 +26,17 @@
             --dt-success: {{ company.brand_success_color }};
             --dt-alert: {{ company.brand_alert_color }};
         }
-        
+
         /* Override Bootstrap primary color classes with brand colors */
         .bg-primary {
             background-color: {{ company.brand_primary_color }} !important;
         }
-        
+
         .btn-primary {
             background-color: {{ company.brand_primary_color }} !important;
             border-color: {{ company.brand_primary_color }} !important;
         }
-        
+
         .btn-primary:hover,
         .btn-primary:focus,
         .btn-primary:active {
@@ -44,12 +44,12 @@
             border-color: {{ company.brand_primary_color }} !important;
             filter: brightness(0.85);
         }
-        
+
         .btn-outline-primary {
             color: {{ company.brand_primary_color }} !important;
             border-color: {{ company.brand_primary_color }} !important;
         }
-        
+
         .btn-outline-primary:hover,
         .btn-outline-primary:focus,
         .btn-outline-primary:active {
@@ -57,54 +57,54 @@
             border-color: {{ company.brand_primary_color }} !important;
             color: white !important;
         }
-        
+
         .text-primary {
             color: {{ company.brand_primary_color }} !important;
         }
-        
+
         .border-primary {
             border-color: {{ company.brand_primary_color }} !important;
         }
-        
+
         .link-primary {
             color: {{ company.brand_primary_color }} !important;
         }
-        
+
         .navbar-dark .navbar-brand:hover,
         .navbar-dark .navbar-brand:focus {
             color: rgba(255, 255, 255, 0.9);
         }
-        
+
         /* Badge primary */
         .badge.bg-primary {
             background-color: {{ company.brand_primary_color }} !important;
         }
-        
+
         /* Alert primary */
         .alert-primary {
             background-color: {{ company.brand_primary_color }}20 !important;
             border-color: {{ company.brand_primary_color }} !important;
             color: {{ company.brand_primary_color }} !important;
         }
-        
+
         /* Override Bootstrap info color classes with secondary brand color */
         .bg-info {
             background-color: {{ company.brand_secondary_color }} !important;
         }
-        
+
         .text-info {
             color: {{ company.brand_secondary_color }} !important;
         }
-        
+
         .border-info {
             border-color: {{ company.brand_secondary_color }} !important;
         }
-        
+
         .badge.bg-info {
             background-color: #f8f9fa !important;
             color: {{ company.brand_primary_color }} !important;
         }
-        
+
         /* Force ALL badges to use light background - override Bootstrap defaults */
         .badge,
         .badge.bg-success,
@@ -119,23 +119,23 @@
             background-color: #f8f9fa !important;
             border: 1px solid #dee2e6 !important;
         }
-        
+
         /* Text colors based on semantic meaning */
         .badge.bg-success {
             color: {{ company.brand_success_color }} !important;
             background-color: #f8f9fa !important;
         }
-        
+
         .badge.bg-warning {
             color: #ffc107 !important;
             background-color: #f8f9fa !important;
         }
-        
+
         .badge.bg-danger {
             color: {{ company.brand_danger_color }} !important;
             background-color: #f8f9fa !important;
         }
-        
+
         .badge.bg-primary,
         .badge.bg-info,
         .badge.bg-light,
@@ -144,60 +144,60 @@
             color: {{ company.brand_primary_color }} !important;
             background-color: #f8f9fa !important;
         }
-        
+
         .alert-info {
             background-color: {{ company.brand_secondary_color }}20 !important;
             border-color: {{ company.brand_secondary_color }} !important;
             color: {{ company.brand_secondary_color }} !important;
         }
-        
+
         .progress-bar.bg-info {
             background-color: {{ company.brand_secondary_color }} !important;
         }
-        
+
         .card-header.bg-info {
             background-color: {{ company.brand_secondary_color }} !important;
         }
-        
+
         .modal-header.bg-info {
             background-color: {{ company.brand_secondary_color }} !important;
         }
-        
+
         /* Card and modal headers with bg-primary use gradient */
         .card-header.bg-primary {
             background: {{ company.brand_gradient }} !important;
         }
-        
+
         .modal-header.bg-primary {
             background: {{ company.brand_gradient }} !important;
         }
-        
+
         /* Override Bootstrap success color classes for positive metrics */
         .bg-success {
             background-color: {{ company.brand_success_color }} !important;
         }
-        
+
         .text-success {
             color: {{ company.brand_success_color }} !important;
         }
-        
+
         .border-success {
             border-color: {{ company.brand_success_color }} !important;
         }
-        
+
         .badge.bg-success {
             background-color: {{ company.brand_success_color }} !important;
         }
-        
+
         .progress-bar.bg-success {
             background-color: {{ company.brand_success_color }} !important;
         }
-        
+
         .btn-success {
             background-color: {{ company.brand_success_color }} !important;
             border-color: {{ company.brand_success_color }} !important;
         }
-        
+
         .btn-success:hover,
         .btn-success:focus,
         .btn-success:active {
@@ -205,79 +205,79 @@
             border-color: {{ company.brand_success_color }} !important;
             filter: brightness(0.85);
         }
-        
+
         /* Override Bootstrap warning color classes with alert brand color */
         .bg-warning {
             background-color: {{ company.brand_alert_color }} !important;
         }
-        
+
         .text-warning {
             color: {{ company.brand_alert_color }} !important;
         }
-        
+
         .border-warning {
             border-color: {{ company.brand_alert_color }} !important;
         }
-        
+
         .badge.bg-warning {
             background-color: {{ company.brand_alert_color }} !important;
             color: #000 !important;
         }
-        
+
         .alert-warning {
             background-color: {{ company.brand_alert_color }}50 !important;
             border-color: {{ company.brand_alert_color }} !important;
             color: #000 !important;
         }
-        
+
         .alert-warning .alert-heading {
             color: #000 !important;
         }
-        
+
         .progress-bar.bg-warning {
             background-color: {{ company.brand_alert_color }} !important;
         }
-        
+
         /* Dropdown menu item hover and active states */
         .dropdown-item:hover,
         .dropdown-item:focus {
             background-color: {{ company.brand_primary_color }} !important;
             color: #ffffff !important;
         }
-        
+
         .dropdown-item:active {
             background-color: {{ company.brand_primary_color }} !important;
             color: #ffffff !important;
         }
-        
+
         /* Form control focus states */
         .form-control:focus,
         .form-select:focus {
             border-color: {{ company.brand_primary_color }} !important;
             box-shadow: 0 0 0 0.25rem {{ company.brand_primary_color }}40 !important;
         }
-        
+
         /* Chat widget input - override to use blue instead of red */
         #chatWidgetInput:focus,
         .chat-widget-input:focus {
             border-color: #007bff !important;
             box-shadow: 0 0 0 0.25rem rgba(0, 123, 255, 0.25) !important;
         }
-        
+
         /* Alert success - use brand primary color */
         .alert-success {
             background-color: {{ company.brand_primary_color }}20 !important;
             border-color: {{ company.brand_primary_color }} !important;
             color: #000000 !important;
         }
-        
+
         /* Navbar gradient styling */
         .navbar-gradient {
             background: {{ company.brand_gradient }} !important;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
     </style>
-    
+
     {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -446,7 +446,7 @@
         <div class="container">
             <p class="text-muted mb-1">{{ company.copyright }}</p>
             <p class="text-muted mb-1">
-                <i class="bi bi-telephone"></i> {{ company.phone }} | 
+                <i class="bi bi-telephone"></i> {{ company.phone }} |
                 <i class="bi bi-envelope"></i> {{ company.email }}
             </p>
             <p class="text-muted small mb-0">
@@ -462,7 +462,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Custom JS -->
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
-    
+
     <!-- Accessibility Settings Script -->
     <script>
         // Load saved accessibility preferences on page load
@@ -471,35 +471,35 @@
             const fontSize = localStorage.getItem('accessibility-font-size') || 'normal';
             const screenReader = localStorage.getItem('accessibility-screen-reader') === 'true';
             const reducedMotion = localStorage.getItem('accessibility-reduced-motion') === 'true';
-            
+
             applyTheme(theme);
             applyFontSize(fontSize);
             if (screenReader) applyScreenReader();
             if (reducedMotion) applyReducedMotion();
         });
-        
+
         function setAccessibilityTheme(theme) {
             localStorage.setItem('accessibility-theme', theme);
             applyTheme(theme);
             announceChange('Theme changed to ' + theme.replace(/-/g, ' '));
         }
-        
+
         function applyTheme(theme) {
             document.body.classList.remove('theme-default', 'theme-high-contrast', 'theme-colorblind-deuteranopia', 'theme-colorblind-protanopia', 'theme-dark');
             document.body.classList.add('theme-' + theme);
         }
-        
+
         function setFontSize(size) {
             localStorage.setItem('accessibility-font-size', size);
             applyFontSize(size);
             announceChange('Font size changed to ' + size);
         }
-        
+
         function applyFontSize(size) {
             document.body.classList.remove('font-size-normal', 'font-size-large', 'font-size-extra-large');
             document.body.classList.add('font-size-' + size);
         }
-        
+
         function toggleScreenReader() {
             const current = localStorage.getItem('accessibility-screen-reader') === 'true';
             localStorage.setItem('accessibility-screen-reader', !current);
@@ -513,67 +513,67 @@
                 setTimeout(() => speak('Screen reader mode disabled'), 100);
             }
         }
-        
+
         function applyScreenReader() {
             document.body.classList.add('screen-reader-mode');
             initializeSpeechListeners();
         }
-        
+
         // Text-to-Speech functionality using Web Speech API
         let speechSynthesis = window.speechSynthesis;
         let currentUtterance = null;
         let focusInListener = null;
-        
+
         function speak(text, interrupt = true) {
             // Check if screen reader is actually enabled
             if (!localStorage.getItem('accessibility-screen-reader') || localStorage.getItem('accessibility-screen-reader') !== 'true') {
                 return;
             }
-            
+
             if (!text) return;
-            
+
             // Stop current speech if interrupting
             if (interrupt && speechSynthesis.speaking) {
                 speechSynthesis.cancel();
             }
-            
+
             // Create new utterance
             currentUtterance = new SpeechSynthesisUtterance(text);
             currentUtterance.rate = 1.0;
             currentUtterance.pitch = 1.0;
             currentUtterance.volume = 1.0;
-            
+
             // Use default voice or first available
             const voices = speechSynthesis.getVoices();
             if (voices.length > 0) {
                 currentUtterance.voice = voices[0];
             }
-            
+
             speechSynthesis.speak(currentUtterance);
         }
-        
+
         function stopSpeaking() {
             if (speechSynthesis.speaking) {
                 speechSynthesis.cancel();
             }
         }
-        
+
         function initializeSpeechListeners() {
             // Only add listeners if screen reader mode is enabled
             if (!document.body.classList.contains('screen-reader-mode')) return;
-            
+
             // Remove existing listener if present
             if (focusInListener) {
                 document.removeEventListener('focusin', focusInListener);
             }
-            
+
             // Create and store listener function
             focusInListener = function(e) {
                 if (localStorage.getItem('accessibility-screen-reader') !== 'true') return;
-                
+
                 let textToRead = '';
                 const element = e.target;
-                
+
                 // Get text based on element type
                 if (element.tagName === 'A') {
                     textToRead = 'Link: ' + (element.textContent.trim() || element.getAttribute('aria-label') || element.title || 'unnamed link');
@@ -600,16 +600,16 @@
                 } else if (element.textContent.trim()) {
                     textToRead = element.textContent.trim();
                 }
-                
+
                 if (textToRead) {
                     speak(textToRead);
                 }
             };
-            
+
             // Add the listener
             document.addEventListener('focusin', focusInListener);
         }
-        
+
         function removeSpeechListeners() {
             // Remove focus listener
             if (focusInListener) {
@@ -617,7 +617,7 @@
                 focusInListener = null;
             }
         }
-        
+
         function toggleReducedMotion() {
             const current = localStorage.getItem('accessibility-reduced-motion') === 'true';
             localStorage.setItem('accessibility-reduced-motion', !current);
@@ -629,11 +629,11 @@
                 announceChange('Reduced motion disabled');
             }
         }
-        
+
         function applyReducedMotion() {
             document.body.classList.add('reduced-motion');
         }
-        
+
         function resetAccessibility() {
             localStorage.removeItem('accessibility-theme');
             localStorage.removeItem('accessibility-font-size');
@@ -641,7 +641,7 @@
             localStorage.removeItem('accessibility-reduced-motion');
             location.reload();
         }
-        
+
         function announceChange(message) {
             // Create ARIA live region for screen readers
             let announcer = document.getElementById('accessibility-announcer');
@@ -659,11 +659,11 @@
             }
             announcer.textContent = message;
         }
-        
+
         // Language Translation Functions
         function setLanguage(languageCode, languageName) {
             console.log('setLanguage called:', languageCode, languageName);
-            
+
             // Store language preference in session
             fetch('/set-language', {
                 method: 'POST',
@@ -695,7 +695,7 @@
                         </div>
                     `;
                     document.body.appendChild(loadingToast);
-                    
+
                     console.log('Reloading page in 500ms...');
                     // Reload page to apply translations
                     setTimeout(() => {
@@ -712,7 +712,7 @@
             });
         }
     </script>
-    
+
     <!-- Accessibility CSS -->
     <style>
         /* High Contrast Theme */
@@ -734,7 +734,7 @@
             color: #0000ff;
             text-decoration: underline;
         }
-        
+
         /* Colorblind Themes */
         .theme-colorblind-deuteranopia .bg-success,
         .theme-colorblind-deuteranopia .btn-success {
@@ -751,7 +751,7 @@
             background-color: #029e73 !important;
             border-color: #029e73 !important;
         }
-        
+
         .theme-colorblind-protanopia .bg-success,
         .theme-colorblind-protanopia .btn-success {
             background-color: #6699cc !important;
@@ -762,7 +762,7 @@
             background-color: #cc9966 !important;
             border-color: #cc9966 !important;
         }
-        
+
         /* Dark Mode */
         .theme-dark {
             background-color: #1a1a1a;
@@ -779,7 +779,7 @@
         .theme-dark .text-muted {
             color: #b0b0b0 !important;
         }
-        
+
         /* Font Sizes */
         .font-size-large {
             font-size: 1.15rem;
@@ -790,7 +790,7 @@
         .font-size-large h1, .font-size-extra-large h1 { font-size: calc(1.375rem * 1.3); }
         .font-size-large h2, .font-size-extra-large h2 { font-size: calc(1.325rem * 1.3); }
         .font-size-large h3, .font-size-extra-large h3 { font-size: calc(1.3rem * 1.25); }
-        
+
         /* Screen Reader Mode */
         .screen-reader-mode :focus {
             outline: 3px solid #ff0 !important;
@@ -801,7 +801,7 @@
         .screen-reader-mode input:focus {
             box-shadow: 0 0 0 3px rgba(255, 255, 0, 0.5) !important;
         }
-        
+
         /* Reduced Motion */
         .reduced-motion *,
         .reduced-motion *::before,
@@ -818,7 +818,7 @@
             right: 20px;
             z-index: 1000;
         }
-        
+
         .chat-widget-button {
             width: 60px;
             height: 60px;
@@ -836,19 +836,19 @@
             color: #007bff;
             font-size: 24px;
         }
-        
+
         .chat-widget-button:hover {
             transform: scale(1.1);
             background: rgba(0, 123, 255, 0.25);
             border: 2px solid rgba(0, 123, 255, 0.5);
             box-shadow: 0 6px 16px rgba(0, 123, 255, 0.3);
         }
-        
+
         .chat-widget-button.active {
             background: rgba(0, 123, 255, 0.2);
             border: 2px solid rgba(0, 123, 255, 0.4);
         }
-        
+
         .chat-widget-window {
             display: none;
             position: fixed;
@@ -865,11 +865,11 @@
             flex-direction: column;
             overflow: hidden;
         }
-        
+
         .chat-widget-window.open {
             display: flex;
         }
-        
+
         .chat-widget-header {
             background: rgba(0, 123, 255, 0.15);
             backdrop-filter: blur(10px);
@@ -881,13 +881,13 @@
             justify-content: space-between;
             align-items: center;
         }
-        
+
         .chat-widget-header h5 {
             margin: 0;
             font-size: 16px;
             font-weight: 600;
         }
-        
+
         .chat-widget-close {
             background: none;
             border: none;
@@ -901,24 +901,24 @@
             align-items: center;
             justify-content: center;
         }
-        
+
         .chat-widget-body {
             flex: 1;
             overflow-y: auto;
             padding: 15px;
             background: #f8f9fa;
         }
-        
+
         .chat-widget-message {
             margin-bottom: 12px;
             display: flex;
             align-items: flex-start;
         }
-        
+
         .chat-widget-message.user {
             justify-content: flex-end;
         }
-        
+
         .chat-widget-message-bubble {
             max-width: 75%;
             padding: 10px 14px;
@@ -926,31 +926,31 @@
             font-size: 14px;
             line-height: 1.4;
         }
-        
+
         .chat-widget-message.user .chat-widget-message-bubble {
             background: #007bff;
             color: white;
             border-bottom-right-radius: 4px;
         }
-        
+
         .chat-widget-message.assistant .chat-widget-message-bubble {
             background: white;
             border: 1px solid #dee2e6;
             color: #333;
             border-bottom-left-radius: 4px;
         }
-        
+
         .chat-widget-footer {
             padding: 15px;
             background: white;
             border-top: 1px solid #dee2e6;
         }
-        
+
         .chat-widget-input-group {
             display: flex;
             gap: 8px;
         }
-        
+
         .chat-widget-input {
             flex: 1;
             border: 1px solid #ced4da;
@@ -959,19 +959,19 @@
             font-size: 14px;
             outline: none;
         }
-        
+
         .chat-widget-input:focus {
             border-color: #007bff !important;
             box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important;
             outline: none !important;
         }
-        
+
         /* Double specificity to ensure chat widget input uses blue */
         #chatWidgetInput.chat-widget-input:focus {
             border-color: #007bff !important;
             box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important;
         }
-        
+
         .chat-widget-voice {
             background: #007bff;
             border: none;
@@ -986,11 +986,11 @@
             transition: all 0.3s;
             flex-shrink: 0;
         }
-        
+
         .chat-widget-voice:hover {
             background: #0056b3;
         }
-        
+
         .chat-widget-send {
             background: #007bff;
             border: none;
@@ -1005,21 +1005,21 @@
             transition: background 0.2s;
             flex-shrink: 0;
         }
-        
+
         .chat-widget-send:hover {
             background: #0056b3;
         }
-        
+
         .chat-widget-send:disabled {
             background: #6c757d;
             cursor: not-allowed;
         }
-        
+
         .chat-widget-controls {
             margin-top: 8px;
             text-align: center;
         }
-        
+
         @keyframes pulse {
             0%, 100% {
                 opacity: 1;
@@ -1030,7 +1030,7 @@
                 transform: scale(1.1);
             }
         }
-        
+
         .chat-widget-typing {
             padding: 10px 14px;
             background: white;
@@ -1040,7 +1040,7 @@
             font-size: 14px;
             color: #6c757d;
         }
-        
+
         .chat-widget-welcome {
             text-align: center;
             padding: 20px;
@@ -1048,16 +1048,16 @@
             font-size: 14px;
         }
     </style>
-    
+
     <!-- Chat Widget for All Users -->
     <div class="chat-widget">
-        <button class="chat-widget-button" id="chatWidgetToggle" title="Chat with AI Copilot">
+        <button class="chat-widget-button" id="chatWidgetToggle" title="Chat with Copilot">
             <img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot" style="width: 28px; height: 28px;">
         </button>
-        
+
         <div class="chat-widget-window" id="chatWidgetWindow">
             <div class="chat-widget-header">
-                <h5><img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot" style="width: 20px; height: 20px; margin-right: 8px;"> AI Copilot</h5>
+                <h5><img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot" style="width: 20px; height: 20px; margin-right: 8px;"> Copilot</h5>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <button class="chat-widget-close" id="chatWidgetMinimize" title="Minimize">
                         <i class="bi bi-dash"></i>
@@ -1067,7 +1067,7 @@
                     </button>
                 </div>
             </div>
-            
+
             <div class="chat-widget-body" id="chatWidgetMessages">
                 <div class="chat-widget-welcome">
                     <img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot" style="width: 64px; height: 64px; margin-bottom: 10px;">
@@ -1075,7 +1075,7 @@
                     <p>Ask me about deliveries, tracking, or general inquiries.</p>
                 </div>
             </div>
-            
+
             <div class="chat-widget-footer">
                 <div class="chat-widget-input-group">
                     <input type="text" class="chat-widget-input" id="chatWidgetInput" placeholder="Type or speak..." />
@@ -1098,7 +1098,7 @@
             </div>
         </div>
     </div>
-    
+
     <script>
         // Chat Widget JavaScript
         (function() {
@@ -1112,21 +1112,21 @@
             const voiceBtn = document.getElementById('chatWidgetVoice');
             const micIcon = document.getElementById('chatWidgetMicIcon');
             const autoSpeakCheckbox = document.getElementById('chatWidgetAutoSpeak');
-            
+
             let widgetSpeechConfig = null;
             let widgetRecognizer = null;
             let widgetSynthesizer = null;
             let isWidgetListening = false;
             let useWidgetAzureSpeech = false;
-            
+
             let isOpen = false;
-            
+
             // Initialize Azure Speech for widget
             async function initWidgetSpeech() {
                 try {
                     const response = await fetch('/api/speech/token');
                     const data = await response.json();
-                    
+
                     if (data.token && data.region && window.SpeechSDK) {
                         widgetSpeechConfig = window.SpeechSDK.SpeechConfig.fromAuthorizationToken(data.token, data.region);
                         widgetSpeechConfig.speechRecognitionLanguage = data.language || 'en-AU';
@@ -1138,15 +1138,15 @@
                     console.log('⚠️ Widget using Web Speech API fallback');
                 }
             }
-            
+
             initWidgetSpeech();
-            
+
             // Detect if user is on mobile device
             function isMobileDevice() {
-                return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) 
+                return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
                     || (window.innerWidth <= 768);
             }
-            
+
             // Toggle chat window
             toggleBtn.addEventListener('click', function() {
                 // On mobile, open public chat page in new tab instead of popup
@@ -1154,31 +1154,31 @@
                     window.open('{{ url_for("public_chat") }}', '_blank');
                     return;
                 }
-                
+
                 // Desktop behavior - show popup widget
                 isOpen = !isOpen;
                 chatWindow.classList.toggle('open', isOpen);
                 toggleBtn.classList.toggle('active', isOpen);
-                
+
                 if (isOpen) {
                     input.focus();
                 }
             });
-            
+
             // Close chat window
             closeBtn.addEventListener('click', function() {
                 isOpen = false;
                 chatWindow.classList.remove('open');
                 toggleBtn.classList.remove('active');
             });
-            
+
             // Minimize chat window (same as close)
             minimizeBtn.addEventListener('click', function() {
                 isOpen = false;
                 chatWindow.classList.remove('open');
                 toggleBtn.classList.remove('active');
             });
-            
+
             // Voice input
             voiceBtn.addEventListener('click', function() {
                 if (isWidgetListening) {
@@ -1187,16 +1187,16 @@
                     startWidgetListening();
                 }
             });
-            
+
             function startWidgetListening() {
                 if (useWidgetAzureSpeech && widgetSpeechConfig) {
                     const audioConfig = window.SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
                     widgetRecognizer = new window.SpeechSDK.SpeechRecognizer(widgetSpeechConfig, audioConfig);
-                    
+
                     isWidgetListening = true;
                     voiceBtn.style.backgroundColor = '#dc3545';
                     micIcon.style.animation = 'pulse 1s infinite';
-                    
+
                     widgetRecognizer.recognizeOnceAsync(
                         function (result) {
                             input.value = result.text;
@@ -1212,24 +1212,24 @@
                     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                     const recognition = new SpeechRecognition();
                     recognition.lang = 'en-AU';
-                    
+
                     isWidgetListening = true;
                     voiceBtn.style.backgroundColor = '#dc3545';
                     micIcon.style.animation = 'pulse 1s infinite';
-                    
+
                     recognition.onresult = function(event) {
                         input.value = event.results[0][0].transcript;
                         sendMessage();
                     };
-                    
+
                     recognition.onend = function() {
                         stopWidgetListening();
                     };
-                    
+
                     recognition.start();
                 }
             }
-            
+
             function stopWidgetListening() {
                 isWidgetListening = false;
                 voiceBtn.style.backgroundColor = '';
@@ -1239,16 +1239,16 @@
                     widgetRecognizer = null;
                 }
             }
-            
+
             function speakWidgetMessage(text) {
                 if (!autoSpeakCheckbox.checked) return;
-                
+
                 const cleanText = text.replace(/\*\*/g, '').replace(/<[^>]+>/g, '').trim();
-                
+
                 // Use server-side Azure Neural TTS for high quality
                 speakWidgetWithAzure(cleanText);
             }
-            
+
             async function speakWidgetWithAzure(text) {
                 try {
                     console.log('🔊 Widget using Azure Neural voice: natasha');
@@ -1262,23 +1262,23 @@
                             voice_persona: 'natasha'
                         })
                     });
-                    
+
                     if (response.ok) {
                         const audioBlob = await response.blob();
                         const audioUrl = URL.createObjectURL(audioBlob);
                         const audio = new Audio(audioUrl);
-                        
+
                         audio.onended = () => {
                             URL.revokeObjectURL(audioUrl);
                             console.log('🔊 Widget Azure speech ended');
                         };
-                        
+
                         audio.onerror = (error) => {
                             console.error('🔊 Widget audio playback error:', error);
                             // Fallback to browser speech
                             speakWidgetWithBrowser(text);
                         };
-                        
+
                         await audio.play();
                     } else {
                         console.warn('Widget Azure speech failed, falling back to browser');
@@ -1289,13 +1289,13 @@
                     speakWidgetWithBrowser(text);
                 }
             }
-            
+
             function speakWidgetWithBrowser(text) {
                 if (window.speechSynthesis) {
                     const utterance = new SpeechSynthesisUtterance(text);
                     utterance.lang = 'en-AU';
                     const voices = window.speechSynthesis.getVoices();
-                    const naturalVoice = voices.find(v => v.name.includes('Natural') || v.name.includes('Premium')) 
+                    const naturalVoice = voices.find(v => v.name.includes('Natural') || v.name.includes('Premium'))
                                       || voices.find(v => v.lang.startsWith('en-AU'))
                                       || voices.find(v => v.lang.startsWith('en'));
                     if (naturalVoice) {
@@ -1304,20 +1304,20 @@
                     window.speechSynthesis.speak(utterance);
                 }
             }
-            
+
             // Send message
             async function sendMessage() {
                 const message = input.value.trim();
                 if (!message) return;
-                
+
                 // Add user message
                 addMessage(message, 'user');
                 input.value = '';
                 sendBtn.disabled = true;
-                
+
                 // Show typing indicator
                 const typingId = 'typing-' + Date.now();
-                messagesContainer.insertAdjacentHTML('beforeend', 
+                messagesContainer.insertAdjacentHTML('beforeend',
                     `<div class="chat-widget-message assistant" id="${typingId}">
                         <div class="chat-widget-typing">
                             <i class="bi bi-three-dots"></i> Typing...
@@ -1325,7 +1325,7 @@
                     </div>`
                 );
                 scrollToBottom();
-                
+
                 try {
                     // Call public chatbot API
                     const response = await fetch('/api/public/chatbot', {
@@ -1335,16 +1335,16 @@
                         },
                         body: JSON.stringify({ query: message })
                     });
-                    
+
                     const data = await response.json();
-                    
+
                     // Remove typing indicator
                     document.getElementById(typingId).remove();
-                    
+
                     if (response.ok) {
                         // Extract response text from AI agent response
                         let responseText = '';
-                        
+
                         // Handle different response formats
                         if (typeof data === 'string') {
                             responseText = data;
@@ -1367,7 +1367,7 @@
                         } else {
                             responseText = JSON.stringify(data);
                         }
-                        
+
                         addMessage(responseText, 'assistant');
                         speakWidgetMessage(responseText);
                     } else {
@@ -1384,27 +1384,27 @@
                     sendBtn.disabled = false;
                 }
             }
-            
+
             // Add message to chat
             function addMessage(text, type) {
                 const messageDiv = document.createElement('div');
                 messageDiv.className = `chat-widget-message ${type}`;
-                
+
                 const bubbleDiv = document.createElement('div');
                 bubbleDiv.className = 'chat-widget-message-bubble';
                 bubbleDiv.textContent = text;
-                
+
                 messageDiv.appendChild(bubbleDiv);
                 messagesContainer.appendChild(messageDiv);
-                
+
                 scrollToBottom();
             }
-            
+
             // Scroll to bottom
             function scrollToBottom() {
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
             }
-            
+
             // End chat
             function clearChat() {
                 // Stop any playing audio
@@ -1412,7 +1412,7 @@
                     window.currentAudio.pause();
                     window.currentAudio = null;
                 }
-                
+
                 messagesContainer.innerHTML = `
                     <div class="chat-widget-welcome">
                         <img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot" style="width: 64px; height: 64px; margin-bottom: 10px;">
@@ -1422,7 +1422,7 @@
                 `;
                 console.log('🗑️ Chat cleared and audio stopped');
             }
-            
+
             // Event listeners
             sendBtn.addEventListener('click', sendMessage);
             input.addEventListener('keypress', function(e) {
@@ -1430,12 +1430,12 @@
                     sendMessage();
                 }
             });
-            
+
             const clearBtn = document.getElementById('chatWidgetClear');
             clearBtn.addEventListener('click', clearChat);
         })();
     </script>
-    
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>

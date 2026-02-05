@@ -3815,24 +3815,24 @@ def analyze_image():
         # Call Azure AI Vision OCR
         from azure.ai.vision.imageanalysis import ImageAnalysisClient
         from azure.ai.vision.imageanalysis.models import VisualFeatures
-        from azure.core.credentials import AzureKeyCredential
+        from azure.identity import DefaultAzureCredential
 
         endpoint = os.getenv("AZURE_VISION_ENDPOINT")
-        key = os.getenv("AZURE_VISION_KEY")
 
-        if not endpoint or not key:
+        if not endpoint:
             return (
                 jsonify(
                     {
                         "error": "Azure Vision not configured",
-                        "full_text": "Please set AZURE_VISION_ENDPOINT and AZURE_VISION_KEY environment variables",
+                        "full_text": "Please set AZURE_VISION_ENDPOINT environment variable",
                     }
                 ),
                 500,
             )
 
-        # Create client
-        client = ImageAnalysisClient(endpoint=endpoint, credential=AzureKeyCredential(key))
+        # Create client using DefaultAzureCredential (Managed Identity in Azure, Azure CLI locally)
+        credential = DefaultAzureCredential()
+        client = ImageAnalysisClient(endpoint=endpoint, credential=credential)
 
         # Analyze image
         result = client.analyze(image_data=image_data, visual_features=[VisualFeatures.READ])

@@ -5,18 +5,50 @@
 {% block extra_css %}
 <!-- Azure Speech SDK -->
 <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
+<style>
+    /* Fix flash messages to not affect chat layout */
+    body.chatbot-page .alert {
+        position: fixed;
+        top: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 9999;
+        min-width: 400px;
+        max-width: 600px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    body.chatbot-page .container.mt-3:has(.alert) {
+        margin-top: 0 !important;
+        height: 0;
+        overflow: visible;
+    }
+</style>
+<script>
+    // Auto-dismiss flash messages after 3 seconds on chatbot page
+    document.addEventListener('DOMContentLoaded', function() {
+        document.body.classList.add('chatbot-page');
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(function(alert) {
+            setTimeout(function() {
+                const bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            }, 3000);
+        });
+    });
+</script>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-4">
-    <div class="row">
-        <div class="col-12">
-            <h2><i class="bi bi-robot"></i> AI Customer Service Assistant</h2>
-            <p class="text-muted">Ask questions about parcels, check fraud reports, and get AI-powered assistance</p>
+<div class="container-fluid" style="padding: 0.5rem 1rem 0;">
+    <div class="row" style="margin-bottom: 0.5rem;">
+        <div class="col-12" style="padding-bottom: 0;">
+            <h2 style="margin-bottom: 0; font-size: 1.5rem; display: inline-block;"><i class="bi bi-robot"></i> AI Customer Service Assistant</h2>
+            <p class="text-muted" style="margin: 0; font-size: 0.875rem; display: inline-block; margin-left: 1rem;">Ask questions about parcels, check fraud reports, and get AI-powered assistance</p>
         </div>
     </div>
 
-    <div class="row mt-4">
+    <div class="row">
         <!-- Quick Actions Panel -->
         <div class="col-md-3">
             <div class="card mb-3">
@@ -139,43 +171,39 @@
 
         <!-- Chat Panel -->
         <div class="col-md-6">
-            <div class="card" style="height: calc(100vh - 200px); min-height: 600px;">
-                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <span><i class="bi bi-chat-dots-fill"></i> Chat with AI Assistant</span>
+            <div class="card" style="height: calc(100vh - 180px); max-height: calc(100vh - 180px); display: flex; flex-direction: column;">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center" style="flex-shrink: 0; padding: 0.4rem 0.75rem;">
+                    <span style="font-size: 0.95rem;"><i class="bi bi-chat-dots-fill"></i> Chat with AI Assistant</span>
                     <span id="voiceStatus" class="badge badge-light text-dark" style="display:none;">
                         <i class="bi bi-mic-fill"></i> Listening...
                     </span>
                 </div>
-                <div class="card-body chat-container" id="chatMessages" style="overflow-y: auto; height: calc(100vh - 380px); min-height: 450px; background-color: #fff; padding: 1.5rem;">
+                <div class="card-body chat-container" id="chatMessages" style="overflow-y: auto; flex: 1; min-height: 0; background-color: #fff; padding: 1rem;">
                     <div class="chat-message ai-message">
                         <div class="message-content" style="background-color: transparent; border: 1px solid #dee2e6; padding-left: 0.5rem;"><i class="bi bi-info-circle-fill"></i><strong>Welcome!</strong> I'm Alex, your customer service assistant.<br><small>💬 Ask me anything about your parcels or 🎤 use voice input!</small></div>
                     </div>
                 </div>
-                <div class="card-footer">
-                    <div class="input-group">
+                <div class="card-footer" style="flex-shrink: 0; padding: 0.5rem 0.75rem;">
+                    <div class="input-group input-group-sm">
                         <input type="text" class="form-control" id="chatInput" placeholder="Ask a question or use voice..." onkeypress="handleEnter(event)">
-                        <button class="btn btn-primary" id="voiceBtn" onclick="toggleVoiceInput()" title="Voice Input">
+                        <button class="btn btn-primary btn-sm" id="voiceBtn" onclick="toggleVoiceInput()" title="Voice Input">
                             <i class="bi bi-mic-fill" id="micIcon"></i>
                         </button>
-                        <button class="btn btn-primary" onclick="sendMessage()">
-                            <i class="bi bi-send-fill"></i> Send
+                        <button class="btn btn-primary btn-sm" onclick="sendMessage()">
+                            <i class="bi bi-send-fill"></i>
                         </button>
                     </div>
-                    <div class="mt-2">
-                        <small class="text-muted d-flex align-items-center gap-2">
-                            <div>
-                                <input type="checkbox" id="autoSpeak"> Auto-speak responses
-                            </div>
-                            <div>
-                                <select id="voiceSelector" class="form-select form-select-sm" style="width: 200px;">
-                                    <option value="">Loading voices...</option>
-                                </select>
-                            </div>
-                            <div>
-                                <button class="btn btn-sm btn-outline-secondary" onclick="stopSpeaking()" title="Stop Speaking">
-                                    <i class="bi bi-volume-mute-fill"></i>
-                                </button>
-                            </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem;">
+                        <small class="text-muted" style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem;">
+                            <label style="margin: 0; display: flex; align-items: center; gap: 0.25rem;">
+                                <input type="checkbox" id="autoSpeak" style="margin: 0;"> Auto-speak
+                            </label>
+                            <select id="voiceSelector" class="form-select form-select-sm" style="width: 160px; font-size: 0.8rem; padding: 0.2rem 0.4rem;">
+                                <option value="">Loading voices...</option>
+                            </select>
+                            <button class="btn btn-sm btn-outline-secondary" style="padding: 0.1rem 0.35rem; font-size: 0.8rem;" onclick="stopSpeaking()" title="Stop Speaking">
+                                <i class="bi bi-volume-mute-fill"></i>
+                            </button>
                         </small>
                     </div>
                 </div>
@@ -246,27 +274,27 @@ function populateVoiceSelector() {
     availableVoices = speechSynthesis.getVoices();
     const voiceSelector = document.getElementById('voiceSelector');
     voiceSelector.innerHTML = '';
-    
+
     // Add Azure Neural voices first (premium)
     if (Object.keys(azureVoices).length > 0) {
         const azureGroup = document.createElement('optgroup');
         azureGroup.label = '🌟 Azure Neural Voices (Premium)';
-        
+
         Object.entries(azureVoices).forEach(([key, voice]) => {
             const option = document.createElement('option');
             option.value = 'azure:' + key;
             option.textContent = `${voice.display_name} (${voice.gender}) - ${voice.description}`;
             azureGroup.appendChild(option);
         });
-        
+
         voiceSelector.appendChild(azureGroup);
     }
-    
+
     // Add browser voices
     if (availableVoices.length > 0) {
         const browserGroup = document.createElement('optgroup');
         browserGroup.label = '🔊 Browser Voices';
-        
+
         const enVoices = availableVoices.filter(v => v.lang.startsWith('en'));
         enVoices.forEach(voice => {
             const option = document.createElement('option');
@@ -274,10 +302,10 @@ function populateVoiceSelector() {
             option.textContent = `${voice.name} (${voice.lang})`;
             browserGroup.appendChild(option);
         });
-        
+
         voiceSelector.appendChild(browserGroup);
     }
-    
+
     // Set default to Natasha (Azure Neural) or first available
     const defaultOption = voiceSelector.querySelector('option[value="azure:natasha"]');
     if (defaultOption) {
@@ -302,7 +330,7 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.lang = 'en-US';
-    
+
     recognition.onstart = function() {
         isListening = true;
         document.getElementById('voiceBtn').classList.remove('btn-primary');
@@ -311,7 +339,7 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         document.getElementById('voiceStatus').style.display = 'inline-block';
         console.log('🎤 Voice recognition started');
     };
-    
+
     recognition.onend = function() {
         isListening = false;
         document.getElementById('voiceBtn').classList.remove('btn-danger');
@@ -320,21 +348,21 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         document.getElementById('voiceStatus').style.display = 'none';
         console.log('🎤 Voice recognition ended');
     };
-    
+
     recognition.onresult = function(event) {
         const transcript = event.results[0][0].transcript;
         console.log('🎤 Heard:', transcript);
         document.getElementById('chatInput').value = transcript;
         sendMessage();
     };
-    
+
     recognition.onerror = function(event) {
         console.error('🎤 Speech recognition error:', event.error);
         isListening = false;
         document.getElementById('voiceBtn').classList.remove('btn-danger');
         document.getElementById('voiceBtn').classList.add('btn-primary');
         document.getElementById('micIcon').classList.remove('bi-pulse');
-        
+
         if (event.error === 'no-speech') {
             addMessage('No speech detected. Please try again.', 'warning');
         } else if (event.error === 'not-allowed') {
@@ -348,7 +376,7 @@ function toggleVoiceInput() {
         addMessage('Voice input is not supported in your browser. Please use Chrome, Edge, or Safari.', 'warning');
         return;
     }
-    
+
     if (isListening) {
         recognition.stop();
     } else {
@@ -359,12 +387,12 @@ function toggleVoiceInput() {
 async function speak(text) {
     // Stop any current speech
     stopSpeaking();
-    
+
     // Check if auto-speak is enabled
     if (!document.getElementById('autoSpeak').checked) {
         return;
     }
-    
+
     // Clean text for better speech (remove markdown, special chars)
     let cleanText = text
         .replace(/\*\*/g, '') // Remove bold markdown
@@ -373,11 +401,11 @@ async function speak(text) {
         .replace(/<[^>]+>/g, '') // Remove HTML tags
         .replace(/`/g, '') // Remove code backticks
         .trim();
-    
+
     // Get selected voice
     const voiceSelector = document.getElementById('voiceSelector');
     const selectedValue = voiceSelector.value;
-    
+
     // Check if Azure Neural voice is selected
     if (selectedValue.startsWith('azure:')) {
         const voiceKey = selectedValue.replace('azure:', '');
@@ -401,25 +429,25 @@ async function speakWithAzure(text, voicePersona) {
                 voice_persona: voicePersona
             })
         });
-        
+
         if (response.ok) {
             const audioBlob = await response.blob();
             const audioUrl = URL.createObjectURL(audioBlob);
             currentAudio = new Audio(audioUrl);
-            
+
             currentAudio.onended = () => {
                 URL.revokeObjectURL(audioUrl);
                 currentAudio = null;
                 console.log('🔊 Azure speech ended');
             };
-            
+
             currentAudio.onerror = (error) => {
                 console.error('🔊 Audio playback error:', error);
                 currentAudio = null;
                 // Fallback to browser speech
                 speakWithBrowser(text);
             };
-            
+
             await currentAudio.play();
         } else {
             console.warn('Azure speech failed, falling back to browser');
@@ -436,38 +464,38 @@ function speakWithBrowser(text, voiceName = null) {
         console.warn('Speech synthesis not supported');
         return;
     }
-    
+
     currentUtterance = new SpeechSynthesisUtterance(text);
     currentUtterance.rate = 1.0;
     currentUtterance.pitch = 1.0;
     currentUtterance.volume = 1.0;
-    
+
     // Use selected voice or find a good default
     const voices = speechSynthesis.getVoices();
     let voice = null;
-    
+
     if (voiceName && voiceName.startsWith('browser:')) {
         const name = voiceName.replace('browser:', '');
         voice = voices.find(v => v.name === name);
     }
-    
+
     if (!voice) {
-        voice = voices.find(v => v.name.includes('Natural') || v.name.includes('Premium')) 
+        voice = voices.find(v => v.name.includes('Natural') || v.name.includes('Premium'))
              || voices.find(v => v.lang.startsWith('en'));
     }
-    
+
     if (voice) {
         currentUtterance.voice = voice;
     }
-    
+
     currentUtterance.onend = function() {
         console.log('🔊 Browser speech ended');
     };
-    
+
     currentUtterance.onerror = function(event) {
         console.error('🔊 Browser speech error:', event.error);
     };
-    
+
     console.log('🔊 Speaking with browser:', text.substring(0, 50) + '...');
     speechSynthesis.speak(currentUtterance);
 }
@@ -478,7 +506,7 @@ function stopSpeaking() {
         speechSynthesis.cancel();
         console.log('🔊 Browser speech stopped');
     }
-    
+
     // Stop Azure audio playback
     if (currentAudio) {
         currentAudio.pause();
@@ -492,21 +520,21 @@ function addMessage(message, isUser = false) {
     const chatMessages = document.getElementById('chatMessages');
     const messageWrapper = document.createElement('div');
     messageWrapper.className = `chat-message ${isUser ? 'user-message' : 'ai-message'}`;
-    
+
     const messageContent = document.createElement('div');
     messageContent.className = 'message-content';
-    
+
     // Convert markdown headers to HTML for AI messages
     if (!isUser) {
         message = message.replace(/### (.+)/g, '<h3>$1</h3>');
     }
-    
+
     messageContent.innerHTML = message;
-    
+
     messageWrapper.appendChild(messageContent);
     chatMessages.appendChild(messageWrapper);
     chatMessages.scrollTop = chatMessages.scrollHeight;
-    
+
     // Speak AI responses if auto-speak is enabled
     if (!isUser) {
         speak(message);
@@ -517,11 +545,11 @@ function addError(message) {
     const chatMessages = document.getElementById('chatMessages');
     const messageWrapper = document.createElement('div');
     messageWrapper.className = 'chat-message error-message';
-    
+
     const messageContent = document.createElement('div');
     messageContent.className = 'message-content';
     messageContent.innerHTML = `<i class="bi bi-exclamation-circle-fill"></i> ${message}`;
-    
+
     messageWrapper.appendChild(messageContent);
     chatMessages.appendChild(messageWrapper);
     chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -547,13 +575,13 @@ function removeLoading() {
 async function sendMessage() {
     const input = document.getElementById('chatInput');
     const query = input.value.trim();
-    
+
     if (!query) return;
-    
+
     addMessage(query, true);
     input.value = '';
     addLoading();
-    
+
     try {
         const response = await fetch('/api/chatbot/query', {
             method: 'POST',
@@ -565,19 +593,19 @@ async function sendMessage() {
                 tracking_number: null
             })
         });
-        
+
         const data = await response.json();
         removeLoading();
-        
+
         if (response.ok) {
             const aiResponse = data.response || data.message || JSON.stringify(data, null, 2);
             addMessage(aiResponse);
-            
+
             // Display lodgement photos if included in response
             if (data.lodgement_photos && data.lodgement_photos.length > 0) {
                 const photosHtml = '<div class="mt-2"><strong>📸 Lodgement Photos:</strong></div>';
                 addMessage(photosHtml);
-                
+
                 data.lodgement_photos.forEach((photo, index) => {
                     const photoHtml = `
                         <div class="card mt-2" style="max-width: 400px;">
@@ -592,12 +620,12 @@ async function sendMessage() {
                     addMessage(photoHtml);
                 });
             }
-            
+
             // Display delivery photos if included in response
             if (data.delivery_photos && data.delivery_photos.length > 0) {
                 const photosHtml = '<div class="mt-2"><strong>📸 Delivery Photos:</strong></div>';
                 addMessage(photosHtml);
-                
+
                 data.delivery_photos.forEach((photo, index) => {
                     const photoHtml = `
                         <div class="card mt-2" style="max-width: 400px;">
@@ -623,19 +651,19 @@ async function sendMessage() {
 
 async function trackParcel() {
     const trackingNumber = document.getElementById('trackingNumber').value.trim();
-    
+
     if (!trackingNumber) {
         addError('Please enter a tracking number');
         return;
     }
-    
+
     addLoading();
-    
+
     try {
         const response = await fetch(`/api/chatbot/track/${trackingNumber}`);
         const data = await response.json();
         removeLoading();
-        
+
         if (response.ok && data.found) {
             const info = `
                 <h6><i class="fas fa-box"></i> ${data.tracking_number}</h6>
@@ -646,7 +674,7 @@ async function trackParcel() {
                 ${data.estimated_delivery ? `<p><strong>ETA:</strong> ${data.estimated_delivery}</p>` : ''}
             `;
             document.getElementById('infoPanel').innerHTML = info;
-            
+
             const message = `Found parcel ${data.tracking_number}. Status: ${data.status}, Location: ${data.current_location}`;
             addMessage(message);
         } else {
@@ -660,102 +688,102 @@ async function trackParcel() {
 
 async function getProofOfDelivery() {
     const trackingNumber = document.getElementById('proofTrackingNumber').value.trim();
-    
+
     if (!trackingNumber) {
         addError('Please enter a tracking number to get proof of delivery');
         return;
     }
-    
+
     const query = `Can I get photo proof of delivery for parcel ${trackingNumber}?`;
     document.getElementById('chatInput').value = query;
     await sendMessage();
-    
+
     // Clear the input after sending
     document.getElementById('proofTrackingNumber').value = '';
 }
 
 async function getProofOfLodgement() {
     const trackingNumber = document.getElementById('lodgementTrackingNumber').value.trim();
-    
+
     if (!trackingNumber) {
         addError('Please enter a tracking number to get proof of lodgement');
         return;
     }
-    
+
     const query = `Can I get photo proof of lodgement for parcel ${trackingNumber}?`;
     document.getElementById('chatInput').value = query;
     await sendMessage();
-    
+
     // Clear the input after sending
     document.getElementById('lodgementTrackingNumber').value = '';
 }
 
 async function quickTrackParcel() {
     const trackingNumber = document.getElementById('quickTrackNumber').value.trim();
-    
+
     if (!trackingNumber) {
         addError('Please enter a tracking number to track');
         return;
     }
-    
+
     const query = `Track parcel ${trackingNumber}`;
     document.getElementById('chatInput').value = query;
     await sendMessage();
-    
+
     // Clear the input after sending
     document.getElementById('quickTrackNumber').value = '';
 }
 
 async function searchFraudReports() {
     const searchQuery = document.getElementById('fraudSearchQuery').value.trim();
-    
+
     let query;
     if (searchQuery) {
         query = `Show fraud reports for ${searchQuery}`;
     } else {
         query = 'Show recent fraud reports';
     }
-    
+
     document.getElementById('chatInput').value = query;
     await sendMessage();
-    
+
     // Clear the input after sending
     document.getElementById('fraudSearchQuery').value = '';
 }
 
 async function getParcelsInTransit() {
     const driverSelect = document.getElementById('driverSelect').value;
-    
+
     let query;
     if (driverSelect) {
         query = `Show parcels in transit for ${driverSelect}`;
     } else {
         query = 'Show all parcels in transit';
     }
-    
+
     document.getElementById('chatInput').value = query;
     await sendMessage();
 }
 
 async function getParcelLocation() {
     const trackingNumber = document.getElementById('trackingNumber').value.trim();
-    
+
     if (!trackingNumber) {
         addError('Please enter a tracking number');
         return;
     }
-    
+
     addLoading();
-    
+
     try {
         const response = await fetch(`/api/chatbot/location/${trackingNumber}`);
         const data = await response.json();
         removeLoading();
-        
+
         if (response.ok && data.found) {
-            const locationClass = data.location_type === 'IN_TRANSIT' ? 'success' : 
+            const locationClass = data.location_type === 'IN_TRANSIT' ? 'success' :
                                  data.location_type === 'AT_DISTRIBUTION_CENTER' ? 'warning' : 'info';
-            
+
             const info = `
                 <div class="alert alert-${locationClass}">
                     <h6><i class="fas fa-map-marker-alt"></i> Location Status</h6>
@@ -767,7 +795,7 @@ async function getParcelLocation() {
                 <p><strong>Status:</strong> ${data.status}</p>
             `;
             document.getElementById('infoPanel').innerHTML = info;
-            
+
             addMessage(data.location_description);
         } else {
             addError(data.message || 'Parcel not found');
@@ -798,25 +826,25 @@ function searchByAddress() {
     const state = document.getElementById('recipientState').value;
     const postcode = document.getElementById('recipientPostcode').value.trim();
     const days = document.getElementById('timeRange').value;
-    
+
     if (!address && !state && !postcode) {
         addError('Please enter at least a street address, state, or postcode');
         return;
     }
-    
+
     // Build the question with all provided details
     let parts = [];
     if (address) parts.push(address);
     if (state) parts.push(state);
     if (postcode) parts.push(postcode);
-    
+
     let question = `How many parcels sent to ${parts.join(', ')}`;
     if (days) {
         const weeks = days == 21 ? '3 weeks' : days == 7 ? '1 week' : days == 30 ? '1 month' : days + ' days';
         question += ` in the last ${weeks}`;
     }
     question += '?';
-    
+
     askQuickQuestion(question);
 }
 
@@ -826,15 +854,15 @@ let chatHistory = [];
 function clearChat() {
     // Stop any ongoing speech
     stopSpeaking();
-    
+
     // Save current chat to history
     const chatMessages = document.getElementById('chatMessages');
     const messages = chatMessages.querySelectorAll('.chat-message');
-    
+
     if (messages.length > 1) { // More than just the welcome message
         const timestamp = new Date().toLocaleString();
         const messageCount = messages.length - 1; // Exclude welcome message
-        
+
         // Extract text from messages for preview
         const preview = [];
         messages.forEach((msg, idx) => {
@@ -843,22 +871,22 @@ function clearChat() {
                 preview.push(text);
             }
         });
-        
+
         chatHistory.unshift({
             timestamp: timestamp,
             messageCount: messageCount,
             preview: preview.join(' ... ')
         });
-        
+
         // Keep only last 5 chats
         if (chatHistory.length > 5) {
             chatHistory = chatHistory.slice(0, 5);
         }
-        
+
         // Update info panel with chat history
         updateChatHistory();
     }
-    
+
     // Clear chat messages
     chatMessages.innerHTML = `
         <div class="chat-message ai-message">
@@ -871,12 +899,12 @@ function clearChat() {
 
 function updateChatHistory() {
     const infoPanel = document.getElementById('infoPanel');
-    
+
     if (chatHistory.length === 0) {
         infoPanel.innerHTML = '<p class="text-muted">Chat history will appear here when you end a conversation.</p>';
         return;
     }
-    
+
     const historyHtml = `
         <h6><i class="bi bi-clock-history"></i> Chat History (${chatHistory.length})</h6>
         <div class="small">
@@ -889,7 +917,7 @@ function updateChatHistory() {
             `).join('')}
         </div>
     `;
-    
+
     infoPanel.innerHTML = historyHtml;
 }
 
