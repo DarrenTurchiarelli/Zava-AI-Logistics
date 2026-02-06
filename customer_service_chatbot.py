@@ -255,9 +255,9 @@ class CustomerServiceChatbot:
             if parcel_data.get("delivery_photos"):
                 photos = parcel_data["delivery_photos"]
                 if is_public:
-                    parts.append(f"\nDelivery Photos: {len(photos)} photo(s) available for this parcel")
+                    parts.append(f"\nDelivery Photos: {len(photos)} photo(s) ON FILE for this parcel")
                     parts.append(
-                        "NOTE: Delivery proof photos were captured during delivery and will be displayed below"
+                        f"NOTE: Photos cannot be displayed in this chat. Tell the customer: 'We have a delivery photo on file. If you'd like a copy, please contact our customer service team at {config.COMPANY_PHONE} or {config.COMPANY_EMAIL}'"
                     )
                 else:
                     parts.append(f"\nDelivery Photos: {len(photos)} photo(s) available")
@@ -267,6 +267,24 @@ class CustomerServiceChatbot:
                         )
                     parts.append(
                         "IMPORTANT: Photos will be automatically displayed in the chat below your response. Do NOT tell the user to view them elsewhere - they are already visible in the chat."
+                    )
+
+            # Add lodgement photo information
+            if parcel_data.get("lodgement_photos"):
+                photos = parcel_data["lodgement_photos"]
+                if is_public:
+                    parts.append(f"\nLodgement Photos: {len(photos)} photo(s) ON FILE for this parcel")
+                    parts.append(
+                        f"NOTE: Photos cannot be displayed in this chat. Tell the customer: 'We have a lodgement photo on file showing when the parcel was dropped off. If you'd like a copy, please contact our customer service team at {config.COMPANY_PHONE} or {config.COMPANY_EMAIL}'"
+                    )
+                else:
+                    parts.append(f"\nLodgement Photos: {len(photos)} photo(s) available")
+                    for idx, photo in enumerate(photos, 1):
+                        parts.append(
+                            f"  Photo {idx}: Uploaded by {photo.get('uploaded_by', 'unknown')} at {photo.get('timestamp', 'unknown time')}"
+                        )
+                    parts.append(
+                        "IMPORTANT: Lodgement photos will be automatically displayed in the chat below your response."
                     )
 
             parts.append("=== END PARCEL DATA ===\n")

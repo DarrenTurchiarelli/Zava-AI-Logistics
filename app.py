@@ -1605,7 +1605,11 @@ def chatbot_query():
             # Extract tracking number from query, tracking_number param, response, or context
             import re
 
-            tracking_pattern = r"\b(DTVIC\d+|DT\d+|[A-Z]{2}\d{8,}[A-Z]{2})\b"
+            # Match various barcode formats:
+            # - DTVIC123456, DT202512090001 (DT prefixed)
+            # - OV96748588HU (2 letters + 8+ digits + 2 letters)
+            # - BCC5253CE53659 (mixed alphanumeric with letters and digits)
+            tracking_pattern = r"\b(DTVIC\d+|DT\d+|[A-Z]{2}\d{8,}[A-Z]{2}|[A-Z]{2,4}\d{3,}[A-Z]{1,3}\d{3,})\b"
 
             # Try multiple sources for tracking number
             tracking_num = None
@@ -1813,7 +1817,8 @@ def public_chatbot():
                     # Extract tracking number from query, tracking_number param, response, or context
                     import re
 
-                    tracking_pattern = r"\b(DTVIC\d+|DT\d+|[A-Z]{2}\d{8,}[A-Z]{2})\b"
+                    # Match various barcode formats including BCC-style
+                    tracking_pattern = r"\b(DTVIC\d+|DT\d+|[A-Z]{2}\d{8,}[A-Z]{2}|[A-Z]{2,4}\d{3,}[A-Z]{1,3}\d{3,})\b"
 
                     # Try multiple sources for tracking number
                     tracking_num = None
