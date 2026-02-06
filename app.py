@@ -3860,21 +3860,45 @@ def analyze_image():
                                 {"text": line.text, "x": avg_x, "y": avg_y, "points": [(p.x, p.y) for p in points]}
                             )
 
-        # Parse extracted data
+        # Parse extracted data using smart region detection
         barcode = extract_barcode(text_lines)
-        address = extract_address(text_lines, text_with_positions)
-        recipient_name = extract_recipient_name(text_lines)
-        postcode = extract_postcode_bottom_right(text_with_positions)
+
+        # Use smart address region detection
+        address_region = detect_address_region(text_with_positions)
+        address_data = extract_address_from_region(text_with_positions, address_region)
+
+        # Get individual fields from smart extraction
+        recipient_name = address_data.get("name", "")
+        address = address_data.get("full_address", "")
+        postcode = address_data.get("postcode", "")
+
+        # Fallback to old methods if smart detection fails
+        if not postcode:
+            postcode = extract_postcode_bottom_right(text_with_positions)
+        if not address:
+            address = extract_address(text_lines, text_with_positions)
+        if not recipient_name:
+            recipient_name = extract_recipient_name(text_lines)
+
+        # Filter the full text to show only address-relevant content
+        filtered_lines = [line for line in text_lines if not is_noise_text(line)]
+        filtered_text = "\n".join(filtered_lines) if filtered_lines else full_text.strip()
 
         return jsonify(
             {
                 "success": True,
-                "full_text": full_text.strip(),
+                "full_text": filtered_text,
+                "raw_text": full_text.strip(),  # Keep original for debugging
                 "text_lines": text_lines,
+                "filtered_lines": filtered_lines,
                 "barcode": barcode,
                 "address": address,
                 "recipient_name": recipient_name,
                 "postcode": postcode,
+                "state": address_data.get("state", ""),
+                "suburb": address_data.get("suburb", ""),
+                "street": address_data.get("street", ""),
+                "address_region_detected": address_region is not None,
             }
         )
 
@@ -3890,6 +3914,554 @@ def analyze_image():
         )
     except Exception as e:
         return jsonify({"error": str(e), "full_text": f"Error: {str(e)}"}), 500
+
+
+# ============================================================================
+# ADDRESS REGION DETECTION - Smart filtering for Australia Post envelopes
+# ============================================================================
+
+# Australian state abbreviations (official and common variations)
+AUSTRALIAN_STATES = {
+    "NSW": "NSW",
+    "N.S.W.": "NSW",
+    "N.S.W": "NSW",
+    "NEW SOUTH WALES": "NSW",
+    "VIC": "VIC",
+    "V.I.C.": "VIC",
+    "V.I.C": "VIC",
+    "VICTORIA": "VIC",
+    "QLD": "QLD",
+    "Q.L.D.": "QLD",
+    "Q.L.D": "QLD",
+    "QUEENSLAND": "QLD",
+    "SA": "SA",
+    "S.A.": "SA",
+    "S.A": "SA",
+    "SOUTH AUSTRALIA": "SA",
+    "WA": "WA",
+    "W.A.": "WA",
+    "W.A": "WA",
+    "WESTERN AUSTRALIA": "WA",
+    "TAS": "TAS",
+    "T.A.S.": "TAS",
+    "TASMANIA": "TAS",
+    "NT": "NT",
+    "N.T.": "NT",
+    "N.T": "NT",
+    "NORTHERN TERRITORY": "NT",
+    "ACT": "ACT",
+    "A.C.T.": "ACT",
+    "A.C.T": "ACT",
+    "AUSTRALIAN CAPITAL TERRITORY": "ACT",
+}
+
+# State regex pattern for matching
+STATE_PATTERN = re.compile(
+    r"\b(NSW|VIC|QLD|SA|WA|TAS|NT|ACT|N\.?S\.?W\.?|V\.?I\.?C\.?|Q\.?L\.?D\.?|S\.?A\.?|W\.?A\.?|T\.?A\.?S\.?|N\.?T\.?|A\.?C\.?T\.?)\b",
+    re.IGNORECASE,
+)
+
+
+def normalize_state(state_text: str) -> str:
+    """Normalize state abbreviation to standard format (e.g., 'vic' -> 'VIC')"""
+    if not state_text:
+        return ""
+    cleaned = state_text.upper().replace(".", "").strip()
+    return AUSTRALIAN_STATES.get(cleaned, cleaned)
+
+
+def split_suburb_state(text: str) -> tuple:
+    """
+    Split a line like 'Southbank VIC' or 'Southbank, VIC' or 'Southbank. VIC.' into (suburb, state).
+    Returns (suburb, state) tuple. State will be normalized.
+    """
+    text = text.strip()
+
+    # Remove trailing periods
+    text = text.rstrip(".")
+
+    # Try to find state at the end of the text
+    state_match = STATE_PATTERN.search(text)
+    if state_match:
+        state = normalize_state(state_match.group(1))
+        # Get suburb part (everything before the state)
+        suburb = text[: state_match.start()].strip().rstrip(",").rstrip(".").strip()
+        return (suburb, state)
+
+    return (text, "")
+
+
+# Known noise text patterns found on Australia Post packaging
+AUSPOST_NOISE_PATTERNS = [
+    # Australia Post branding - filter these ANYWHERE they appear
+    r"Australia\s*Post",
+    r"auspost",
+    r"alia\s*Post",  # Partial matches from OCR
+    # Packaging logo text - "Squish Me", "Peerside", etc.
+    r"^SQUISH$",
+    r"^Squish$",
+    r"Squish\s*Me",
+    r"^ME$",  # Too short and part of "Squish Me" logo
+    r"^PEERSIDE$",
+    r"^Peerside$",
+    r"^SIDE$",
+    r"^PEER$",
+    r"^Sendle$",  # Sendle logo
+    r"^SENDLE$",
+    r"^Aramex$",  # Aramex logo
+    r"^ARAMEX$",
+    r"^DHL$",  # DHL logo
+    r"^TNT$",  # TNT logo
+    r"^TOLL$",  # Toll logo
+    r"^FedEx$",  # FedEx logo
+    r"^FEDEX$",
+    r"^UPS$",  # UPS logo
+    # Product labels - Padded Mailer variations
+    r"Padded\s*Mailer",
+    r"Pedded\s*Mailer",  # OCR variation
+    r"Padded\s*Mail",
+    r"^Mailer$",
+    r"^PM\d+$",  # PM1, PM2, etc.
+    # Tracking and postage
+    r"TRACKING\s*AVAILABLE",
+    r"IMPORTANT",
+    r"Postage\s*n.t\s*paid",  # OCR might read "not" as "nel" etc
+    r"Pertoge\s*nel\s*paid",  # OCR variation
+    r"No\s*delivery\s*without",
+    r"Affix\s*postage",
+    # "Use within Australia or World"
+    r"Use.?\s*within\s*Austral",
+    r"Uher\s*within",  # OCR variation
+    r"Uer\s*within",  # OCR variation
+    r"within\s*Austral",
+    r"Australie\s*or\s*World",
+    r"Australia\s*or\s*World",
+    # Form field labels (printed on envelope, not actual data)
+    r"Recipient\s*mobile",
+    r"fleetplent\s*mobile",  # OCR variation
+    r"or\s*email",
+    r"@\s*email",
+    r"Contact\s*[hn]ame",  # OCR might read "name" as "hame"
+    r"Company\s*name",
+    r"Traditional\s*place",
+    r"name\s*\(?if\s*known\)?",
+    r"Street\s*address\s*o[fr]",  # "Street address or" / "Street address of"
+    r"PO\s*Box\s*number",
+    r"Suburb\s*or\s*town",
+    r"State,?\s*Postcode",
+    r"Sign\s*here",
+    r"Bilan\s*here",  # OCR variation
+    r"Sionhere",  # OCR variation
+    r"Signhere",  # OCR variation
+    r"^To:?$",
+    # Random OCR noise fragments
+    r"^MA$",
+    r"^MAT$",
+    r"^FRIAL$",
+    r"^ARTERIAL$",
+    # Aviation Security and Dangerous Goods Declaration
+    r"Aviation\s*Security",
+    r"Dangerous\s*Goods",
+    r"and\s*Dangerous",
+    r"Declaration",
+    r"Goods\s*Declaration",
+    r"sender\s*acknowledges",
+    r"carried\s*by\s*air",
+    r"false\s*declaration",
+    r"criminal\s*offence",
+    r"cannot\s*be\s*carried",
+    r"signed\s*this\s*article",
+    r"does\s*not\s*contain",
+    r"other\s*than\s*those",
+    r"which\s*Austral",
+    r"is\s*permitted",
+    r"erinin\s*any",  # OCR of "containing any"
+    r"dengerne\s*goods",  # OCR of "dangerous goods"
+    r"Port\s*is\s*permitted",
+    r"Post\s*is\s*permitted",
+    r"Australin",  # OCR of "Australian"
+    # Environmental labels - "MADE WITH AT LEAST 50% RECYCLED MATERIAL" / "MADE HERE"
+    r"MADE\s*WITH",
+    r"MADE\s*HERE",
+    r"made\s*with\s*recycled",
+    r"recycled\s*material",
+    r"^MADE$",
+    r"^WITH$",
+    r"^HERE$",
+    r"^AT\s*LEAST$",
+    r"AT\s*LEAST\s*\d+%",
+    r"^RECY$",  # Partial "RECYCLED"
+    r"^CYCLED$",  # Partial "RECYCLED"
+    r"RECYCLED",
+    r"^MATERIAL$",
+    r"^MATERIALS$",
+    r"^50%\.?$",
+    r"^\d+%$",  # Any standalone percentage
+    # Logo text - commonly found in/near logos (not recipient data)
+    r"^POST$",  # "POST" from Australia Post logo
+    r"^AUSTRALIA$",  # "AUSTRALIA" from logo
+    r"^AUST$",  # Abbreviated
+    r"^AUSPOS$",  # Partial OCR
+    r"^AUSTR$",  # Partial OCR
+    r"^ALIA$",  # Partial from "Australia"
+    r"^RALIA$",  # Partial from "Australia"
+    r"^TRALIA$",  # Partial from "Australia"
+    r"^USTRALIA$",  # Partial from "Australia"
+    r"STARTRACK",  # StarTrack logo
+    r"Star\s*Track",
+    r"^STAR$",
+    r"^TRACK$",
+    r"Express\s*Post",  # Express Post logo/branding
+    r"^EXPRESS$",
+    r"Parcel\s*Post",  # Parcel Post logo/branding
+    r"^PARCEL$",
+    r"eparcel",  # eParcel branding
+    r"^eParcel$",
+    r"MyPost",  # MyPost branding
+    r"^MyPost$",
+    r"Registered\s*Post",  # Registered Post branding
+    r"^REGISTERED$",
+    # Dimensions and specs
+    r"YFX\s*\d+mm",
+    r"^\d+\s*x\s*\d+mm$",
+    r"^\d+mm$",
+    # Australian phone numbers (04XX XXX XXX, +61 4XX XXX XXX, etc.)
+    r"^04\d{2}\s*\d{3}\s*\d{3}$",  # 0478 063 523
+    r"^04\d{8}$",  # 0478063523
+    r"04\d{2}\s*\d{3}\s*\d{3}",  # Phone anywhere in text
+    r"^\+?61\s*4",  # +61 4XX...
+    r"^\(0\d\)\s*\d{4}",  # (02) 1234...
+    r"^0\d\s*\d{4}\s*\d{4}$",  # 02 1234 5678
+    r"^1[38]00\s*\d{3}\s*\d{3}$",  # 1300/1800 numbers
+]
+
+# Compile patterns for efficiency
+NOISE_REGEX = [re.compile(pattern, re.IGNORECASE) for pattern in AUSPOST_NOISE_PATTERNS]
+
+
+def is_noise_text(text: str) -> bool:
+    """Check if text is noise/template text from the envelope packaging"""
+    text = text.strip()
+
+    # Very short text is likely noise
+    if len(text) < 2:
+        return True
+
+    # Check against known noise patterns
+    for pattern in NOISE_REGEX:
+        if pattern.search(text):
+            return True
+
+    # All caps text longer than 15 chars is usually printed labels
+    if text.isupper() and len(text) > 15 and " " in text:
+        return True
+
+    return False
+
+
+def is_valid_recipient_name(text: str) -> bool:
+    """
+    Check if text looks like a valid recipient/sender name.
+    Filters out branding, form labels, and other non-name text.
+    """
+    text = text.strip()
+
+    # Must have at least 3 characters (filters out "ME", "TO", etc.)
+    if len(text) < 3:
+        return False
+
+    # Cannot be noise text
+    if is_noise_text(text):
+        return False
+
+    # Cannot be "Australia Post" or similar branding (anywhere in text)
+    if re.search(r"australia|auspost|post\b", text, re.IGNORECASE):
+        return False
+
+    # Cannot start with a number (that's likely street address)
+    if text[0].isdigit():
+        return False
+
+    # Cannot be a state abbreviation alone (with or without periods)
+    cleaned_upper = text.upper().replace(".", "").strip()
+    if cleaned_upper in AUSTRALIAN_STATES or cleaned_upper in AUSTRALIAN_STATES.values():
+        return False
+
+    # Cannot be just a postcode
+    if re.match(r"^\d{4}$", text):
+        return False
+
+    # Cannot contain "street", "address", "mobile", "email" etc (form labels)
+    form_label_words = ["street", "address", "mobile", "email", "suburb", "postcode", "phone", "contact"]
+    text_lower = text.lower()
+    if any(word in text_lower for word in form_label_words):
+        return False
+
+    # Should contain mostly letters
+    letters = sum(1 for c in text if c.isalpha())
+    if letters < len(text) * 0.5:
+        return False
+
+    return True
+
+
+def detect_address_region(text_with_positions: list) -> dict:
+    """
+    Detect the handwritten address region on an Australia Post envelope.
+
+    Australia Post envelopes have a structured address box typically in the
+    center-right area. The handwritten text tends to:
+    1. Be clustered together spatially
+    2. NOT match the printed template text patterns
+    3. Contain actual names, street addresses, and postcodes
+
+    Returns dict with bounds: {min_x, max_x, min_y, max_y} or None
+    """
+    if not text_with_positions:
+        return None
+
+    # Filter out noise text first
+    address_candidates = []
+    for item in text_with_positions:
+        if not is_noise_text(item["text"]):
+            address_candidates.append(item)
+
+    if not address_candidates:
+        return None
+
+    # Find clusters of non-noise text (the actual handwritten address)
+    # Use simple spatial clustering - find the region with most address-like text
+
+    # First, look for text that looks like actual address content
+    address_indicators = []
+    for item in address_candidates:
+        text = item["text"]
+        score = 0
+
+        # Looks like a name (2-3 words, title case or mixed case)
+        if re.match(r"^[A-Z][a-z]+(\s+[A-Z][a-z]+){0,2}$", text):
+            score += 2
+
+        # Contains street number
+        if re.match(r"^\d+\s+", text):
+            score += 3
+
+        # Contains street type
+        if re.search(
+            r"\b(St|Street|Rd|Road|Ave|Avenue|Dr|Drive|Pl|Place|Ct|Court|Cres|Crescent|Lane|Ln|Way)\b",
+            text,
+            re.IGNORECASE,
+        ):
+            score += 3
+
+        # Contains suburb/city name (title case words)
+        if re.match(r"^[A-Z][a-z]+$", text) and len(text) > 3:
+            score += 1
+
+        # Contains state abbreviation
+        if re.search(r"\b(NSW|VIC|QLD|SA|WA|TAS|NT|ACT|N\.?S\.?W|V\.?I\.?C)\b", text, re.IGNORECASE):
+            score += 2
+
+        # Contains 4-digit postcode
+        if re.search(r"\b\d{4}\b", text):
+            score += 2
+
+        if score > 0:
+            address_indicators.append({**item, "score": score})
+
+    if not address_indicators:
+        # Fallback to all non-noise candidates
+        return None
+
+    # Find the bounding region of address-like text
+    min_x = min(item["x"] for item in address_indicators)
+    max_x = max(item["x"] for item in address_indicators)
+    min_y = min(item["y"] for item in address_indicators)
+    max_y = max(item["y"] for item in address_indicators)
+
+    # Expand region slightly to catch nearby text
+    width = max_x - min_x
+    height = max_y - min_y
+
+    return {
+        "min_x": min_x - width * 0.1,
+        "max_x": max_x + width * 0.1,
+        "min_y": min_y - height * 0.1,
+        "max_y": max_y + height * 0.1,
+        "indicators": address_indicators,
+    }
+
+
+def extract_address_from_region(text_with_positions: list, region: dict = None) -> dict:
+    """
+    Extract sender name, address, and postcode from detected address region.
+
+    Returns dict with: {name, street, suburb, state, postcode, full_address}
+
+    Logic follows natural line order on Australian envelopes:
+    1. Name (first line - letters only, no numbers)
+    2. Street address (starts with number or unit/apt)
+    3. Suburb (after address, ALL CAPS or Title Case)
+    4. State + Postcode (may be combined or separate)
+    """
+    result = {"name": "", "street": "", "suburb": "", "state": "", "postcode": "", "full_address": ""}
+
+    if not text_with_positions:
+        return result
+
+    # Australian postcode to state mapping
+    def get_state_from_postcode(postcode: str) -> str:
+        """Get Australian state from postcode"""
+        try:
+            pc = int(postcode)
+            if 1000 <= pc <= 2599 or 2619 <= pc <= 2899 or 2921 <= pc <= 2999:
+                return "NSW"
+            if 2600 <= pc <= 2618 or 2900 <= pc <= 2920:
+                return "ACT"
+            if 3000 <= pc <= 3999 or 8000 <= pc <= 8999:
+                return "VIC"
+            if 4000 <= pc <= 4999 or 9000 <= pc <= 9999:
+                return "QLD"
+            if 5000 <= pc <= 5799 or 5800 <= pc <= 5999:
+                return "SA"
+            if 6000 <= pc <= 6797 or 6800 <= pc <= 6999:
+                return "WA"
+            if 7000 <= pc <= 7799 or 7800 <= pc <= 7999:
+                return "TAS"
+            if 800 <= pc <= 899 or 900 <= pc <= 999:
+                return "NT"
+            if 200 <= pc <= 299:
+                return "ACT"
+        except ValueError:
+            pass
+        return ""
+
+    # Helper: Check if text looks like a phone number
+    def is_phone_number(text: str) -> bool:
+        """Check if text looks like an Australian phone number"""
+        text = text.strip()
+        digits_only = re.sub(r"\s+", "", text)
+        if re.match(r"^04\d{8}$", digits_only):
+            return True
+        if re.match(r"^0[2-9]\d{8}$", digits_only):
+            return True
+        if digits_only.startswith("+61") or digits_only.startswith("61"):
+            return True
+        return False
+
+    # Helper: Check if line looks like a street address
+    def is_street_address(text: str) -> bool:
+        """Check if text looks like a street address"""
+        return bool(re.match(r"^(?:\d+|unit|apt|apartment|level|lot|shop|suite|floor)\s+", text, re.IGNORECASE))
+
+    # Helper: Check if line is just a postcode
+    def is_postcode_line(text: str) -> bool:
+        """Check if text is just a 4-digit postcode"""
+        return bool(re.match(r"^\d{4}$", text.strip()))
+
+    # Get all text items sorted by Y position (top to bottom)
+    all_items = text_with_positions.copy()
+    all_items.sort(key=lambda x: (x["y"], x["x"]))
+
+    # Build list of clean text lines (non-noise), preserving order
+    clean_lines = []
+    for item in all_items:
+        text = item["text"].strip()
+        if text and len(text) > 1 and not is_noise_text(text) and not is_phone_number(text):
+            clean_lines.append(text)
+
+    # SEQUENTIAL PARSING - respect the natural order of address lines
+    # Line order: Name → Street → Suburb → State/Postcode
+
+    name_line = None
+    street_line = None
+    suburb_line = None
+    postcode_value = None
+    state_value = None
+
+    for i, line in enumerate(clean_lines):
+        # Skip already processed
+        if line == name_line or line == street_line or line == suburb_line:
+            continue
+
+        # Check for postcode (4 digits)
+        postcode_match = re.search(r"\b(\d{4})\b", line)
+        if postcode_match and not postcode_value:
+            pc = postcode_match.group(1)
+            pc_int = int(pc)
+            # Valid postcode range, skip phone prefixes (04XX)
+            if 200 <= pc_int <= 9999 and not (400 <= pc_int <= 499):
+                postcode_value = pc
+                # Check if line also has state
+                suburb, state = split_suburb_state(line)
+                if state:
+                    state_value = state
+                    if suburb and not suburb_line:
+                        suburb_line = suburb
+                continue
+
+        # Check for state abbreviation (with or without suburb)
+        if not state_value:
+            suburb, state = split_suburb_state(line)
+            if state:
+                state_value = state
+                if suburb:
+                    suburb_line = suburb
+                continue
+
+        # Check if it's a street address (starts with number/unit)
+        if is_street_address(line) and not street_line:
+            # Make sure it contains street name (letters)
+            if re.search(r"[A-Za-z]{2,}", line):
+                street_line = line
+                continue
+
+        # Check if it's a suburb (ALL CAPS, single word, letters only)
+        # Must come AFTER a street address in the list order
+        if not suburb_line and street_line:
+            if line.isupper() and line.isalpha() and 3 <= len(line) <= 25:
+                suburb_line = line
+                continue
+
+        # First valid name-like line that's NOT an address = recipient name
+        if not name_line and not is_street_address(line):
+            if is_valid_recipient_name(line):
+                # Make sure it's not the suburb
+                if suburb_line and line.upper() == suburb_line.upper():
+                    continue
+                name_line = line
+                continue
+
+    # If state not found, derive from postcode
+    if postcode_value and not state_value:
+        state_value = get_state_from_postcode(postcode_value)
+
+    # Populate result
+    result["name"] = name_line or ""
+    result["street"] = street_line or ""
+    result["suburb"] = suburb_line.title() if suburb_line else ""
+    result["state"] = state_value or ""
+    result["postcode"] = postcode_value or ""
+
+    # Build full address (street + suburb + state + postcode, NO name)
+    parts = []
+    if result["street"]:
+        parts.append(result["street"])
+
+    suburb_line_parts = []
+    if result["suburb"]:
+        suburb_line_parts.append(result["suburb"])
+    if result["state"]:
+        suburb_line_parts.append(result["state"])
+    if result["postcode"]:
+        suburb_line_parts.append(result["postcode"])
+
+    if suburb_line_parts:
+        parts.append(" ".join(suburb_line_parts))
+
+    result["full_address"] = ", ".join(parts)
+
+    return result
 
 
 def extract_barcode(text_lines):

@@ -105,12 +105,12 @@
 // Form validation and scanned data handling
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.querySelector('form');
-    
+
     // Form validation before submit
     form.addEventListener('submit', async function(e) {
         const senderAddress = document.getElementById('sender_address').value.trim();
         const recipientAddress = document.getElementById('recipient_address').value.trim();
-        
+
         // If addresses haven't been validated yet, validate them now
         if (senderAddress && !document.getElementById('sender_address_status').innerHTML.includes('Valid Address')) {
             e.preventDefault();
@@ -118,7 +118,7 @@ document.addEventListener('DOMContentLoaded', function() {
             await validateAddress('sender_address', 'sender_address_status');
             return false;
         }
-        
+
         if (recipientAddress && !document.getElementById('recipient_address_status').innerHTML.includes('Valid Address')) {
             e.preventDefault();
             alert('Please wait while we validate the recipient address...');
@@ -129,33 +129,33 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Check if there's scanned data from camera scanner
     const scannedData = sessionStorage.getItem('scannedData');
-    
+
     if (scannedData) {
         try {
             const data = JSON.parse(scannedData);
-            
+
             // Show notification that data is being pre-filled
             const alert = document.createElement('div');
             alert.className = 'alert alert-secondary alert-dismissible fade show';
             alert.innerHTML = `
-                <i class="bi bi-check-circle"></i> 
+                <i class="bi bi-check-circle"></i>
                 <strong>Data from camera scanner loaded!</strong> Please verify and complete the remaining fields.
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             `;
             document.querySelector('.card-body').insertBefore(alert, document.querySelector('form'));
-            
+
             // Pre-fill recipient name if detected
             if (data.recipient_name) {
                 document.getElementById('recipient_name').value = data.recipient_name;
             }
-            
+
             // Pre-fill recipient address if detected
             if (data.address) {
                 document.getElementById('recipient_address').value = data.address;
                 // Trigger validation after populating
                 validateAddress('recipient_address', 'recipient_address_status');
             }
-            
+
             // If barcode was detected, you might use it for special handling
             if (data.barcode) {
                 // Could be used to auto-fill special instructions or reference number
@@ -164,7 +164,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     specialInstructions.value = `Scanned Barcode: ${data.barcode}`;
                 }
             }
-            
+
             // Parse additional fields from detected text if available
             if (data.full_text) {
                 // Try to extract phone numbers (Australian format)
@@ -173,20 +173,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById('recipient_phone').value = phoneMatch[0].replace(/\s/g, '');
                 }
             }
-            
+
             // Clear the session storage after using the data
             sessionStorage.removeItem('scannedData');
-            
+
         } catch (error) {
             console.error('Error loading scanned data:', error);
         }
     }
-    
+
     // Check if there's a captured photo from the camera scanner
     const capturedPhoto = sessionStorage.getItem('capturedPhotoBase64');
     if (capturedPhoto) {
         console.log('📸 Found captured photo from camera scanner');
-        
+
         // Convert base64 to blob and store in file input
         fetch(capturedPhoto)
             .then(res => res.blob())
@@ -196,18 +196,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 dataTransfer.items.add(file);
                 document.getElementById('lodgement_photo').files = dataTransfer.files;
                 console.log('✅ Photo ready for upload with form submission');
-                
+
                 // Show a badge indicating photo is attached
                 const photoBadge = document.createElement('div');
                 photoBadge.className = 'alert alert-success alert-dismissible fade show mt-2';
                 photoBadge.innerHTML = `
-                    <i class="bi bi-camera-fill"></i> 
+                    <i class="bi bi-camera-fill"></i>
                     <strong>Lodgement photo attached</strong> from camera scanner
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 `;
                 document.querySelector('.card-body').insertBefore(photoBadge, document.querySelector('form'));
             });
-        
+
         // Clear from sessionStorage after loading
         sessionStorage.removeItem('capturedPhotoBase64');
     }
@@ -219,15 +219,15 @@ let validationTimeout;
 async function validateAddress(addressField, statusElementId) {
     const address = document.getElementById(addressField).value.trim();
     const statusElement = document.getElementById(statusElementId);
-    
+
     if (!address || address.length < 10) {
         statusElement.innerHTML = '';
         return;
     }
-    
+
     // Show validating status
     statusElement.innerHTML = '<span class="badge bg-secondary"><i class="bi bi-hourglass-split"></i> Validating...</span>';
-    
+
     try {
         const response = await fetch('/api/validate-address', {
             method: 'POST',
@@ -236,18 +236,15 @@ async function validateAddress(addressField, statusElementId) {
             },
             body: JSON.stringify({ address: address })
         });
-        
+
         const data = await response.json();
-        
+
         if (data.valid) {
             statusElement.innerHTML = '<span class="badge bg-success"><i class="bi bi-check-circle-fill"></i> Valid Address</span>';
-            
-            // Update with formatted address if available
+
+            // Auto-update with formatted address if available (no confirmation needed)
             if (data.formatted_address && data.formatted_address !== address) {
-                const confirmation = confirm(`Azure Maps suggests this format:\n\n"${data.formatted_address}"\n\nUse this format?`);
-                if (confirmation) {
-                    document.getElementById(addressField).value = data.formatted_address;
-                }
+                document.getElementById(addressField).value = data.formatted_address;
             }
         } else {
             statusElement.innerHTML = '<span class="badge bg-warning"><i class="bi bi-exclamation-triangle-fill"></i> Could not validate</span>';
@@ -273,7 +270,7 @@ async function getAddressSuggestions(fieldId, query) {
         hideAutocomplete(fieldId);
         return;
     }
-    
+
     try {
         const response = await fetch('/api/autocomplete-address', {
             method: 'POST',
@@ -282,9 +279,9 @@ async function getAddressSuggestions(fieldId, query) {
             },
             body: JSON.stringify({ query: query })
         });
-        
+
         const data = await response.json();
-        
+
         if (data.suggestions && data.suggestions.length > 0) {
             showAutocomplete(fieldId, data.suggestions);
         } else {
@@ -299,7 +296,7 @@ async function getAddressSuggestions(fieldId, query) {
 function showAutocomplete(fieldId, suggestions) {
     // Remove any existing dropdown
     hideAutocomplete(fieldId);
-    
+
     const field = document.getElementById(fieldId);
     const dropdown = document.createElement('div');
     dropdown.id = fieldId + '_autocomplete';
@@ -318,7 +315,7 @@ function showAutocomplete(fieldId, suggestions) {
         left: 0;
         margin-top: -1px;
     `;
-    
+
     suggestions.forEach(suggestion => {
         const item = document.createElement('div');
         item.className = 'autocomplete-item';
@@ -328,27 +325,27 @@ function showAutocomplete(fieldId, suggestions) {
             border-bottom: 1px solid #f0f0f0;
         `;
         item.textContent = suggestion.address;
-        
+
         item.addEventListener('mouseenter', function() {
             this.style.backgroundColor = '#f8f9fa';
         });
-        
+
         item.addEventListener('mouseleave', function() {
             this.style.backgroundColor = 'white';
         });
-        
+
         item.addEventListener('click', function() {
             field.value = suggestion.address;
             hideAutocomplete(fieldId);
-            
+
             // Trigger validation after selection
             const statusId = fieldId + '_status';
             validateAddress(fieldId, statusId);
         });
-        
+
         dropdown.appendChild(item);
     });
-    
+
     // Set parent to relative positioning and append dropdown
     field.parentElement.style.position = 'relative';
     field.parentElement.appendChild(dropdown);
@@ -365,7 +362,7 @@ function hideAutocomplete(fieldId) {
 document.getElementById('sender_address').addEventListener('input', function(e) {
     clearTimeout(autocompleteTimeout);
     currentFocusedField = 'sender_address';
-    
+
     autocompleteTimeout = setTimeout(() => {
         getAddressSuggestions('sender_address', e.target.value);
     }, 300);
@@ -374,7 +371,7 @@ document.getElementById('sender_address').addEventListener('input', function(e) 
 document.getElementById('recipient_address').addEventListener('input', function(e) {
     clearTimeout(autocompleteTimeout);
     currentFocusedField = 'recipient_address';
-    
+
     autocompleteTimeout = setTimeout(() => {
         getAddressSuggestions('recipient_address', e.target.value);
     }, 300);

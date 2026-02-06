@@ -16,12 +16,12 @@
                 <div class="card-body">
                     <!-- Instructions -->
                     <div class="alert alert-permanent alert-info mb-4">
-                        <i class="bi bi-info-circle"></i> 
-                        <strong>How to use:</strong> Click "Start Camera" and point at a barcode or handwritten address. 
-                        The AI will automatically detect and extract text to pre-fill the parcel registration form. This demo could be extended to scan the back of the parcel for the sender's details.
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Smart Address Detection:</strong> Point the camera at an Australia Post envelope or parcel label.
+                        The AI uses <strong>intelligent filtering</strong> to ignore printed text (branding, disclaimers, form labels)
+                        and extract only the <strong>handwritten sender details</strong>: name, street address, suburb, state, and postcode.
                         <br><br>
-                        Insipration <a href="https://newsroom.auspost.com.au/video-australia-post-unveils-next-generation-post-office-to-meet-parcel-boom" target="_blank" class="alert-link">Australia Post's next-generation post office</a>: 
-                        Grab an envelope from the vending machine and scan the barcode on your phone to activate it. Place it on a self-service scale which leverages Azure AI Foundry to detect dimensions like size and weight, allowing customers to lodge parcels 24×7×365.
+                        <i class="bi bi-lightbulb"></i> <em>Tip: For best results, ensure the address area is well-lit and in focus.</em>
                     </div>
 
                     <!-- Camera Controls -->
@@ -90,9 +90,29 @@
                                             <input type="text" id="extractedName" class="form-control" readonly>
                                         </div>
 
-                                        <div class="mb-3">
-                                            <label class="form-label"><strong>Postcode:</strong></label>
-                                            <input type="text" id="extractedPostcode" class="form-control" readonly>
+                                        <div class="row">
+                                            <div class="col-md-5">
+                                                <div class="mb-3">
+                                                    <label class="form-label"><strong>Suburb:</strong></label>
+                                                    <input type="text" id="extractedSuburb" class="form-control" readonly>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="mb-3">
+                                                    <label class="form-label"><strong>State:</strong></label>
+                                                    <input type="text" id="extractedState" class="form-control" readonly>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="mb-3">
+                                                    <label class="form-label"><strong>Postcode:</strong></label>
+                                                    <input type="text" id="extractedPostcode" class="form-control" readonly>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div id="detectionStatus" class="alert alert-success mb-3" style="display: none;">
+                                            <i class="bi bi-check-circle"></i> <span id="detectionStatusText"></span>
                                         </div>
 
                                         <div class="d-grid gap-2">
@@ -118,21 +138,45 @@
 
 <script>
 let videoStream = null;
-let video = document.getElementById('cameraFeed');
-let canvas = document.getElementById('capturedCanvas');
-let ctx = canvas.getContext('2d');
+let video = null;
+let canvas = null;
+let ctx = null;
+
+// Initialize elements after DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    video = document.getElementById('cameraFeed');
+    canvas = document.getElementById('capturedCanvas');
+    if (canvas) {
+        ctx = canvas.getContext('2d');
+    }
+});
+
+// Fallback initialization
+function ensureElements() {
+    if (!video) video = document.getElementById('cameraFeed');
+    if (!canvas) canvas = document.getElementById('capturedCanvas');
+    if (canvas && !ctx) ctx = canvas.getContext('2d');
+    return video && canvas && ctx;
+}
 
 // Start Camera
 document.getElementById('startCamera').addEventListener('click', async () => {
+    if (!ensureElements()) {
+        alert('Error: Camera elements not found. Please refresh the page.');
+        return;
+    }
+
     try {
-        videoStream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: 'environment', width: 1280, height: 720 } 
+        videoStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment', width: 1280, height: 720 }
         });
         video.srcObject = videoStream;
         video.style.display = 'block';
         canvas.style.display = 'none';
-        document.getElementById('cameraPlaceholder').style.display = 'none';
-        
+
+        const placeholder = document.getElementById('cameraPlaceholder');
+        if (placeholder) placeholder.style.display = 'none';
+
         document.getElementById('startCamera').disabled = true;
         document.getElementById('captureImage').disabled = false;
         document.getElementById('stopCamera').disabled = false;
@@ -143,22 +187,42 @@ document.getElementById('startCamera').addEventListener('click', async () => {
 
 // Capture Image
 document.getElementById('captureImage').addEventListener('click', async () => {
+    if (!ensureElements()) {
+        alert('Error: Camera elements not found. Please refresh the page.');
+        return;
+    }
+
     // Draw current video frame to canvas
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    
+
     // Hide video, show canvas
     video.style.display = 'none';
     canvas.style.display = 'block';
-    
+
+    // Show processing indicator immediately
+    const processingIndicator = document.getElementById('processingIndicator');
+    const extractedData = document.getElementById('extractedData');
+    const noDataMessage = document.getElementById('noDataMessage');
+
+    if (processingIndicator) processingIndicator.style.display = 'block';
+    if (extractedData) extractedData.style.display = 'none';
+    if (noDataMessage) noDataMessage.style.display = 'none';
+
     // Convert to blob and send to server
     canvas.toBlob(async (blob) => {
+        if (!blob) {
+            alert('Error: Could not capture image from canvas.');
+            if (processingIndicator) processingIndicator.style.display = 'none';
+            if (noDataMessage) noDataMessage.style.display = 'block';
+            return;
+        }
+
         const formData = new FormData();
         formData.append('image', blob, 'capture.jpg');
-        
+
         // Store the captured image in sessionStorage for the registration form
-        // Convert blob to base64 for storage
         const reader = new FileReader();
         reader.onloadend = function() {
             const base64data = reader.result;
@@ -166,41 +230,72 @@ document.getElementById('captureImage').addEventListener('click', async () => {
             console.log('📸 Photo stored in sessionStorage for registration');
         };
         reader.readAsDataURL(blob);
-        
-        // Show processing indicator
-        document.getElementById('processingIndicator').style.display = 'block';
-        document.getElementById('extractedData').style.display = 'none';
-        document.getElementById('noDataMessage').style.display = 'none';
-        
+
         try {
             const response = await fetch('/api/analyze-image', {
                 method: 'POST',
                 body: formData
             });
-            
+
             const result = await response.json();
-            
+
+            // Check for API error
+            if (result.error) {
+                throw new Error(result.error);
+            }
+
             // Hide processing indicator
-            document.getElementById('processingIndicator').style.display = 'none';
-            document.getElementById('extractedData').style.display = 'block';
-            
-            // Display results
-            document.getElementById('detectedText').textContent = result.full_text || 'No text detected';
-            document.getElementById('extractedBarcode').value = result.barcode || '';
-            document.getElementById('extractedAddress').value = result.address || '';
-            document.getElementById('extractedName').value = result.recipient_name || '';
-            document.getElementById('extractedPostcode').value = result.postcode || '';
-            
+            if (processingIndicator) processingIndicator.style.display = 'none';
+            if (extractedData) extractedData.style.display = 'block';
+
+            // Display results with null checks
+            const detectedText = document.getElementById('detectedText');
+            const extractedBarcode = document.getElementById('extractedBarcode');
+            const extractedAddress = document.getElementById('extractedAddress');
+            const extractedName = document.getElementById('extractedName');
+            const extractedSuburb = document.getElementById('extractedSuburb');
+            const extractedState = document.getElementById('extractedState');
+            const extractedPostcode = document.getElementById('extractedPostcode');
+
+            if (detectedText) detectedText.textContent = result.full_text || 'No text detected';
+            if (extractedBarcode) extractedBarcode.value = result.barcode || '';
+            if (extractedAddress) extractedAddress.value = result.address || '';
+            if (extractedName) extractedName.value = result.recipient_name || '';
+            if (extractedSuburb) extractedSuburb.value = result.suburb || '';
+            if (extractedState) extractedState.value = result.state || '';
+            if (extractedPostcode) extractedPostcode.value = result.postcode || '';
+
+            // Show detection status
+            const detectionStatusEl = document.getElementById('detectionStatus');
+            const detectionStatusTextEl = document.getElementById('detectionStatusText');
+            if (detectionStatusEl && detectionStatusTextEl && result.address_region_detected) {
+                const totalLines = result.text_lines ? result.text_lines.length : 0;
+                const filteredLines = result.filtered_lines ? result.filtered_lines.length : 0;
+                const noiseFiltered = totalLines - filteredLines;
+
+                detectionStatusEl.style.display = 'block';
+                detectionStatusTextEl.textContent =
+                    'Smart address detection filtered out ' + noiseFiltered +
+                    ' noise items (printed labels, branding, etc.)';
+            } else if (detectionStatusEl) {
+                detectionStatusEl.style.display = 'none';
+            }
+
             // Store data in sessionStorage for pre-filling registration form
+            const useDataButton = document.getElementById('useDataButton');
             if (result.barcode || result.address || result.postcode) {
                 sessionStorage.setItem('scannedData', JSON.stringify(result));
-                document.getElementById('useDataButton').style.display = 'block';
+                if (useDataButton) useDataButton.style.display = 'block';
             }
-            
+
         } catch (error) {
-            alert('Error Analysing image: ' + error.message);
-            document.getElementById('processingIndicator').style.display = 'none';
-            document.getElementById('noDataMessage').style.display = 'block';
+            console.error('Error analysing image:', error);
+            alert('Error Analysing image: ' + (error.message || 'Unknown error'));
+            if (processingIndicator) processingIndicator.style.display = 'none';
+            if (noDataMessage) noDataMessage.style.display = 'block';
+
+            const detectionStatusEl = document.getElementById('detectionStatus');
+            if (detectionStatusEl) detectionStatusEl.style.display = 'none';
         }
     }, 'image/jpeg', 0.95);
 });
@@ -211,10 +306,13 @@ document.getElementById('stopCamera').addEventListener('click', () => {
         videoStream.getTracks().forEach(track => track.stop());
         videoStream = null;
     }
-    video.style.display = 'none';
-    canvas.style.display = 'none';
-    document.getElementById('cameraPlaceholder').style.display = 'block';
-    
+
+    if (video) video.style.display = 'none';
+    if (canvas) canvas.style.display = 'none';
+
+    const placeholder = document.getElementById('cameraPlaceholder');
+    if (placeholder) placeholder.style.display = 'block';
+
     document.getElementById('startCamera').disabled = false;
     document.getElementById('captureImage').disabled = true;
     document.getElementById('stopCamera').disabled = true;
