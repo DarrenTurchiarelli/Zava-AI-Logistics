@@ -474,9 +474,9 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="{{ url_for('track_parcel_page') }}" aria-label="Track">
-                    <i class="bi bi-search"></i>
-                    <span>Track</span>
+                <a class="nav-link" href="{{ url_for('camera_scanner') }}" aria-label="AI Scanner">
+                    <i class="bi bi-camera"></i>
+                    <span>Scan</span>
                 </a>
             </li>
             <li class="nav-item">
@@ -508,9 +508,9 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="{{ url_for('track_parcel_public') }}" aria-label="Track Parcel">
-                    <i class="bi bi-search"></i>
-                    <span>Track</span>
+                <a class="nav-link" href="{{ url_for('camera_scanner') }}" aria-label="AI Scanner">
+                    <i class="bi bi-camera"></i>
+                    <span>Scan</span>
                 </a>
             </li>
             <li class="nav-item">
@@ -888,6 +888,20 @@
             bottom: 20px;
             right: 20px;
             z-index: 1000;
+        }
+
+        @media (max-width: 768px) {
+            .chat-widget {
+                bottom: 80px; /* Clear the mobile bottom nav bar */
+            }
+        }
+
+        @supports (padding: env(safe-area-inset-bottom)) {
+            @media (max-width: 768px) {
+                .chat-widget {
+                    bottom: calc(80px + env(safe-area-inset-bottom));
+                }
+            }
         }
 
         .chat-widget-button {
