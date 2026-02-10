@@ -4,6 +4,20 @@ A cutting-edge parcel tracking system powered by **8 Active Azure AI Foundry Age
 
 ## ⭐ **Latest Updates** ⭐
 
+**February 10, 2026**
+
+- ✅ **Mobile-First Responsive UI**: Complete mobile optimization across all pages
+- ✅ **Mobile Bottom Navigation**: Touch-friendly nav bar with role-based links
+- ✅ **Mobile Card Views**: Tables convert to swipeable cards on small screens
+- ✅ **Address Notes Lifecycle**: Auto-categorised notes with TTL expiry (Safety 180d, Carded 30d)
+- ✅ **Note Dismiss System**: Drivers can remove stale/inaccurate address notes
+- ✅ **Expired Notes Cleanup**: Lazy pruning on read + scheduled bulk cleanup utility
+- ✅ **iOS/Android Optimizations**: Safe areas, viewport fixes, double-tap prevention
+
+**January 13, 2026**
+
+- ✅ **Customer Service Agent**: Lodgement photos now display correctly in tracking
+
 **December 18, 2025**
 
 - ✅ **8 Active AI Agents**: All core agents deployed and operational
@@ -70,6 +84,9 @@ python main.py
 - **Interactive Maps**: Embedded Azure Maps with route visualization
 - **Proof of Delivery**: Mobile-friendly interface for drivers
 - **Admin Dashboard**: View all active manifests with progress tracking
+- **Address Notes Lifecycle**: Auto-categorised delivery notes (Safety, Carded, Access, Property)
+- **Note Expiry & Cleanup**: Carded notes expire after 30 days, safety/access/property after 180 days
+- **Driver Note Dismiss**: Drivers can dismiss inaccurate notes directly from the manifest
 
 ### **🎙️ Voice-Enabled Customer Service**
 
@@ -88,12 +105,17 @@ python main.py
 - **Identity Verification**: For very high-risk cases (≥85% risk score)
 - **Automatic Parcel Holds**: Critical fraud cases (≥90% risk score)
 
-### **📱 Responsive Design**
+### **📱 Mobile-First Responsive Design**
 
-- Mobile-friendly interface
-- Touch-optimized controls
-- Works on tablets and smartphones
-- Progressive web app capabilities
+- **Mobile-optimized UI**: All pages redesigned for mobile-first experience
+- **Bottom Navigation Bar**: Touch-friendly role-based navigation on mobile
+- **Card-based Table Views**: Tables convert to swipeable cards on small screens
+- **Touch Targets**: Minimum 44px touch targets throughout the app
+- **iOS Safe Areas**: Full support for notched devices and safe area insets
+- **Viewport Fixes**: Correct 100vh handling on iOS, prevents zoom on input focus
+- **Dual-View Manifests**: Desktop table + mobile card views for driver and admin manifests
+- **Collapsible Panels**: Chatbot side panels collapse on mobile for full-width chat
+- **Landscape Support**: Optimized layouts for landscape mobile orientation
 
 ---
 

@@ -13,53 +13,53 @@
     </div>
 
     <!-- Overall Metrics Cards -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card border-primary">
-                <div class="card-body">
+    <div class="row mb-4 g-2">
+        <div class="col-6 col-md-3">
+            <div class="card border-primary h-100">
+                <div class="card-body py-3">
                     <h6 class="card-subtitle mb-2 text-muted">Total Decisions</h6>
                     <h2 class="card-title text-primary">{{ dashboard.total_decisions }}</h2>
-                    <p class="card-text small">
+                    <p class="card-text small d-none d-md-block">
                         <i class="fas fa-robot"></i> All agents
                     </p>
                 </div>
             </div>
         </div>
 
-        <div class="col-md-3">
-            <div class="card border-primary">
-                <div class="card-body">
-                    <h6 class="card-subtitle mb-2 text-muted">Average Confidence</h6>
+        <div class="col-6 col-md-3">
+            <div class="card border-primary h-100">
+                <div class="card-body py-3">
+                    <h6 class="card-subtitle mb-2 text-muted">Avg Confidence</h6>
                     <h2 class="card-title text-dark">
                         {{ (dashboard.overall_avg_confidence * 100)|round(0)|int }}%
                     </h2>
-                    <p class="card-text small">
+                    <p class="card-text small d-none d-md-block">
                         <i class="fas fa-check-circle"></i> Across all decisions
                     </p>
                 </div>
             </div>
         </div>
 
-        <div class="col-md-3">
-            <div class="card border-primary">
-                <div class="card-body">
-                    <h6 class="card-subtitle mb-2 text-muted">Avg Response Time</h6>
+        <div class="col-6 col-md-3">
+            <div class="card border-primary h-100">
+                <div class="card-body py-3">
+                    <h6 class="card-subtitle mb-2 text-muted">Avg Response</h6>
                     <h2 class="card-title text-dark">
-                        {{ dashboard.overall_avg_execution_ms|round(0)|int }} ms
+                        {{ dashboard.overall_avg_execution_ms|round(0)|int }}<small>ms</small>
                     </h2>
-                    <p class="card-text small">
+                    <p class="card-text small d-none d-md-block">
                         <i class="fas fa-tachometer-alt"></i> Decision speed
                     </p>
                 </div>
             </div>
         </div>
 
-        <div class="col-md-3">
-            <div class="card border-primary">
-                <div class="card-body">
+        <div class="col-6 col-md-3">
+            <div class="card border-primary h-100">
+                <div class="card-body py-3">
                     <h6 class="card-subtitle mb-2 text-muted">Active Agents</h6>
                     <h2 class="card-title text-dark">{{ dashboard.configured_active_agents }}</h2>
-                    <p class="card-text small">
+                    <p class="card-text small d-none d-md-block">
                         <i class="fas fa-brain"></i> Currently deployed
                     </p>
                 </div>
@@ -87,7 +87,7 @@
                     <!-- Row 1: First 3 Active Agents -->
                     <div class="row">
                         <!-- Customer Service Agent -->
-                        <div class="col-md-4 mb-3">
+                        <div class="col-sm-6 col-md-4 mb-3">
                             <div class="card h-100 border-primary shadow-sm">
                                 <div class="card-body d-flex flex-column">
                                     <div class="d-flex justify-content-between align-items-start">
@@ -140,7 +140,7 @@
                         </div>
 
                         <!-- Fraud Detection Agent -->
-                        <div class="col-md-4 mb-3">
+                        <div class="col-sm-6 col-md-4 mb-3">
                             <div class="card h-100 border-primary shadow-sm">
                                 <div class="card-body d-flex flex-column">
                                     <div class="d-flex justify-content-between align-items-start">
@@ -192,7 +192,7 @@
                         </div>
 
                         <!-- Identity Agent -->
-                        <div class="col-md-4 mb-3">
+                        <div class="col-sm-6 col-md-4 mb-3">
                             <div class="card h-100 border-primary shadow-sm">
                                 <div class="card-body d-flex flex-column">
                                     <div class="d-flex justify-content-between align-items-start">
@@ -247,7 +247,7 @@
                     <!-- Row 2: Remaining Active Agents -->
                     <div class="row">
                         <!-- Dispatcher Agent -->
-                        <div class="col-md-4 mb-3">
+                        <div class="col-sm-6 col-md-4 mb-3">
                             <div class="card h-100 border-primary shadow-sm">
                                 <div class="card-body d-flex flex-column">
                                     <div class="d-flex justify-content-between align-items-start">
@@ -299,7 +299,7 @@
                         </div>
 
                         <!-- Parcel Intake Agent -->
-                        <div class="col-md-4 mb-3">
+                        <div class="col-sm-6 col-md-4 mb-3">
                             <div class="card h-100 border-primary shadow-sm">
                                 <div class="card-body d-flex flex-column">
                                     <div class="d-flex justify-content-between align-items-start">
@@ -352,7 +352,7 @@
                         </div>
 
                         <!-- Optimisation Agent -->
-                        <div class="col-md-4 mb-3">
+                        <div class="col-sm-6 col-md-4 mb-3">
                             <div class="card h-100 border-primary shadow-sm">
                                 <div class="card-body d-flex flex-column">
                                     <div class="d-flex justify-content-between align-items-start">
@@ -407,7 +407,7 @@
                     <!-- Row 3: More Active Agents -->
                     <div class="row">
                         <!-- Sorting Facility Agent -->
-                        <div class="col-md-4 mb-3">
+                        <div class="col-sm-6 col-md-4 mb-3">
                             <div class="card h-100 border-primary shadow-sm">
                                 <div class="card-body d-flex flex-column">
                                     <div class="d-flex justify-content-between align-items-start">
@@ -459,7 +459,7 @@
                         </div>
 
                         <!-- Delivery Coordination Agent -->
-                        <div class="col-md-4 mb-3">
+                        <div class="col-sm-6 col-md-4 mb-3">
                             <div class="card h-100 border-primary shadow-sm">
                                 <div class="card-body d-flex flex-column">
                                     <div class="d-flex justify-content-between align-items-start">
@@ -525,7 +525,7 @@
                 <div class="card-body">
                     {% if dashboard.agents %}
                     <div class="table-responsive">
-                        <table class="table table-hover">
+                        <table class="table table-hover table-mobile-cards">
                             <thead class="table-light">
                                 <tr>
                                     <th>Agent Name</th>
@@ -541,15 +541,15 @@
                             <tbody>
                                 {% for agent in dashboard.agents %}
                                 <tr>
-                                    <td>
+                                    <td data-label="Agent">
                                         <strong>{{ agent.name }}</strong>
                                     </td>
-                                    <td>
+                                    <td data-label="Type">
                                         <span class="badge bg-secondary">{{ agent.type.replace('_', ' ').title() }}</span>
                                     </td>
-                                    <td>{{ agent.total_decisions }}</td>
-                                    <td>
-                                        <div class="progress" style="height: 20px;">
+                                    <td data-label="Decisions">{{ agent.total_decisions }}</td>
+                                    <td data-label="Success Rate">
+                                        <div class="progress" style="height: 20px; min-width: 80px;">
                                             <div class="progress-bar
                                                 {% if agent.success_rate > 0.7 %}bg-success
                                                 {% elif agent.success_rate > 0.3 %}bg-warning
@@ -560,7 +560,7 @@
                                             </div>
                                         </div>
                                     </td>
-                                    <td>
+                                    <td data-label="Confidence">
                                         <span class="badge
                                             {% if agent.avg_confidence > 0.8 %}bg-success
                                             {% elif agent.avg_confidence > 0.6 %}bg-warning
@@ -568,15 +568,15 @@
                                             {{ (agent.avg_confidence * 100)|round(0)|int }}%
                                         </span>
                                     </td>
-                                    <td>{{ agent.avg_execution_ms|round(0)|int }} ms</td>
-                                    <td>
+                                    <td data-label="Response Time">{{ agent.avg_execution_ms|round(0)|int }} ms</td>
+                                    <td data-label="Last Run">
                                         {% if agent.last_execution %}
                                         <small>{{ agent.last_execution[:19] }}</small>
                                         {% else %}
                                         <small class="text-muted">Never</small>
                                         {% endif %}
                                     </td>
-                                    <td>
+                                    <td data-label="Status">
                                         {% if agent.last_execution %}
                                         <span class="badge bg-success">
                                             <i class="fas fa-check-circle"></i> Active

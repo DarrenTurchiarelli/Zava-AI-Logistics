@@ -20,6 +20,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Deployment script now automatically updates agent instructions via register_agent_tools.py
 
+## [1.3.0] - 2026-02-10
+
+### Added
+
+- **Mobile-First Responsive UI**: Complete mobile optimization across all pages
+  - Mobile bottom navigation bar with role-based links (logged-in vs public)
+  - Card-based table views on mobile (tables convert to swipeable cards)
+  - Touch-friendly 44px minimum targets, iOS safe area support
+  - Dual-view manifests: desktop table + mobile card views
+  - Collapsible side panels on chatbot page for full-width chat
+  - Landscape mobile optimizations
+  - iOS viewport height fix, double-tap zoom prevention
+  - Skeleton loading animations, swipe hints for scrollable tables
+- **Address Notes Lifecycle System**: Intelligent note categorization and expiry
+  - Auto-categorisation of notes: Safety, Carded, Access, Property, General
+  - TTL-based expiry: Carded 30d, General 90d, Safety/Access/Property 180d
+  - Lazy pruning on read: expired notes filtered and removed automatically
+  - Driver dismiss: drivers can remove inaccurate notes via AJAX dismiss button
+  - Category badges with color coding in notes modal and delivery completion modal
+  - Expiry date display on each note
+  - `Scripts/cleanup_expired_notes.py`: Bulk cleanup utility (dry-run + apply modes)
+  - `POST /api/address-notes/dismiss` API endpoint
+
+### Changed
+
+- `static/css/style.css`: Complete mobile-first CSS rewrite with breakpoints for phones, small phones, tablets, and landscape
+- `static/js/app.js`: Added mobile detection, bottom nav highlighting, iOS viewport fix, double-tap prevention
+- `templates/base.html`: Mobile meta tags, mobile bottom navigation bar, theme-color
+- `templates/driver_manifest.html`: Mobile card view for deliveries, category badges on notes, dismiss button
+- `templates/admin_manifests.html`: Dual view with desktop table + mobile cards, state filter for both views
+- `templates/manifest_details.html`: Mobile card view for delivery items, responsive footer
+- `templates/customer_service_chatbot.html`: Collapsible side panels, mobile chat optimizations
+- `templates/dashboard.html`: 2-column stat cards on mobile, mobile-card table
+- `templates/ai_insights.html`: Responsive metric cards, compact system health bar
+- `templates/agent_dashboard.html`: 2-column agent cards, mobile-card performance table
+- `templates/all_parcels.html`: Mobile register button, table-mobile-cards with data-labels
+- `templates/index.html`: 2-column demo credentials and tech showcase cards
+- `templates/register_parcel.html`: Side-by-side weight/value fields on mobile
+- `templates/track_parcel.html`: 3-column weight/dimensions/value on all screen sizes
+- `parcel_tracking_db.py`: Note categorization system (`NOTE_CATEGORIES`, `_categorise_note()`), expiry filtering in `get_address_notes()`, new `dismiss_address_note()` method
+- `app.py`: Added `POST /api/address-notes/dismiss` endpoint
+
 ## [1.2.3] - 2026-01-13
 
 ### Fixed

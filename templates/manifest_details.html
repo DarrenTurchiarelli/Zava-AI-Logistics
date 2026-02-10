@@ -33,30 +33,30 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-3">
+                    <div class="row g-2">
+                        <div class="col-6 col-md-3">
                             <h6 class="text-muted">Driver</h6>
                             <p class="mb-0">
                                 <strong>{{ manifest.driver_name }}</strong><br>
                                 <small class="text-muted">ID: {{ manifest.driver_id }}</small>
                             </p>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-6 col-md-2">
                             <h6 class="text-muted">Total Items</h6>
                             <p class="mb-0">
                                 <span class="badge bg-info fs-6">{{ manifest.total_items }}</span>
                             </p>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-12 col-md-3">
                             <h6 class="text-muted">Progress</h6>
-                            <div class="progress" style="height: 25px;">
-                                <div class="progress-bar bg-success" role="progressbar" 
+                            <div class="progress" style="height: 22px;">
+                                <div class="progress-bar bg-success" role="progressbar"
                                      style="width: {{ (manifest.completed_items / manifest.total_items * 100)|int if manifest.total_items > 0 else 0 }}%">
                                     {{ manifest.completed_items }}/{{ manifest.total_items }}
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-6 col-md-2">
                             <h6 class="text-muted">Status</h6>
                             <p class="mb-0">
                                 <span class="badge bg-{{ 'success' if manifest.status == 'completed' else 'primary' }} fs-6">
@@ -64,7 +64,7 @@
                                 </span>
                             </p>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-6 col-md-2">
                             <h6 class="text-muted">Route</h6>
                             <p class="mb-0">
                                 {% if manifest.route_Optimised %}
@@ -118,18 +118,18 @@
                     </h5>
                 </div>
                 <div class="card-body p-0">
-                    <iframe 
-                        src="{{ manifest.embed_url }}" 
-                        width="100%" 
-                        height="500" 
+                    <iframe
+                        src="{{ manifest.embed_url }}"
+                        width="100%"
+                        height="500"
                         style="border:0; display: block;"
-                        allowfullscreen="" 
+                        allowfullscreen=""
                         loading="lazy">
                     </iframe>
                 </div>
                 <div class="card-footer">
                     <small class="text-muted">
-                        <i class="bi bi-info-circle"></i> 
+                        <i class="bi bi-info-circle"></i>
                         Route Optimised considering real-time traffic conditions
                         {% if not manifest.get('Optimised') %}
                         (Mock Optimisation - add Azure Maps key for real routing)
@@ -155,18 +155,19 @@
                     </h5>
                 </div>
                 <div class="card-body p-0">
-                    <div class="table-responsive">
+                    <!-- Desktop Table View -->
+                    <div class="table-responsive d-none d-lg-block">
                         <table class="table table-hover mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th width="5%">Stop</th>
-                                    <th width="12%">Barcode</th>
-                                    <th width="15%">Recipient</th>
-                                    <th width="25%">Address</th>
-                                    <th width="12%">Phone</th>
-                                    <th width="10%">Priority</th>
-                                    <th width="8%">Status</th>
-                                    <th width="13%">Notes</th>
+                                    <th>Stop</th>
+                                    <th>Barcode</th>
+                                    <th>Recipient</th>
+                                    <th>Address</th>
+                                    <th>Phone</th>
+                                    <th>Priority</th>
+                                    <th>Status</th>
+                                    <th>Notes</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -228,19 +229,45 @@
                             </tbody>
                         </table>
                     </div>
+                    <!-- Mobile Card View -->
+                    <div class="d-lg-none p-2">
+                        {% for item in manifest['items'] %}
+                        <div class="card mb-2 {{ 'border-success' if item.status == 'completed' else '' }}" style="border-left: 4px solid {{ '#28a745' if item.status == 'completed' else '#ffc107' }};">
+                            <div class="card-body py-2 px-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <strong>#{{ loop.index }} {{ item.recipient_name }}</strong>
+                                    <div>
+                                        {% if item.priority == 'urgent' %}
+                                        <span class="badge bg-danger"><i class="bi bi-exclamation-triangle"></i> Urgent</span>
+                                        {% endif %}
+                                        {% if item.status == 'completed' %}
+                                        <span class="badge bg-success"><i class="bi bi-check-circle"></i> Done</span>
+                                        {% else %}
+                                        <span class="badge bg-warning"><i class="bi bi-clock"></i> Pending</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="small text-muted mb-1"><code>{{ item.barcode }}</code></div>
+                                <div class="small mb-1"><i class="bi bi-geo-alt"></i> {{ item.recipient_address }}</div>
+                                {% if item.delivery_notes %}
+                                <div class="small text-muted mb-1"><i class="bi bi-sticky"></i> {{ item.delivery_notes }}</div>
+                                {% endif %}
+                                <a href="tel:{{ item.recipient_phone }}" class="btn btn-sm btn-outline-primary mt-1">
+                                    <i class="bi bi-telephone"></i> {{ item.recipient_phone }}
+                                </a>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
                 </div>
                 <div class="card-footer">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <small class="text-muted">
-                                Created: {{ manifest.created_timestamp }}
-                            </small>
-                        </div>
-                        <div class="col-md-6 text-end">
-                            <button class="btn btn-sm btn-outline-primary" onclick="window.print()">
-                                <i class="bi bi-printer"></i> Print Manifest
-                            </button>
-                        </div>
+                    <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
+                        <small class="text-muted">
+                            Created: {{ manifest.created_timestamp }}
+                        </small>
+                        <button class="btn btn-sm btn-outline-primary" onclick="window.print()">
+                            <i class="bi bi-printer"></i> Print Manifest
+                        </button>
                     </div>
                 </div>
             </div>

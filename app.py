@@ -3154,6 +3154,36 @@ def mark_delivery_complete(manifest_id, barcode):
     return redirect(url_for("driver_manifest"))
 
 
+@app.route("/api/address-notes/dismiss", methods=["POST"])
+@login_required
+def dismiss_address_note():
+    """Dismiss an address note that is no longer accurate (drivers & admins)"""
+    try:
+        data = request.get_json()
+        address = data.get("address", "").strip()
+        note_id = data.get("note_id", "").strip()
+
+        if not address or not note_id:
+            return jsonify({"success": False, "error": "Address and note_id are required"}), 400
+
+        user = session.get("user", {})
+        dismissed_by = user.get("display_name") or user.get("username", "unknown")
+
+        async def do_dismiss():
+            async with ParcelTrackingDB() as db:
+                return await db.dismiss_address_note(address, note_id, dismissed_by)
+
+        success = run_async(do_dismiss())
+
+        if success:
+            return jsonify({"success": True, "message": "Note dismissed successfully"})
+        else:
+            return jsonify({"success": False, "error": "Note not found"}), 404
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route("/admin/manifests")
 @role_required(UserManager.ROLE_ADMIN, UserManager.ROLE_DEPOT_MANAGER)
 def admin_manifests():

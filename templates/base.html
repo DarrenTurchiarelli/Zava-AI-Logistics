@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+    <meta name="theme-color" content="{{ company.brand_primary_color }}">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="format-detection" content="telephone=no">
     <title>{% block title %}{{ company.browser_title }}{% endblock %}</title>
 
     <!-- Bootstrap CSS -->
@@ -457,6 +462,72 @@
             </p>
         </div>
     </footer>
+
+    <!-- Mobile Bottom Navigation -->
+    <nav class="mobile-bottom-nav" aria-label="Mobile navigation">
+        <ul class="nav">
+            {% if session.logged_in %}
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('ai_insights') }}" aria-label="Dashboard">
+                    <i class="bi bi-speedometer2"></i>
+                    <span>Dashboard</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('track_parcel_page') }}" aria-label="Track">
+                    <i class="bi bi-search"></i>
+                    <span>Track</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('driver_manifest') }}" aria-label="Manifest">
+                    <i class="bi bi-truck"></i>
+                    <span>Manifest</span>
+                </a>
+            </li>
+            <li class="nav-item" style="position: relative;">
+                <a class="nav-link" href="{{ url_for('approvals') }}" aria-label="Approvals">
+                    <i class="bi bi-clipboard-check"></i>
+                    <span>Approvals</span>
+                    {% if session.get('pending_count', 0) > 0 %}
+                    <span class="badge bg-danger rounded-pill">{{ session.pending_count }}</span>
+                    {% endif %}
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="document.querySelector('.navbar-toggler').click(); return false;" aria-label="More">
+                    <i class="bi bi-three-dots"></i>
+                    <span>More</span>
+                </a>
+            </li>
+            {% else %}
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('index') }}" aria-label="Home">
+                    <i class="bi bi-house"></i>
+                    <span>Home</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('track_parcel_public') }}" aria-label="Track Parcel">
+                    <i class="bi bi-search"></i>
+                    <span>Track</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('report_fraud') }}" aria-label="Report Fraud">
+                    <i class="bi bi-shield-exclamation"></i>
+                    <span>Fraud</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('login') }}" aria-label="Login">
+                    <i class="bi bi-box-arrow-in-right"></i>
+                    <span>Login</span>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

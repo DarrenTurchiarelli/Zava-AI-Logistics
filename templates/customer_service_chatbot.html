@@ -23,6 +23,34 @@
         height: 0;
         overflow: visible;
     }
+
+    /* Mobile chatbot optimizations */
+    @media (max-width: 768px) {
+        body.chatbot-page .card[style*="height: calc"] {
+            height: calc(100vh - 220px) !important;
+            max-height: calc(100vh - 220px) !important;
+        }
+
+        body.chatbot-page .container-fluid {
+            padding: 0.25rem 0.5rem 0 !important;
+        }
+
+        body.chatbot-page h2 {
+            font-size: 1.15rem !important;
+        }
+
+        body.chatbot-page .card-footer {
+            padding: 0.4rem 0.5rem !important;
+        }
+
+        body.chatbot-page #voiceSelector {
+            display: none;
+        }
+
+        body.chatbot-page .btn-outline-secondary[onclick="stopSpeaking()"] {
+            display: none;
+        }
+    }
 </style>
 <script>
     // Auto-dismiss flash messages after 3 seconds on chatbot page
@@ -44,13 +72,17 @@
     <div class="row" style="margin-bottom: 0.5rem;">
         <div class="col-12" style="padding-bottom: 0;">
             <h2 style="margin-bottom: 0; font-size: 1.5rem; display: inline-block;"><i class="bi bi-robot"></i> AI Customer Service Assistant</h2>
-            <p class="text-muted" style="margin: 0; font-size: 0.875rem; display: inline-block; margin-left: 1rem;">Ask questions about parcels, check fraud reports, and get AI-powered assistance</p>
+            <p class="text-muted d-none d-md-inline-block" style="margin: 0; font-size: 0.875rem; margin-left: 1rem;">Ask questions about parcels, check fraud reports, and get AI-powered assistance</p>
         </div>
     </div>
 
     <div class="row">
-        <!-- Quick Actions Panel -->
-        <div class="col-md-3">
+        <!-- Quick Actions Panel - Collapsible on mobile -->
+        <div class="col-lg-3 col-md-4 order-2 order-md-1">
+            <button class="btn btn-primary w-100 d-md-none mb-2" type="button" data-bs-toggle="collapse" data-bs-target="#quickActionsPanel" aria-expanded="false">
+                <i class="bi bi-lightning-charge-fill"></i> Quick Actions & Lookup
+            </button>
+            <div class="collapse d-md-block" id="quickActionsPanel">
             <div class="card mb-3">
                 <div class="card-header bg-primary text-white">
                     <i class="bi bi-lightning-charge-fill"></i> Quick Actions
@@ -167,10 +199,11 @@
                     </button>
                 </div>
             </div>
+            </div><!-- end collapsible quickActionsPanel -->
         </div>
 
         <!-- Chat Panel -->
-        <div class="col-md-6">
+        <div class="col-lg-6 col-md-8 order-1 order-md-2">
             <div class="card" style="height: calc(100vh - 180px); max-height: calc(100vh - 180px); display: flex; flex-direction: column;">
                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center" style="flex-shrink: 0; padding: 0.4rem 0.75rem;">
                     <span style="font-size: 0.95rem;"><i class="bi bi-chat-dots-fill"></i> Chat with AI Assistant</span>
@@ -178,15 +211,15 @@
                         <i class="bi bi-mic-fill"></i> Listening...
                     </span>
                 </div>
-                <div class="card-body chat-container" id="chatMessages" style="overflow-y: auto; flex: 1; min-height: 0; background-color: #fff; padding: 1rem;">
+                <div class="card-body chat-container" id="chatMessages" style="overflow-y: auto; flex: 1; min-height: 0; background-color: #fff; padding: 1rem; -webkit-overflow-scrolling: touch;">
                     <div class="chat-message ai-message">
                         <div class="message-content" style="background-color: transparent; border: 1px solid #dee2e6; padding-left: 0.5rem;"><i class="bi bi-info-circle-fill"></i><strong>Welcome!</strong> I'm Alex, your customer service assistant.<br><small>💬 Ask me anything about your parcels or 🎤 use voice input!</small></div>
                     </div>
                 </div>
                 <div class="card-footer" style="flex-shrink: 0; padding: 0.5rem 0.75rem;">
-                    <div class="input-group input-group-sm">
+                    <div class="input-group">
                         <input type="text" class="form-control" id="chatInput" placeholder="Ask a question or use voice..." onkeypress="handleEnter(event)">
-                        <button class="btn btn-primary btn-sm" id="voiceBtn" onclick="toggleVoiceInput()" title="Voice Input">
+                        <button class="btn btn-primary" id="voiceBtn" onclick="toggleVoiceInput()" title="Voice Input">
                             <i class="bi bi-mic-fill" id="micIcon"></i>
                         </button>
                         <button class="btn btn-primary btn-sm" onclick="sendMessage()">
@@ -210,8 +243,8 @@
             </div>
         </div>
 
-        <!-- Information Panel -->
-        <div class="col-md-3">
+        <!-- Information Panel - Collapsible on mobile -->
+        <div class="col-lg-3 d-none d-lg-block order-3">
             <div class="card">
                 <div class="card-header bg-primary text-white">
                     <i class="bi bi-info-circle-fill"></i> Information
