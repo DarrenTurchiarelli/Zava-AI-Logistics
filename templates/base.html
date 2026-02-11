@@ -1209,6 +1209,76 @@
             // Current conversation thread ID for persistence
             let widgetThreadId = null;
 
+            // --- iOS Audio Compatibility ---
+            // iOS Safari blocks Audio.play() and speechSynthesis.speak() outside user gestures.
+            // AudioContext, once unlocked on first tap, allows reliable cross-platform playback.
+            let widgetAudioCtx = null;
+            let widgetAudioSource = null;
+
+            function getWidgetAudioCtx() {
+                if (!widgetAudioCtx) {
+                    widgetAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                return widgetAudioCtx;
+            }
+
+            let widgetAudioUnlocked = false;
+            function unlockWidgetAudio() {
+                if (widgetAudioUnlocked) return;
+                widgetAudioUnlocked = true;
+                try {
+                    const ctx = getWidgetAudioCtx();
+                    if (ctx.state === 'suspended') ctx.resume();
+                    const buf = ctx.createBuffer(1, 1, 22050);
+                    const src = ctx.createBufferSource();
+                    src.buffer = buf;
+                    src.connect(ctx.destination);
+                    src.start(0);
+                } catch(e) {}
+                if (window.speechSynthesis) {
+                    const u = new SpeechSynthesisUtterance(' ');
+                    u.volume = 0.01;
+                    window.speechSynthesis.speak(u);
+                }
+                console.log('🔓 Widget: iOS audio unlocked');
+            }
+
+            // Play audio blob via AudioContext (works on iOS Safari)
+            async function playWidgetAudioBlob(blob) {
+                const ctx = getWidgetAudioCtx();
+                if (ctx.state === 'suspended') await ctx.resume();
+                stopWidgetAudioSource();
+                try {
+                    const arrayBuffer = await blob.arrayBuffer();
+                    const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+                    const source = ctx.createBufferSource();
+                    source.buffer = audioBuffer;
+                    source.connect(ctx.destination);
+                    widgetAudioSource = source;
+                    source.start(0);
+                    return new Promise((resolve) => {
+                        source.onended = () => { widgetAudioSource = null; resolve(); };
+                    });
+                } catch (decodeErr) {
+                    // Fallback: use Audio element with blob URL (handles WAV on iOS Safari)
+                    console.warn('Widget AudioContext decode failed, using Audio element fallback:', decodeErr);
+                    const url = URL.createObjectURL(blob);
+                    const audio = new Audio(url);
+                    return new Promise((resolve, reject) => {
+                        audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
+                        audio.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+                        audio.play().catch((e) => { URL.revokeObjectURL(url); reject(e); });
+                    });
+                }
+            }
+
+            function stopWidgetAudioSource() {
+                if (widgetAudioSource) {
+                    try { widgetAudioSource.stop(); } catch(e) {}
+                    widgetAudioSource = null;
+                }
+            }
+
             // Initialize Azure Speech for widget
             async function initWidgetSpeech() {
                 try {
@@ -1237,13 +1307,7 @@
 
             // Toggle chat window
             toggleBtn.addEventListener('click', function() {
-                // On mobile, open public chat page in new tab instead of popup
-                if (isMobileDevice()) {
-                    window.open('{{ url_for("public_chat") }}', '_blank');
-                    return;
-                }
-
-                // Desktop behavior - show popup widget
+                // Show popup widget on all devices (mobile and desktop)
                 isOpen = !isOpen;
                 chatWindow.classList.toggle('open', isOpen);
                 toggleBtn.classList.toggle('active', isOpen);
@@ -1277,6 +1341,7 @@
             });
 
             function startWidgetListening() {
+                unlockWidgetAudio();
                 if (useWidgetAzureSpeech && widgetSpeechConfig) {
                     const audioConfig = window.SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
                     widgetRecognizer = new window.SpeechSDK.SpeechRecognizer(widgetSpeechConfig, audioConfig);
@@ -1287,9 +1352,14 @@
 
                     widgetRecognizer.recognizeOnceAsync(
                         function (result) {
-                            input.value = result.text;
-                            stopWidgetListening();
-                            sendMessage();
+                            if (result.text && result.text.trim()) {
+                                input.value = result.text;
+                                stopWidgetListening();
+                                sendMessage();
+                            } else {
+                                console.warn('🎤 No speech detected');
+                                stopWidgetListening();
+                            }
                         },
                         function (error) {
                             console.error('Voice error:', error);
@@ -1356,21 +1426,13 @@
                         const contentType = response.headers.get('content-type') || '';
                         if (contentType.includes('audio')) {
                             const audioBlob = await response.blob();
-                            const audioUrl = URL.createObjectURL(audioBlob);
-                            const audio = new Audio(audioUrl);
-
-                            audio.onended = () => {
-                                URL.revokeObjectURL(audioUrl);
+                            try {
+                                await playWidgetAudioBlob(audioBlob);
                                 console.log('🔊 Widget Azure speech ended');
-                            };
-
-                            audio.onerror = (error) => {
-                                console.error('🔊 Widget audio playback error:', error);
-                                // Fallback to browser speech (female - natasha)
+                            } catch (playError) {
+                                console.error('🔊 Widget audio playback error:', playError);
                                 speakWidgetWithBrowser(text, 'Female');
-                            };
-
-                            await audio.play();
+                            }
                         } else {
                             console.warn('Widget Azure speech returned non-audio response, using browser voice');
                             speakWidgetWithBrowser(text, 'Female');
@@ -1419,6 +1481,7 @@
 
             // Send message
             async function sendMessage() {
+                unlockWidgetAudio();
                 const message = input.value.trim();
                 if (!message) return;
 
@@ -1515,7 +1578,8 @@
                             scrollToBottom();
                         }
                     } else {
-                        const errorMsg = 'Sorry, I encountered an error. Please try again.';
+                        // Try to use response body message even on non-OK status
+                        const errorMsg = (data && data.response) ? data.response : 'Sorry, I encountered an error. Please try again.';
                         addMessage(errorMsg, 'assistant');
                         speakWidgetMessage(errorMsg);
                     }
@@ -1552,10 +1616,8 @@
             // End chat
             function clearChat() {
                 // Stop any playing audio
-                if (window.currentAudio) {
-                    window.currentAudio.pause();
-                    window.currentAudio = null;
-                }
+                stopWidgetAudioSource();
+                if (window.speechSynthesis) window.speechSynthesis.cancel();
 
                 // Reset conversation thread
                 widgetThreadId = null;

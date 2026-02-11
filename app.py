@@ -2126,11 +2126,7 @@ def get_speech_token():
 
 @app.route("/api/speech/synthesize", methods=["POST"])
 def synthesize_speech():
-    """Convert text to speech using Azure Speech Services"""
-    # Check auth without redirect (AJAX-friendly)
-    if not session.get("user"):
-        return jsonify({"error": "Authentication required"}), 401
-
+    """Convert text to speech using Azure Speech Services (no auth - accessible for mobile/widget TTS)"""
     from services.speech import get_speech_service
 
     data = request.get_json()

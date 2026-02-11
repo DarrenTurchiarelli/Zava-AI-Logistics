@@ -291,6 +291,78 @@ let availableVoices = [];
 let selectedVoice = null;
 let azureVoices = {};
 
+// --- iOS Audio Compatibility ---
+// iOS Safari blocks Audio.play() and speechSynthesis.speak() outside user gestures.
+// AudioContext, once unlocked on first tap, allows reliable cross-platform playback.
+let _csAudioCtx = null;
+let _csAudioSource = null;
+
+function _getCsAudioCtx() {
+    if (!_csAudioCtx) {
+        _csAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    return _csAudioCtx;
+}
+
+let _csAudioUnlocked = false;
+function _unlockCsAudio() {
+    if (_csAudioUnlocked) return;
+    _csAudioUnlocked = true;
+    try {
+        const ctx = _getCsAudioCtx();
+        if (ctx.state === 'suspended') ctx.resume();
+        const buf = ctx.createBuffer(1, 1, 22050);
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(ctx.destination);
+        src.start(0);
+    } catch(e) {}
+    if (window.speechSynthesis) {
+        const u = new SpeechSynthesisUtterance(' ');
+        u.volume = 0.01;
+        window.speechSynthesis.speak(u);
+    }
+    console.log('🔓 iOS audio unlocked');
+}
+
+async function _playCsAudioBlob(blob) {
+    const ctx = _getCsAudioCtx();
+    if (ctx.state === 'suspended') await ctx.resume();
+    _stopCsAudioSource();
+    try {
+        const arrayBuffer = await blob.arrayBuffer();
+        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(ctx.destination);
+        _csAudioSource = source;
+        source.start(0);
+        return new Promise((resolve) => {
+            source.onended = () => { _csAudioSource = null; resolve(); };
+        });
+    } catch (decodeErr) {
+        // Fallback: use Audio element with blob URL (handles WAV on iOS Safari)
+        console.warn('AudioContext decode failed, using Audio element fallback:', decodeErr);
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        return new Promise((resolve, reject) => {
+            audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
+            audio.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+            audio.play().catch((e) => { URL.revokeObjectURL(url); reject(e); });
+        });
+    }
+}
+
+function _stopCsAudioSource() {
+    if (_csAudioSource) {
+        try { _csAudioSource.stop(); } catch(e) {}
+        _csAudioSource = null;
+    }
+}
+
+document.addEventListener('click', _unlockCsAudio, { once: true });
+document.addEventListener('touchstart', _unlockCsAudio, { once: true });
+
 // Load Azure Neural voices from API
 async function loadAzureVoices() {
     try {
@@ -415,6 +487,7 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
 }
 
 function toggleVoiceInput() {
+    _unlockCsAudio();
     if (!recognition) {
         addMessage('Voice input is not supported in your browser. Please use Chrome, Edge, or Safari.', 'warning');
         return;
@@ -481,23 +554,13 @@ async function speakWithAzure(text, voicePersona) {
         const contentType = response.headers.get('content-type') || '';
         if (response.ok && contentType.includes('audio')) {
             const audioBlob = await response.blob();
-            const audioUrl = URL.createObjectURL(audioBlob);
-            currentAudio = new Audio(audioUrl);
-
-            currentAudio.onended = () => {
-                URL.revokeObjectURL(audioUrl);
-                currentAudio = null;
+            try {
+                await _playCsAudioBlob(audioBlob);
                 console.log('🔊 Azure speech ended');
-            };
-
-            currentAudio.onerror = (error) => {
-                console.error('🔊 Audio playback error:', error);
-                currentAudio = null;
-                // Fallback to browser speech with gender preference
+            } catch (playError) {
+                console.error('🔊 Audio playback error:', playError);
                 speakWithBrowser(text, null, preferredGender);
-            };
-
-            await currentAudio.play();
+            }
         } else {
             console.warn('Azure speech unavailable (HTTP', response.status, ', type:', contentType, '), using browser voice');
             speakWithBrowser(text, null, preferredGender);
@@ -581,7 +644,10 @@ function stopSpeaking() {
         console.log('🔊 Browser speech stopped');
     }
 
-    // Stop Azure audio playback
+    // Stop AudioContext playback (iOS-compatible)
+    _stopCsAudioSource();
+
+    // Stop legacy Audio element playback
     if (currentAudio) {
         currentAudio.pause();
         currentAudio.currentTime = 0;
@@ -647,6 +713,7 @@ function removeLoading() {
 }
 
 async function sendMessage() {
+    _unlockCsAudio();
     const input = document.getElementById('chatInput');
     const query = input.value.trim();
 
@@ -702,7 +769,11 @@ async function sendMessage() {
                 currentThreadId = data.thread_id;
             }
 
-            const aiResponse = data.response || data.message || JSON.stringify(data, null, 2);
+            let aiResponse = data.response || data.message || '';
+            // If response is empty or just whitespace, show a friendly message
+            if (!aiResponse || !aiResponse.trim()) {
+                aiResponse = "I'm sorry, I wasn't able to process that request. Could you please try again?";
+            }
             addMessage(aiResponse);
 
             // Display lodgement photos if included in response

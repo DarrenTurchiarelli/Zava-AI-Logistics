@@ -289,6 +289,8 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Azure Speech SDK -->
+    <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
     <script>
 // Public Chat JavaScript
 (function() {
@@ -304,8 +306,100 @@
     // Current conversation thread ID for persistence
     let currentThreadId = null;
 
+    // Azure Speech SDK for voice input (works on iOS Safari)
+    let pcSpeechConfig = null;
+    let pcRecognizer = null;
+    let useAzureSpeechInput = false;
+
+    async function initPublicChatSpeech() {
+        try {
+            const response = await fetch('/api/speech/token');
+            const data = await response.json();
+            if (data.token && data.region && window.SpeechSDK) {
+                pcSpeechConfig = window.SpeechSDK.SpeechConfig.fromAuthorizationToken(data.token, data.region);
+                pcSpeechConfig.speechRecognitionLanguage = data.language || 'en-AU';
+                useAzureSpeechInput = true;
+                console.log('\ud83c\udf99\ufe0f Public chat: Azure Speech SDK initialized for voice input');
+            }
+        } catch (error) {
+            console.log('\u26a0\ufe0f Public chat: Azure Speech unavailable, using Web Speech API fallback');
+        }
+    }
+
+    initPublicChatSpeech();
+
+    // --- iOS Audio Compatibility ---
+    // iOS Safari blocks Audio.play() and speechSynthesis.speak() outside user gestures.
+    // AudioContext, once unlocked on first tap, allows reliable cross-platform playback.
+    let pcAudioCtx = null;
+    let pcAudioSource = null;
+
+    function getPcAudioCtx() {
+        if (!pcAudioCtx) {
+            pcAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        return pcAudioCtx;
+    }
+
+    let pcAudioUnlocked = false;
+    function unlockPcAudio() {
+        if (pcAudioUnlocked) return;
+        pcAudioUnlocked = true;
+        try {
+            const ctx = getPcAudioCtx();
+            if (ctx.state === 'suspended') ctx.resume();
+            const buf = ctx.createBuffer(1, 1, 22050);
+            const src = ctx.createBufferSource();
+            src.buffer = buf;
+            src.connect(ctx.destination);
+            src.start(0);
+        } catch(e) {}
+        if (window.speechSynthesis) {
+            const u = new SpeechSynthesisUtterance(' ');
+            u.volume = 0.01;
+            window.speechSynthesis.speak(u);
+        }
+        console.log('🔓 iOS audio unlocked');
+    }
+
+    async function playPcAudioBlob(blob) {
+        const ctx = getPcAudioCtx();
+        if (ctx.state === 'suspended') await ctx.resume();
+        stopPcAudio();
+        try {
+            const arrayBuffer = await blob.arrayBuffer();
+            const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+            const source = ctx.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(ctx.destination);
+            pcAudioSource = source;
+            source.start(0);
+            return new Promise((resolve) => {
+                source.onended = () => { pcAudioSource = null; resolve(); };
+            });
+        } catch (decodeErr) {
+            console.warn('AudioContext decode failed, using Audio element fallback:', decodeErr);
+            const url = URL.createObjectURL(blob);
+            const audio = new Audio(url);
+            return new Promise((resolve, reject) => {
+                audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
+                audio.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+                audio.play().catch((e) => { URL.revokeObjectURL(url); reject(e); });
+            });
+        }
+    }
+
+    function stopPcAudio() {
+        if (pcAudioSource) {
+            try { pcAudioSource.stop(); } catch(e) {}
+            pcAudioSource = null;
+        }
+        if (window.speechSynthesis) window.speechSynthesis.cancel();
+    }
+
     // Send message
     async function sendMessage() {
+        unlockPcAudio();
         const query = input.value.trim();
         if (!query) return;
 
@@ -344,8 +438,10 @@
                 if (autoSpeakCheckbox.checked) {
                     speakText(data.response);
                 }
+            } else if (data.error) {
+                addMessage('Sorry, something went wrong. Please try again.', 'bot');
             } else {
-                addMessage('Sorry, I encountered an error. Please try again.', 'bot');
+                addMessage('Sorry, I wasn\'t able to process that. Please try again.', 'bot');
             }
         } catch (error) {
             removeTyping(typingId);
@@ -413,29 +509,90 @@
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
-    // Text-to-speech
+    // Text-to-speech (Azure Neural TTS with iOS-compatible AudioContext playback)
     async function speakText(text) {
+        const cleanText = text.replace(/\*\*/g, '').replace(/<[^>]+>/g, '').trim();
+
+        // Try Azure Neural TTS first (high quality, works on iOS via AudioContext)
+        try {
+            const response = await fetch('/api/speech/synthesize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: cleanText, voice_persona: 'natasha' })
+            });
+
+            if (response.ok) {
+                const contentType = response.headers.get('content-type') || '';
+                if (contentType.includes('audio')) {
+                    const audioBlob = await response.blob();
+                    await playPcAudioBlob(audioBlob);
+                    console.log('🔊 Azure speech ended');
+                    return;
+                }
+            }
+        } catch (error) {
+            console.warn('Azure TTS unavailable, using browser voice:', error.message);
+        }
+
+        // Fallback to browser speechSynthesis (also iOS-unlocked)
         if ('speechSynthesis' in window) {
             window.speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance(text);
+            const utterance = new SpeechSynthesisUtterance(cleanText);
             utterance.lang = 'en-AU';
             utterance.rate = 1.0;
+            const voices = window.speechSynthesis.getVoices();
+            const enVoices = voices.filter(v => v.lang.startsWith('en'));
+            const voice = enVoices.find(v => v.lang === 'en-AU' && (v.name.includes('Natural') || v.name.includes('Premium')))
+                       || enVoices.find(v => v.lang === 'en-AU')
+                       || enVoices.find(v => v.lang.startsWith('en'));
+            if (voice) utterance.voice = voice;
             window.speechSynthesis.speak(utterance);
         }
     }
 
     // Voice input
     function startVoiceInput() {
-        // Check for Speech Recognition API support
+        unlockPcAudio();
+
+        if (isListening) return;
+
+        // Try Azure Speech SDK first (works on iOS Safari)
+        if (useAzureSpeechInput && pcSpeechConfig) {
+            try {
+                const audioConfig = window.SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+                pcRecognizer = new window.SpeechSDK.SpeechRecognizer(pcSpeechConfig, audioConfig);
+
+                isListening = true;
+                voiceBtn.classList.add('btn-danger');
+                voiceBtn.classList.remove('btn-outline-primary');
+                voiceBtn.innerHTML = '<i class="bi bi-mic-fill"></i>';
+
+                pcRecognizer.recognizeOnceAsync(
+                    function(result) {
+                        if (result.text) {
+                            input.value = result.text;
+                        }
+                        stopVoiceInput();
+                    },
+                    function(error) {
+                        console.error('Azure Speech recognition error:', error);
+                        stopVoiceInput();
+                    }
+                );
+                return;
+            } catch (error) {
+                console.warn('Azure Speech SDK mic failed, trying Web Speech API:', error);
+                stopVoiceInput();
+            }
+        }
+
+        // Fallback to Web Speech API (not available on iOS Safari)
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
         if (!SpeechRecognition) {
-            // Show user-friendly alert for unsupported browsers (mainly Safari on iOS)
-            alert('Voice input is not available on this device. Please type your message instead.\n\nNote: Voice input works on Chrome and Edge browsers.');
+            alert('Voice input is not available on this device. Please type your message instead.\n\nTip: Use the chat widget on the main site for voice input on all devices.');
             return;
         }
-
-        if (isListening) return;
 
         try {
             const recognition = new SpeechRecognition();
@@ -479,8 +636,20 @@
         }
     }
 
+    function stopVoiceInput() {
+        isListening = false;
+        voiceBtn.classList.remove('btn-danger');
+        voiceBtn.classList.add('btn-outline-primary');
+        voiceBtn.innerHTML = '<i class="bi bi-mic-fill"></i>';
+        if (pcRecognizer) {
+            pcRecognizer.close();
+            pcRecognizer = null;
+        }
+    }
+
     // Clear chat
     function clearChat() {
+        stopPcAudio();
         currentThreadId = null;  // Reset conversation thread
         messagesContainer.innerHTML = `
             <div class="welcome-section">
