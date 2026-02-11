@@ -301,6 +301,9 @@
 
     let isListening = false;
 
+    // Current conversation thread ID for persistence
+    let currentThreadId = null;
+
     // Send message
     async function sendMessage() {
         const query = input.value.trim();
@@ -314,16 +317,27 @@
         const typingId = showTyping();
 
         try {
+            const requestBody = { query: query };
+            // Include thread_id for conversation persistence
+            if (currentThreadId) {
+                requestBody.thread_id = currentThreadId;
+            }
+
             const response = await fetch('/api/public/chatbot', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query: query })
+                body: JSON.stringify(requestBody)
             });
 
             const data = await response.json();
             removeTyping(typingId);
 
             if (data.response) {
+                // Store thread_id for conversation continuity
+                if (data.thread_id) {
+                    currentThreadId = data.thread_id;
+                }
+
                 addMessage(data.response, 'bot');
 
                 // Auto-speak if enabled
@@ -467,6 +481,7 @@
 
     // Clear chat
     function clearChat() {
+        currentThreadId = null;  // Reset conversation thread
         messagesContainer.innerHTML = `
             <div class="welcome-section">
                 <img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot">

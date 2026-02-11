@@ -379,26 +379,46 @@ def setup_users_now():
                         "username": "admin",
                         "password": "admin123",
                         "role": UserManager.ROLE_ADMIN,
-                        "full_name": "Administrator",
+                        "full_name": "System Administrator",
+                        "email": "admin@dtlogistics.com.au",
                     },
                     {
                         "username": "support",
                         "password": "support123",
                         "role": UserManager.ROLE_CUSTOMER_SERVICE,
                         "full_name": "Support Agent",
-                    },
-                    {
-                        "username": "driver001",
-                        "password": "driver123",
-                        "role": UserManager.ROLE_DRIVER,
-                        "full_name": "Driver One",
-                        "driver_id": "driver-001",
+                        "email": "support@dtlogistics.com.au",
                     },
                     {
                         "username": "depot_mgr",
                         "password": "depot123",
                         "role": UserManager.ROLE_DEPOT_MANAGER,
                         "full_name": "Depot Manager",
+                        "email": "lisa.anderson@dtlogistics.com.au",
+                    },
+                    {
+                        "username": "driver001",
+                        "password": "driver123",
+                        "role": UserManager.ROLE_DRIVER,
+                        "full_name": "John Smith",
+                        "driver_id": "driver-001",
+                        "email": "john.smith@dtlogistics.com.au",
+                    },
+                    {
+                        "username": "driver002",
+                        "password": "driver123",
+                        "role": UserManager.ROLE_DRIVER,
+                        "full_name": "Sarah Jones",
+                        "driver_id": "driver-002",
+                        "email": "sarah.jones@dtlogistics.com.au",
+                    },
+                    {
+                        "username": "driver003",
+                        "password": "driver123",
+                        "role": UserManager.ROLE_DRIVER,
+                        "full_name": "Mike Brown",
+                        "driver_id": "driver-003",
+                        "email": "mike.brown@dtlogistics.com.au",
                     },
                 ]
 
@@ -539,28 +559,93 @@ def login():
 
 @app.route("/demo-login/<username>")
 def demo_login(username):
-    """Auto-login for demo users"""
-    # Define demo credentials
-    demo_credentials = {
-        "admin": "admin123",
-        "support": "support123",
-        "depot_mgr": "depot123",
-        "driver001": "driver123",
-        "driver002": "driver123",
-        "driver003": "driver123",
+    """Auto-login for demo users (auto-creates user if missing)"""
+    # Define demo credentials and user details
+    demo_users = {
+        "admin": {
+            "password": "admin123",
+            "role": UserManager.ROLE_ADMIN,
+            "full_name": "System Administrator",
+            "email": "admin@dtlogistics.com.au",
+        },
+        "support": {
+            "password": "support123",
+            "role": UserManager.ROLE_CUSTOMER_SERVICE,
+            "full_name": "Support Agent",
+            "email": "support@dtlogistics.com.au",
+        },
+        "depot_mgr": {
+            "password": "depot123",
+            "role": UserManager.ROLE_DEPOT_MANAGER,
+            "full_name": "Depot Manager",
+            "email": "lisa.anderson@dtlogistics.com.au",
+        },
+        "driver001": {
+            "password": "driver123",
+            "role": UserManager.ROLE_DRIVER,
+            "full_name": "John Smith",
+            "email": "john.smith@dtlogistics.com.au",
+            "driver_id": "driver-001",
+        },
+        "driver002": {
+            "password": "driver123",
+            "role": UserManager.ROLE_DRIVER,
+            "full_name": "Sarah Jones",
+            "email": "sarah.jones@dtlogistics.com.au",
+            "driver_id": "driver-002",
+        },
+        "driver003": {
+            "password": "driver123",
+            "role": UserManager.ROLE_DRIVER,
+            "full_name": "Mike Brown",
+            "email": "mike.brown@dtlogistics.com.au",
+            "driver_id": "driver-003",
+        },
     }
 
-    if username not in demo_credentials:
+    if username not in demo_users:
         flash("Invalid demo user", "danger")
         return redirect(url_for("index"))
 
-    # Authenticate user
+    demo_info = demo_users[username]
+
+    # Authenticate user, auto-creating if missing
     async def auth_demo_user():
         async with ParcelTrackingDB() as db:
             if not db.database:
                 await db.connect()
             user_mgr = UserManager(db)
-            return await user_mgr.authenticate(username, demo_credentials[username])
+
+            # Ensure users container exists
+            try:
+                await db.database.create_container(id="users", partition_key={"paths": ["/username"], "kind": "Hash"})
+            except Exception:
+                pass  # Container already exists
+
+            # Try to authenticate
+            user = await user_mgr.authenticate(username, demo_info["password"])
+            if user:
+                return user
+
+            # User doesn't exist - auto-create it
+            try:
+                existing = await user_mgr.get_user_by_username(username)
+                if not existing:
+                    print(f"🔧 Auto-creating demo user: {username}")
+                    await user_mgr.create_user(
+                        username=username,
+                        password=demo_info["password"],
+                        role=demo_info["role"],
+                        full_name=demo_info["full_name"],
+                        email=demo_info.get("email"),
+                        driver_id=demo_info.get("driver_id"),
+                    )
+                    # Authenticate the newly created user
+                    return await user_mgr.authenticate(username, demo_info["password"])
+            except Exception as create_err:
+                print(f"❌ Error auto-creating demo user {username}: {create_err}")
+
+            return None
 
     try:
         user = run_async(auth_demo_user())
@@ -1566,6 +1651,7 @@ def chatbot_query():
     data = request.get_json()
     query = data.get("query", "")
     tracking_number = data.get("tracking_number")
+    thread_id = data.get("thread_id")  # Conversation thread persistence
 
     if not query:
         return jsonify({"error": "Query is required"}), 400
@@ -1579,13 +1665,35 @@ def chatbot_query():
             if tracking_number:
                 context["tracking_number"] = tracking_number
 
-            # Process query
-            response = await chatbot.process_query(query, context)
+            # Process query with thread persistence
+            response = await chatbot.process_query(query, context, thread_id=thread_id)
             return response
 
     try:
         result = run_async(process())
-        response_text = result.get("response", "")
+
+        # Extract response text - handle nested Azure AI agent formats
+        response_text = ""
+        if isinstance(result, dict):
+            response_obj = result.get("response", "")
+            if isinstance(response_obj, str):
+                response_text = response_obj
+            elif isinstance(response_obj, dict):
+                if response_obj.get("type") == "text" and response_obj.get("text"):
+                    if isinstance(response_obj["text"], dict):
+                        response_text = response_obj["text"].get("value", str(response_obj))
+                    else:
+                        response_text = str(response_obj["text"])
+                elif response_obj.get("value"):
+                    response_text = response_obj["value"]
+                else:
+                    response_text = str(response_obj)
+            else:
+                response_text = str(response_obj) if response_obj else ""
+        elif isinstance(result, str):
+            response_text = result
+        else:
+            response_text = str(result) if result else ""
 
         # Check if response mentions photos and attach photo data
         delivery_photos = []
@@ -1607,9 +1715,12 @@ def chatbot_query():
 
             # Match various barcode formats:
             # - DTVIC123456, DT202512090001 (DT prefixed)
+            # - LP123456, BCC12345 (2-4 letter prefix + digits)
             # - OV96748588HU (2 letters + 8+ digits + 2 letters)
             # - BCC5253CE53659 (mixed alphanumeric with letters and digits)
-            tracking_pattern = r"\b(DTVIC\d+|DT\d+|[A-Z]{2}\d{8,}[A-Z]{2}|[A-Z]{2,4}\d{3,}[A-Z]{1,3}\d{3,})\b"
+            tracking_pattern = (
+                r"\b(DTVIC\d+|DT\d+|[A-Z]{2}\d{5,}|[A-Z]{2}\d{8,}[A-Z]{2}|[A-Z]{2,4}\d{3,}[A-Z]{1,3}\d{3,})\b"
+            )
 
             # Try multiple sources for tracking number
             tracking_num = None
@@ -1657,6 +1768,9 @@ def chatbot_query():
                 print(f"   ⚠️  No tracking number found in query or context")
 
         response_data = {"response": response_text}
+        # Include thread_id for conversation persistence
+        if isinstance(result, dict) and result.get("thread_id"):
+            response_data["thread_id"] = result["thread_id"]
         if delivery_photos:
             print(f"📸 Adding {len(delivery_photos)} delivery photos to response")
             response_data["delivery_photos"] = delivery_photos
@@ -1692,10 +1806,13 @@ def public_chatbot():
     data = request.get_json()
     query = data.get("query", "")
     tracking_number = data.get("tracking_number")  # Support explicit tracking number
+    thread_id = data.get("thread_id")  # Conversation thread persistence
 
     print(f"📝 Query: {query}")
     if tracking_number:
         print(f"📦 Tracking Number: {tracking_number}")
+    if thread_id:
+        print(f"🧵 Thread ID: {thread_id}")
     if is_logged_in:
         print(f"👤 User: {user.get('username')} (Role: {user.get('role')})")
     else:
@@ -1720,8 +1837,8 @@ def public_chatbot():
             if tracking_number:
                 context["tracking_number"] = tracking_number
 
-            # Process query with restricted access
-            response = await chatbot.process_query(query, context)
+            # Process query with restricted access and thread persistence
+            response = await chatbot.process_query(query, context, thread_id=thread_id)
             print(f"\n📦 Raw response from chatbot: {response}")
             print(f"📦 Response type: {type(response)}")
             if isinstance(response, dict):
@@ -1784,7 +1901,10 @@ def public_chatbot():
                     )
                     if match:
                         customer_message = match.group(1).strip()
-                        return jsonify({"response": customer_message})
+                        resp = {"response": customer_message}
+                        if isinstance(result, dict) and result.get("thread_id"):
+                            resp["thread_id"] = result["thread_id"]
+                        return jsonify(resp)
 
                 # Clean up any residual structured markers
                 import re
@@ -1817,8 +1937,10 @@ def public_chatbot():
                     # Extract tracking number from query, tracking_number param, response, or context
                     import re
 
-                    # Match various barcode formats including BCC-style
-                    tracking_pattern = r"\b(DTVIC\d+|DT\d+|[A-Z]{2}\d{8,}[A-Z]{2}|[A-Z]{2,4}\d{3,}[A-Z]{1,3}\d{3,})\b"
+                    # Match various barcode formats
+                    tracking_pattern = (
+                        r"\b(DTVIC\d+|DT\d+|[A-Z]{2}\d{5,}|[A-Z]{2}\d{8,}[A-Z]{2}|[A-Z]{2,4}\d{3,}[A-Z]{1,3}\d{3,})\b"
+                    )
 
                     # Try multiple sources for tracking number
                     tracking_num = None
@@ -1866,6 +1988,9 @@ def public_chatbot():
                         print(f"   ⚠️  No tracking number found in query or context")
 
                 response_data = {"response": response_text}
+                # Include thread_id for conversation persistence
+                if isinstance(result, dict) and result.get("thread_id"):
+                    response_data["thread_id"] = result["thread_id"]
                 if delivery_photos:
                     print(f"📸 Adding {len(delivery_photos)} photos to response")
                     response_data["delivery_photos"] = delivery_photos
@@ -1875,7 +2000,10 @@ def public_chatbot():
                 return jsonify(response_data)
 
         # Fallback - return as-is
-        return jsonify({"response": str(result)})
+        fallback_resp = {"response": str(result)}
+        if isinstance(result, dict) and result.get("thread_id"):
+            fallback_resp["thread_id"] = result["thread_id"]
+        return jsonify(fallback_resp)
     except Exception as e:
         print(f"❌ Chatbot exception: {str(e)}")
         import traceback
@@ -1997,9 +2125,12 @@ def get_speech_token():
 
 
 @app.route("/api/speech/synthesize", methods=["POST"])
-@login_required
 def synthesize_speech():
     """Convert text to speech using Azure Speech Services"""
+    # Check auth without redirect (AJAX-friendly)
+    if not session.get("user"):
+        return jsonify({"error": "Authentication required"}), 401
+
     from services.speech import get_speech_service
 
     data = request.get_json()

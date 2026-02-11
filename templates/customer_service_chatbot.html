@@ -222,8 +222,11 @@
                         <button class="btn btn-primary" id="voiceBtn" onclick="toggleVoiceInput()" title="Voice Input">
                             <i class="bi bi-mic-fill" id="micIcon"></i>
                         </button>
-                        <button class="btn btn-primary btn-sm" onclick="sendMessage()">
+                        <button class="btn btn-primary btn-sm" onclick="sendMessage()" title="Send Message">
                             <i class="bi bi-send-fill"></i>
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm" onclick="clearChat()" title="End Chat & Start New Conversation" id="endChatBtn">
+                            <i class="bi bi-x-lg"></i>
                         </button>
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem;">
@@ -306,6 +309,9 @@ async function loadAzureVoices() {
 function populateVoiceSelector() {
     availableVoices = speechSynthesis.getVoices();
     const voiceSelector = document.getElementById('voiceSelector');
+
+    // Preserve current selection if user has already chosen
+    const previousValue = voiceSelector.value;
     voiceSelector.innerHTML = '';
 
     // Add Azure Neural voices first (premium)
@@ -339,10 +345,14 @@ function populateVoiceSelector() {
         voiceSelector.appendChild(browserGroup);
     }
 
-    // Set default to Natasha (Azure Neural) or first available
-    const defaultOption = voiceSelector.querySelector('option[value="azure:natasha"]');
-    if (defaultOption) {
-        voiceSelector.value = 'azure:natasha';
+    // Restore previous selection if it still exists, otherwise default to Natasha
+    if (previousValue && voiceSelector.querySelector(`option[value="${CSS.escape(previousValue)}"]`)) {
+        voiceSelector.value = previousValue;
+    } else {
+        const defaultOption = voiceSelector.querySelector('option[value="azure:natasha"]');
+        if (defaultOption) {
+            voiceSelector.value = 'azure:natasha';
+        }
     }
 }
 
@@ -450,6 +460,10 @@ async function speak(text) {
 }
 
 async function speakWithAzure(text, voicePersona) {
+    // Look up gender from loaded Azure voice config for browser fallback matching
+    const voiceInfo = azureVoices[voicePersona];
+    const preferredGender = voiceInfo ? voiceInfo.gender : null;
+
     try {
         console.log('🔊 Using Azure Neural voice:', voicePersona);
         const response = await fetch('/api/speech/synthesize', {
@@ -463,7 +477,9 @@ async function speakWithAzure(text, voicePersona) {
             })
         });
 
-        if (response.ok) {
+        // Check that we got actual audio back (not a redirect to login page)
+        const contentType = response.headers.get('content-type') || '';
+        if (response.ok && contentType.includes('audio')) {
             const audioBlob = await response.blob();
             const audioUrl = URL.createObjectURL(audioBlob);
             currentAudio = new Audio(audioUrl);
@@ -477,22 +493,22 @@ async function speakWithAzure(text, voicePersona) {
             currentAudio.onerror = (error) => {
                 console.error('🔊 Audio playback error:', error);
                 currentAudio = null;
-                // Fallback to browser speech
-                speakWithBrowser(text);
+                // Fallback to browser speech with gender preference
+                speakWithBrowser(text, null, preferredGender);
             };
 
             await currentAudio.play();
         } else {
-            console.warn('Azure speech failed, falling back to browser');
-            speakWithBrowser(text);
+            console.warn('Azure speech unavailable (HTTP', response.status, ', type:', contentType, '), using browser voice');
+            speakWithBrowser(text, null, preferredGender);
         }
     } catch (error) {
         console.error('Azure speech error:', error);
-        speakWithBrowser(text);
+        speakWithBrowser(text, null, preferredGender);
     }
 }
 
-function speakWithBrowser(text, voiceName = null) {
+function speakWithBrowser(text, voiceName = null, preferredGender = null) {
     if (!speechSynthesis) {
         console.warn('Speech synthesis not supported');
         return;
@@ -502,6 +518,7 @@ function speakWithBrowser(text, voiceName = null) {
     currentUtterance.rate = 1.0;
     currentUtterance.pitch = 1.0;
     currentUtterance.volume = 1.0;
+    currentUtterance.lang = 'en-AU';
 
     // Use selected voice or find a good default
     const voices = speechSynthesis.getVoices();
@@ -513,12 +530,37 @@ function speakWithBrowser(text, voiceName = null) {
     }
 
     if (!voice) {
-        voice = voices.find(v => v.name.includes('Natural') || v.name.includes('Premium'))
-             || voices.find(v => v.lang.startsWith('en'));
+        // Filter to English voices first
+        const enVoices = voices.filter(v => v.lang.startsWith('en'));
+        let candidates = enVoices;
+
+        // Try to match preferred gender when falling back from Azure voice
+        if (preferredGender) {
+            const isFemale = preferredGender.toLowerCase() === 'female';
+            // Known voice name patterns by gender (Windows/Edge/Chrome)
+            const femalePattern = /zira|jenny|natasha|catherine|aria|sara|libby|hazel|susan|emma|michelle|sonia|clara|emily|carly|elsie|freya|joanne|kim|tina|annette|nicole|karen|fiona|moira|samantha|female/i;
+            const malePattern = /david|mark|ryan|guy|william|james|sam|liam|sean|darren|duncan|ken|neil|roger|george|christopher|daniel|thomas|male(?!fe)/i;
+
+            const genderFiltered = candidates.filter(v => {
+                if (isFemale) return femalePattern.test(v.name);
+                else return malePattern.test(v.name);
+            });
+
+            if (genderFiltered.length > 0) {
+                candidates = genderFiltered;
+                console.log(`🔊 Browser fallback: matched ${candidates.length} ${preferredGender.toLowerCase()} voice(s)`);
+            }
+        }
+
+        voice = candidates.find(v => v.lang === 'en-AU' && (v.name.includes('Natural') || v.name.includes('Premium')))
+             || candidates.find(v => v.lang === 'en-AU')
+             || candidates.find(v => v.name.includes('Natural') || v.name.includes('Premium'))
+             || candidates.find(v => v.lang.startsWith('en'));
     }
 
     if (voice) {
         currentUtterance.voice = voice;
+        console.log('🔊 Using browser voice:', voice.name, '(' + voice.lang + ')');
     }
 
     currentUtterance.onend = function() {
@@ -529,7 +571,6 @@ function speakWithBrowser(text, voiceName = null) {
         console.error('🔊 Browser speech error:', event.error);
     };
 
-    console.log('🔊 Speaking with browser:', text.substring(0, 50) + '...');
     speechSynthesis.speak(currentUtterance);
 }
 
@@ -615,22 +656,52 @@ async function sendMessage() {
     input.value = '';
     addLoading();
 
+    // Try to extract tracking number from input fields or query text
+    let trackingNum = null;
+    const trackingInput = document.getElementById('trackingNumber');
+    const proofTrackingInput = document.getElementById('proofTrackingNumber');
+    const lodgementTrackingInput = document.getElementById('lodgementTrackingNumber');
+    if (trackingInput && trackingInput.value.trim()) {
+        trackingNum = trackingInput.value.trim();
+    } else if (proofTrackingInput && proofTrackingInput.value.trim()) {
+        trackingNum = proofTrackingInput.value.trim();
+    } else if (lodgementTrackingInput && lodgementTrackingInput.value.trim()) {
+        trackingNum = lodgementTrackingInput.value.trim();
+    } else {
+        // Try to extract from the query text
+        const match = query.match(/\b(DTVIC\d+|DT\d+|[A-Z]{2}\d{5,}|[A-Z]{2}\d{8,}[A-Z]{2}|[A-Z]{2,4}\d{3,}[A-Z]{1,3}\d{3,})\b/i);
+        if (match) {
+            trackingNum = match[1].toUpperCase();
+        }
+    }
+
     try {
+        const requestBody = {
+            query: query,
+            tracking_number: trackingNum
+        };
+        // Include thread_id for conversation persistence
+        if (currentThreadId) {
+            requestBody.thread_id = currentThreadId;
+        }
+
         const response = await fetch('/api/chatbot/query', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                query: query,
-                tracking_number: null
-            })
+            body: JSON.stringify(requestBody)
         });
 
         const data = await response.json();
         removeLoading();
 
         if (response.ok) {
+            // Store thread_id for conversation continuity
+            if (data.thread_id) {
+                currentThreadId = data.thread_id;
+            }
+
             const aiResponse = data.response || data.message || JSON.stringify(data, null, 2);
             addMessage(aiResponse);
 
@@ -884,9 +955,15 @@ function searchByAddress() {
 // Store chat history
 let chatHistory = [];
 
+// Current conversation thread ID for persistence
+let currentThreadId = null;
+
 function clearChat() {
     // Stop any ongoing speech
     stopSpeaking();
+
+    // Clear conversation thread for new chat
+    currentThreadId = null;
 
     // Save current chat to history
     const chatMessages = document.getElementById('chatMessages');

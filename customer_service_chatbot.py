@@ -19,13 +19,14 @@ class CustomerServiceChatbot:
         self.db = db
         self.conversation_history = []
 
-    async def process_query(self, query: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
+    async def process_query(self, query: str, context: Dict[str, Any] = None, thread_id: str = None) -> Dict[str, Any]:
         """
         Process customer service query using AI agent
 
         Args:
             query: The customer service representative's question or request
             context: Additional context like tracking numbers, customer info, etc.
+            thread_id: Optional existing thread ID for conversation continuity
 
         Returns:
             AI response with relevant information and actions
@@ -41,7 +42,9 @@ class CustomerServiceChatbot:
             # Try to extract tracking number from query
             import re
 
-            tracking_pattern = r"\b(DTVIC\d+|DT\d+)\b"
+            tracking_pattern = (
+                r"\b(DTVIC\d+|DT\d+|[A-Z]{2}\d{5,}|[A-Z]{2,4}\d{3,}[A-Z]{1,3}\d{3,}|[A-Z]{2}\d{8,}[A-Z]{2})\b"
+            )
             matches = re.findall(tracking_pattern, query, re.IGNORECASE)
             if matches:
                 print(f"📦 Extracted tracking number from query: {matches[0]}")
@@ -74,8 +77,8 @@ class CustomerServiceChatbot:
             agent_request["tracking_number"] = context.get("tracking_number") if context else None
             agent_request["preferred_resolution"] = context.get("preferred_resolution") if context else None
 
-        # Call AI agent
-        response = await customer_service_agent(agent_request)
+        # Call AI agent with thread persistence
+        response = await customer_service_agent(agent_request, thread_id=thread_id)
 
         # Add response to history
         self.conversation_history.append({"timestamp": datetime.utcnow().isoformat(), "response": response})
@@ -135,6 +138,7 @@ class CustomerServiceChatbot:
                 "recent_events": events[:10] if events else [],  # Last 10 events
                 "total_events": len(events),
                 "delivery_photos": parcel.get("delivery_photos", []),  # Include delivery photos
+                "lodgement_photos": parcel.get("lodgement_photos", []),  # Include lodgement photos
             }
 
             return parcel_data
@@ -170,12 +174,12 @@ class CustomerServiceChatbot:
         # Add public mode instruction for AI
         if is_public:
             parts.append(
-                "IMPORTANT: This is a public customer inquiry via chat widget. Provide helpful, friendly, conversational responses about Zava services, tracking, delivery times, and general questions. Use the company information above to answer questions. If the customer provides a tracking number or asks to track a parcel, use the parcel data provided below to give them detailed tracking information including current status, location, estimated delivery, and any delivery photos if available. If a customer asks about proof of delivery and photos are available, confirm that delivery photos were captured. Be concise and natural - respond like a helpful customer service agent. Focus on what matters to the customer: where their parcel is, when it will arrive, its current status, and proof of delivery."
+                "IMPORTANT: This is a public customer inquiry via chat widget. ALWAYS answer the customer's actual question first. Provide helpful, friendly, conversational responses about Zava services, tracking, delivery times, and general questions. Use the company information above to answer questions about phone numbers, business hours, email, services, etc. Only look up or discuss parcel tracking data when the customer specifically asks about a parcel or provides a tracking number. If the customer provides a tracking number or asks to track a parcel, use the parcel data provided below to give them detailed tracking information including current status, location, estimated delivery, and any delivery photos if available. If a customer asks about proof of delivery and photos are available, confirm that delivery photos were captured. Be concise and natural - respond like a helpful customer service agent."
             )
             parts.append("")
         else:
             parts.append(
-                "IMPORTANT: This is an internal customer service representative inquiry. Provide detailed information including access to parcel tracking data, delivery photos, and internal systems. Be professional and comprehensive. Respond in natural conversational language, not structured formats. If delivery photos are available, inform the agent so they can view them in the interface."
+                "IMPORTANT: This is an internal customer service representative inquiry. ALWAYS answer the actual question first. For general questions (phone, hours, services, etc.), answer directly from the company information above. Only provide parcel tracking data when the question is specifically about a parcel. Provide detailed information when relevant, including access to parcel tracking data, delivery photos, and internal systems. Be professional and comprehensive. Respond in natural conversational language, not structured formats. If delivery photos are available, inform the agent so they can view them in the interface."
             )
             parts.append("")
 
@@ -255,9 +259,11 @@ class CustomerServiceChatbot:
             if parcel_data.get("delivery_photos"):
                 photos = parcel_data["delivery_photos"]
                 if is_public:
-                    parts.append(f"\nDelivery Photos: {len(photos)} photo(s) ON FILE for this parcel")
+                    parts.append(f"\nDelivery Photos: {len(photos)} photo(s) available for this parcel")
                     parts.append(
-                        f"NOTE: Photos cannot be displayed in this chat. Tell the customer: 'We have a delivery photo on file. If you'd like a copy, please contact our customer service team at {config.COMPANY_PHONE} or {config.COMPANY_EMAIL}'"
+                        "IMPORTANT: Delivery photos will be automatically displayed in the chat below your response. "
+                        "Confirm to the customer that proof of delivery photos are available and will appear below. "
+                        "Do NOT tell them to contact customer service for delivery photos."
                     )
                 else:
                     parts.append(f"\nDelivery Photos: {len(photos)} photo(s) available")

@@ -1206,6 +1206,9 @@
 
             let isOpen = false;
 
+            // Current conversation thread ID for persistence
+            let widgetThreadId = null;
+
             // Initialize Azure Speech for widget
             async function initWidgetSpeech() {
                 try {
@@ -1349,40 +1352,64 @@
                     });
 
                     if (response.ok) {
-                        const audioBlob = await response.blob();
-                        const audioUrl = URL.createObjectURL(audioBlob);
-                        const audio = new Audio(audioUrl);
+                        // Check we got actual audio back (not a login redirect)
+                        const contentType = response.headers.get('content-type') || '';
+                        if (contentType.includes('audio')) {
+                            const audioBlob = await response.blob();
+                            const audioUrl = URL.createObjectURL(audioBlob);
+                            const audio = new Audio(audioUrl);
 
-                        audio.onended = () => {
-                            URL.revokeObjectURL(audioUrl);
-                            console.log('🔊 Widget Azure speech ended');
-                        };
+                            audio.onended = () => {
+                                URL.revokeObjectURL(audioUrl);
+                                console.log('🔊 Widget Azure speech ended');
+                            };
 
-                        audio.onerror = (error) => {
-                            console.error('🔊 Widget audio playback error:', error);
-                            // Fallback to browser speech
-                            speakWidgetWithBrowser(text);
-                        };
+                            audio.onerror = (error) => {
+                                console.error('🔊 Widget audio playback error:', error);
+                                // Fallback to browser speech (female - natasha)
+                                speakWidgetWithBrowser(text, 'Female');
+                            };
 
-                        await audio.play();
+                            await audio.play();
+                        } else {
+                            console.warn('Widget Azure speech returned non-audio response, using browser voice');
+                            speakWidgetWithBrowser(text, 'Female');
+                        }
                     } else {
-                        console.warn('Widget Azure speech failed, falling back to browser');
-                        speakWidgetWithBrowser(text);
+                        console.warn('Widget Azure speech failed (HTTP', response.status, '), using browser voice');
+                        speakWidgetWithBrowser(text, 'Female');
                     }
                 } catch (error) {
                     console.error('Widget Azure speech error:', error);
-                    speakWidgetWithBrowser(text);
+                    speakWidgetWithBrowser(text, 'Female');
                 }
             }
 
-            function speakWidgetWithBrowser(text) {
+            function speakWidgetWithBrowser(text, preferredGender = null) {
                 if (window.speechSynthesis) {
                     const utterance = new SpeechSynthesisUtterance(text);
                     utterance.lang = 'en-AU';
                     const voices = window.speechSynthesis.getVoices();
-                    const naturalVoice = voices.find(v => v.name.includes('Natural') || v.name.includes('Premium'))
-                                      || voices.find(v => v.lang.startsWith('en-AU'))
-                                      || voices.find(v => v.lang.startsWith('en'));
+                    // Filter to English voices first
+                    const enVoices = voices.filter(v => v.lang.startsWith('en'));
+                    let candidates = enVoices;
+
+                    // Try to match preferred gender
+                    if (preferredGender) {
+                        const isFemale = preferredGender.toLowerCase() === 'female';
+                        const femalePattern = /zira|jenny|natasha|catherine|aria|sara|libby|hazel|susan|emma|michelle|sonia|clara|emily|carly|elsie|freya|joanne|kim|tina|annette|nicole|karen|fiona|moira|samantha|female/i;
+                        const malePattern = /david|mark|ryan|guy|william|james|sam|liam|sean|darren|duncan|ken|neil|roger|george|christopher|daniel|thomas|male(?!fe)/i;
+                        const genderFiltered = candidates.filter(v => {
+                            if (isFemale) return femalePattern.test(v.name);
+                            else return malePattern.test(v.name);
+                        });
+                        if (genderFiltered.length > 0) candidates = genderFiltered;
+                    }
+
+                    const naturalVoice = candidates.find(v => v.lang === 'en-AU' && (v.name.includes('Natural') || v.name.includes('Premium')))
+                                      || candidates.find(v => v.lang === 'en-AU')
+                                      || candidates.find(v => v.name.includes('Natural') || v.name.includes('Premium'))
+                                      || candidates.find(v => v.lang.startsWith('en'));
                     if (naturalVoice) {
                         utterance.voice = naturalVoice;
                     }
@@ -1413,15 +1440,26 @@
 
                 try {
                     // Call public chatbot API
+                    const requestBody = { query: message };
+                    // Include thread_id for conversation persistence
+                    if (widgetThreadId) {
+                        requestBody.thread_id = widgetThreadId;
+                    }
+
                     const response = await fetch('/api/public/chatbot', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify({ query: message })
+                        body: JSON.stringify(requestBody)
                     });
 
                     const data = await response.json();
+
+                    // Store thread_id for conversation continuity
+                    if (data.thread_id) {
+                        widgetThreadId = data.thread_id;
+                    }
 
                     // Remove typing indicator
                     document.getElementById(typingId).remove();
@@ -1455,6 +1493,27 @@
 
                         addMessage(responseText, 'assistant');
                         speakWidgetMessage(responseText);
+
+                        // Display delivery photos if included in response (NOT lodgement photos - customer policy)
+                        if (data.delivery_photos && data.delivery_photos.length > 0) {
+                            data.delivery_photos.forEach((photo, index) => {
+                                const photoDiv = document.createElement('div');
+                                photoDiv.className = 'chat-widget-message assistant';
+                                photoDiv.innerHTML = `
+                                    <div class="chat-widget-message-bubble" style="padding: 4px;">
+                                        <div style="font-size: 11px; font-weight: bold; margin-bottom: 4px;">📸 Delivery Photo ${index + 1}</div>
+                                        <img src="data:image/png;base64,${photo.photo_data}"
+                                             alt="Delivery Photo ${index + 1}"
+                                             style="max-width: 100%; border-radius: 4px; border: 1px solid #ddd;">
+                                        <div style="font-size: 10px; color: #666; margin-top: 2px;">
+                                            ${photo.uploaded_by || 'Driver'} - ${photo.timestamp || ''}
+                                        </div>
+                                    </div>
+                                `;
+                                messagesContainer.appendChild(photoDiv);
+                            });
+                            scrollToBottom();
+                        }
                     } else {
                         const errorMsg = 'Sorry, I encountered an error. Please try again.';
                         addMessage(errorMsg, 'assistant');
@@ -1497,6 +1556,9 @@
                     window.currentAudio.pause();
                     window.currentAudio = null;
                 }
+
+                // Reset conversation thread
+                widgetThreadId = null;
 
                 messagesContainer.innerHTML = `
                     <div class="chat-widget-welcome">

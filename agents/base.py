@@ -73,7 +73,9 @@ class AzureAIAgentClient:
         return self._client
 
 
-async def call_azure_agent(agent_id: str, message: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def call_azure_agent(
+    agent_id: str, message: str, context: Optional[Dict[str, Any]] = None, thread_id: Optional[str] = None
+) -> Dict[str, Any]:
     """
     Universal function to call any Azure AI Foundry agent
 
@@ -81,6 +83,7 @@ async def call_azure_agent(agent_id: str, message: str, context: Optional[Dict[s
         agent_id: The Azure AI agent ID (asst_XXX)
         message: The user message to send to the agent
         context: Optional context dictionary for additional information
+        thread_id: Optional existing thread ID to continue a conversation
 
     Returns:
         Dictionary with agent response and metadata
@@ -123,10 +126,14 @@ async def call_azure_agent(agent_id: str, message: str, context: Optional[Dict[s
             has_tools = False
             print("⚠️ Agent tools not available")
 
-        # Create and run with explicit parameters - DON'T use create_thread_and_process_run
+        # Create or reuse thread with explicit parameters - DON'T use create_thread_and_process_run
         # because it tries to auto-execute tools. We need manual control.
-        print(f"🧵 Creating thread...")
-        thread = client.agents.threads.create()
+        if thread_id:
+            print(f"🧵 Reusing existing thread: {thread_id}")
+            thread = type("Thread", (), {"id": thread_id})()
+        else:
+            print(f"🧵 Creating new thread...")
+            thread = client.agents.threads.create()
         print(f"   Thread ID: {thread.id}")
 
         print(f"📝 Adding message to thread...")
@@ -635,12 +642,13 @@ async def optimization_agent(route_conditions: Dict[str, Any]) -> Dict[str, Any]
     return await call_azure_agent(OPTIMIZATION_AGENT_ID, message, route_conditions)
 
 
-async def customer_service_agent(customer_request: Dict[str, Any]) -> Dict[str, Any]:
+async def customer_service_agent(customer_request: Dict[str, Any], thread_id: Optional[str] = None) -> Dict[str, Any]:
     """
     Call Customer Service Agent for exception handling and communications
 
     Args:
         customer_request: Customer issue, delivery preferences, or inquiry
+        thread_id: Optional existing thread ID to continue a conversation
 
     Returns:
         Resolution options and customer communication
@@ -657,6 +665,8 @@ async def customer_service_agent(customer_request: Dict[str, Any]) -> Dict[str, 
         {customer_request.get('details', 'No details provided')}
 
         Guidelines for your response:
+        - ALWAYS answer the customer's actual question first - if they ask about phone numbers, hours, services, etc., answer that directly
+        - Only discuss parcel tracking if the customer specifically asks about a parcel or provides a tracking number
         - Talk like a real person, not a robot - use natural language and be warm
         - Keep it conversational - avoid bullet points, asterisks, or formatted lists
         - Be concise but friendly - get to the point without being cold
@@ -665,6 +675,7 @@ async def customer_service_agent(customer_request: Dict[str, Any]) -> Dict[str, 
         - Use contractions (I'll, you're, it's) to sound more natural
         - Add personality - show empathy if there's a delay, enthusiasm when things are on track
         - Don't end every message asking if there's anything else - sometimes just sign off naturally
+        - Do NOT call any tools unless the customer specifically asks about a parcel or tracking number
         - IMPORTANT PHOTO HANDLING: When you see lodgement_photos or delivery_photos in the tracking data:
           * If photos exist, acknowledge they are ON FILE and available
           * Tell the customer: "We have a [lodgement/delivery] photo on file for your parcel. If you'd like a copy, please contact our customer service team at {COMPANY_PHONE} or {COMPANY_EMAIL}"
@@ -687,6 +698,10 @@ async def customer_service_agent(customer_request: Dict[str, Any]) -> Dict[str, 
 
         {"Preferred Resolution: " + customer_request.get('preferred_resolution', '') if customer_request.get('preferred_resolution') else ""}
 
+        CRITICAL: Answer the customer's actual question first. If they ask a general question (phone number, hours, services, pricing, etc.), answer it directly using the company information provided in the request details. Only look up parcel data or use tools when the question is specifically about a parcel or tracking.
+
+        Do NOT call tools (track_parcel, search_parcels_by_recipient, etc.) unless the customer explicitly asks about a parcel, tracking number, or delivery status.
+
         Provide resolution options and customer communication message.
 
         IMPORTANT PHOTO GUIDANCE:
@@ -696,7 +711,7 @@ async def customer_service_agent(customer_request: Dict[str, Any]) -> Dict[str, 
         - If no photos exist in the data (empty arrays), then it's appropriate to say photos are not available
         """
 
-    return await call_azure_agent(CUSTOMER_SERVICE_AGENT_ID, message, customer_request)
+    return await call_azure_agent(CUSTOMER_SERVICE_AGENT_ID, message, customer_request, thread_id=thread_id)
 
 
 async def fraud_risk_agent(suspicious_activity: Dict[str, Any]) -> Dict[str, Any]:
