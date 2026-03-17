@@ -4,6 +4,9 @@
 .env.*.local
 *.env
 
+# Exclude .env.example template (this should be committed)
+!.env.example
+
 # Azure credentials and configuration
 azure.conf
 azureauth.json
@@ -12,6 +15,16 @@ azureauth.json
 *.pfx
 *.p12
 .azure-deployment.json
+
+# Generated Bicep files
+infra/*.json
+!infra/README.md
+
+# Temporary test and debug files
+test_*.py
+check_*.py
+list_*.py
+debug_*.py
 
 # Python cache
 __pycache__/

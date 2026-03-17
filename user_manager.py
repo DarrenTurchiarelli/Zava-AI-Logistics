@@ -70,16 +70,23 @@ class UserManager:
         try:
             container = self.db.database.get_container_client("users")
 
-            # Find user
+            # Find user — supply partition_key so this is a single-partition read
             query = "SELECT * FROM c WHERE c.username = @username AND c.active = true"
             parameters = [{"name": "@username", "value": username}]
 
-            async for user in container.query_items(query=query, parameters=parameters):
+            async for user in container.query_items(
+                query=query,
+                parameters=parameters,
+                partition_key=username,
+            ):
                 # Verify password
                 if self.verify_password(password, user["password_hash"], user["salt"]):
-                    # Update last login
-                    user["last_login"] = datetime.now(timezone.utc).isoformat()
-                    await container.replace_item(item=user["id"], body=user)
+                    # Update last login (non-fatal — don't block login on this)
+                    try:
+                        user["last_login"] = datetime.now(timezone.utc).isoformat()
+                        await container.replace_item(item=user["id"], body=user)
+                    except Exception as update_err:
+                        print(f"[WARN] Could not update last_login for {username}: {update_err}")
 
                     # Return user info (without sensitive data)
                     return {
@@ -94,7 +101,7 @@ class UserManager:
             return None
 
         except Exception as e:
-            print(f"❌ Authentication error: {e}")
+            print(f"[ERROR] Authentication error: {e}")
             return None
 
     async def get_user_by_username(self, username: str) -> Optional[Dict[str, Any]]:
@@ -105,13 +112,17 @@ class UserManager:
             query = "SELECT * FROM c WHERE c.username = @username"
             parameters = [{"name": "@username", "value": username}]
 
-            async for user in container.query_items(query=query, parameters=parameters):
+            async for user in container.query_items(
+                query=query,
+                parameters=parameters,
+                partition_key=username,
+            ):
                 return user
 
             return None
 
         except Exception as e:
-            print(f"❌ Error fetching user: {e}")
+            print(f"[ERROR] Error fetching user: {e}")
             return None
 
     async def update_password(self, username: str, new_password: str) -> bool:
@@ -133,7 +144,7 @@ class UserManager:
             return True
 
         except Exception as e:
-            print(f"❌ Error updating password: {e}")
+            print(f"[ERROR] Error updating password: {e}")
             return False
 
     async def deactivate_user(self, username: str) -> bool:
@@ -151,7 +162,7 @@ class UserManager:
             return True
 
         except Exception as e:
-            print(f"❌ Error deactivating user: {e}")
+            print(f"[ERROR] Error deactivating user: {e}")
             return False
 
     async def get_all_users(self) -> List[Dict[str, Any]]:
@@ -178,7 +189,7 @@ class UserManager:
             return users
 
         except Exception as e:
-            print(f"❌ Error fetching users: {e}")
+            print(f"[ERROR] Error fetching users: {e}")
             return []
 
 

@@ -164,7 +164,7 @@ class ParcelTrackingDB:
                     # If key auth fails, only try Azure AD if the error suggests it
                     if "Local Authorization is disabled" in str(key_error):
                         if os.getenv("DEBUG_MODE") == "true":
-                            print(f"⚠️ Key-based auth disabled, trying Azure AD...")
+                            print(f"[WARN] Key-based auth disabled, trying Azure AD...")
                         # Use cached credential to avoid re-authentication timeout
                         self.credential = get_cached_credential()
                         self.client = CosmosClient(self.endpoint, self.credential)
@@ -176,12 +176,12 @@ class ParcelTrackingDB:
                             print(f"✓ Connected to Cosmos DB using Azure AD (AzureCliCredential)")
                     else:
                         # For other errors, re-raise them
-                        print(f"❌ Cosmos DB connection failed: {key_error}")
+                        print(f"[ERROR] Cosmos DB connection failed: {key_error}")
                         raise key_error
             else:
                 # No key provided - must use Azure AD
                 if os.getenv("DEBUG_MODE") == "true":
-                    print(f"⚠️ No account key found, trying Azure AD authentication...")
+                    print(f"[WARN] No account key found, trying Azure AD authentication...")
                 # Use cached credential to avoid re-authentication timeout
                 self.credential = get_cached_credential()
                 self.client = CosmosClient(self.endpoint, self.credential)
@@ -198,12 +198,12 @@ class ParcelTrackingDB:
                     await self._create_containers()
                 except Exception as container_error:
                     # If container creation fails, assume they already exist (common with Azure AD limited permissions)
-                    print(f"⚠️ Skipping container creation: {str(container_error)[:100]}")
+                    print(f"[WARN] Skipping container creation: {str(container_error)[:100]}")
 
             # Database connection successful - ready for operations
 
         except Exception as e:
-            print(f"❌ Failed to connect to Cosmos DB: {e}")
+            print(f"[ERROR] Failed to connect to Cosmos DB: {e}")
             raise
 
     async def _create_containers(self):
@@ -265,7 +265,9 @@ class ParcelTrackingDB:
                 # Properly close the aiohttp client session
                 if hasattr(self.client, "_client_connection"):
                     try:
-                        await self.client._client_connection.close()
+                        connection = self.client._client_connection
+                        if connection and not connection.closed:
+                            await connection.close()
                     except Exception:
                         pass
 
@@ -276,8 +278,6 @@ class ParcelTrackingDB:
                         # If it returns a coroutine, await it
                         if hasattr(result, "__await__"):
                             await result
-                        # Add small delay to ensure cleanup completes
-                        await asyncio.sleep(0.1)
                     except Exception:
                         pass
                 self.client = None
@@ -290,10 +290,7 @@ class ParcelTrackingDB:
                             await self.credential.close()
                         else:
                             self.credential.close()
-                        # Add delay for credential cleanup
-                        await asyncio.sleep(0.1)
                     except Exception:
-                        pass
                         pass
                 self.credential = None
         except Exception:

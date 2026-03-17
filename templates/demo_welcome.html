@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Demo Day - {{ company.browser_title }}{% endblock %}
+{% block title %}Experience AI - {{ company.browser_title }}{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
@@ -8,8 +8,8 @@
     <div class="hero-gradient text-white py-5 mb-4">
         <div class="row">
             <div class="col-12 text-center hero-content">
-                <h1 class="display-3 fw-bold mb-3">Australia Post</h1>
-                <p class="display-6 fw-light mb-4">Think Digital and Data.</p>
+                <h1 class="display-3 fw-bold mb-3">Zava</h1>
+                <p class="display-6 fw-light mb-4">Experience AI.</p>
                 <p class="lead mb-0">Imagine the Possibilities</p>
             </div>
         </div>
@@ -17,7 +17,7 @@
 
     <!-- Agent Demo Tiles -->
     <div class="row g-4 mb-5">
-        
+
         <!-- Customer Service Agent -->
         <div class="col-lg-6 col-xl-4">
             <div class="card h-100 shadow-sm hover-shadow">
@@ -40,12 +40,12 @@
                     <div class="alert alert-secondary alert-permanent py-3 mt-2">
                         <div class="d-flex justify-content-between align-items-center">
                             <div style="font-size: 0.85rem;">
-                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong> 
+                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong>
                                 <a href="{{ url_for('demo_login', username='support', next=url_for('customer_service_chatbot')) }}" class="text-dark fw-bold text-decoration-none">
                                     <u>support</u>
                                 </a>
                             </div>
-                            <a href="{{ url_for('demo_login', username='support', next=url_for('customer_service_chatbot')) }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
+                            <a href="{{ url_for('demo_login', username='support', next=url_for('customer_service_chatbot')) }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
                                 <i class="bi bi-chat-dots"></i> Open Chat Assistant
                             </a>
                         </div>
@@ -76,12 +76,12 @@
                     <div class="alert alert-secondary alert-permanent py-3 mt-2">
                         <div class="d-flex justify-content-between align-items-center">
                             <div style="font-size: 0.85rem;">
-                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong> 
+                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong>
                                 <a href="{{ url_for('demo_login', username='admin', next=url_for('report_fraud')) }}" class="text-dark fw-bold text-decoration-none">
                                     <u>admin</u>
                                 </a>
                             </div>
-                            <a href="{{ url_for('demo_login', username='admin', next=url_for('report_fraud')) }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
+                            <a href="{{ url_for('demo_login', username='admin', next=url_for('report_fraud')) }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
                                 <i class="bi bi-shield-exclamation"></i> Report Fraud
                             </a>
                         </div>
@@ -114,7 +114,7 @@
                             <div style="font-size: 0.85rem;">
                                 <i class="bi bi-unlock"></i> <strong>Try it:</strong> No login required
                             </div>
-                            <a href="{{ url_for('camera_scanner') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
+                            <a href="{{ url_for('camera_scanner') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
                                 <i class="bi bi-camera"></i> Camera Scanner
                             </a>
                         </div>
@@ -145,12 +145,12 @@
                     <div class="alert alert-secondary alert-permanent py-3 mt-2">
                         <div class="d-flex justify-content-between align-items-center">
                             <div style="font-size: 0.85rem;">
-                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong> 
+                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong>
                                 <a href="{{ url_for('demo_login', username='admin') }}" class="text-dark fw-bold text-decoration-none">
                                     <u>admin</u>
                                 </a>
                             </div>
-                            <a href="{{ url_for('demo_login', username='admin') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
+                            <a href="{{ url_for('demo_login', username='admin') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
                                 <i class="bi bi-graph-up"></i> AI Insights
                             </a>
                         </div>
@@ -181,12 +181,12 @@
                     <div class="alert alert-secondary alert-permanent py-3 mt-2">
                         <div class="d-flex justify-content-between align-items-center flex-wrap">
                             <div style="font-size: 0.85rem;" class="mb-2 mb-sm-0">
-                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong> 
-                                <a href="{{ url_for('demo_login', username='driver001') }}" class="text-dark fw-bold text-decoration-none"><u>driver001</u></a> | 
-                                <a href="{{ url_for('demo_login', username='driver002') }}" class="text-dark fw-bold text-decoration-none"><u>driver002</u></a> | 
+                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong>
+                                <a href="{{ url_for('demo_login', username='driver001') }}" class="text-dark fw-bold text-decoration-none"><u>driver001</u></a> |
+                                <a href="{{ url_for('demo_login', username='driver002') }}" class="text-dark fw-bold text-decoration-none"><u>driver002</u></a> |
                                 <a href="{{ url_for('demo_login', username='driver003') }}" class="text-dark fw-bold text-decoration-none"><u>driver003</u></a>
                             </div>
-                            <a href="{{ url_for('demo_login', username='driver001') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
+                            <a href="{{ url_for('demo_login', username='driver001') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
                                 <i class="bi bi-map"></i> Driver Manifest
                             </a>
                         </div>
@@ -217,11 +217,11 @@
                     <div class="alert alert-secondary alert-permanent py-3 mt-2">
                         <div class="d-flex justify-content-between align-items-center flex-wrap">
                             <div style="font-size: 0.85rem;" class="mb-2 mb-sm-0">
-                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong> 
-                                <a href="{{ url_for('demo_login', username='admin', next=url_for('admin_manifests')) }}" class="text-dark fw-bold text-decoration-none"><u>admin</u></a> | 
+                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong>
+                                <a href="{{ url_for('demo_login', username='admin', next=url_for('admin_manifests')) }}" class="text-dark fw-bold text-decoration-none"><u>admin</u></a> |
                                 <a href="{{ url_for('demo_login', username='depot_mgr', next=url_for('admin_manifests')) }}" class="text-dark fw-bold text-decoration-none"><u>depot_mgr</u></a>
                             </div>
-                            <a href="{{ url_for('demo_login', username='admin', next=url_for('admin_manifests')) }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
+                            <a href="{{ url_for('demo_login', username='admin', next=url_for('admin_manifests')) }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
                                 <i class="bi bi-clipboard-check"></i> View Manifests
                             </a>
                         </div>
@@ -252,12 +252,12 @@
                     <div class="alert alert-secondary alert-permanent py-3 mt-2">
                         <div class="d-flex justify-content-between align-items-center">
                             <div style="font-size: 0.85rem;">
-                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong> 
+                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong>
                                 <a href="{{ url_for('demo_login', username='admin') }}" class="text-dark fw-bold text-decoration-none">
                                     <u>admin</u>
                                 </a>
                             </div>
-                            <a href="{{ url_for('demo_login', username='admin') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
+                            <a href="{{ url_for('demo_login', username='admin') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
                                 <i class="bi bi-speedometer2"></i> Optimisation
                             </a>
                         </div>
@@ -289,12 +289,12 @@
                     <div class="alert alert-secondary alert-permanent py-3 mt-2">
                         <div class="d-flex justify-content-between align-items-center flex-wrap">
                             <div style="font-size: 0.85rem;" class="mb-2 mb-sm-0">
-                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong> 
-                                <a href="{{ url_for('demo_login', username='driver001') }}" class="text-dark fw-bold text-decoration-none"><u>driver001</u></a> | 
-                                <a href="{{ url_for('demo_login', username='driver002') }}" class="text-dark fw-bold text-decoration-none"><u>driver002</u></a> | 
+                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong>
+                                <a href="{{ url_for('demo_login', username='driver001') }}" class="text-dark fw-bold text-decoration-none"><u>driver001</u></a> |
+                                <a href="{{ url_for('demo_login', username='driver002') }}" class="text-dark fw-bold text-decoration-none"><u>driver002</u></a> |
                                 <a href="{{ url_for('demo_login', username='driver003') }}" class="text-dark fw-bold text-decoration-none"><u>driver003</u></a>
                             </div>
-                            <a href="{{ url_for('demo_login', username='driver001') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
+                            <a href="{{ url_for('demo_login', username='driver001') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
                                 <i class="bi bi-pin-map"></i> Driver Interface
                             </a>
                         </div>
@@ -325,9 +325,9 @@
                     <div class="alert alert-secondary alert-permanent py-3 mt-2">
                         <div class="d-flex justify-content-between align-items-center flex-wrap">
                             <div style="font-size: 0.85rem;" class="mb-2 mb-sm-0">
-                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong> 
-                                <a href="{{ url_for('demo_login', username='admin') }}" class="text-dark fw-bold text-decoration-none"><u>admin</u></a> | 
-                                <a href="{{ url_for('demo_login', username='support') }}" class="text-dark fw-bold text-decoration-none"><u>support</u></a> | 
+                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong>
+                                <a href="{{ url_for('demo_login', username='admin') }}" class="text-dark fw-bold text-decoration-none"><u>admin</u></a> |
+                                <a href="{{ url_for('demo_login', username='support') }}" class="text-dark fw-bold text-decoration-none"><u>support</u></a> |
                                 <a href="{{ url_for('demo_login', username='driver001') }}" class="text-dark fw-bold text-decoration-none"><u>driver001</u></a>
                             </div>
                             <a href="{{ url_for('demo_login', username='admin') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6;">
@@ -408,7 +408,7 @@
                         <li><strong>View AI Insights:</strong> Explore Optimisation metrics and agent decisions</li>
                         <li><strong>Check Driver Manifest:</strong> See route Optimisation and delivery sequencing</li>
                     </ol>
-                    
+
                     <div class="alert alert-primary alert-permanent mt-4">
                         <strong><i class="bi bi-info-circle"></i> Getting Started:</strong><br>
                         Select a persona from the login dropdown to experience different user roles and capabilities across the platform.
@@ -444,7 +444,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: 
+    background:
         radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
         radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.08) 0%, transparent 50%);
     pointer-events: none;

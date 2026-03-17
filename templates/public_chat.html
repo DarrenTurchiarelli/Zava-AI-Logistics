@@ -310,16 +310,25 @@
     let pcSpeechConfig = null;
     let pcRecognizer = null;
     let useAzureSpeechInput = false;
+    let pcAuthType = 'key';
 
     async function initPublicChatSpeech() {
         try {
             const response = await fetch('/api/speech/token');
             const data = await response.json();
             if (data.token && data.region && window.SpeechSDK) {
-                pcSpeechConfig = window.SpeechSDK.SpeechConfig.fromAuthorizationToken(data.token, data.region);
+                pcAuthType = data.authType || 'key';
+                if (data.authType === 'aad' && data.resourceId) {
+                    const authToken = 'aad#' + data.resourceId + '#' + data.token;
+                    pcSpeechConfig = window.SpeechSDK.SpeechConfig.fromAuthorizationToken(authToken, data.region);
+                } else if (data.authType === 'aad') {
+                    pcSpeechConfig = window.SpeechSDK.SpeechConfig.fromAuthorizationToken(data.token, data.region);
+                } else {
+                    pcSpeechConfig = window.SpeechSDK.SpeechConfig.fromSubscription(data.token, data.region);
+                }
                 pcSpeechConfig.speechRecognitionLanguage = data.language || 'en-AU';
                 useAzureSpeechInput = true;
-                console.log('\ud83c\udf99\ufe0f Public chat: Azure Speech SDK initialized for voice input');
+                console.log('\ud83c\udf99\ufe0f Public chat: Azure Speech SDK initialized (auth:', data.authType, ')');
             }
         } catch (error) {
             console.log('\u26a0\ufe0f Public chat: Azure Speech unavailable, using Web Speech API fallback');

@@ -887,7 +887,7 @@
             position: fixed;
             bottom: 20px;
             right: 20px;
-            z-index: 1000;
+            z-index: 1060; /* Above mobile-bottom-nav (1050) */
         }
 
         @media (max-width: 768px) {
@@ -1203,6 +1203,10 @@
             let widgetSynthesizer = null;
             let isWidgetListening = false;
             let useWidgetAzureSpeech = false;
+            let widgetAuthType = 'key';
+            let widgetSpeechResourceId = '';
+            let widgetSpeechToken = '';
+            let widgetSpeechRegion = '';
 
             let isOpen = false;
 
@@ -1286,11 +1290,26 @@
                     const data = await response.json();
 
                     if (data.token && data.region && window.SpeechSDK) {
-                        widgetSpeechConfig = window.SpeechSDK.SpeechConfig.fromAuthorizationToken(data.token, data.region);
+                        widgetSpeechToken = data.token;
+                        widgetSpeechRegion = data.region;
+                        widgetSpeechResourceId = data.resourceId || '';
+                        widgetAuthType = data.authType || 'key';
+
+                        if (data.authType === 'aad' && data.resourceId) {
+                            // AAD auth: use aad#resourceId#token format
+                            const authToken = 'aad#' + data.resourceId + '#' + data.token;
+                            widgetSpeechConfig = window.SpeechSDK.SpeechConfig.fromAuthorizationToken(authToken, data.region);
+                        } else if (data.authType === 'aad') {
+                            // AAD without resource ID
+                            widgetSpeechConfig = window.SpeechSDK.SpeechConfig.fromAuthorizationToken(data.token, data.region);
+                        } else {
+                            // Use subscription key
+                            widgetSpeechConfig = window.SpeechSDK.SpeechConfig.fromSubscription(data.token, data.region);
+                        }
                         widgetSpeechConfig.speechRecognitionLanguage = data.language || 'en-AU';
                         widgetSpeechConfig.speechSynthesisVoiceName = data.voice || 'en-AU-NatashaNeural';
                         useWidgetAzureSpeech = true;
-                        console.log('🎤 Widget Azure Speech initialized');
+                        console.log('🎤 Widget Azure Speech initialized (auth:', data.authType, ')');
                     }
                 } catch (error) {
                     console.log('⚠️ Widget using Web Speech API fallback');
@@ -1311,6 +1330,7 @@
                 isOpen = !isOpen;
                 chatWindow.classList.toggle('open', isOpen);
                 toggleBtn.classList.toggle('active', isOpen);
+                document.body.classList.toggle('chat-widget-open', isOpen);
 
                 if (isOpen) {
                     input.focus();
@@ -1322,6 +1342,7 @@
                 isOpen = false;
                 chatWindow.classList.remove('open');
                 toggleBtn.classList.remove('active');
+                document.body.classList.remove('chat-widget-open');
             });
 
             // Minimize chat window (same as close)
@@ -1329,6 +1350,7 @@
                 isOpen = false;
                 chatWindow.classList.remove('open');
                 toggleBtn.classList.remove('active');
+                document.body.classList.remove('chat-widget-open');
             });
 
             // Voice input
@@ -1342,49 +1364,90 @@
 
             function startWidgetListening() {
                 unlockWidgetAudio();
-                if (useWidgetAzureSpeech && widgetSpeechConfig) {
-                    const audioConfig = window.SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
-                    widgetRecognizer = new window.SpeechSDK.SpeechRecognizer(widgetSpeechConfig, audioConfig);
 
-                    isWidgetListening = true;
-                    voiceBtn.style.backgroundColor = '#dc3545';
-                    micIcon.style.animation = 'pulse 1s infinite';
+                // For AAD auth, Azure Speech SDK recognition requires a custom domain endpoint
+                // which isn't available client-side. Use Web Speech API for mic input instead.
+                // Server-side Azure TTS (auto-speak) still uses AAD auth and works perfectly.
+                if (useWidgetAzureSpeech && widgetSpeechConfig && widgetAuthType !== 'aad') {
+                    // API key auth: use Azure Speech SDK for recognition
+                    try {
+                        const audioConfig = window.SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+                        widgetRecognizer = new window.SpeechSDK.SpeechRecognizer(widgetSpeechConfig, audioConfig);
 
-                    widgetRecognizer.recognizeOnceAsync(
-                        function (result) {
-                            if (result.text && result.text.trim()) {
-                                input.value = result.text;
+                        isWidgetListening = true;
+                        voiceBtn.style.backgroundColor = '#dc3545';
+                        micIcon.style.animation = 'pulse 1s infinite';
+                        input.placeholder = '🎤 Listening...';
+
+                        widgetRecognizer.recognizeOnceAsync(
+                            function (result) {
+                                if (result && result.text && result.text.trim()) {
+                                    input.value = result.text;
+                                    stopWidgetListening();
+                                    sendMessage();
+                                } else {
+                                    console.warn('🎤 No speech detected via Azure SDK');
+                                    stopWidgetListening();
+                                }
+                            },
+                            function (error) {
+                                console.error('🎤 Azure Voice error, falling back to Web Speech API:', error);
                                 stopWidgetListening();
-                                sendMessage();
-                            } else {
-                                console.warn('🎤 No speech detected');
-                                stopWidgetListening();
+                                startWebSpeechListening();
                             }
-                        },
-                        function (error) {
-                            console.error('Voice error:', error);
-                            stopWidgetListening();
-                        }
-                    );
-                } else if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                        );
+                    } catch (sdkError) {
+                        console.error('🎤 Azure Speech SDK init error:', sdkError);
+                        stopWidgetListening();
+                        startWebSpeechListening();
+                    }
+                } else {
+                    // AAD auth or no Azure SDK: use Web Speech API for mic input
+                    startWebSpeechListening();
+                }
+            }
+
+            function startWebSpeechListening() {
+                if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
                     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                     const recognition = new SpeechRecognition();
                     recognition.lang = 'en-AU';
+                    recognition.interimResults = false;
+                    recognition.maxAlternatives = 1;
 
                     isWidgetListening = true;
                     voiceBtn.style.backgroundColor = '#dc3545';
                     micIcon.style.animation = 'pulse 1s infinite';
+                    input.placeholder = '🎤 Listening...';
 
                     recognition.onresult = function(event) {
-                        input.value = event.results[0][0].transcript;
-                        sendMessage();
+                        const transcript = event.results[0][0].transcript;
+                        if (transcript && transcript.trim()) {
+                            input.value = transcript;
+                            sendMessage();
+                        }
+                    };
+
+                    recognition.onerror = function(event) {
+                        console.error('🎤 Web Speech API error:', event.error);
+                        stopWidgetListening();
                     };
 
                     recognition.onend = function() {
                         stopWidgetListening();
                     };
 
-                    recognition.start();
+                    try {
+                        recognition.start();
+                        console.log('🎤 Web Speech API listening started');
+                    } catch (startError) {
+                        console.error('🎤 Failed to start Web Speech API:', startError);
+                        stopWidgetListening();
+                    }
+                } else {
+                    console.warn('🎤 No speech recognition available in this browser');
+                    alert('Voice input is not supported in this browser. Please use Chrome or Safari.');
+                    stopWidgetListening();
                 }
             }
 
@@ -1392,16 +1455,18 @@
                 isWidgetListening = false;
                 voiceBtn.style.backgroundColor = '';
                 micIcon.style.animation = '';
+                input.placeholder = 'Type or speak...';
                 if (widgetRecognizer) {
-                    widgetRecognizer.close();
+                    try { widgetRecognizer.close(); } catch(e) {}
                     widgetRecognizer = null;
                 }
             }
 
             function speakWidgetMessage(text) {
-                if (!autoSpeakCheckbox.checked) return;
+                if (!autoSpeakCheckbox || !autoSpeakCheckbox.checked) return;
 
-                const cleanText = text.replace(/\*\*/g, '').replace(/<[^>]+>/g, '').trim();
+                const cleanText = text.replace(/\*\*/g, '').replace(/<[^>]+>/g, '').replace(/#{1,6}\s/g, '').trim();
+                if (!cleanText) return;
 
                 // Use server-side Azure Neural TTS for high quality
                 speakWidgetWithAzure(cleanText);
@@ -1447,11 +1512,26 @@
                 }
             }
 
+            // Preload browser voices (Chrome loads them asynchronously)
+            let widgetBrowserVoices = [];
+            function loadWidgetVoices() {
+                if (window.speechSynthesis) {
+                    widgetBrowserVoices = window.speechSynthesis.getVoices();
+                }
+            }
+            loadWidgetVoices();
+            if (window.speechSynthesis && window.speechSynthesis.onvoiceschanged !== undefined) {
+                window.speechSynthesis.onvoiceschanged = loadWidgetVoices;
+            }
+
             function speakWidgetWithBrowser(text, preferredGender = null) {
                 if (window.speechSynthesis) {
+                    // Cancel any ongoing speech first
+                    window.speechSynthesis.cancel();
+
                     const utterance = new SpeechSynthesisUtterance(text);
                     utterance.lang = 'en-AU';
-                    const voices = window.speechSynthesis.getVoices();
+                    const voices = widgetBrowserVoices.length > 0 ? widgetBrowserVoices : window.speechSynthesis.getVoices();
                     // Filter to English voices first
                     const enVoices = voices.filter(v => v.lang.startsWith('en'));
                     let candidates = enVoices;
@@ -1622,6 +1702,7 @@
                 // Reset conversation thread
                 widgetThreadId = null;
 
+                // Reset messages to welcome screen
                 messagesContainer.innerHTML = `
                     <div class="chat-widget-welcome">
                         <img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot" style="width: 64px; height: 64px; margin-bottom: 10px;">
@@ -1629,7 +1710,14 @@
                         <p>Ask me about deliveries, tracking, or general inquiries.</p>
                     </div>
                 `;
-                console.log('🗑️ Chat cleared and audio stopped');
+
+                // Close the widget window
+                isOpen = false;
+                chatWindow.classList.remove('open');
+                toggleBtn.classList.remove('active');
+                document.body.classList.remove('chat-widget-open');
+
+                console.log('🗑️ Chat ended, conversation cleared and widget closed');
             }
 
             // Event listeners

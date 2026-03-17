@@ -108,6 +108,10 @@ app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "dt-logistics-secret-key-change-in-production")
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max upload
 
+# Track if users have been initialized
+USERS_INITIALIZED = False
+USERS_INIT_LOCK = threading.Lock()
+
 # Global: Server-Sent Events queues for real-time updates
 sse_queues = {}  # manifest_id -> Queue
 sse_lock = threading.Lock()
@@ -129,6 +133,137 @@ global_state_manager = StateManager()
 setup_warning_suppression()
 
 
+# User initialization function
+async def ensure_users_initialized():
+    """Ensure default users exist in database (auto-creates if missing)"""
+    global USERS_INITIALIZED
+
+    with USERS_INIT_LOCK:
+        if USERS_INITIALIZED:
+            return True
+
+    try:
+        async with ParcelTrackingDB() as db:
+            if not db.database:
+                await db.connect()
+
+            # Ensure users container exists
+            try:
+                await db.database.create_container(id="users", partition_key={"paths": ["/username"], "kind": "Hash"})
+                print("[INIT] Users container created")
+            except Exception as e:
+                if "already exists" in str(e).lower() or "conflict" in str(e).lower():
+                    print("[INIT] Users container already exists")
+                else:
+                    print(f"[WARN] Container creation warning: {e}")
+
+            user_mgr = UserManager(db)
+
+            # Define default users
+            default_users = [
+                {
+                    "username": "admin",
+                    "password": "admin123",
+                    "role": UserManager.ROLE_ADMIN,
+                    "full_name": "System Administrator",
+                    "email": "admin@dtlogistics.com.au",
+                },
+                {
+                    "username": "driver001",
+                    "password": "driver123",
+                    "role": UserManager.ROLE_DRIVER,
+                    "full_name": "John Smith",
+                    "email": "john.smith@dtlogistics.com.au",
+                    "driver_id": "driver-001",
+                },
+                {
+                    "username": "driver002",
+                    "password": "driver123",
+                    "role": UserManager.ROLE_DRIVER,
+                    "full_name": "Sarah Jones",
+                    "email": "sarah.jones@dtlogistics.com.au",
+                    "driver_id": "driver-002",
+                },
+                {
+                    "username": "driver003",
+                    "password": "driver123",
+                    "role": UserManager.ROLE_DRIVER,
+                    "full_name": "Mike Brown",
+                    "email": "mike.brown@dtlogistics.com.au",
+                    "driver_id": "driver-003",
+                },
+                {
+                    "username": "depot_mgr",
+                    "password": "depot123",
+                    "role": UserManager.ROLE_DEPOT_MANAGER,
+                    "full_name": "Lisa Anderson",
+                    "email": "lisa.anderson@dtlogistics.com.au",
+                },
+                {
+                    "username": "support",
+                    "password": "support123",
+                    "role": UserManager.ROLE_CUSTOMER_SERVICE,
+                    "full_name": "Tom Wilson",
+                    "email": "support@dtlogistics.com.au",
+                },
+            ]
+
+            users_created = 0
+            for user_data in default_users:
+                try:
+                    existing = await user_mgr.get_user_by_username(user_data["username"])
+                    if not existing:
+                        await user_mgr.create_user(
+                            username=user_data["username"],
+                            password=user_data["password"],
+                            role=user_data["role"],
+                            full_name=user_data["full_name"],
+                            email=user_data.get("email"),
+                            driver_id=user_data.get("driver_id"),
+                        )
+                        print(f"[INIT] Created user: {user_data['username']}")
+                        users_created += 1
+                except Exception as e:
+                    print(f"[WARN] Error creating user {user_data['username']}: {e}")
+
+            if users_created > 0:
+                print(f"[INIT] Initialized {users_created} default users")
+            else:
+                print("[INIT] All default users already exist")
+
+            with USERS_INIT_LOCK:
+                USERS_INITIALIZED = True
+            return True
+
+    except Exception as e:
+        print(f"[ERROR] User initialization failed: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return False
+        # Don't fail the app if user init fails - users can be auto-created on login
+        return False
+
+
+def init_users_on_startup():
+    """Initialize users on app startup (non-blocking)"""
+    try:
+        run_async(ensure_users_initialized())
+    except Exception as e:
+        print(f"⚠️ Background user initialization failed: {e}")
+        print("   Users will be auto-created on first login attempt")
+
+
+# Trigger initialization when app module is loaded (for Gunicorn/production)
+# This runs automatically when Gunicorn imports the app module
+try:
+    init_users_on_startup()
+    print("✅ App startup initialization completed")
+except Exception as startup_error:
+    print(f"⚠️ Startup initialization skipped: {startup_error}")
+    print("   Users will be auto-created on first login")
+
+
 # Make company info available to all templates
 @app.context_processor
 def inject_company_info():
@@ -143,18 +278,29 @@ def run_async(coro):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            return loop.run_until_complete(coro)
+            result = loop.run_until_complete(coro)
+            # IMPORTANT: Give a moment for any background cleanup tasks to complete
+            # (e.g., Azure SDK connection cleanup) before forcibly shutting down
+            loop.run_until_complete(asyncio.sleep(0.05))
+            return result
         finally:
-            # Cancel all pending tasks before closing
+            # Only cancel tasks that are still pending after main coroutine completes
+            # Don't be too aggressive - let SDK cleanup tasks finish naturally
             try:
-                pending = asyncio.all_tasks(loop)
-                for task in pending:
-                    task.cancel()
+                pending = [task for task in asyncio.all_tasks(loop) if not task.done()]
                 if pending:
-                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                    # Give background tasks a moment to finish instead of immediate cancellation
+                    loop.run_until_complete(asyncio.sleep(0.1))
+                    # Re-check after waiting
+                    still_pending = [task for task in asyncio.all_tasks(loop) if not task.done()]
+                    for task in still_pending:
+                        task.cancel()
+                    if still_pending:
+                        loop.run_until_complete(asyncio.gather(*still_pending, return_exceptions=True))
             except Exception:
                 pass
-            loop.close()
+            finally:
+                loop.close()
     except RuntimeError as e:
         if "cannot schedule new futures after shutdown" in str(e):
             # Event loop already shut down, return None gracefully
@@ -449,7 +595,7 @@ def setup_users_now():
 
 @app.route("/")
 def index():
-    """Demo Day Welcome Page"""
+    """Experience AI Welcome Page"""
     return render_template("demo_welcome.html")
 
 
@@ -479,6 +625,9 @@ def login():
         # Authenticate with UserManager
         async def auth_user():
             from agents.base import identity_agent
+
+            # Ensure users are initialized before authentication
+            await ensure_users_initialized()
 
             async with ParcelTrackingDB() as db:
                 if not db.database:
@@ -611,21 +760,28 @@ def demo_login(username):
 
     # Authenticate user, auto-creating if missing
     async def auth_demo_user():
+        # Ensure users are initialized
+        await ensure_users_initialized()
+
         async with ParcelTrackingDB() as db:
             if not db.database:
                 await db.connect()
             user_mgr = UserManager(db)
 
-            # Ensure users container exists
+            # Ensure users container exists (may fail with Azure AD RBAC — that's OK)
             try:
                 await db.database.create_container(id="users", partition_key={"paths": ["/username"], "kind": "Hash"})
-            except Exception:
-                pass  # Container already exists
+                print(f"✅ Users container created")
+            except Exception as container_err:
+                if "already exists" not in str(container_err).lower() and "conflict" not in str(container_err).lower():
+                    print(f"⚠️ Users container create skipped (may already exist): {container_err}")
 
             # Try to authenticate
             user = await user_mgr.authenticate(username, demo_info["password"])
             if user:
                 return user
+
+            print(f"⚠️ Demo user '{username}' auth returned None — attempting auto-create")
 
             # User doesn't exist - auto-create it
             try:
@@ -642,8 +798,19 @@ def demo_login(username):
                     )
                     # Authenticate the newly created user
                     return await user_mgr.authenticate(username, demo_info["password"])
+                else:
+                    # User exists but password may not match — reset password
+                    print(f"🔧 User '{username}' exists but auth failed — resetting password")
+                    success = await user_mgr.update_password(username, demo_info["password"])
+                    if success:
+                        return await user_mgr.authenticate(username, demo_info["password"])
+                    else:
+                        print(f"❌ Password reset failed for '{username}'")
             except Exception as create_err:
                 print(f"❌ Error auto-creating demo user {username}: {create_err}")
+                import traceback
+
+                traceback.print_exc()
 
             return None
 
@@ -1672,6 +1839,20 @@ def chatbot_query():
     try:
         result = run_async(process())
 
+        # Check if agent call failed
+        if isinstance(result, dict) and not result.get("success", True):
+            error_msg = result.get("error", "Unknown error occurred")
+            print(f"\u274c Agent error: {error_msg}")
+            return (
+                jsonify(
+                    {
+                        "response": "I'm sorry, I'm having trouble connecting right now. Please try again in a moment.",
+                        "error": error_msg,
+                    }
+                ),
+                200,
+            )
+
         # Extract response text - handle nested Azure AI agent formats
         response_text = ""
         if isinstance(result, dict):
@@ -1694,6 +1875,10 @@ def chatbot_query():
             response_text = result
         else:
             response_text = str(result) if result else ""
+
+        # If response text is empty or None, provide a friendly fallback
+        if not response_text or response_text == "None":
+            response_text = "I'm sorry, I wasn't able to process that request. Could you please try again?"
 
         # Check if response mentions photos and attach photo data
         delivery_photos = []
@@ -1856,7 +2041,15 @@ def public_chatbot():
             if not result.get("success", True):
                 error_msg = result.get("error", "Unknown error occurred")
                 print(f"❌ Agent error: {error_msg}")
-                return jsonify({"error": error_msg}), 500
+                return (
+                    jsonify(
+                        {
+                            "response": "I'm sorry, I'm having trouble connecting right now. Please try again in a moment.",
+                            "error": error_msg,
+                        }
+                    ),
+                    200,
+                )
 
             # Extract response text from nested structure
             response_text = None
@@ -1885,6 +2078,10 @@ def public_chatbot():
                     response_text = result["text"].get("value", str(result))
                 else:
                     response_text = str(result["text"])
+
+            # If response text is still empty, provide a friendly fallback
+            if not response_text or response_text == "None":
+                response_text = "I'm sorry, I wasn't able to process that request. Could you please try again?"
 
             if response_text:
                 # For public mode, extract just the customer communication part if structured format is returned
@@ -1954,8 +2151,6 @@ def public_chatbot():
                         response_matches = re.findall(tracking_pattern, response_text, re.IGNORECASE)
                         if response_matches:
                             tracking_num = response_matches[0].upper()
-                        elif context_data.get("tracking_number"):
-                            tracking_num = context_data["tracking_number"].upper()
 
                     if tracking_num:
                         print(f"📸 Extracting delivery photos for: {tracking_num}")
@@ -2009,7 +2204,15 @@ def public_chatbot():
         import traceback
 
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        return (
+            jsonify(
+                {
+                    "response": "I'm sorry, something went wrong on our end. Please try again in a moment.",
+                    "error": str(e),
+                }
+            ),
+            200,
+        )
 
 
 @app.route("/api/chatbot/track/<tracking_number>")
@@ -3281,6 +3484,48 @@ def mark_delivery_complete(manifest_id, barcode):
     return redirect(url_for("driver_manifest"))
 
 
+@app.route("/api/address-notes/add", methods=["POST"])
+@login_required
+def add_address_note_api():
+    """Add a custom address note without completing a delivery (drivers & admins)"""
+    try:
+        data = request.get_json()
+        address = data.get("address", "").strip()
+        note = data.get("note", "").strip()
+        category = data.get("category", "general").strip()
+
+        if not address or not note:
+            return jsonify({"success": False, "error": "Address and note are required"}), 400
+
+        user = session.get("user", {})
+        driver_name = user.get("display_name") or user.get("username", "unknown")
+
+        # Prefix note with category hint so auto-categoriser picks it up,
+        # but only when the chosen category wouldn't already be detected.
+        category_hints = {
+            "safety": "[SAFETY] ",
+            "access": "[ACCESS] ",
+            "property": "[PROPERTY] ",
+            "carded": "[CARDED] ",
+        }
+        prefix = category_hints.get(category, "")
+        note_with_hint = f"{prefix}{note}" if prefix and prefix.strip("[] ").lower() not in note.lower() else note
+
+        async def do_save():
+            async with ParcelTrackingDB() as db:
+                return await db.save_address_note(address, note_with_hint, driver_name)
+
+        success = run_async(do_save())
+
+        if success:
+            return jsonify({"success": True, "message": "Note saved successfully"})
+        else:
+            return jsonify({"success": False, "error": "Failed to save note"}), 500
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route("/api/address-notes/dismiss", methods=["POST"])
 @login_required
 def dismiss_address_note():
@@ -4079,7 +4324,7 @@ def analyze_image():
 
 
 # ============================================================================
-# ADDRESS REGION DETECTION - Smart filtering for Australia Post envelopes
+# ADDRESS REGION DETECTION - Smart filtering for Zava envelopes
 # ============================================================================
 
 # Australian state abbreviations (official and common variations)
@@ -4153,9 +4398,9 @@ def split_suburb_state(text: str) -> tuple:
     return (text, "")
 
 
-# Known noise text patterns found on Australia Post packaging
+# Known noise text patterns found on Zava packaging
 AUSPOST_NOISE_PATTERNS = [
-    # Australia Post branding - filter these ANYWHERE they appear
+    # Zava branding - filter these ANYWHERE they appear
     r"Australia\s*Post",
     r"auspost",
     r"alia\s*Post",  # Partial matches from OCR
@@ -4260,7 +4505,7 @@ AUSPOST_NOISE_PATTERNS = [
     r"^50%\.?$",
     r"^\d+%$",  # Any standalone percentage
     # Logo text - commonly found in/near logos (not recipient data)
-    r"^POST$",  # "POST" from Australia Post logo
+    r"^POST$",  # "POST" from Zava logo
     r"^AUSTRALIA$",  # "AUSTRALIA" from logo
     r"^AUST$",  # Abbreviated
     r"^AUSPOS$",  # Partial OCR
@@ -4336,7 +4581,7 @@ def is_valid_recipient_name(text: str) -> bool:
     if is_noise_text(text):
         return False
 
-    # Cannot be "Australia Post" or similar branding (anywhere in text)
+    # Cannot be "Zava" or similar branding (anywhere in text)
     if re.search(r"australia|auspost|post\b", text, re.IGNORECASE):
         return False
 
@@ -4369,9 +4614,9 @@ def is_valid_recipient_name(text: str) -> bool:
 
 def detect_address_region(text_with_positions: list) -> dict:
     """
-    Detect the handwritten address region on an Australia Post envelope.
+    Detect the handwritten address region on an Zava envelope.
 
-    Australia Post envelopes have a structured address box typically in the
+    Zava envelopes have a structured address box typically in the
     center-right area. The handwritten text tends to:
     1. Be clustered together spatially
     2. NOT match the printed template text patterns
@@ -5029,6 +5274,10 @@ def render_map(manifest_id):
 
 
 if __name__ == "__main__":
+    # Initialize users on startup
+    print("🚀 Initializing Zava application...")
+    init_users_on_startup()
+
     port = int(os.getenv("PORT", 5000))
     # Debug mode disabled by default for better performance
     # Only enable debug if DEBUG_MODE=true is explicitly set

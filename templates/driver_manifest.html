@@ -171,8 +171,8 @@
                                         Click to calculate fastest route
                                     </p>
                                     <hr>
-                                    <button class="btn btn-sm" type="button" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
-                                        <i class="bi bi-calculator" style="color: #eb2525;"></i> Calculate Route
+                                    <button class="btn btn-sm" type="button" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
+                                        <i class="bi bi-calculator" style="color: #007FFF;"></i> Calculate Route
                                     </button>
                                     <div class="mt-2 d-none" id="fastest-spinner">
                                         <div class="spinner-border spinner-border-sm" role="status">
@@ -225,8 +225,8 @@
                                         Click to calculate shortest route
                                     </p>
                                     <hr>
-                                    <button class="btn btn-sm" type="button" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
-                                        <i class="bi bi-calculator" style="color: #eb2525;"></i> Calculate Route
+                                    <button class="btn btn-sm" type="button" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
+                                        <i class="bi bi-calculator" style="color: #007FFF;"></i> Calculate Route
                                     </button>
                                     <div class="mt-2 d-none" id="shortest-spinner">
                                         <div class="spinner-border spinner-border-sm" role="status">
@@ -284,8 +284,8 @@
                                         Click to calculate safest route
                                     </p>
                                     <hr>
-                                    <button class="btn btn-sm" type="button" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
-                                        <i class="bi bi-calculator" style="color: #eb2525;"></i> Calculate Route
+                                    <button class="btn btn-sm" type="button" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
+                                        <i class="bi bi-calculator" style="color: #007FFF;"></i> Calculate Route
                                     </button>
                                     <div class="mt-2 d-none" id="safest-spinner">
                                         <div class="spinner-border spinner-border-sm" role="status">
@@ -385,8 +385,8 @@
                                         <button type="button" class="btn btn-sm"
                                                 data-bs-toggle="modal"
                                                 data-bs-target="#notesModal{{ loop.index }}"
-                                                style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
-                                            <i class="bi bi-sticky" style="color: #eb2525;"></i> {{ item.address_notes|length }} note(s)
+                                                style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
+                                            <i class="bi bi-sticky" style="color: #007FFF;"></i> {{ item.address_notes|length }} note(s)
                                         </button>
                                         {% else %}
                                         <span class="text-muted">No notes</span>
@@ -407,8 +407,14 @@
                                         {% if item.status != 'delivered' %}
                                         <button type="button" class="btn btn-sm mb-1"
                                                 onclick="notifyCustomer('{{ item.barcode }}', '{{ item.recipient_name }}', {{ loop.index }})"
-                                                style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
-                                            <i class="bi bi-chat-dots" style="color: #eb2525;"></i> Notify Customer
+                                                style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
+                                            <i class="bi bi-chat-dots" style="color: #007FFF;"></i> Notify Customer
+                                        </button>
+                                        <button type="button" class="btn btn-sm mb-1"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#addNoteModal{{ loop.index }}"
+                                                style="background-color: #f8f9fa; color: #0d6efd; border: 1px solid #dee2e6;">
+                                            <i class="bi bi-sticky" style="color: #0d6efd;"></i> Add Note
                                         </button>
                                         <button type="button" class="btn btn-sm"
                                                 data-bs-toggle="modal"
@@ -471,6 +477,11 @@
                                             onclick="notifyCustomer('{{ item.barcode }}', '{{ item.recipient_name }}', {{ loop.index }})">
                                         <i class="bi bi-chat-dots"></i> Notify
                                     </button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#addNoteModal{{ loop.index }}">
+                                        <i class="bi bi-sticky"></i> Note
+                                    </button>
                                     <button type="button" class="btn btn-sm btn-success"
                                             data-bs-toggle="modal"
                                             data-bs-target="#completeModal{{ loop.index }}">
@@ -485,8 +496,8 @@
                 </div>
                 <div class="card-footer">
                     <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
-                        <button class="btn" onclick="window.print();" style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;">
-                            <i class="bi bi-printer" style="color: #eb2525;"></i> Print Manifest
+                        <button class="btn" onclick="window.print();" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
+                            <i class="bi bi-printer" style="color: #007FFF;"></i> Print Manifest
                         </button>
                         <a href="{{ url_for('dashboard') }}" class="btn" style="background-color: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6;">
                             <i class="bi bi-arrow-left" style="color: #6c757d;"></i> Back to Dashboard
@@ -563,6 +574,52 @@
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn" data-bs-dismiss="modal" style="background-color: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6;">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add Note Modal -->
+                <div class="modal fade" id="addNoteModal{{ loop.index }}" tabindex="-1" aria-labelledby="addNoteModalLabel{{ loop.index }}" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header" style="background-color: #0d6efd; color: white;">
+                                <h5 class="modal-title" id="addNoteModalLabel{{ loop.index }}">
+                                    <i class="bi bi-sticky"></i> Add Address Note
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p><strong>Barcode:</strong> <code>{{ item.barcode }}</code></p>
+                                <p><strong>Recipient:</strong> {{ item.recipient_name }}</p>
+                                <p><strong>Address:</strong> {{ item.recipient_address }}</p>
+                                <hr>
+                                <div class="mb-3">
+                                    <label for="noteCategory{{ loop.index }}" class="form-label fw-bold">
+                                        <i class="bi bi-tag"></i> Note Category
+                                    </label>
+                                    <select class="form-select" id="noteCategory{{ loop.index }}">
+                                        <option value="general">General</option>
+                                        <option value="access">Access (gate codes, entry instructions)</option>
+                                        <option value="safety">Safety (dogs, hazards)</option>
+                                        <option value="property">Property (leave locations, landmarks)</option>
+                                        <option value="carded">Carded (collection info)</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="customNote{{ loop.index }}" class="form-label fw-bold">
+                                        <i class="bi bi-pencil"></i> Note <span class="text-danger">*</span>
+                                    </label>
+                                    <textarea class="form-control" id="customNote{{ loop.index }}" rows="3" placeholder="e.g., Large dog in yard, Use side gate, Apartment buzzer code is #1234" required></textarea>
+                                    <small class="text-muted">This note will help future drivers delivering to this address.</small>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn" data-bs-dismiss="modal" style="background-color: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6;">Cancel</button>
+                                <button type="button" class="btn" style="background-color: #f8f9fa; color: #0d6efd; border: 1px solid #dee2e6;"
+                                        onclick="submitAddressNote('{{ item.recipient_address | e }}', {{ loop.index }})">
+                                    <i class="bi bi-sticky" style="color: #0d6efd;"></i> Save Note
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -683,7 +740,7 @@
                                                 <!-- Camera button -->
                                                 <button type="button"
                                                         class="btn btn-block w-100"
-                                                        style="background-color: #f8f9fa; color: #eb2525; border: 1px solid #dee2e6;"
+                                                        style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;"
                                                         onclick="document.getElementById('deliveryPhoto{{ loop.index }}').click()">
                                                     <i class="bi bi-camera-fill"></i> Take Photo with Camera
                                                 </button>
@@ -1149,6 +1206,53 @@ function notifyCustomer(barcode, recipientName, itemIndex) {
     // Clean up modal after it's hidden
     document.getElementById('acsInfoModal').addEventListener('hidden.bs.modal', function () {
         this.remove();
+    });
+}
+
+// ── Add address note (standalone, without completing delivery) ────
+function submitAddressNote(address, loopIndex) {
+    const noteText = document.getElementById('customNote' + loopIndex).value.trim();
+    const category = document.getElementById('noteCategory' + loopIndex).value;
+
+    if (!noteText) {
+        alert('Please enter a note.');
+        return;
+    }
+
+    const btn = event.currentTarget;
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+
+    fetch('/api/address-notes/add', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            address: address,
+            note: noteText,
+            category: category
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Note saved for this address', 'success');
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addNoteModal' + loopIndex));
+            if (modal) modal.hide();
+            // Clear the form
+            document.getElementById('customNote' + loopIndex).value = '';
+            document.getElementById('noteCategory' + loopIndex).value = 'general';
+        } else {
+            showToast('Could not save note: ' + (data.error || 'Unknown error'), 'danger');
+        }
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+    })
+    .catch(() => {
+        showToast('Network error – please try again.', 'danger');
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
     });
 }
 

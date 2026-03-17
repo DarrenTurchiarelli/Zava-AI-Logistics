@@ -390,35 +390,46 @@ Menu-driven interface for:
 
 ### 4. Environment Configuration
 
-Create a `.env` file in the project root:
+Copy the template file and configure with your Azure resources:
 
-```env
-# Azure AI Foundry Configuration
-AZURE_AI_PROJECT_CONNECTION_STRING = "your-azure-ai-project-connection-string"
-AZURE_AI_MODEL_DEPLOYMENT_NAME = "gpt-4o"
+```powershell
+# Copy the template
+Copy-Item .env.example .env
 
-# Azure Cosmos DB Configuration (Local Development)
-COSMOS_CONNECTION_STRING = "AccountEndpoint=https://your-account.documents.azure.com:443/;AccountKey=your-key-here;"
-
-# Azure Cosmos DB Configuration (Production - Managed Identity)
-# USE_MANAGED_IDENTITY = "true"
-# COSMOS_DB_ENDPOINT = "https://your-account.documents.azure.com:443/"
-# COSMOS_DB_DATABASE_NAME = "logisticstracking"
-
-# Azure Maps (Route Optimization)
-AZURE_MAPS_SUBSCRIPTION_KEY = "your-azure-maps-key"
-
-# Azure Speech Services (Voice Features)
-AZURE_SPEECH_KEY = "your-speech-key"
-AZURE_SPEECH_REGION = "your-region"  # e.g., australiaeast
-
-# Flask Configuration
-FLASK_SECRET_KEY = "your-secret-key-for-sessions"
-FLASK_ENV = "development"
-PORT = 5000
+# Edit .env with your Azure resource values
+notepad .env  # or use your preferred editor
 ```
 
-**Production Note**: For Azure App Service deployment, use managed identity authentication instead of connection strings. See [DEPLOYMENT.md](Guides/DEPLOYMENT.md#rbac-permissions-required-for-managed-identity) for RBAC setup.
+**Required Configuration:**
+
+```env
+# Azure AI Foundry
+AZURE_AI_PROJECT_ENDPOINT="https://your-region.api.azureml.ms/discovery"
+AZURE_AI_MODEL_DEPLOYMENT_NAME="gpt-4o"
+
+# Azure Computer Vision
+AZURE_VISION_ENDPOINT="https://your-vision-service.cognitiveservices.azure.com/"
+
+# Azure Cosmos DB
+COSMOS_DB_ENDPOINT="https://your-cosmos-account.documents.azure.com:443/"
+COSMOS_DB_DATABASE_NAME="logisticstracking"
+USE_MANAGED_IDENTITY="false"  # Use "true" for Azure deployment
+
+# Azure Maps (Route Optimization)
+AZURE_MAPS_SUBSCRIPTION_KEY="your-azure-maps-key"
+
+# Azure Speech Services (Voice Features)
+AZURE_SPEECH_RESOURCE_ID="/subscriptions/xxx/resourceGroups/xxx/providers/Microsoft.CognitiveServices/accounts/xxx"
+AZURE_SPEECH_ENDPOINT="https://your-speech-service.cognitiveservices.azure.com/"
+AZURE_SPEECH_REGION="australiaeast"
+
+# Flask Configuration
+FLASK_SECRET_KEY="your-random-secret-key"
+FLASK_ENV="development"
+PORT="5000"
+```
+
+**Production Note**: For Azure App Service deployment, managed identity is automatically configured. See [Guides/DEPLOYMENT.md](Guides/DEPLOYMENT.md) for automated deployment with `deploy_to_azure.ps1`.
 
 ### 5. Install Dependencies
 
@@ -902,16 +913,30 @@ workflow_result = await fraud_detection_to_customer_service_workflow(
 
 ## 🚀 Deployment
 
-### **Azure App Service**
+### **Azure App Service (Recommended)**
 
 ```powershell
-# Deploy using Azure CLI
-az webapp up --runtime PYTHON:3.11 --sku B1 --name dt-logistics-web
+# Deploy complete infrastructure + code using PowerShell + Bicep
+.\deploy_to_azure.ps1
+
+# Or deploy code only (after infrastructure exists)
+.\deploy_to_azure.ps1 -CodeOnly
 ```
 
-See `Guides/DEPLOYMENT.md` for complete instructions including:
+**Automatically Deploys:**
+- ✅ All required Azure resource providers (works on fresh subscriptions)
+- ✅ Cosmos DB (serverless) with 5 containers
+- ✅ Azure AI Hub & Project (9 agents)
+- ✅ Azure Maps, Speech, Vision services
+- ✅ App Service with RBAC authentication
+- ✅ Demo data and user accounts
+
+**Zero manual Azure portal configuration required!**
+
+See [Guides/DEPLOYMENT.md](Guides/DEPLOYMENT.md) for complete instructions including:
 
 - Environment variable configuration
+- Manual deployment options
 - CI/CD setup
 - Monitoring and logging
 - Scaling options

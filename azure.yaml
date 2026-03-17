@@ -1,5 +1,7 @@
 # Azure Developer CLI Configuration
-name: dt-logistics-web
+# NOTE: The recommended deployment method is deploy_to_azure.ps1
+# This file is provided for Azure Developer CLI (azd) compatibility
+name: zava-logistics
 metadata:
   template: python-web@1.0.0
 
@@ -8,10 +10,10 @@ services:
     project: .
     language: python
     host: appservice
-    
+
 infra:
   provider: bicep
   path: infra
-  
+
 pipeline:
   provider: github
