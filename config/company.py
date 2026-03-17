@@ -46,68 +46,71 @@ SERVICE_AREAS = {
     "WA": "Western Australia",
     "TAS": "Tasmania",
     "NT": "Northern Territory",
-    "ACT": "Australian Capital Territory"
+    "ACT": "Australian Capital Territory",
 }
 
 # Branding Colors (for future CSS customization)
-BRAND_PRIMARY_COLOR = "#eb2525" 
-BRAND_SECONDARY_COLOR = "#000000"  
-BRAND_ACCENT_COLOR = "#ffffff" 
-BRAND_DANGER_COLOR = "#eb2525"
+BRAND_PRIMARY_COLOR = "#007FFF"
+BRAND_SECONDARY_COLOR = "#000000"
+BRAND_ACCENT_COLOR = "#ffffff"
+BRAND_DANGER_COLOR = "#FF0000"
 BRAND_SUCCESS_COLOR = "#198754"  # Green for positive metrics, Active status, success rates
-BRAND_ALERT_COLOR = "#fff3cd"  # Light yellow for alerts and warnings  
+BRAND_ALERT_COLOR = "#fff3cd"  # Light yellow for alerts and warnings
 
 # Gradient Configuration (for modern glassmorphism effects)
-BRAND_GRADIENT = "linear-gradient(135deg, #eb2525 0%, #c41e1e 50%, #9a1818 100%)"
-BRAND_GRADIENT_START = "#eb2525"  # Bright red
-BRAND_GRADIENT_MID = "#c41e1e"    # Medium red
-BRAND_GRADIENT_END = "#9a1818"    # Dark red  
+BRAND_GRADIENT = "linear-gradient(135deg, #007FFF 0%, #0066CC 50%, #004C99 100%)"
+BRAND_GRADIENT_START = "#007FFF"
+BRAND_GRADIENT_MID = "#0066CC"
+BRAND_GRADIENT_END = "#004C99"
+
 
 # Terms & Legal
 TERMS_URL = f"{COMPANY_WEBSITE}/terms"
 PRIVACY_URL = f"{COMPANY_WEBSITE}/privacy"
 ABN = "12 345 678 901"  # Update with your actual ABN
 
+
 def get_company_info():
     """Returns a dictionary of all company information"""
     return {
-        'name': COMPANY_NAME,
-        'name_short': COMPANY_NAME_SHORT,
-        'tagline': COMPANY_TAGLINE,
-        'phone': COMPANY_PHONE,
-        'email': COMPANY_EMAIL,
-        'support_email': COMPANY_SUPPORT_EMAIL,
-        'fraud_email': COMPANY_FRAUD_EMAIL,
-        'address': COMPANY_ADDRESS_FULL,
-        'website': COMPANY_WEBSITE,
-        'facebook': COMPANY_FACEBOOK,
-        'twitter': COMPANY_TWITTER,
-        'linkedin': COMPANY_LINKEDIN,
-        'business_hours': BUSINESS_HOURS,
-        'business_hours_weekend': BUSINESS_HOURS_WEEKEND,
-        'support_hours': SUPPORT_HOURS,
-        'version': APP_VERSION,
-        'copyright': APP_COPYRIGHT,
-        'browser_title': BROWSER_TITLE,
-        'terms_url': TERMS_URL,
-        'privacy_url': PRIVACY_URL,
-        'abn': ABN,
-        'brand_primary_color': BRAND_PRIMARY_COLOR,
-        'brand_secondary_color': BRAND_SECONDARY_COLOR,
-        'brand_accent_color': BRAND_ACCENT_COLOR,
-        'brand_danger_color': BRAND_DANGER_COLOR,
-        'brand_success_color': BRAND_SUCCESS_COLOR,
-        'brand_alert_color': BRAND_ALERT_COLOR,
-        'brand_gradient': BRAND_GRADIENT,
-        'brand_gradient_start': BRAND_GRADIENT_START,
-        'brand_gradient_mid': BRAND_GRADIENT_MID,
-        'brand_gradient_end': BRAND_GRADIENT_END
+        "name": COMPANY_NAME,
+        "name_short": COMPANY_NAME_SHORT,
+        "tagline": COMPANY_TAGLINE,
+        "phone": COMPANY_PHONE,
+        "email": COMPANY_EMAIL,
+        "support_email": COMPANY_SUPPORT_EMAIL,
+        "fraud_email": COMPANY_FRAUD_EMAIL,
+        "address": COMPANY_ADDRESS_FULL,
+        "website": COMPANY_WEBSITE,
+        "facebook": COMPANY_FACEBOOK,
+        "twitter": COMPANY_TWITTER,
+        "linkedin": COMPANY_LINKEDIN,
+        "business_hours": BUSINESS_HOURS,
+        "business_hours_weekend": BUSINESS_HOURS_WEEKEND,
+        "support_hours": SUPPORT_HOURS,
+        "version": APP_VERSION,
+        "copyright": APP_COPYRIGHT,
+        "browser_title": BROWSER_TITLE,
+        "terms_url": TERMS_URL,
+        "privacy_url": PRIVACY_URL,
+        "abn": ABN,
+        "brand_primary_color": BRAND_PRIMARY_COLOR,
+        "brand_secondary_color": BRAND_SECONDARY_COLOR,
+        "brand_accent_color": BRAND_ACCENT_COLOR,
+        "brand_danger_color": BRAND_DANGER_COLOR,
+        "brand_success_color": BRAND_SUCCESS_COLOR,
+        "brand_alert_color": BRAND_ALERT_COLOR,
+        "brand_gradient": BRAND_GRADIENT,
+        "brand_gradient_start": BRAND_GRADIENT_START,
+        "brand_gradient_mid": BRAND_GRADIENT_MID,
+        "brand_gradient_end": BRAND_GRADIENT_END,
     }
+
 
 def get_contact_methods():
     """Returns formatted contact methods for display"""
     return [
-        {'icon': 'phone', 'label': 'Phone', 'value': COMPANY_PHONE, 'link': f'tel:{COMPANY_PHONE.replace(" ", "")}'},
-        {'icon': 'envelope', 'label': 'Email', 'value': COMPANY_EMAIL, 'link': f'mailto:{COMPANY_EMAIL}'},
-        {'icon': 'globe', 'label': 'Website', 'value': COMPANY_WEBSITE, 'link': COMPANY_WEBSITE},
+        {"icon": "phone", "label": "Phone", "value": COMPANY_PHONE, "link": f'tel:{COMPANY_PHONE.replace(" ", "")}'},
+        {"icon": "envelope", "label": "Email", "value": COMPANY_EMAIL, "link": f"mailto:{COMPANY_EMAIL}"},
+        {"icon": "globe", "label": "Website", "value": COMPANY_WEBSITE, "link": COMPANY_WEBSITE},
     ]

@@ -1,390 +1,393 @@
-# Zava - Azure App Service Deployment Guide
+# Zava - Azure Deployment Guide
 
 ## Prerequisites
 
 1. Azure Subscription
 2. Azure CLI installed (`az`)
-3. Azure Developer CLI installed (`azd`)
+3. PowerShell 7+ (for deployment script)
 4. Git installed
+5. `.env` file configured with agent IDs and configuration
 
-## Deployment Steps
+## Quick Start - Automated Deployment
 
-### Option 1: Deploy with Azure Developer CLI (Recommended)
+The recommended way to deploy Zava is using the automated PowerShell deployment script with Bicep:
 
-```bash
-# Login to Azure
-azd auth login
-
-# Initialize and provision resources
-azd up
-
-# Follow prompts to:
-# - Select subscription
-# - Choose region (e.g., australiaeast)
-# - Name your resources
-```
-
-### Option 2: Deploy with Azure CLI
-
-```bash
+```powershell
 # Login to Azure
 az login
 
-# Create Resource Group
-az group create --name dt-logistics-rg --location australiaeast
+# Navigate to project directory
+cd c:\Workbench\dt_item_scanner
 
-# Create App Service Plan
-az appservice plan create \
-  --name dt-logistics-plan \
-  --resource-group dt-logistics-rg \
-  --sku B1 \
-  --is-linux
+# Deploy everything (infrastructure + code)
+.\deploy_to_azure.ps1
 
-# Create Web App
-az webapp create \
-  --name dt-logistics-web \
-  --resource-group dt-logistics-rg \
-  --plan dt-logistics-plan \
-  --runtime "PYTHON:3.11"
-
-# Configure startup command
-az webapp config set \
-  --name dt-logistics-web \
-  --resource-group dt-logistics-rg \
-  --startup-file "gunicorn --bind=0.0.0.0:8000 --timeout 600 --workers=4 app:app"
-
-# Enable managed identity (recommended for production)
-az webapp identity assign \
-  --name dt-logistics-web \
-  --resource-group dt-logistics-rg
-
-# Set environment variables
-az webapp config appsettings set \
-  --name dt-logistics-web \
-  --resource-group dt-logistics-rg \
-  --settings \
-    COSMOS_DB_ENDPOINT="<your_cosmos_endpoint>" \
-    COSMOS_DB_DATABASE_NAME="<your_database_name>" \
-    AZURE_AI_PROJECT_CONNECTION_STRING="<your_ai_connection>" \
-    AZURE_SPEECH_KEY="<your_speech_key>" \
-    AZURE_SPEECH_REGION="<your_region>" \
-    FLASK_SECRET_KEY="<generate_secure_key>" \
-    FLASK_ENV="production" \
-    USE_MANAGED_IDENTITY="true"
-
-# Deploy code
-az webapp up \
-  --name dt-logistics-web \
-  --resource-group dt-logistics-rg \
-  --runtime "PYTHON:3.11"
+# Or deploy to specific environment
+.\deploy_to_azure.ps1 -Environment "production" -Sku "P1v2" -Location "eastus"
 ```
 
-### Option 3: Deploy from GitHub
+### What Gets Deployed
 
-1. Push code to GitHub repository
-2. In Azure Portal, go to your App Service
-3. Select "Deployment Center"
-4. Choose GitHub as source
-5. Authenticate and select repository
-6. Azure will auto-deploy on every push
+The deployment script uses the Bicep template (`infra/main.bicep`) to create:
 
-## Environment Variables (Required)
+- ✅ **Cosmos DB** (serverless) with 5 containers
+- ✅ **Azure AI Hub & Project** for 9 AI agents
+- ✅ **Azure Maps** for route optimization
+- ✅ **Speech Services** for voice features
+- ✅ **Computer Vision** for OCR
+- ✅ **App Service & Plan** (Linux Python 3.11)
+- ✅ **Application Insights & Log Analytics**
+- ✅ **Storage Account** for AI Hub
+- ✅ **RBAC Permissions** (managed identity authentication)
+- ✅ **Agent Configuration** (9 agent IDs from `.env`)
+- ✅ **Demo Data** (users, manifests, parcels)
 
-Set these in Azure Portal → App Service → Configuration → Application Settings:
+### Prerequisites Check
 
-| Variable | Description | Example |
-|----------|-------------|---------|------|
-| `COSMOS_DB_ENDPOINT` | Azure Cosmos DB endpoint URL | `https://your-cosmos.documents.azure.com:443/` |
-| `COSMOS_DB_DATABASE_NAME` | Cosmos DB database name | `logisticstracking` |
-| `AZURE_AI_PROJECT_CONNECTION_STRING` | Azure AI Foundry endpoint | `https://your-hub.services.ai.azure.com/api/projects/your-project` |
-| `AZURE_SPEECH_KEY` | Azure Speech Services key | `your-speech-key` |
-| `AZURE_SPEECH_REGION` | Azure Speech Services region | `australiaeast` |
-| `FLASK_SECRET_KEY` | Flask session secret | Generate with `python -c "import secrets; print(secrets.token_hex(32))"` |
-| `FLASK_ENV` | Environment mode | `production` |
-| `USE_MANAGED_IDENTITY` | Enable managed identity auth | `true` |
-| `PORT` | Port number (auto-set) | `8000` |
+The deployment script **automatically handles**:
+- ✅ **Resource Provider Registration**: All required Azure resource providers are registered automatically
+  - Microsoft.DocumentDB (Cosmos DB)
+  - Microsoft.CognitiveServices (AI, Speech, Vision)
+  - Microsoft.Maps, Microsoft.Web, Microsoft.Insights
+  - Microsoft.Storage, Microsoft.MachineLearningServices
+- ✅ **RBAC Permission Propagation**: Waits for managed identity permissions
+- ✅ **Fresh Subscription Support**: Works on brand new Azure subscriptions
 
-**Note**: Do NOT set `COSMOS_CONNECTION_STRING` or `COSMOS_DB_KEY` when using managed identity authentication.
+No manual portal configuration required!
 
-## RBAC Permissions (Required for Managed Identity)
+## Deployment Options
 
-After enabling managed identity, grant the following Azure RBAC roles to the App Service's managed identity:
-
-### 1. Cosmos DB Access
-
-```bash
-# Get the managed identity principal ID
-PRINCIPAL_ID=$(az webapp identity show \
-  --name dt-logistics-web \
-  --resource-group dt-logistics-rg \
-  --query principalId -o tsv)
-
-# Assign Cosmos DB Built-in Data Contributor role
-az cosmosdb sql role assignment create \
-  --account-name your-cosmos-account \
-  --resource-group dt-logistics-rg \
-  --role-definition-id 00000000-0000-0000-0000-000000000002 \
-  --principal-id $PRINCIPAL_ID \
-  --scope "/"
+### Full Deployment (First Time)
+```powershell
+.\deploy_to_azure.ps1
 ```
 
-### 2. Azure AI Foundry Access
-
-```bash
-# Get subscription ID
-SUBSCRIPTION_ID=$(az account show --query id -o tsv)
-
-# Assign Cognitive Services OpenAI Contributor role
-az role assignment create \
-  --assignee-object-id $PRINCIPAL_ID \
-  --assignee-principal-type ServicePrincipal \
-  --role "Cognitive Services OpenAI Contributor" \
-  --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/dt-logistics-rg"
-
-# Assign Azure AI Developer role (for agents/write operations)
-az role assignment create \
-  --assignee-object-id $PRINCIPAL_ID \
-  --assignee-principal-type ServicePrincipal \
-  --role "Azure AI Developer" \
-  --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/dt-logistics-rg"
-
-# Assign Cognitive Services User role (for agents/read operations)
-az role assignment create \
-  --assignee-object-id $PRINCIPAL_ID \
-  --assignee-principal-type ServicePrincipal \
-  --role "Cognitive Services User" \
-  --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/dt-logistics-rg"
-
-# CRITICAL: Assign roles to the specific AI Hub resource (required for agents/read)
-# Find your AI Hub resource ID
-AI_HUB_RESOURCE_ID=$(az resource list \
-  --query "[?contains(name, 'dtaihub') && type=='Microsoft.CognitiveServices/accounts'].id | [0]" \
-  -o tsv)
-
-echo "AI Hub Resource: $AI_HUB_RESOURCE_ID"
-
-# Assign Cognitive Services Contributor to AI Hub (includes all agent operations)
-az role assignment create \
-  --assignee-object-id $PRINCIPAL_ID \
-  --assignee-principal-type ServicePrincipal \
-  --role "Cognitive Services Contributor" \
-  --scope "$AI_HUB_RESOURCE_ID"
-
-# Assign Azure AI Developer to AI Hub
-az role assignment create \
-  --assignee-object-id $PRINCIPAL_ID \
-  --assignee-principal-type ServicePrincipal \
-  --role "Azure AI Developer" \
-  --scope "$AI_HUB_RESOURCE_ID"
-
-# Assign Cognitive Services OpenAI Contributor to AI Hub
-az role assignment create \
-  --assignee-object-id $PRINCIPAL_ID \
-  --assignee-principal-type ServicePrincipal \
-  --role "Cognitive Services OpenAI Contributor" \
-  --scope "$AI_HUB_RESOURCE_ID"
+### Code-Only Deployment (After Infrastructure Exists)
+```powershell
+.\deploy_to_azure.ps1 -CodeOnly
 ```
 
-### 3. Verify Role Assignments
-
-```bash
-# List all role assignments for the managed identity
-az role assignment list \
-  --assignee $PRINCIPAL_ID \
-  --all \
-  --query "[].{Role:roleDefinitionName, Scope:scope}" \
-  --output table
+### Force Complete Redeployment
+```powershell
+.\deploy_to_azure.ps1 -Force
 ```
 
-### Required Roles Summary
-
-| Service | Role | Scope | Purpose |
-|---------|------|-------|---------|
-| **Cosmos DB** | `Cosmos DB Built-in Data Contributor` | Cosmos DB Account | Full data plane access (CRUD operations) |
-| **AI Foundry (RG)** | `Cognitive Services OpenAI Contributor` | Resource Group | OpenAI model operations |
-| **AI Foundry (RG)** | `Azure AI Developer` | Resource Group | General agent permissions |
-| **AI Foundry (RG)** | `Cognitive Services User` | Resource Group | Agent read operations |
-| **AI Hub (Resource)** | `Cognitive Services Contributor` | AI Hub Resource | **CRITICAL**: Includes agents/read data action |
-| **AI Hub (Resource)** | `Azure AI Developer` | AI Hub Resource | Agent write/execute on specific resource |
-| **AI Hub (Resource)** | `Cognitive Services OpenAI Contributor` | AI Hub Resource | OpenAI operations on specific resource |
-| **Azure Speech** | Configured via API key | N/A | Speech synthesis and recognition |
-
-**⚠️ CRITICAL**: The `agents/read` permission requires roles assigned directly to the AI Hub **resource**, not just the resource group. Without this, chatbot and fraud detection will fail with permission errors.
-
-**Important**: Role assignments can take up to 5 minutes to propagate. Restart the App Service after granting permissions:
-
-```bash
-az webapp restart --name dt-logistics-web --resource-group dt-logistics-rg
+### Custom Configuration
+```powershell
+.\deploy_to_azure.ps1 `
+  -ResourceGroup "my-custom-rg" `
+  -Location "australiaeast" `
+  -Environment "production" `
+  -Sku "P1v2"
 ```
 
-## Post-Deployment Configuration
+## Environment File Configuration
 
-### 1. Generate Demo Data (First-Time Setup)
+Before deploying, ensure your `.env` file contains all required values:
 
-After your first deployment, populate the database with sample parcels and driver manifests:
+```ini
+# Azure AI Foundry
+AZURE_AI_PROJECT_ENDPOINT="https://your-hub.services.ai.azure.com/api/projects/your-project"
+AZURE_AI_MODEL_DEPLOYMENT_NAME="gpt-4o-mini"
 
-**Automatic (via deploy_to_azure.ps1):**
-The deployment script automatically runs post-deployment tasks that create:
+# Agent IDs (9 agents)
+CUSTOMER_SERVICE_AGENT_ID="asst_xxx"
+FRAUD_RISK_AGENT_ID="asst_xxx"
+IDENTITY_AGENT_ID="asst_xxx"
+DISPATCHER_AGENT_ID="asst_xxx"
+PARCEL_INTAKE_AGENT_ID="asst_xxx"
+SORTING_FACILITY_AGENT_ID="asst_xxx"
+DELIVERY_COORDINATION_AGENT_ID="asst_xxx"
+OPTIMIZATION_AGENT_ID="asst_xxx"
+DRIVER_AGENT_ID="asst_xxx"
 
-- ✅ Default user accounts (admin, support, drivers, depot_mgr)
-- ✅ 57 driver manifests (driver-001 through driver-057)
-- ✅ Sample parcels distributed across Australian states
-- ✅ Ready-to-use demo environment
+# Azure Cosmos DB (created by Bicep deployment)
+COSMOS_DB_ENDPOINT="https://your-cosmos.documents.azure.com:443/"
+COSMOS_DB_DATABASE_NAME="logisticstracking"
 
-**Manual (if needed):**
+# Azure Maps
+AZURE_MAPS_SUBSCRIPTION_KEY="your-key"
 
-```bash
-# If automatic setup failed or you need to regenerate data
+# Azure Speech Services
+AZURE_SPEECH_RESOURCE_ID="/subscriptions/.../providers/Microsoft.CognitiveServices/accounts/your-speech"
+AZURE_SPEECH_REGION="australiaeast"
 
-# Generate demo manifests for all 57 drivers
-cd utils/generators
-python generate_demo_manifests.py
+# Azure Computer Vision
+AZURE_VISION_ENDPOINT="https://your-vision.cognitiveservices.azure.com/"
+AZURE_VISION_KEY="your-key"
 
-# OR generate large scalability test for driver-004 (120 parcels)
-python generate_demo_manifests.py --large-default
-
-# OR generate custom large manifest
-python generate_demo_manifests.py --large 200
+# Depot Addresses (8 Australian states)
+DEPOT_NSW="1 Homebush Bay Drive, Rhodes NSW 2138"
+DEPOT_VIC="456 Spencer Street, Melbourne VIC 3000"
+# ... (remaining depot addresses)
 ```
 
-**What this creates:**
+## Deployment Script Features
 
-- Sample parcels across NSW, VIC, QLD, SA, WA, ACT
-- Driver manifests with 30-50 parcels each
-- Realistic Sydney addresses and delivery details
-- Immediate testing capability for all features
+### Automated Infrastructure
+- Creates all Azure resources via Bicep template
+- Configures RBAC permissions automatically
+- Sets up managed identity authentication
+- No manual portal configuration needed
 
-### 2. Enable Always On
+### Intelligent Redeployment
+- Detects existing deployments
+- Preserves Flask session keys
+- Updates only changed resources
+- Saves deployment configuration to `.azure-deployment.json`
 
-```bash
-az webapp config set \
-  --name dt-logistics-web \
-  --resource-group dt-logistics-rg \
-  --always-on true
+### Post-Deployment Tasks
+- Initializes default users (admin, support, drivers)
+- Generates demo manifests for all drivers
+- Updates agent instructions in Azure AI Foundry
+- Tests application endpoint
+
+## Manual Infrastructure Deployment (Advanced)
+
+If you need to deploy infrastructure separately:
+
+```powershell
+# Deploy only infrastructure (uses infra/main.bicep)
+az deployment group create `
+  --name "zava-deployment" `
+  --resource-group "RG-Zava-Logistics" `
+  --template-file "infra/main.bicep" `
+  --parameters location="australiaeast" environment="dev" appServiceSku="B2"
 ```
 
-### 3. Configure Logging
+## Post-Deployment Verification
 
-```bash
-az webapp log config \
-  --name dt-logistics-web \
-  --resource-group dt-logistics-rg \
-  --application-logging filesystem \
-  --detailed-error-messages true \
-  --web-server-logging filesystem
+### 1. Check Deployment Status
+```powershell
+# View deployment outputs
+az deployment group show `
+  --name "zava-deployment-YYYYMMDDHHMMSS" `
+  --resource-group "RG-Zava-Logistics" `
+  --query "properties.outputs"
+
+# List app services
+az webapp list --resource-group "RG-Zava-Logistics" --output table
 ```
 
-### 4. View Logs
-
-```bash
-az webapp log tail \
-  --name dt-logistics-web \
-  --resource-group dt-logistics-rg
+### 2. View Application Logs
+```powershell
+az webapp log tail `
+  --name "zava-dev-web-XXXXXX" `
+  --resource-group "RG-Zava-Logistics"
 ```
 
-## Custom Domain & SSL
-
-```bash
-# Map custom domain
-az webapp config hostname add \
-  --webapp-name dt-logistics-web \
-  --resource-group dt-logistics-rg \
-  --hostname yourdomain.com
-
-# Enable HTTPS
-az webapp update \
-  --name dt-logistics-web \
-  --resource-group dt-logistics-rg \
-  --https-only true
-```
+### 3. Test Application
+Visit the application URL provided in the deployment output:
+- Default credentials: `admin` / `admin123`
+- Wait 1-2 minutes for RBAC permissions to propagate
 
 ## Scaling
 
-```bash
-# Scale up (change App Service Plan)
-az appservice plan update \
-  --name dt-logistics-plan \
-  --resource-group dt-logistics-rg \
-  --sku P1V2
+### Scale Up (Change SKU)
+```powershell
+# Update to Premium tier
+.\deploy_to_azure.ps1 -Sku "P1v2"
 
-# Scale out (increase instances)
-az appservice plan update \
-  --name dt-logistics-plan \
-  --resource-group dt-logistics-rg \
+# Or manually via CLI
+az appservice plan update `
+  --name "zava-dev-plan" `
+  --resource-group "RG-Zava-Logistics" `
+  --sku "P1v2"
+```
+
+### Scale Out (Increase Instances)
+```powershell
+az appservice plan update `
+  --name "zava-dev-plan" `
+  --resource-group "RG-Zava-Logistics" `
   --number-of-workers 3
 ```
 
-## Monitoring
+### Restart App Service
+```powershell
+# Find your app service name
+az webapp list --resource-group "RG-Zava-Logistics" --query "[].name" -o table
 
-```bash
-# Enable Application Insights
-az monitor app-insights component create \
-  --app dt-logistics-insights \
-  --location australiaeast \
-  --resource-group dt-logistics-rg
-
-# Link to App Service
-INSTRUMENTATION_KEY=$(az monitor app-insights component show \
-  --app dt-logistics-insights \
-  --resource-group dt-logistics-rg \
-  --query instrumentationKey -o tsv)
-
-az webapp config appsettings set \
-  --name dt-logistics-web \
-  --resource-group dt-logistics-rg \
-  --settings APPINSIGHTS_INSTRUMENTATIONKEY=$INSTRUMENTATION_KEY
+# Restart it
+az webapp restart `
+  --name "zava-dev-web-XXXXXX" `
+  --resource-group "RG-Zava-Logistics"
 ```
 
-## Troubleshooting
+## Monitoring & Diagnostics
 
-### Check Application Logs
-
-```bash
-az webapp log tail --name dt-logistics-web --resource-group dt-logistics-rg
+### View Live Logs
+```powershell
+az webapp log tail `
+  --name "zava-dev-web-XXXXXX" `
+  --resource-group "RG-Zava-Logistics"
 ```
 
-### SSH into Container
+### View Application Insights
+The Bicep deployment includes Application Insights. Access it via:
+- Azure Portal → Application Insights → zava-dev-appinsights-XXXXXX
+- View: Failures, Performance, Live Metrics, Logs
 
-```bash
-az webapp ssh --name dt-logistics-web --resource-group dt-logistics-rg
-```
-
-### Restart App
-
-```bash
-az webapp restart --name dt-logistics-web --resource-group dt-logistics-rg
+### Health Check
+```powershell
+# Test application endpoint
+$webAppName = (az webapp list --resource-group "RG-Zava-Logistics" --query "[0].defaultHostName" -o tsv)
+Invoke-WebRequest "https://$webAppName/health" -UseBasicParsing
 ```
 
 ## Security Checklist
 
-- ✅ HTTPS enabled
-- ✅ Managed Identity enabled and assigned
-- ✅ RBAC roles granted (Cosmos DB, Azure AI, Speech Services)
-- ✅ Environment variables set in Azure (not in code)
-- ✅ Connection strings removed (using managed identity)
-- ✅ .gitignore includes .env file
-- ✅ Authentication configured (for production)
-- ✅ IP restrictions enabled (optional)
-- ✅ Application Insights monitoring enabled
-- ✅ Cosmos DB key-based auth disabled (`DisableLocalAuth=true`)
+- ✅ **HTTPS Only**: Enforced by Bicep template
+- ✅ **Managed Identity**: Enabled automatically
+- ✅ **RBAC Permissions**: Granted during deployment
+  - Cosmos DB Data Contributor
+  - Cognitive Services OpenAI Contributor  
+  - Azure AI Developer
+- ✅ **No Connection Strings**: Uses managed identity authentication
+- ✅ **Secrets Management**: `.env` file excluded from Git
+- ✅ **Cosmos DB**: Local auth disabled (`DisableLocalAuth=true`)
+- ✅ **Application Insights**: Enabled with Log Analytics
+- ✅ **Network Isolation**: _(Optional)_ Configure VNet integration
+
+### Optional: Enable IP Restrictions
+```powershell
+az webapp config access-restriction add `
+  --name "zava-dev-web-XXXXXX" `
+  --resource-group "RG-Zava-Logistics" `
+  --rule-name "office" `
+  --action Allow `
+  --ip-address "203.0.113.0/24" `
+  --priority 100
+```
 
 ## Cost Optimization
 
-- Use B1 Basic tier for development ($13/month)
-- Use P1V2 Premium for production ($146/month)
-- Enable auto-scaling based on CPU/Memory
+### Recommended SKUs by Environment
+- **Development**: B2 ($62/month AUD) - Included in deployment
+- **Staging**: S1 ($100/month AUD)
+- **Production**: P1v2 ($146/month AUD) - Auto-scaling, custom domains
+
+### Cost-Saving Tips
+- Use Cosmos DB serverless mode (included in Bicep)
+- Enable auto-scaling only on production
 - Use Azure Cost Management alerts
+- Stop development environments outside business hours
 
-## URLs
+### Set Budget Alert
+```powershell
+# Create budget alert at $200/month
+az consumption budget create `
+  --budget-name "zava-monthly-budget" `
+  --amount 200 `
+  --time-grain Monthly `
+  --start-date (Get-Date -Format "yyyy-MM-01") `
+  --end-date (Get-Date).AddYears(1).ToString("yyyy-MM-01") `
+  --resource-group "RG-Zava-Logistics"
+```
 
-- App URL: `https://dt-logistics-web.azurewebsites.net`
-- SCM URL: `https://dt-logistics-web.scm.azurewebsites.net`
-- Health Check: `https://dt-logistics-web.azurewebsites.net/health`
+## Troubleshooting
 
-## Support
+### Deployment Fails
+```powershell
+# Check Bicep deployment errors
+az deployment group list `
+  --resource-group "RG-Zava-Logistics" `
+  --query "[?properties.provisioningState=='Failed']"
 
-For issues or questions:
+# View detailed error
+az deployment group show `
+  --name "zava-deployment-YYYYMMDDHHMMSS" `
+  --resource-group "RG-Zava-Logistics" `
+  --query "properties.error"
+```
 
+### RBAC Permission Errors
+```powershell
+# Wait 2-5 minutes for RBAC propagation, then restart app
+Start-Sleep -Seconds 300
+az webapp restart --name "zava-dev-web-XXXXXX" --resource-group "RG-Zava-Logistics"
+
+# Verify role assignments
+$principalId = (az webapp identity show --name "zava-dev-web-XXXXXX" --resource-group "RG-Zava-Logistics" --query "principalId" -o tsv)
+az role assignment list --assignee $principalId --all --output table
+```
+
+### Login Issues After Deployment
+**Symptom**: "Invalid credentials" or "Demo login failed"
+
+**Cause**: RBAC permissions not yet propagated (takes 2-5 minutes)
+
+**Solution**:
+- Wait 2-5 minutes after deployment
+- App auto-initializes users on first successful connection
+- Restart app service to retry: `az webapp restart --name "zava-dev-web-XXXXXX" --resource-group "RG-Zava-Logistics"`
+
+### Agent Errors
+```powershell
+# Verify all 9 agent IDs are set in .env
+Select-String -Path ".env" -Pattern "AGENT_ID"
+
+# Check agent connectivity in logs
+az webapp log tail --name "zava-dev-web-XXXXXX" --resource-group "RG-Zava-Logistics" | Select-String "agent"
+```
+
+### Database Connection Errors
+```powershell
+# Test Cosmos DB connection
+python parcel_tracking_db.py
+
+# Verify endpoint in app settings
+az webapp config appsettings list `
+  --name "zava-dev-web-XXXXXX" `
+  --resource-group "RG-Zava-Logistics" `
+  --query "[?name=='COSMOS_DB_ENDPOINT']"
+```
+
+## Useful URLs
+
+After deployment, your application will be available at:
+- **App URL**: `https://zava-dev-web-XXXXXX.azurewebsites.net`
+- **Admin Portal**: `https://zava-dev-web-XXXXXX.azurewebsites.net/admin`
+- **API Health Check**: `https://zava-dev-web-XXXXXX.azurewebsites.net/health`
+
+_(Replace XXXXXX with your unique suffix)_
+
+## CI/CD Integration
+
+### Deploy from GitHub Actions
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy with PowerShell
+        run: .\deploy_to_azure.ps1 -CodeOnly
+        shell: pwsh
+```
+
+## Support & Documentation
+
+For additional help:
+- 📖 [Main README](../readme.md) - User-focused overview
+- 🤖 [AGENTS.md](../AGENTS.md) - Developer documentation
+- 🚀 [DEMO_GUIDE.md](DEMO_GUIDE.md) - Feature walkthrough
+- 🔐 [USER_AUTH_GUIDE.md](USER_AUTH_GUIDE.md) - Authentication details
+
+**Technical Support:**
 - Check Azure Portal → App Service → Diagnose and solve problems
-- Review application logs
-- Contact Azure Support
+- Review application logs: `az webapp log tail`
+- Contact: [GitHub Issues](https://github.com/your-repo/issues)

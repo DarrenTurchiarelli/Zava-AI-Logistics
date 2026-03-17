@@ -23,6 +23,34 @@
         height: 0;
         overflow: visible;
     }
+
+    /* Mobile chatbot optimizations */
+    @media (max-width: 768px) {
+        body.chatbot-page .card[style*="height: calc"] {
+            height: calc(100vh - 220px) !important;
+            max-height: calc(100vh - 220px) !important;
+        }
+
+        body.chatbot-page .container-fluid {
+            padding: 0.25rem 0.5rem 0 !important;
+        }
+
+        body.chatbot-page h2 {
+            font-size: 1.15rem !important;
+        }
+
+        body.chatbot-page .card-footer {
+            padding: 0.4rem 0.5rem !important;
+        }
+
+        body.chatbot-page #voiceSelector {
+            display: none;
+        }
+
+        body.chatbot-page .btn-outline-secondary[onclick="stopSpeaking()"] {
+            display: none;
+        }
+    }
 </style>
 <script>
     // Auto-dismiss flash messages after 3 seconds on chatbot page
@@ -44,13 +72,17 @@
     <div class="row" style="margin-bottom: 0.5rem;">
         <div class="col-12" style="padding-bottom: 0;">
             <h2 style="margin-bottom: 0; font-size: 1.5rem; display: inline-block;"><i class="bi bi-robot"></i> AI Customer Service Assistant</h2>
-            <p class="text-muted" style="margin: 0; font-size: 0.875rem; display: inline-block; margin-left: 1rem;">Ask questions about parcels, check fraud reports, and get AI-powered assistance</p>
+            <p class="text-muted d-none d-md-inline-block" style="margin: 0; font-size: 0.875rem; margin-left: 1rem;">Ask questions about parcels, check fraud reports, and get AI-powered assistance</p>
         </div>
     </div>
 
     <div class="row">
-        <!-- Quick Actions Panel -->
-        <div class="col-md-3">
+        <!-- Quick Actions Panel - Collapsible on mobile -->
+        <div class="col-lg-3 col-md-4 order-2 order-md-1">
+            <button class="btn btn-primary w-100 d-md-none mb-2" type="button" data-bs-toggle="collapse" data-bs-target="#quickActionsPanel" aria-expanded="false">
+                <i class="bi bi-lightning-charge-fill"></i> Quick Actions & Lookup
+            </button>
+            <div class="collapse d-md-block" id="quickActionsPanel">
             <div class="card mb-3">
                 <div class="card-header bg-primary text-white">
                     <i class="bi bi-lightning-charge-fill"></i> Quick Actions
@@ -167,10 +199,11 @@
                     </button>
                 </div>
             </div>
+            </div><!-- end collapsible quickActionsPanel -->
         </div>
 
         <!-- Chat Panel -->
-        <div class="col-md-6">
+        <div class="col-lg-6 col-md-8 order-1 order-md-2">
             <div class="card" style="height: calc(100vh - 180px); max-height: calc(100vh - 180px); display: flex; flex-direction: column;">
                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center" style="flex-shrink: 0; padding: 0.4rem 0.75rem;">
                     <span style="font-size: 0.95rem;"><i class="bi bi-chat-dots-fill"></i> Chat with AI Assistant</span>
@@ -178,19 +211,22 @@
                         <i class="bi bi-mic-fill"></i> Listening...
                     </span>
                 </div>
-                <div class="card-body chat-container" id="chatMessages" style="overflow-y: auto; flex: 1; min-height: 0; background-color: #fff; padding: 1rem;">
+                <div class="card-body chat-container" id="chatMessages" style="overflow-y: auto; flex: 1; min-height: 0; background-color: #fff; padding: 1rem; -webkit-overflow-scrolling: touch;">
                     <div class="chat-message ai-message">
                         <div class="message-content" style="background-color: transparent; border: 1px solid #dee2e6; padding-left: 0.5rem;"><i class="bi bi-info-circle-fill"></i><strong>Welcome!</strong> I'm Alex, your customer service assistant.<br><small>💬 Ask me anything about your parcels or 🎤 use voice input!</small></div>
                     </div>
                 </div>
                 <div class="card-footer" style="flex-shrink: 0; padding: 0.5rem 0.75rem;">
-                    <div class="input-group input-group-sm">
+                    <div class="input-group">
                         <input type="text" class="form-control" id="chatInput" placeholder="Ask a question or use voice..." onkeypress="handleEnter(event)">
-                        <button class="btn btn-primary btn-sm" id="voiceBtn" onclick="toggleVoiceInput()" title="Voice Input">
+                        <button class="btn btn-primary" id="voiceBtn" onclick="toggleVoiceInput()" title="Voice Input">
                             <i class="bi bi-mic-fill" id="micIcon"></i>
                         </button>
-                        <button class="btn btn-primary btn-sm" onclick="sendMessage()">
+                        <button class="btn btn-primary btn-sm" onclick="sendMessage()" title="Send Message">
                             <i class="bi bi-send-fill"></i>
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm" onclick="clearChat()" title="End Chat & Start New Conversation" id="endChatBtn">
+                            <i class="bi bi-x-lg"></i>
                         </button>
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem;">
@@ -210,8 +246,8 @@
             </div>
         </div>
 
-        <!-- Information Panel -->
-        <div class="col-md-3">
+        <!-- Information Panel - Collapsible on mobile -->
+        <div class="col-lg-3 d-none d-lg-block order-3">
             <div class="card">
                 <div class="card-header bg-primary text-white">
                     <i class="bi bi-info-circle-fill"></i> Information
@@ -255,6 +291,78 @@ let availableVoices = [];
 let selectedVoice = null;
 let azureVoices = {};
 
+// --- iOS Audio Compatibility ---
+// iOS Safari blocks Audio.play() and speechSynthesis.speak() outside user gestures.
+// AudioContext, once unlocked on first tap, allows reliable cross-platform playback.
+let _csAudioCtx = null;
+let _csAudioSource = null;
+
+function _getCsAudioCtx() {
+    if (!_csAudioCtx) {
+        _csAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    return _csAudioCtx;
+}
+
+let _csAudioUnlocked = false;
+function _unlockCsAudio() {
+    if (_csAudioUnlocked) return;
+    _csAudioUnlocked = true;
+    try {
+        const ctx = _getCsAudioCtx();
+        if (ctx.state === 'suspended') ctx.resume();
+        const buf = ctx.createBuffer(1, 1, 22050);
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(ctx.destination);
+        src.start(0);
+    } catch(e) {}
+    if (window.speechSynthesis) {
+        const u = new SpeechSynthesisUtterance(' ');
+        u.volume = 0.01;
+        window.speechSynthesis.speak(u);
+    }
+    console.log('🔓 iOS audio unlocked');
+}
+
+async function _playCsAudioBlob(blob) {
+    const ctx = _getCsAudioCtx();
+    if (ctx.state === 'suspended') await ctx.resume();
+    _stopCsAudioSource();
+    try {
+        const arrayBuffer = await blob.arrayBuffer();
+        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(ctx.destination);
+        _csAudioSource = source;
+        source.start(0);
+        return new Promise((resolve) => {
+            source.onended = () => { _csAudioSource = null; resolve(); };
+        });
+    } catch (decodeErr) {
+        // Fallback: use Audio element with blob URL (handles WAV on iOS Safari)
+        console.warn('AudioContext decode failed, using Audio element fallback:', decodeErr);
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        return new Promise((resolve, reject) => {
+            audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
+            audio.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+            audio.play().catch((e) => { URL.revokeObjectURL(url); reject(e); });
+        });
+    }
+}
+
+function _stopCsAudioSource() {
+    if (_csAudioSource) {
+        try { _csAudioSource.stop(); } catch(e) {}
+        _csAudioSource = null;
+    }
+}
+
+document.addEventListener('click', _unlockCsAudio, { once: true });
+document.addEventListener('touchstart', _unlockCsAudio, { once: true });
+
 // Load Azure Neural voices from API
 async function loadAzureVoices() {
     try {
@@ -273,6 +381,9 @@ async function loadAzureVoices() {
 function populateVoiceSelector() {
     availableVoices = speechSynthesis.getVoices();
     const voiceSelector = document.getElementById('voiceSelector');
+
+    // Preserve current selection if user has already chosen
+    const previousValue = voiceSelector.value;
     voiceSelector.innerHTML = '';
 
     // Add Azure Neural voices first (premium)
@@ -306,10 +417,14 @@ function populateVoiceSelector() {
         voiceSelector.appendChild(browserGroup);
     }
 
-    // Set default to Natasha (Azure Neural) or first available
-    const defaultOption = voiceSelector.querySelector('option[value="azure:natasha"]');
-    if (defaultOption) {
-        voiceSelector.value = 'azure:natasha';
+    // Restore previous selection if it still exists, otherwise default to Natasha
+    if (previousValue && voiceSelector.querySelector(`option[value="${CSS.escape(previousValue)}"]`)) {
+        voiceSelector.value = previousValue;
+    } else {
+        const defaultOption = voiceSelector.querySelector('option[value="azure:natasha"]');
+        if (defaultOption) {
+            voiceSelector.value = 'azure:natasha';
+        }
     }
 }
 
@@ -372,6 +487,7 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
 }
 
 function toggleVoiceInput() {
+    _unlockCsAudio();
     if (!recognition) {
         addMessage('Voice input is not supported in your browser. Please use Chrome, Edge, or Safari.', 'warning');
         return;
@@ -417,6 +533,10 @@ async function speak(text) {
 }
 
 async function speakWithAzure(text, voicePersona) {
+    // Look up gender from loaded Azure voice config for browser fallback matching
+    const voiceInfo = azureVoices[voicePersona];
+    const preferredGender = voiceInfo ? voiceInfo.gender : null;
+
     try {
         console.log('🔊 Using Azure Neural voice:', voicePersona);
         const response = await fetch('/api/speech/synthesize', {
@@ -430,36 +550,28 @@ async function speakWithAzure(text, voicePersona) {
             })
         });
 
-        if (response.ok) {
+        // Check that we got actual audio back (not a redirect to login page)
+        const contentType = response.headers.get('content-type') || '';
+        if (response.ok && contentType.includes('audio')) {
             const audioBlob = await response.blob();
-            const audioUrl = URL.createObjectURL(audioBlob);
-            currentAudio = new Audio(audioUrl);
-
-            currentAudio.onended = () => {
-                URL.revokeObjectURL(audioUrl);
-                currentAudio = null;
+            try {
+                await _playCsAudioBlob(audioBlob);
                 console.log('🔊 Azure speech ended');
-            };
-
-            currentAudio.onerror = (error) => {
-                console.error('🔊 Audio playback error:', error);
-                currentAudio = null;
-                // Fallback to browser speech
-                speakWithBrowser(text);
-            };
-
-            await currentAudio.play();
+            } catch (playError) {
+                console.error('🔊 Audio playback error:', playError);
+                speakWithBrowser(text, null, preferredGender);
+            }
         } else {
-            console.warn('Azure speech failed, falling back to browser');
-            speakWithBrowser(text);
+            console.warn('Azure speech unavailable (HTTP', response.status, ', type:', contentType, '), using browser voice');
+            speakWithBrowser(text, null, preferredGender);
         }
     } catch (error) {
         console.error('Azure speech error:', error);
-        speakWithBrowser(text);
+        speakWithBrowser(text, null, preferredGender);
     }
 }
 
-function speakWithBrowser(text, voiceName = null) {
+function speakWithBrowser(text, voiceName = null, preferredGender = null) {
     if (!speechSynthesis) {
         console.warn('Speech synthesis not supported');
         return;
@@ -469,6 +581,7 @@ function speakWithBrowser(text, voiceName = null) {
     currentUtterance.rate = 1.0;
     currentUtterance.pitch = 1.0;
     currentUtterance.volume = 1.0;
+    currentUtterance.lang = 'en-AU';
 
     // Use selected voice or find a good default
     const voices = speechSynthesis.getVoices();
@@ -480,12 +593,37 @@ function speakWithBrowser(text, voiceName = null) {
     }
 
     if (!voice) {
-        voice = voices.find(v => v.name.includes('Natural') || v.name.includes('Premium'))
-             || voices.find(v => v.lang.startsWith('en'));
+        // Filter to English voices first
+        const enVoices = voices.filter(v => v.lang.startsWith('en'));
+        let candidates = enVoices;
+
+        // Try to match preferred gender when falling back from Azure voice
+        if (preferredGender) {
+            const isFemale = preferredGender.toLowerCase() === 'female';
+            // Known voice name patterns by gender (Windows/Edge/Chrome)
+            const femalePattern = /zira|jenny|natasha|catherine|aria|sara|libby|hazel|susan|emma|michelle|sonia|clara|emily|carly|elsie|freya|joanne|kim|tina|annette|nicole|karen|fiona|moira|samantha|female/i;
+            const malePattern = /david|mark|ryan|guy|william|james|sam|liam|sean|darren|duncan|ken|neil|roger|george|christopher|daniel|thomas|male(?!fe)/i;
+
+            const genderFiltered = candidates.filter(v => {
+                if (isFemale) return femalePattern.test(v.name);
+                else return malePattern.test(v.name);
+            });
+
+            if (genderFiltered.length > 0) {
+                candidates = genderFiltered;
+                console.log(`🔊 Browser fallback: matched ${candidates.length} ${preferredGender.toLowerCase()} voice(s)`);
+            }
+        }
+
+        voice = candidates.find(v => v.lang === 'en-AU' && (v.name.includes('Natural') || v.name.includes('Premium')))
+             || candidates.find(v => v.lang === 'en-AU')
+             || candidates.find(v => v.name.includes('Natural') || v.name.includes('Premium'))
+             || candidates.find(v => v.lang.startsWith('en'));
     }
 
     if (voice) {
         currentUtterance.voice = voice;
+        console.log('🔊 Using browser voice:', voice.name, '(' + voice.lang + ')');
     }
 
     currentUtterance.onend = function() {
@@ -496,7 +634,6 @@ function speakWithBrowser(text, voiceName = null) {
         console.error('🔊 Browser speech error:', event.error);
     };
 
-    console.log('🔊 Speaking with browser:', text.substring(0, 50) + '...');
     speechSynthesis.speak(currentUtterance);
 }
 
@@ -507,7 +644,10 @@ function stopSpeaking() {
         console.log('🔊 Browser speech stopped');
     }
 
-    // Stop Azure audio playback
+    // Stop AudioContext playback (iOS-compatible)
+    _stopCsAudioSource();
+
+    // Stop legacy Audio element playback
     if (currentAudio) {
         currentAudio.pause();
         currentAudio.currentTime = 0;
@@ -573,6 +713,7 @@ function removeLoading() {
 }
 
 async function sendMessage() {
+    _unlockCsAudio();
     const input = document.getElementById('chatInput');
     const query = input.value.trim();
 
@@ -582,23 +723,57 @@ async function sendMessage() {
     input.value = '';
     addLoading();
 
+    // Try to extract tracking number from input fields or query text
+    let trackingNum = null;
+    const trackingInput = document.getElementById('trackingNumber');
+    const proofTrackingInput = document.getElementById('proofTrackingNumber');
+    const lodgementTrackingInput = document.getElementById('lodgementTrackingNumber');
+    if (trackingInput && trackingInput.value.trim()) {
+        trackingNum = trackingInput.value.trim();
+    } else if (proofTrackingInput && proofTrackingInput.value.trim()) {
+        trackingNum = proofTrackingInput.value.trim();
+    } else if (lodgementTrackingInput && lodgementTrackingInput.value.trim()) {
+        trackingNum = lodgementTrackingInput.value.trim();
+    } else {
+        // Try to extract from the query text
+        const match = query.match(/\b(DTVIC\d+|DT\d+|[A-Z]{2}\d{5,}|[A-Z]{2}\d{8,}[A-Z]{2}|[A-Z]{2,4}\d{3,}[A-Z]{1,3}\d{3,})\b/i);
+        if (match) {
+            trackingNum = match[1].toUpperCase();
+        }
+    }
+
     try {
+        const requestBody = {
+            query: query,
+            tracking_number: trackingNum
+        };
+        // Include thread_id for conversation persistence
+        if (currentThreadId) {
+            requestBody.thread_id = currentThreadId;
+        }
+
         const response = await fetch('/api/chatbot/query', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                query: query,
-                tracking_number: null
-            })
+            body: JSON.stringify(requestBody)
         });
 
         const data = await response.json();
         removeLoading();
 
         if (response.ok) {
-            const aiResponse = data.response || data.message || JSON.stringify(data, null, 2);
+            // Store thread_id for conversation continuity
+            if (data.thread_id) {
+                currentThreadId = data.thread_id;
+            }
+
+            let aiResponse = data.response || data.message || '';
+            // If response is empty or just whitespace, show a friendly message
+            if (!aiResponse || !aiResponse.trim()) {
+                aiResponse = "I'm sorry, I wasn't able to process that request. Could you please try again?";
+            }
             addMessage(aiResponse);
 
             // Display lodgement photos if included in response
@@ -851,9 +1026,15 @@ function searchByAddress() {
 // Store chat history
 let chatHistory = [];
 
+// Current conversation thread ID for persistence
+let currentThreadId = null;
+
 function clearChat() {
     // Stop any ongoing speech
     stopSpeaking();
+
+    // Clear conversation thread for new chat
+    currentThreadId = null;
 
     // Save current chat to history
     const chatMessages = document.getElementById('chatMessages');

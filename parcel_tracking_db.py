@@ -164,7 +164,7 @@ class ParcelTrackingDB:
                     # If key auth fails, only try Azure AD if the error suggests it
                     if "Local Authorization is disabled" in str(key_error):
                         if os.getenv("DEBUG_MODE") == "true":
-                            print(f"⚠️ Key-based auth disabled, trying Azure AD...")
+                            print(f"[WARN] Key-based auth disabled, trying Azure AD...")
                         # Use cached credential to avoid re-authentication timeout
                         self.credential = get_cached_credential()
                         self.client = CosmosClient(self.endpoint, self.credential)
@@ -176,12 +176,12 @@ class ParcelTrackingDB:
                             print(f"✓ Connected to Cosmos DB using Azure AD (AzureCliCredential)")
                     else:
                         # For other errors, re-raise them
-                        print(f"❌ Cosmos DB connection failed: {key_error}")
+                        print(f"[ERROR] Cosmos DB connection failed: {key_error}")
                         raise key_error
             else:
                 # No key provided - must use Azure AD
                 if os.getenv("DEBUG_MODE") == "true":
-                    print(f"⚠️ No account key found, trying Azure AD authentication...")
+                    print(f"[WARN] No account key found, trying Azure AD authentication...")
                 # Use cached credential to avoid re-authentication timeout
                 self.credential = get_cached_credential()
                 self.client = CosmosClient(self.endpoint, self.credential)
@@ -198,12 +198,12 @@ class ParcelTrackingDB:
                     await self._create_containers()
                 except Exception as container_error:
                     # If container creation fails, assume they already exist (common with Azure AD limited permissions)
-                    print(f"⚠️ Skipping container creation: {str(container_error)[:100]}")
+                    print(f"[WARN] Skipping container creation: {str(container_error)[:100]}")
 
             # Database connection successful - ready for operations
 
         except Exception as e:
-            print(f"❌ Failed to connect to Cosmos DB: {e}")
+            print(f"[ERROR] Failed to connect to Cosmos DB: {e}")
             raise
 
     async def _create_containers(self):
@@ -265,7 +265,9 @@ class ParcelTrackingDB:
                 # Properly close the aiohttp client session
                 if hasattr(self.client, "_client_connection"):
                     try:
-                        await self.client._client_connection.close()
+                        connection = self.client._client_connection
+                        if connection and not connection.closed:
+                            await connection.close()
                     except Exception:
                         pass
 
@@ -276,8 +278,6 @@ class ParcelTrackingDB:
                         # If it returns a coroutine, await it
                         if hasattr(result, "__await__"):
                             await result
-                        # Add small delay to ensure cleanup completes
-                        await asyncio.sleep(0.1)
                     except Exception:
                         pass
                 self.client = None
@@ -290,10 +290,7 @@ class ParcelTrackingDB:
                             await self.credential.close()
                         else:
                             self.credential.close()
-                        # Add delay for credential cleanup
-                        await asyncio.sleep(0.1)
                     except Exception:
-                        pass
                         pass
                 self.credential = None
         except Exception:
@@ -1633,8 +1630,115 @@ class ParcelTrackingDB:
             print(f"❌ Error marking delivery complete: {e}")
             return False
 
+    # ── Address note categories & TTL ──────────────────────────────────
+    # Notes are auto-categorised at save time. Each category has a retention period
+    # after which notes are automatically filtered out on read and pruned.
+    NOTE_CATEGORIES = {
+        "carded": {
+            "ttl_days": 30,
+            "label": "Carded",
+            "keywords": [
+                "card left",
+                "carded",
+                "no one home",
+                "not home",
+                "no answer",
+                "not available",
+                "collect from",
+                "recipient not available",
+                "left card",
+            ],
+        },
+        "safety": {
+            "ttl_days": 180,
+            "label": "Safety",
+            "keywords": [
+                "dog",
+                "dogs",
+                "aggressive",
+                "dangerous",
+                "weapon",
+                "unsafe",
+                "caution",
+                "beware",
+                "threat",
+                "attack",
+                "bitten",
+                "bite",
+                "guard dog",
+                "loose animal",
+                "hostile",
+                "violent",
+                "intimidat",
+            ],
+        },
+        "access": {
+            "ttl_days": 180,
+            "label": "Access",
+            "keywords": [
+                "gate",
+                "code",
+                "pin",
+                "buzzer",
+                "intercom",
+                "side entrance",
+                "rear entrance",
+                "back door",
+                "key",
+                "lockbox",
+                "concierge",
+                "reception",
+                "loading dock",
+                "lift",
+                "elevator",
+                "floor",
+                "unit",
+                "apartment",
+                "level",
+            ],
+        },
+        "property": {
+            "ttl_days": 180,
+            "label": "Property",
+            "keywords": [
+                "broken",
+                "doorbell",
+                "bell",
+                "stairs",
+                "steps",
+                "steep",
+                "driveway",
+                "narrow",
+                "no parking",
+                "gravel",
+                "mud",
+                "flood",
+                "overgrown",
+            ],
+        },
+    }
+    # Fallback for notes that don't match any category
+    DEFAULT_NOTE_TTL_DAYS = 90
+
+    @staticmethod
+    def _categorise_note(note_text: str) -> tuple:
+        """Categorise a note based on keyword matching.
+
+        Returns:
+            (category_key, ttl_days)
+        """
+        text_lower = note_text.lower()
+        for cat_key, cat_info in ParcelTrackingDB.NOTE_CATEGORIES.items():
+            for keyword in cat_info["keywords"]:
+                if keyword in text_lower:
+                    return cat_key, cat_info["ttl_days"]
+        return "general", ParcelTrackingDB.DEFAULT_NOTE_TTL_DAYS
+
     async def save_address_note(self, address: str, note: str, driver_name: str) -> bool:
-        """Save or append a note about a delivery address for future reference
+        """Save or append a note about a delivery address for future reference.
+
+        Notes are auto-categorised (carded / safety / access / property / general)
+        and given an expiry date based on category TTL rules.
 
         Args:
             address: The delivery address
@@ -1648,40 +1752,46 @@ class ParcelTrackingDB:
             normalized_address = address.strip().lower()
             note_id = f"note_{normalized_address.replace(' ', '_').replace(',', '')}"
 
-            # Check if note already exists for this address
+            # Auto-categorise and calculate expiry
+            category, ttl_days = self._categorise_note(note)
+            now = datetime.now(timezone.utc)
+            expires_at = (now + timedelta(days=ttl_days)).isoformat()
+
+            new_entry = {
+                "note_id": uuid.uuid4().hex[:12],
+                "note": note,
+                "driver_name": driver_name,
+                "timestamp": now.isoformat(),
+                "category": category,
+                "ttl_days": ttl_days,
+                "expires_at": expires_at,
+            }
+
+            # Check if document already exists for this address
             query = "SELECT * FROM c WHERE c.normalized_address = @address"
             parameters = [{"name": "@address", "value": normalized_address}]
 
-            existing_note = None
+            existing_doc = None
             async for doc in container.query_items(query=query, parameters=parameters):
-                existing_note = doc
+                existing_doc = doc
                 break
 
-            if existing_note:
-                # Append to existing notes
-                new_entry = {
-                    "note": note,
-                    "driver_name": driver_name,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                }
-                existing_note["notes"].append(new_entry)
-                existing_note["last_updated"] = datetime.now(timezone.utc).isoformat()
-                await container.replace_item(item=existing_note["id"], body=existing_note)
-                print(f"✅ Updated address note for {address}")
+            if existing_doc:
+                existing_doc["notes"].append(new_entry)
+                existing_doc["last_updated"] = now.isoformat()
+                await container.replace_item(item=existing_doc["id"], body=existing_doc)
+                print(f"✅ Updated address note for {address} (category: {category}, expires: {ttl_days}d)")
             else:
-                # Create new address note document
                 note_doc = {
                     "id": note_id,
                     "address": address,
                     "normalized_address": normalized_address,
-                    "notes": [
-                        {"note": note, "driver_name": driver_name, "timestamp": datetime.now(timezone.utc).isoformat()}
-                    ],
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                    "last_updated": datetime.now(timezone.utc).isoformat(),
+                    "notes": [new_entry],
+                    "created_at": now.isoformat(),
+                    "last_updated": now.isoformat(),
                 }
                 await container.create_item(body=note_doc)
-                print(f"✅ Created new address note for {address}")
+                print(f"✅ Created new address note for {address} (category: {category}, expires: {ttl_days}d)")
 
             return True
 
@@ -1691,13 +1801,16 @@ class ParcelTrackingDB:
             return False
 
     async def get_address_notes(self, address: str) -> List[Dict[str, Any]]:
-        """Get all notes for a specific delivery address
+        """Get all *active* (non-expired) notes for a specific delivery address.
+
+        Expired notes are filtered out on read. If any expired notes are found,
+        they are lazily pruned from the document to keep the store clean.
 
         Args:
             address: The delivery address to look up
 
         Returns:
-            List of notes with driver name and timestamp
+            List of active notes with driver name, timestamp, category, and expires_at
         """
         try:
             container = self.database.get_container_client("address_notes")
@@ -1708,14 +1821,49 @@ class ParcelTrackingDB:
             query = "SELECT * FROM c WHERE c.normalized_address = @address"
             parameters = [{"name": "@address", "value": normalized_address}]
 
+            now = datetime.now(timezone.utc)
+
             async for doc in container.query_items(query=query, parameters=parameters):
-                return doc.get("notes", [])
+                all_notes = doc.get("notes", [])
+
+                # Separate active vs expired notes
+                active_notes = []
+                pruned = False
+                for n in all_notes:
+                    expires_at_str = n.get("expires_at")
+                    if expires_at_str:
+                        try:
+                            expires_at = datetime.fromisoformat(expires_at_str)
+                            if expires_at <= now:
+                                pruned = True
+                                continue  # Skip expired note
+                        except (ValueError, TypeError):
+                            pass  # Keep notes with unparseable expiry
+                    # Legacy notes without expires_at are kept (will be categorised on next save)
+                    active_notes.append(n)
+
+                # Lazy prune: write back if we removed any expired notes
+                if pruned:
+                    try:
+                        doc["notes"] = active_notes
+                        doc["last_updated"] = now.isoformat()
+                        if active_notes:
+                            await container.replace_item(item=doc["id"], body=doc)
+                        else:
+                            # No notes left – delete the document entirely
+                            await container.delete_item(item=doc["id"], partition_key=normalized_address)
+                            print(f"🗑️ Deleted empty address notes document for {address}")
+                    except Exception as prune_err:
+                        # Non-critical – don't fail the read
+                        if os.getenv("DEBUG_MODE") == "True":
+                            print(f"⚠️ Lazy prune failed for {address}: {prune_err}")
+
+                return active_notes
 
             return []
 
         except RuntimeError as e:
             if "cannot schedule new futures after shutdown" in str(e):
-                # Event loop shutting down during Flask reload, return empty list
                 return []
             print(f"❌ Error retrieving address notes: {e}")
             return []
@@ -1723,6 +1871,49 @@ class ParcelTrackingDB:
             if os.getenv("DEBUG_MODE") == "True":
                 print(f"❌ Error retrieving address notes: {e}")
             return []
+
+    async def dismiss_address_note(self, address: str, note_id: str, dismissed_by: str) -> bool:
+        """Dismiss (delete) a specific note that is no longer accurate.
+
+        Drivers can remove stale notes (e.g. after a property changes owners).
+
+        Args:
+            address: The delivery address
+            note_id: The unique note_id of the note entry to remove
+            dismissed_by: Username/name of the driver dismissing the note
+
+        Returns:
+            True if the note was found and removed
+        """
+        try:
+            container = self.database.get_container_client("address_notes")
+            normalized_address = address.strip().lower()
+
+            query = "SELECT * FROM c WHERE c.normalized_address = @address"
+            parameters = [{"name": "@address", "value": normalized_address}]
+
+            async for doc in container.query_items(query=query, parameters=parameters):
+                original_count = len(doc.get("notes", []))
+                doc["notes"] = [n for n in doc.get("notes", []) if n.get("note_id") != note_id]
+
+                if len(doc["notes"]) == original_count:
+                    return False  # Note not found
+
+                doc["last_updated"] = datetime.now(timezone.utc).isoformat()
+
+                if doc["notes"]:
+                    await container.replace_item(item=doc["id"], body=doc)
+                else:
+                    await container.delete_item(item=doc["id"], partition_key=normalized_address)
+
+                print(f"🗑️ Note {note_id} dismissed by {dismissed_by} for {address}")
+                return True
+
+            return False
+
+        except Exception as e:
+            print(f"❌ Error dismissing address note: {e}")
+            return False
 
     async def get_all_active_manifests(self) -> List[Dict[str, Any]]:
         """Get all active manifests for admin overview"""

@@ -101,6 +101,9 @@ resource cosmosDbAccount 'Microsoft.DocumentDB/databaseAccounts@2023-11-15' = {
   name: cosmosDbAccountName
   location: location
   kind: 'GlobalDocumentDB'
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: {
     databaseAccountOfferType: 'Standard'
     consistencyPolicy: {
@@ -118,6 +121,7 @@ resource cosmosDbAccount 'Microsoft.DocumentDB/databaseAccounts@2023-11-15' = {
         name: 'EnableServerless'
       }
     ]
+    disableLocalAuth: true  // Force RBAC authentication only
   }
 }
 
@@ -225,7 +229,7 @@ resource mapsAccount 'Microsoft.Maps/accounts@2023-06-01' = {
   }
   kind: 'Gen2'
   properties: {
-    disableLocalAuth: false
+    disableLocalAuth: false  // Maps Gen2 uses subscription key authentication
   }
 }
 
@@ -240,9 +244,13 @@ resource speechService 'Microsoft.CognitiveServices/accounts@2023-05-01' = {
     name: 'S0'
   }
   kind: 'SpeechServices'
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: {
     customSubDomainName: speechServiceName
     publicNetworkAccess: 'Enabled'
+    disableLocalAuth: true  // Force managed identity authentication
   }
 }
 
@@ -257,9 +265,13 @@ resource visionService 'Microsoft.CognitiveServices/accounts@2023-05-01' = {
     name: 'S1'
   }
   kind: 'ComputerVision'
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: {
     customSubDomainName: visionServiceName
     publicNetworkAccess: 'Enabled'
+    disableLocalAuth: true  // Force managed identity authentication
   }
 }
 
@@ -341,6 +353,7 @@ resource appService 'Microsoft.Web/sites@2023-01-01' = {
       alwaysOn: true
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
+      appCommandLine: 'gunicorn --bind=0.0.0.0:8000 --timeout 600 --workers=4 app:app'
       appSettings: [
         {
           name: 'SCM_DO_BUILD_DURING_DEPLOYMENT'
@@ -363,8 +376,8 @@ resource appService 'Microsoft.Web/sites@2023-01-01' = {
           value: mapsAccount.listKeys().primaryKey
         }
         {
-          name: 'AZURE_SPEECH_KEY'
-          value: speechService.listKeys().key1
+          name: 'AZURE_SPEECH_ENDPOINT'
+          value: speechService.properties.endpoint
         }
         {
           name: 'AZURE_SPEECH_REGION'
@@ -373,10 +386,6 @@ resource appService 'Microsoft.Web/sites@2023-01-01' = {
         {
           name: 'AZURE_VISION_ENDPOINT'
           value: visionService.properties.endpoint
-        }
-        {
-          name: 'AZURE_VISION_KEY'
-          value: visionService.listKeys().key1
         }
         {
           name: 'AZURE_AI_PROJECT_ENDPOINT'
@@ -430,6 +439,28 @@ resource aiRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' =
   }
 }
 
+// Cognitive Services User for Speech Service
+resource speechRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(speechService.id, appService.id, 'speech-user')
+  scope: speechService
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'a97b65f3-24c7-4388-baec-2e87135dc908')
+    principalId: appService.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Cognitive Services User for Vision Service
+resource visionRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(visionService.id, appService.id, 'vision-user')
+  scope: visionService
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'a97b65f3-24c7-4388-baec-2e87135dc908')
+    principalId: appService.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 // =============================================================================
 // Outputs
 // =============================================================================
@@ -447,14 +478,14 @@ output visionServiceEndpoint string = visionService.properties.endpoint
 output resourceGroupName string = resourceGroup().name
 
 output nextSteps string = '''
-🎉 Infrastructure deployed successfully!
+Infrastructure deployed successfully!
 
 NEXT STEPS:
 
 1. Deploy GPT-4o model in AI Foundry:
    - Visit: https://ai.azure.com
    - Select your project: ${aiProjectName}
-   - Go to "Deployments" → "Deploy Model"
+   - Go to "Deployments" -> "Deploy Model"
    - Deploy "gpt-4o" model
 
 2. Create 8 AI Agents in AI Foundry:

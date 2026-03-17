@@ -162,3 +162,79 @@ const brandColor = getComputedStyle(document.documentElement).getPropertyValue('
 console.log('%cZava', `font-size: 24px; font-weight: bold; color: ${brandColor};`);
 console.log('%cAI-Powered Last-Mile Delivery Management System', 'font-size: 14px; color: #6c757d;');
 console.log('Version: 1.0.0');
+
+// ===== MOBILE OPTIMIZATIONS =====
+
+// Highlight active bottom nav link
+document.addEventListener('DOMContentLoaded', function() {
+    const bottomNav = document.querySelector('.mobile-bottom-nav');
+    if (bottomNav) {
+        const currentPath = window.location.pathname;
+        const links = bottomNav.querySelectorAll('.nav-link');
+        links.forEach(link => {
+            const href = link.getAttribute('href');
+            if (href && href !== '#' && currentPath.startsWith(href)) {
+                link.classList.add('active');
+            }
+        });
+    }
+});
+
+// Detect mobile and add body class
+document.addEventListener('DOMContentLoaded', function() {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+        || window.innerWidth <= 768;
+    if (isMobile) {
+        document.body.classList.add('is-mobile');
+    }
+
+    // Update on resize
+    let resizeTimeout;
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(function() {
+            if (window.innerWidth <= 768) {
+                document.body.classList.add('is-mobile');
+            } else {
+                document.body.classList.remove('is-mobile');
+            }
+        }, 250);
+    });
+});
+
+// Close mobile menu on nav item click
+document.addEventListener('DOMContentLoaded', function() {
+    const navLinks = document.querySelectorAll('.navbar-collapse .nav-link:not(.dropdown-toggle)');
+    const navCollapse = document.querySelector('.navbar-collapse');
+    if (navCollapse) {
+        navLinks.forEach(link => {
+            link.addEventListener('click', function() {
+                if (window.innerWidth <= 991) {
+                    const bsCollapse = bootstrap.Collapse.getInstance(navCollapse);
+                    if (bsCollapse) bsCollapse.hide();
+                }
+            });
+        });
+    }
+});
+
+// Fix iOS viewport height issue (100vh includes address bar)
+function setMobileVH() {
+    const vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty('--mobile-vh', `${vh}px`);
+}
+setMobileVH();
+window.addEventListener('resize', setMobileVH);
+
+// Prevent double-tap zoom on buttons (iOS)
+document.addEventListener('DOMContentLoaded', function() {
+    if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+        const buttons = document.querySelectorAll('.btn, .nav-link, .list-group-item-action');
+        buttons.forEach(btn => {
+            btn.addEventListener('touchend', function(e) {
+                e.preventDefault();
+                this.click();
+            }, { passive: false });
+        });
+    }
+});

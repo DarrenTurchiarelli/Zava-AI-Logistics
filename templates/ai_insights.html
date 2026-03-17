@@ -14,50 +14,50 @@
     </div>
 
     <!-- Performance Metrics -->
-    <div class="row g-4 mb-4">
-        <div class="col-md-3">
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
             <a href="{{ url_for('all_parcels') }}" class="text-decoration-none">
                 <div class="card text-center border-primary card-hover">
-                    <div class="card-body">
-                        <i class="bi bi-box-seam text-primary" style="font-size: 2rem;"></i>
-                        <h3 class="mt-2">{{ insights.total_parcels }}</h3>
-                        <p class="text-muted mb-0">Total Parcels</p>
-                        <small class="text-dark"><i class="bi bi-arrow-right-circle"></i> View All</small>
+                    <div class="card-body py-3">
+                        <i class="bi bi-box-seam text-primary" style="font-size: 1.75rem;"></i>
+                        <h3 class="mt-2 mb-0">{{ insights.total_parcels }}</h3>
+                        <p class="text-muted mb-0 small">Total Parcels</p>
+                        <small class="text-dark d-none d-md-block"><i class="bi bi-arrow-right-circle"></i> View All</small>
                     </div>
                 </div>
             </a>
         </div>
-        <div class="col-md-3">
+        <div class="col-6 col-md-3">
             <a href="{{ url_for('all_parcels') }}?status=In Transit" class="text-decoration-none">
                 <div class="card text-center border-warning card-hover">
-                    <div class="card-body">
-                        <i class="bi bi-truck text-warning" style="font-size: 2rem;"></i>
-                        <h3 class="mt-2">{{ insights.in_transit }}</h3>
-                        <p class="text-muted mb-0">In Transit</p>
-                        <small class="text-dark"><i class="bi bi-arrow-right-circle"></i> Track Now</small>
+                    <div class="card-body py-3">
+                        <i class="bi bi-truck text-warning" style="font-size: 1.75rem;"></i>
+                        <h3 class="mt-2 mb-0">{{ insights.in_transit }}</h3>
+                        <p class="text-muted mb-0 small">In Transit</p>
+                        <small class="text-dark d-none d-md-block"><i class="bi bi-arrow-right-circle"></i> Track Now</small>
                     </div>
                 </div>
             </a>
         </div>
-        <div class="col-md-3">
+        <div class="col-6 col-md-3">
             <a href="{{ url_for('all_parcels') }}?status=Delivered" class="text-decoration-none">
                 <div class="card text-center border-success card-hover">
-                    <div class="card-body">
-                        <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
-                        <h3 class="mt-2">{{ insights.delivered }}</h3>
-                        <p class="text-muted mb-0">Delivered</p>
-                        <small class="text-dark"><i class="bi bi-arrow-right-circle"></i> View History</small>
+                    <div class="card-body py-3">
+                        <i class="bi bi-check-circle text-success" style="font-size: 1.75rem;"></i>
+                        <h3 class="mt-2 mb-0">{{ insights.delivered }}</h3>
+                        <p class="text-muted mb-0 small">Delivered</p>
+                        <small class="text-dark d-none d-md-block"><i class="bi bi-arrow-right-circle"></i> View History</small>
                     </div>
                 </div>
             </a>
         </div>
-        <div class="col-md-3">
+        <div class="col-6 col-md-3">
             <div class="card text-center border-primary">
-                <div class="card-body">
-                    <i class="bi bi-trophy text-success" style="font-size: 2rem;"></i>
-                    <h3 class="mt-2">{{ insights.success_rate }}%</h3>
-                    <p class="text-muted mb-0">Success Rate</p>
-                    <small class="text-muted">Delivered vs Exceptions</small>
+                <div class="card-body py-3">
+                    <i class="bi bi-trophy text-success" style="font-size: 1.75rem;"></i>
+                    <h3 class="mt-2 mb-0">{{ insights.success_rate }}%</h3>
+                    <p class="text-muted mb-0 small">Success Rate</p>
+                    <small class="text-muted d-none d-md-block">Delivered vs Exceptions</small>
                 </div>
             </div>
         </div>
@@ -119,23 +119,23 @@
                         <h6 class="mb-0"><i class="bi bi-robot"></i> AI Agent Performance</h6>
                     </div>
                     <div class="card-body py-2">
-                        <div class="row text-center">
-                            <div class="col-md-3">
+                        <div class="row text-center g-2">
+                            <div class="col-6 col-md-3">
                                 <i class="bi bi-lightning-charge text-warning" style="font-size: 1.5rem;"></i>
                                 <h5 class="mt-1 mb-0">{{ insights.total_approvals }}</h5>
                                 <p class="text-muted mb-0 small">Total Requests</p>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-6 col-md-3">
                                 <i class="bi bi-check-all text-success" style="font-size: 1.5rem;"></i>
                                 <h5 class="mt-1 mb-0">{{ insights.valid_dc_approvals }}</h5>
                                 <p class="text-muted mb-0 small">Ready for Processing</p>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-6 col-md-3">
                                 <i class="bi bi-hourglass-split text-primary" style="font-size: 1.5rem;"></i>
                                 <h5 class="mt-1 mb-0">{{ insights.pending_approvals }}</h5>
                                 <p class="text-muted mb-0 small">Pending Review</p>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-6 col-md-3">
                                 <i class="bi bi-stopwatch text-primary" style="font-size: 1.5rem;"></i>
                                 <h5 class="mt-1 mb-0">{{ insights.avg_decision_time }}</h5>
                                 <p class="text-muted mb-0 small">Avg Decision Time</p>
@@ -161,7 +161,7 @@
                     <p class="text-muted mb-4">
                         <i class="bi bi-cpu"></i> Real-time status of production AI agents powered by Azure AI Foundry
                     </p>
-                    
+
                     <div class="row g-3">
                         <!-- Customer Service Agent -->
                         <div class="col-lg-4 col-md-6">
@@ -178,7 +178,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Fraud Detection Agent -->
                         <div class="col-lg-4 col-md-6">
                             <div class="card border-primary h-100">
@@ -194,7 +194,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Identity Agent -->
                         <div class="col-lg-4 col-md-6">
                             <div class="card border-primary h-100">
@@ -210,7 +210,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Dispatcher Agent -->
                         <div class="col-lg-4 col-md-6">
                             <div class="card border-primary h-100">
@@ -226,7 +226,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Parcel Intake Agent -->
                         <div class="col-lg-4 col-md-6">
                             <div class="card border-primary h-100">
@@ -242,7 +242,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Optimisation Agent -->
                         <div class="col-lg-4 col-md-6">
                             <div class="card border-primary h-100">
@@ -258,7 +258,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Sorting Facility Agent -->
                         <div class="col-lg-4 col-md-6">
                             <div class="card border-primary h-100">
@@ -274,7 +274,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Delivery Coordination Agent -->
                         <div class="col-lg-4 col-md-6">
                             <div class="card border-primary h-100">
@@ -291,10 +291,10 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="alert alert-info alert-persistent mt-3 mb-0">
                         <small>
-                            <i class="bi bi-info-circle"></i> <strong>Architecture:</strong> All agents are deployed as persistent Azure AI Foundry agents with dedicated agent IDs. 
+                            <i class="bi bi-info-circle"></i> <strong>Architecture:</strong> All agents are deployed as persistent Azure AI Foundry agents with dedicated agent IDs.
                             The Customer Service Agent includes Cosmos DB function calling tools for real-time parcel tracking. 2 additional agents available for future integration.
                         </small>
                     </div>
@@ -484,38 +484,38 @@
                     </p>
 
                     <!-- Communication Stats -->
-                    <div class="row g-4 mb-4">
-                        <div class="col-md-3">
+                    <div class="row g-3 mb-4">
+                        <div class="col-6 col-md-3">
                             <div class="card border-success h-100">
-                                <div class="card-body text-center">
-                                    <i class="bi bi-envelope-check text-success" style="font-size: 2rem;"></i>
+                                <div class="card-body text-center py-3">
+                                    <i class="bi bi-envelope-check text-success" style="font-size: 1.75rem;"></i>
                                     <h3 class="mt-2 text-success">142</h3>
                                     <p class="small text-muted mb-0">Notifications Sent Today</p>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-6 col-md-3">
                             <div class="card border-primary h-100">
-                                <div class="card-body text-center">
-                                    <i class="bi bi-phone-vibrate text-muted" style="font-size: 2rem;"></i>
+                                <div class="card-body text-center py-3">
+                                    <i class="bi bi-phone-vibrate text-muted" style="font-size: 1.75rem;"></i>
                                     <h3 class="mt-2 text-muted">89%</h3>
                                     <p class="small text-muted mb-0">SMS Delivery Rate</p>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-6 col-md-3">
                             <div class="card border-primary h-100">
-                                <div class="card-body text-center">
-                                    <i class="bi bi-clock-history text-primary" style="font-size: 2rem;"></i>
+                                <div class="card-body text-center py-3">
+                                    <i class="bi bi-clock-history text-primary" style="font-size: 1.75rem;"></i>
                                     <h3 class="mt-2 text-primary">8 min</h3>
                                     <p class="small text-muted mb-0">Avg Notification Lead Time</p>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-6 col-md-3">
                             <div class="card border-success h-100">
-                                <div class="card-body text-center">
-                                    <i class="bi bi-people text-success" style="font-size: 2rem;"></i>
+                                <div class="card-body text-center py-3">
+                                    <i class="bi bi-people text-success" style="font-size: 1.75rem;"></i>
                                     <h3 class="mt-2 text-success">94%</h3>
                                     <p class="small text-muted mb-0">Customer Satisfaction</p>
                                 </div>
@@ -602,7 +602,7 @@
                                                 <div class="progress-bar bg-success" style="width: 85%"></div>
                                             </div>
                                         </div>
-                                        
+
                                         <!-- Depot Consolidation -->
                                         <div class="recommendation-item" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#depotConsolModal">
                                             <div class="d-flex justify-content-between mb-2 align-items-center">
@@ -613,7 +613,7 @@
                                                 <div class="progress-bar bg-primary" style="width: 65%"></div>
                                             </div>
                                         </div>
-                                        
+
                                         <!-- Exception Reduction -->
                                         <div class="recommendation-item" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#exceptionModal">
                                             <div class="d-flex justify-content-between mb-2 align-items-center">
@@ -649,7 +649,7 @@
                                                 <span class="badge bg-success">Optimal</span>
                                             </div>
                                         </div>
-                                        
+
                                         <div class="alert alert-light border mb-2 py-2">
                                             <small class="text-muted d-block">Depot Utilization</small>
                                             <div class="d-flex justify-content-between align-items-center">
@@ -657,7 +657,7 @@
                                                 <span class="badge bg-info">Good</span>
                                             </div>
                                         </div>
-                                        
+
                                         <div class="alert alert-light border mb-0 py-2">
                                             <small class="text-muted d-block">Sorting Throughput</small>
                                             <div class="d-flex justify-content-between align-items-center">
@@ -691,7 +691,7 @@
                                                 <i class="bi bi-arrow-up"></i> 15% increase predicted
                                             </small>
                                         </div>
-                                        
+
                                         <!-- Peak Day Prediction -->
                                         <div class="mb-3 recommendation-item" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#peakDayModal">
                                             <div class="d-flex justify-content-between mb-1 align-items-center">
@@ -702,7 +702,7 @@
                                                 <i class="bi bi-calendar-event"></i> Prepare extra capacity
                                             </small>
                                         </div>
-                                        
+
                                         <!-- Exception Risk -->
                                         <div class="recommendation-item" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#exceptionRiskModal">
                                             <div class="d-flex justify-content-between mb-1 align-items-center">
@@ -746,28 +746,28 @@
             <div class="card shadow-sm">
                 <div class="card-body py-3">
                     <div class="row align-items-center">
-                        <div class="col-auto">
+                        <div class="col-auto d-none d-md-block">
                             <h6 class="mb-0 text-muted">
                                 <i class="bi bi-hdd-network"></i> System Health:
                             </h6>
                         </div>
                         <div class="col">
-                            <div class="row text-center">
-                                <div class="col-md-3">
+                            <div class="row text-center g-2">
+                                <div class="col-6 col-md-3">
                                     <i class="bi bi-check-circle-fill text-success"></i>
-                                    <strong class="ms-2">Cosmos DB:</strong> <span class="text-muted">Connected</span>
+                                    <strong class="ms-1">Cosmos DB</strong>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-6 col-md-3">
                                     <i class="bi bi-check-circle-fill text-success"></i>
-                                    <strong class="ms-2">AI Agents:</strong> <span class="text-muted">8 Active</span>
+                                    <strong class="ms-1">AI Agents</strong>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-6 col-md-3">
                                     <i class="bi bi-check-circle-fill text-success"></i>
-                                    <strong class="ms-2">Fraud Detection:</strong> <span class="text-muted">Online</span>
+                                    <strong class="ms-1">Fraud Detection</strong>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-6 col-md-3">
                                     <i class="bi bi-check-circle-fill text-success"></i>
-                                    <strong class="ms-2">API Status:</strong> <span class="text-muted">Healthy</span>
+                                    <strong class="ms-1">API Status</strong>
                                 </div>
                             </div>
                         </div>
@@ -784,25 +784,25 @@
         transition: all 0.3s ease;
         cursor: pointer;
     }
-    
+
     .card-hover:hover {
         transform: translateY(-5px);
         box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
     }
-    
+
     .card-hover:hover .card-body {
         background-color: rgba(0, 123, 255, 0.02);
     }
-    
+
     a.text-decoration-none:hover h3,
     a.text-decoration-none:hover small {
         transition: all 0.2s ease;
     }
-    
+
     a.text-decoration-none:hover small {
         font-weight: 600;
     }
-    
+
     .recommendation-item:hover {
         background-color: rgba(0, 123, 255, 0.05);
         border-radius: 4px;
@@ -825,7 +825,7 @@
                 <div class="alert alert-permanent alert-info">
                     <strong><i class="bi bi-robot"></i> AI Confidence:</strong> 85% (High) | <strong>Estimated Savings:</strong> $2,400/month
                 </div>
-                
+
                 <h6 class="text-primary"><i class="bi bi-clipboard-data"></i> Data Analysis</h6>
                 <p>The Optimisation Agent Analysed {{ insights.total_parcels }} parcels across {{ insights.out_for_delivery }} active routes and identified:</p>
                 <ul>
@@ -834,7 +834,7 @@
                     <li>Peak hours: 10 AM - 2 PM account for 68% of deliveries</li>
                     <li>Current fuel cost: ~$8,200/month based on {{ insights.out_for_delivery }} active routes</li>
                 </ul>
-                
+
                 <h6 class="text-primary mt-3"><i class="bi bi-lightbulb"></i> AI Recommendation</h6>
                 <div class="card bg-light">
                     <div class="card-body">
@@ -848,7 +848,7 @@
                         </ul>
                     </div>
                 </div>
-                
+
                 <h6 class="text-primary mt-3"><i class="bi bi-graph-up"></i> Expected Impact</h6>
                 <div class="row">
                     <div class="col-6">
@@ -864,7 +864,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <h6 class="text-warning mt-3"><i class="bi bi-exclamation-triangle"></i> Human Review Required</h6>
                 <ul>
                     <li>Verify driver availability and preferences</li>
@@ -893,7 +893,7 @@
                 <div class="alert alert-info">
                     <strong><i class="bi bi-robot"></i> AI Confidence:</strong> 65% (Medium) | <strong>Estimated Savings:</strong> $1,800/month
                 </div>
-                
+
                 <h6 class="text-primary"><i class="bi bi-clipboard-data"></i> Data Analysis</h6>
                 <p>Analysis of current depot utilization shows:</p>
                 <ul>
@@ -902,7 +902,7 @@
                     <li>Geographic overlap in 15km radius</li>
                     <li>Combined operational cost: $4,200/month</li>
                 </ul>
-                
+
                 <h6 class="text-primary mt-3"><i class="bi bi-lightbulb"></i> AI Recommendation</h6>
                 <div class="card bg-light">
                     <div class="card-body">
@@ -915,7 +915,7 @@
                         </ul>
                     </div>
                 </div>
-                
+
                 <h6 class="text-warning mt-3"><i class="bi bi-exclamation-triangle"></i> Human Review Required</h6>
                 <ul>
                     <li>Assess lease termination costs and timing</li>
@@ -945,7 +945,7 @@
                 <div class="alert alert-warning">
                     <strong><i class="bi bi-robot"></i> AI Confidence:</strong> 45% (Medium-Low) | <strong>Estimated Savings:</strong> $950/month
                 </div>
-                
+
                 <h6 class="text-primary"><i class="bi bi-clipboard-data"></i> Exception Analysis</h6>
                 <p>Current exception rate: {{ (100 - insights.success_rate)|round(1) }}% (Industry avg: 8-12%)</p>
                 <ul>
@@ -953,7 +953,7 @@
                     <li>Cost per reattempt: $19 (driver time + fuel)</li>
                     <li>Top causes: Customer unavailable (45%), Incorrect address (30%)</li>
                 </ul>
-                
+
                 <h6 class="text-primary mt-3"><i class="bi bi-lightbulb"></i> AI Recommendations</h6>
                 <div class="card bg-light mb-2">
                     <div class="card-body">
@@ -973,7 +973,7 @@
                         </ul>
                     </div>
                 </div>
-                
+
                 <h6 class="text-warning mt-3"><i class="bi bi-exclamation-triangle"></i> Human Review Required</h6>
                 <ul>
                     <li>Lower confidence due to external dependencies (customer behavior)</li>
@@ -1001,7 +1001,7 @@
                 <div class="alert alert-info">
                     <strong><i class="bi bi-robot"></i> AI Confidence:</strong> 78% (High) | <strong>Predicted Increase:</strong> +{{ ((insights.total_parcels * 1.15)|round(0)|int - insights.total_parcels) }} parcels
                 </div>
-                
+
                 <h6 class="text-primary"><i class="bi bi-clipboard-data"></i> Historical Pattern Analysis</h6>
                 <ul>
                     <li>Last 4 weeks average: {{ insights.total_parcels }} parcels/week</li>
@@ -1009,7 +1009,7 @@
                     <li>Recent trend: +3% week-over-week for last 3 weeks</li>
                     <li>Seasonal factor: Pre-holiday shopping surge (Dec 18-25)</li>
                 </ul>
-                
+
                 <h6 class="text-primary mt-3"><i class="bi bi-lightbulb"></i> AI Recommendation</h6>
                 <div class="card bg-light">
                     <div class="card-body">
@@ -1022,7 +1022,7 @@
                         </ul>
                     </div>
                 </div>
-                
+
                 <h6 class="text-primary mt-3"><i class="bi bi-database"></i> Model Inputs</h6>
                 <ul class="small">
                     <li>Historical data: 12 months of parcel volumes</li>
@@ -1051,7 +1051,7 @@
                 <div class="alert alert-info">
                     <strong><i class="bi bi-robot"></i> AI Confidence:</strong> 82% (High) | <strong>Predicted Peak:</strong> Friday
                 </div>
-                
+
                 <h6 class="text-primary"><i class="bi bi-clipboard-data"></i> Weekly Pattern Analysis</h6>
                 <div class="row mb-3">
                     <div class="col-md-6">
@@ -1072,7 +1072,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <h6 class="text-primary"><i class="bi bi-lightbulb"></i> Preparation Recommendations</h6>
                 <div class="card bg-light">
                     <div class="card-body">
@@ -1105,7 +1105,7 @@
                 <div class="alert alert-success">
                     <strong><i class="bi bi-robot"></i> AI Assessment:</strong> Low Risk {{ (100 - insights.success_rate)|round(1) }}% (Industry: 8-12%)
                 </div>
-                
+
                 <h6 class="text-primary"><i class="bi bi-clipboard-data"></i> Risk Factors Analysis</h6>
                 <div class="row">
                     <div class="col-md-6">
@@ -1125,7 +1125,7 @@
                         </ul>
                     </div>
                 </div>
-                
+
                 <h6 class="text-primary mt-3"><i class="bi bi-lightbulb"></i> Maintenance Recommendations</h6>
                 <div class="card bg-light">
                     <div class="card-body">
@@ -1159,7 +1159,7 @@
                 <div class="alert alert-info">
                     <strong><i class="bi bi-robot"></i> AI Confidence:</strong> 92% (Very High) | <strong>Impact:</strong> High Priority
                 </div>
-                
+
                 <h6 class="text-primary"><i class="bi bi-clipboard-data"></i> Current Situation Analysis</h6>
                 <p>The Sorting Facility Agent detected capacity imbalance across Melbourne facilities:</p>
                 <ul>
@@ -1168,7 +1168,7 @@
                     <li>25 parcels currently routed to DC-MEL-002 can be redirected to DC-MEL-003</li>
                     <li>Destination postal codes compatible with both facilities</li>
                 </ul>
-                
+
                 <h6 class="text-primary mt-3"><i class="bi bi-lightbulb"></i> AI Recommendation</h6>
                 <div class="card border-primary">
                     <div class="card-body">
@@ -1182,7 +1182,7 @@
                         </ul>
                     </div>
                 </div>
-                
+
                 <h6 class="text-primary mt-3"><i class="bi bi-check2-square"></i> Human Review Checklist</h6>
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" id="checkLoadBalance1">
@@ -1224,7 +1224,7 @@
                 <div class="alert alert-success">
                     <strong><i class="bi bi-robot"></i> AI Confidence:</strong> 88% (High) | <strong>Impact:</strong> Medium Priority
                 </div>
-                
+
                 <h6 class="text-primary"><i class="bi bi-clipboard-data"></i> Express Shipment Analysis</h6>
                 <p>The Sorting Facility Agent identified incoming express parcels requiring priority handling:</p>
                 <ul>
@@ -1233,7 +1233,7 @@
                     <li><strong>Current Time:</strong> 3:45 PM (4h 15m until facility closing)</li>
                     <li><strong>DC-MEL-001:</strong> 68% capacity, fastest throughput (85 parcels/hour)</li>
                 </ul>
-                
+
                 <h6 class="text-primary mt-3"><i class="bi bi-lightbulb"></i> AI Recommendation</h6>
                 <div class="card border-success">
                     <div class="card-body">
@@ -1247,7 +1247,7 @@
                         </ul>
                     </div>
                 </div>
-                
+
                 <h6 class="text-primary mt-3"><i class="bi bi-check2-square"></i> Human Review Checklist</h6>
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" id="checkPriority1">
@@ -1289,7 +1289,7 @@
                 <div class="alert alert-warning">
                     <strong><i class="bi bi-robot"></i> AI Confidence:</strong> 76% (Medium) | <strong>Impact:</strong> Medium Priority
                 </div>
-                
+
                 <h6 class="text-primary"><i class="bi bi-clipboard-data"></i> Performance Degradation Analysis</h6>
                 <p>The Sorting Facility Agent detected throughput decline at DC-MEL-002:</p>
                 <ul>
@@ -1298,7 +1298,7 @@
                     <li><strong>Historical data:</strong> Similar pattern occurs daily around shift fatigue time</li>
                     <li><strong>Staff on duty:</strong> Same team since 8 AM (7h 45m shift)</li>
                 </ul>
-                
+
                 <h6 class="text-primary mt-3"><i class="bi bi-lightbulb"></i> AI Recommendation</h6>
                 <div class="card border-warning">
                     <div class="card-body">
@@ -1312,7 +1312,7 @@
                         </ul>
                     </div>
                 </div>
-                
+
                 <h6 class="text-primary mt-3"><i class="bi bi-check2-square"></i> Human Review Checklist</h6>
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" id="checkThroughput1">

@@ -13,8 +13,8 @@
                 <div class="card-body">
                     <form method="GET" action="{{ url_for('track_parcel_page') }}" class="mb-4">
                         <div class="input-group input-group-lg">
-                            <input type="text" class="form-control" name="tracking_number" 
-                                   placeholder="Enter tracking number..." 
+                            <input type="text" class="form-control" name="tracking_number"
+                                   placeholder="Enter tracking number..."
                                    value="{{ tracking_number or '' }}" required>
                             <button class="btn btn-lg" type="submit" style="background-color: #f8f9fa; color: #198754; border: 1px solid #dee2e6;">
                                 <i class="bi bi-search" style="color: #198754;"></i> Track
@@ -34,9 +34,9 @@
                                 <h5 class="card-title">
                                     <i class="bi bi-box-seam"></i> {{ parcel.tracking_number }}
                                 </h5>
-                                
+
                                 <hr>
-                                
+
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
                                         <h6 class="text-muted">Status</h6>
@@ -68,15 +68,15 @@
                                 <hr>
 
                                 <div class="row">
-                                    <div class="col-md-4 mb-2">
+                                    <div class="col-4 col-md-4 mb-2">
                                         <h6 class="text-muted">Weight</h6>
                                         <p class="mb-0">{{ parcel.weight }} kg</p>
                                     </div>
-                                    <div class="col-md-4 mb-2">
+                                    <div class="col-4 col-md-4 mb-2">
                                         <h6 class="text-muted">Dimensions</h6>
                                         <p class="mb-0">{{ parcel.dimensions or 'N/A' }}</p>
                                     </div>
-                                    <div class="col-md-4 mb-2">
+                                    <div class="col-4 col-md-4 mb-2">
                                         <h6 class="text-muted">Value</h6>
                                         <p class="mb-0">${{ parcel.declared_value }}</p>
                                     </div>
@@ -91,7 +91,7 @@
                                 {% endif %}
                             </div>
                         </div>
-                        
+
                         <!-- Action Buttons -->
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-3">
                             <a href="{{ url_for('register_parcel') }}" class="btn btn-lg" style="background-color: #f8f9fa; color: #198754; border: 1px solid #dee2e6;">
@@ -104,11 +104,11 @@
                         {% else %}
                         <!-- Parcel Not Found -->
                         <div class="alert alert-warning">
-                            <i class="bi bi-exclamation-triangle"></i> 
+                            <i class="bi bi-exclamation-triangle"></i>
                             Parcel not found with tracking number: <strong>{{ tracking_number }}</strong>
                         </div>
                         <p class="text-muted">
-                            Please check the tracking number and try again. If you continue to have issues, 
+                            Please check the tracking number and try again. If you continue to have issues,
                             please contact customer service.
                         </p>
                         {% endif %}

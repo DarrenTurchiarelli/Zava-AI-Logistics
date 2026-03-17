@@ -49,12 +49,19 @@ python main.py
 # Start web app (production)
 py app.py
 
-# Deploy to Azure
+# Deploy to Azure (automatically registers resource providers)
 .\deploy_to_azure.ps1
 
 # Redeploy to existing instance
 .\deploy_to_azure.ps1  # Automatically detects .azure-deployment.json
 ```
+
+**Deployment Features:**
+- ✅ Automatic resource provider registration (works on fresh subscriptions)
+- ✅ Complete infrastructure via Bicep (Cosmos DB, AI Hub, Maps, etc.)
+- ✅ RBAC permissions configured automatically
+- ✅ Demo data and users initialized
+- ✅ No manual Azure portal configuration needed
 
 ## Azure AI Foundry Agents
 
@@ -304,7 +311,7 @@ python utils/generators/generate_demo_manifests.py
 # Logs print to console
 
 # Azure App Service
-az webapp log tail --name <webapp-name> --resource-group dt-logistics-rg
+az webapp log tail --name <webapp-name> --resource-group RG-Zava-Logistics
 
 # View in portal
 # https://portal.azure.com → App Service → Log stream
@@ -323,10 +330,10 @@ az webapp log tail --name <webapp-name> --resource-group dt-logistics-rg
 async def agent_name(request_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Brief description of agent purpose
-    
+
     Args:
         request_data: Description of expected input
-        
+
     Returns:
         Dictionary with success, response, and metadata
     """
@@ -367,21 +374,25 @@ async with ParcelTrackingDB() as db:
 ```
 
 ### Post-Deployment Steps
-1. Wait 2-5 minutes for RBAC permissions to propagate
-2. Verify agents are accessible (deployment script tests connectivity)
-3. Check logs: `az webapp log tail --name <webapp-name> --resource-group dt-logistics-rg`
-4. Test application at: `https://<webapp-name>.azurewebsites.net`
+1. Wait 2-5 minutes for RBAC permissions to propagate (automatic in script)
+2. Default users auto-created during deployment (admin, driver001-003, etc.)
+3. Test login at: `https://<webapp-name>.azurewebsites.net/login` (admin/admin123)
+4. Check logs if needed: `az webapp log tail --name <webapp-name> --resource-group RG-Zava-Logistics`
 
 ### Deployment Script Actions
 The deployment script automatically:
-1. ✅ Creates/updates Azure resources (App Service, Resource Group, Plan)
-2. ✅ Enables managed identity
-3. ✅ Configures RBAC permissions (Cosmos DB, Azure AI)
+1. ✅ Creates/updates Azure resources (App Service, Cosmos DB, AI Hub, etc.)
+2. ✅ Enables managed identity on all services (Cosmos DB, Speech, Vision)
+3. ✅ Configures RBAC permissions (no API keys needed)
 4. ✅ Deploys application code
-5. ✅ Sets environment variables
-6. ✅ Initializes default users
-7. ✅ Generates demo manifests
-8. ✅ **Updates agent instructions** (runs register_agent_tools.py)
+5. ✅ Sets all environment variables from Bicep outputs
+6. ✅ **Initializes default user accounts** (admin, drivers, depot_mgr, support)
+7. ✅ Tests endpoint connectivity
+
+**Note:** Demo manifest generation is optional. Run manually after deployment:
+```bash
+python utils/generators/generate_demo_manifests.py --all
+```
 
 ### Authentication Methods
 
@@ -418,6 +429,39 @@ echo $env:COSMOS_DB_ENDPOINT
 
 # Check RBAC permissions (Azure deployment)
 az role assignment list --assignee <principal-id> --scope <cosmos-resource-id>
+```
+
+### Login Issues on Azure Deployment
+**Symptom:** "Demo login failed" or "Invalid credentials" after deployment
+
+**Root Cause:** RBAC permissions take 2-5 minutes to propagate after deployment. User initialization may fail initially.
+
+**Solution (Automatic):**
+- ✅ **Fixed v1.2.4**: App now auto-initializes users on first startup
+- App retries user creation with each login attempt
+- Users are automatically created when RBAC permissions become available
+
+**Manual Verification:**
+```bash
+# Check app logs for initialization messages
+az webapp log tail --name <webapp-name> --resource-group RG-Zava-Logistics
+
+# Look for these messages:
+# "✅ App startup initialization completed"
+# "✅ Initialized N default users"
+
+# Force app restart to retry initialization
+az webapp restart --name <webapp-name> --resource-group RG-Zava-Logistics
+
+# Test locally
+python test_user_init.py
+```
+
+**If Still Failing After 5 Minutes:**
+```bash
+# Manually run user initialization
+$env:PYTHONPATH="$PWD;$PWD\utils\setup"
+python utils\setup\setup_users.py
 ```
 
 ### Photo Display Issues
@@ -572,6 +616,7 @@ python register_agent_tools.py
 
 ## Version History
 
+- **v1.2.4** (2026-02-12): Fixed Azure deployment login issues with automatic user initialization
 - **v1.2.3** (2026-01-13): Fixed lodgement photo display in Customer Service Agent
 - **v1.2.0** (2025-12-18): Added 8 active AI agents with performance dashboard
 - **v1.1.0** (2025-12): Multi-agent workflows and fraud detection
@@ -579,6 +624,6 @@ python register_agent_tools.py
 
 ---
 
-**Last Updated:** January 13, 2026  
+**Last Updated:** February 12, 2026  
 **Agent Framework:** Azure AI Foundry (Microsoft Agent Framework)  
 **Maintained By:** Darren Turchiarelli (Microsoft Australia)

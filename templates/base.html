@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+    <meta name="theme-color" content="{{ company.brand_primary_color }}">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="format-detection" content="telephone=no">
     <title>{% block title %}{{ company.browser_title }}{% endblock %}</title>
 
     <!-- Bootstrap CSS -->
@@ -458,6 +463,72 @@
         </div>
     </footer>
 
+    <!-- Mobile Bottom Navigation -->
+    <nav class="mobile-bottom-nav" aria-label="Mobile navigation">
+        <ul class="nav">
+            {% if session.logged_in %}
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('ai_insights') }}" aria-label="Dashboard">
+                    <i class="bi bi-speedometer2"></i>
+                    <span>Dashboard</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('camera_scanner') }}" aria-label="AI Scanner">
+                    <i class="bi bi-camera"></i>
+                    <span>Scan</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('driver_manifest') }}" aria-label="Manifest">
+                    <i class="bi bi-truck"></i>
+                    <span>Manifest</span>
+                </a>
+            </li>
+            <li class="nav-item" style="position: relative;">
+                <a class="nav-link" href="{{ url_for('approvals') }}" aria-label="Approvals">
+                    <i class="bi bi-clipboard-check"></i>
+                    <span>Approvals</span>
+                    {% if session.get('pending_count', 0) > 0 %}
+                    <span class="badge bg-danger rounded-pill">{{ session.pending_count }}</span>
+                    {% endif %}
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="document.querySelector('.navbar-toggler').click(); return false;" aria-label="More">
+                    <i class="bi bi-three-dots"></i>
+                    <span>More</span>
+                </a>
+            </li>
+            {% else %}
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('index') }}" aria-label="Home">
+                    <i class="bi bi-house"></i>
+                    <span>Home</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('camera_scanner') }}" aria-label="AI Scanner">
+                    <i class="bi bi-camera"></i>
+                    <span>Scan</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('report_fraud') }}" aria-label="Report Fraud">
+                    <i class="bi bi-shield-exclamation"></i>
+                    <span>Fraud</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('login') }}" aria-label="Login">
+                    <i class="bi bi-box-arrow-in-right"></i>
+                    <span>Login</span>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Custom JS -->
@@ -816,7 +887,21 @@
             position: fixed;
             bottom: 20px;
             right: 20px;
-            z-index: 1000;
+            z-index: 1060; /* Above mobile-bottom-nav (1050) */
+        }
+
+        @media (max-width: 768px) {
+            .chat-widget {
+                bottom: 80px; /* Clear the mobile bottom nav bar */
+            }
+        }
+
+        @supports (padding: env(safe-area-inset-bottom)) {
+            @media (max-width: 768px) {
+                .chat-widget {
+                    bottom: calc(80px + env(safe-area-inset-bottom));
+                }
+            }
         }
 
         .chat-widget-button {
@@ -1118,8 +1203,85 @@
             let widgetSynthesizer = null;
             let isWidgetListening = false;
             let useWidgetAzureSpeech = false;
+            let widgetAuthType = 'key';
+            let widgetSpeechResourceId = '';
+            let widgetSpeechToken = '';
+            let widgetSpeechRegion = '';
 
             let isOpen = false;
+
+            // Current conversation thread ID for persistence
+            let widgetThreadId = null;
+
+            // --- iOS Audio Compatibility ---
+            // iOS Safari blocks Audio.play() and speechSynthesis.speak() outside user gestures.
+            // AudioContext, once unlocked on first tap, allows reliable cross-platform playback.
+            let widgetAudioCtx = null;
+            let widgetAudioSource = null;
+
+            function getWidgetAudioCtx() {
+                if (!widgetAudioCtx) {
+                    widgetAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                return widgetAudioCtx;
+            }
+
+            let widgetAudioUnlocked = false;
+            function unlockWidgetAudio() {
+                if (widgetAudioUnlocked) return;
+                widgetAudioUnlocked = true;
+                try {
+                    const ctx = getWidgetAudioCtx();
+                    if (ctx.state === 'suspended') ctx.resume();
+                    const buf = ctx.createBuffer(1, 1, 22050);
+                    const src = ctx.createBufferSource();
+                    src.buffer = buf;
+                    src.connect(ctx.destination);
+                    src.start(0);
+                } catch(e) {}
+                if (window.speechSynthesis) {
+                    const u = new SpeechSynthesisUtterance(' ');
+                    u.volume = 0.01;
+                    window.speechSynthesis.speak(u);
+                }
+                console.log('🔓 Widget: iOS audio unlocked');
+            }
+
+            // Play audio blob via AudioContext (works on iOS Safari)
+            async function playWidgetAudioBlob(blob) {
+                const ctx = getWidgetAudioCtx();
+                if (ctx.state === 'suspended') await ctx.resume();
+                stopWidgetAudioSource();
+                try {
+                    const arrayBuffer = await blob.arrayBuffer();
+                    const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+                    const source = ctx.createBufferSource();
+                    source.buffer = audioBuffer;
+                    source.connect(ctx.destination);
+                    widgetAudioSource = source;
+                    source.start(0);
+                    return new Promise((resolve) => {
+                        source.onended = () => { widgetAudioSource = null; resolve(); };
+                    });
+                } catch (decodeErr) {
+                    // Fallback: use Audio element with blob URL (handles WAV on iOS Safari)
+                    console.warn('Widget AudioContext decode failed, using Audio element fallback:', decodeErr);
+                    const url = URL.createObjectURL(blob);
+                    const audio = new Audio(url);
+                    return new Promise((resolve, reject) => {
+                        audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
+                        audio.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+                        audio.play().catch((e) => { URL.revokeObjectURL(url); reject(e); });
+                    });
+                }
+            }
+
+            function stopWidgetAudioSource() {
+                if (widgetAudioSource) {
+                    try { widgetAudioSource.stop(); } catch(e) {}
+                    widgetAudioSource = null;
+                }
+            }
 
             // Initialize Azure Speech for widget
             async function initWidgetSpeech() {
@@ -1128,11 +1290,26 @@
                     const data = await response.json();
 
                     if (data.token && data.region && window.SpeechSDK) {
-                        widgetSpeechConfig = window.SpeechSDK.SpeechConfig.fromAuthorizationToken(data.token, data.region);
+                        widgetSpeechToken = data.token;
+                        widgetSpeechRegion = data.region;
+                        widgetSpeechResourceId = data.resourceId || '';
+                        widgetAuthType = data.authType || 'key';
+
+                        if (data.authType === 'aad' && data.resourceId) {
+                            // AAD auth: use aad#resourceId#token format
+                            const authToken = 'aad#' + data.resourceId + '#' + data.token;
+                            widgetSpeechConfig = window.SpeechSDK.SpeechConfig.fromAuthorizationToken(authToken, data.region);
+                        } else if (data.authType === 'aad') {
+                            // AAD without resource ID
+                            widgetSpeechConfig = window.SpeechSDK.SpeechConfig.fromAuthorizationToken(data.token, data.region);
+                        } else {
+                            // Use subscription key
+                            widgetSpeechConfig = window.SpeechSDK.SpeechConfig.fromSubscription(data.token, data.region);
+                        }
                         widgetSpeechConfig.speechRecognitionLanguage = data.language || 'en-AU';
                         widgetSpeechConfig.speechSynthesisVoiceName = data.voice || 'en-AU-NatashaNeural';
                         useWidgetAzureSpeech = true;
-                        console.log('🎤 Widget Azure Speech initialized');
+                        console.log('🎤 Widget Azure Speech initialized (auth:', data.authType, ')');
                     }
                 } catch (error) {
                     console.log('⚠️ Widget using Web Speech API fallback');
@@ -1149,16 +1326,11 @@
 
             // Toggle chat window
             toggleBtn.addEventListener('click', function() {
-                // On mobile, open public chat page in new tab instead of popup
-                if (isMobileDevice()) {
-                    window.open('{{ url_for("public_chat") }}', '_blank');
-                    return;
-                }
-
-                // Desktop behavior - show popup widget
+                // Show popup widget on all devices (mobile and desktop)
                 isOpen = !isOpen;
                 chatWindow.classList.toggle('open', isOpen);
                 toggleBtn.classList.toggle('active', isOpen);
+                document.body.classList.toggle('chat-widget-open', isOpen);
 
                 if (isOpen) {
                     input.focus();
@@ -1170,6 +1342,7 @@
                 isOpen = false;
                 chatWindow.classList.remove('open');
                 toggleBtn.classList.remove('active');
+                document.body.classList.remove('chat-widget-open');
             });
 
             // Minimize chat window (same as close)
@@ -1177,6 +1350,7 @@
                 isOpen = false;
                 chatWindow.classList.remove('open');
                 toggleBtn.classList.remove('active');
+                document.body.classList.remove('chat-widget-open');
             });
 
             // Voice input
@@ -1189,44 +1363,91 @@
             });
 
             function startWidgetListening() {
-                if (useWidgetAzureSpeech && widgetSpeechConfig) {
-                    const audioConfig = window.SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
-                    widgetRecognizer = new window.SpeechSDK.SpeechRecognizer(widgetSpeechConfig, audioConfig);
+                unlockWidgetAudio();
 
-                    isWidgetListening = true;
-                    voiceBtn.style.backgroundColor = '#dc3545';
-                    micIcon.style.animation = 'pulse 1s infinite';
+                // For AAD auth, Azure Speech SDK recognition requires a custom domain endpoint
+                // which isn't available client-side. Use Web Speech API for mic input instead.
+                // Server-side Azure TTS (auto-speak) still uses AAD auth and works perfectly.
+                if (useWidgetAzureSpeech && widgetSpeechConfig && widgetAuthType !== 'aad') {
+                    // API key auth: use Azure Speech SDK for recognition
+                    try {
+                        const audioConfig = window.SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+                        widgetRecognizer = new window.SpeechSDK.SpeechRecognizer(widgetSpeechConfig, audioConfig);
 
-                    widgetRecognizer.recognizeOnceAsync(
-                        function (result) {
-                            input.value = result.text;
-                            stopWidgetListening();
-                            sendMessage();
-                        },
-                        function (error) {
-                            console.error('Voice error:', error);
-                            stopWidgetListening();
-                        }
-                    );
-                } else if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                        isWidgetListening = true;
+                        voiceBtn.style.backgroundColor = '#dc3545';
+                        micIcon.style.animation = 'pulse 1s infinite';
+                        input.placeholder = '🎤 Listening...';
+
+                        widgetRecognizer.recognizeOnceAsync(
+                            function (result) {
+                                if (result && result.text && result.text.trim()) {
+                                    input.value = result.text;
+                                    stopWidgetListening();
+                                    sendMessage();
+                                } else {
+                                    console.warn('🎤 No speech detected via Azure SDK');
+                                    stopWidgetListening();
+                                }
+                            },
+                            function (error) {
+                                console.error('🎤 Azure Voice error, falling back to Web Speech API:', error);
+                                stopWidgetListening();
+                                startWebSpeechListening();
+                            }
+                        );
+                    } catch (sdkError) {
+                        console.error('🎤 Azure Speech SDK init error:', sdkError);
+                        stopWidgetListening();
+                        startWebSpeechListening();
+                    }
+                } else {
+                    // AAD auth or no Azure SDK: use Web Speech API for mic input
+                    startWebSpeechListening();
+                }
+            }
+
+            function startWebSpeechListening() {
+                if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
                     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                     const recognition = new SpeechRecognition();
                     recognition.lang = 'en-AU';
+                    recognition.interimResults = false;
+                    recognition.maxAlternatives = 1;
 
                     isWidgetListening = true;
                     voiceBtn.style.backgroundColor = '#dc3545';
                     micIcon.style.animation = 'pulse 1s infinite';
+                    input.placeholder = '🎤 Listening...';
 
                     recognition.onresult = function(event) {
-                        input.value = event.results[0][0].transcript;
-                        sendMessage();
+                        const transcript = event.results[0][0].transcript;
+                        if (transcript && transcript.trim()) {
+                            input.value = transcript;
+                            sendMessage();
+                        }
+                    };
+
+                    recognition.onerror = function(event) {
+                        console.error('🎤 Web Speech API error:', event.error);
+                        stopWidgetListening();
                     };
 
                     recognition.onend = function() {
                         stopWidgetListening();
                     };
 
-                    recognition.start();
+                    try {
+                        recognition.start();
+                        console.log('🎤 Web Speech API listening started');
+                    } catch (startError) {
+                        console.error('🎤 Failed to start Web Speech API:', startError);
+                        stopWidgetListening();
+                    }
+                } else {
+                    console.warn('🎤 No speech recognition available in this browser');
+                    alert('Voice input is not supported in this browser. Please use Chrome or Safari.');
+                    stopWidgetListening();
                 }
             }
 
@@ -1234,16 +1455,18 @@
                 isWidgetListening = false;
                 voiceBtn.style.backgroundColor = '';
                 micIcon.style.animation = '';
+                input.placeholder = 'Type or speak...';
                 if (widgetRecognizer) {
-                    widgetRecognizer.close();
+                    try { widgetRecognizer.close(); } catch(e) {}
                     widgetRecognizer = null;
                 }
             }
 
             function speakWidgetMessage(text) {
-                if (!autoSpeakCheckbox.checked) return;
+                if (!autoSpeakCheckbox || !autoSpeakCheckbox.checked) return;
 
-                const cleanText = text.replace(/\*\*/g, '').replace(/<[^>]+>/g, '').trim();
+                const cleanText = text.replace(/\*\*/g, '').replace(/<[^>]+>/g, '').replace(/#{1,6}\s/g, '').trim();
+                if (!cleanText) return;
 
                 // Use server-side Azure Neural TTS for high quality
                 speakWidgetWithAzure(cleanText);
@@ -1264,40 +1487,71 @@
                     });
 
                     if (response.ok) {
-                        const audioBlob = await response.blob();
-                        const audioUrl = URL.createObjectURL(audioBlob);
-                        const audio = new Audio(audioUrl);
-
-                        audio.onended = () => {
-                            URL.revokeObjectURL(audioUrl);
-                            console.log('🔊 Widget Azure speech ended');
-                        };
-
-                        audio.onerror = (error) => {
-                            console.error('🔊 Widget audio playback error:', error);
-                            // Fallback to browser speech
-                            speakWidgetWithBrowser(text);
-                        };
-
-                        await audio.play();
+                        // Check we got actual audio back (not a login redirect)
+                        const contentType = response.headers.get('content-type') || '';
+                        if (contentType.includes('audio')) {
+                            const audioBlob = await response.blob();
+                            try {
+                                await playWidgetAudioBlob(audioBlob);
+                                console.log('🔊 Widget Azure speech ended');
+                            } catch (playError) {
+                                console.error('🔊 Widget audio playback error:', playError);
+                                speakWidgetWithBrowser(text, 'Female');
+                            }
+                        } else {
+                            console.warn('Widget Azure speech returned non-audio response, using browser voice');
+                            speakWidgetWithBrowser(text, 'Female');
+                        }
                     } else {
-                        console.warn('Widget Azure speech failed, falling back to browser');
-                        speakWidgetWithBrowser(text);
+                        console.warn('Widget Azure speech failed (HTTP', response.status, '), using browser voice');
+                        speakWidgetWithBrowser(text, 'Female');
                     }
                 } catch (error) {
                     console.error('Widget Azure speech error:', error);
-                    speakWidgetWithBrowser(text);
+                    speakWidgetWithBrowser(text, 'Female');
                 }
             }
 
-            function speakWidgetWithBrowser(text) {
+            // Preload browser voices (Chrome loads them asynchronously)
+            let widgetBrowserVoices = [];
+            function loadWidgetVoices() {
                 if (window.speechSynthesis) {
+                    widgetBrowserVoices = window.speechSynthesis.getVoices();
+                }
+            }
+            loadWidgetVoices();
+            if (window.speechSynthesis && window.speechSynthesis.onvoiceschanged !== undefined) {
+                window.speechSynthesis.onvoiceschanged = loadWidgetVoices;
+            }
+
+            function speakWidgetWithBrowser(text, preferredGender = null) {
+                if (window.speechSynthesis) {
+                    // Cancel any ongoing speech first
+                    window.speechSynthesis.cancel();
+
                     const utterance = new SpeechSynthesisUtterance(text);
                     utterance.lang = 'en-AU';
-                    const voices = window.speechSynthesis.getVoices();
-                    const naturalVoice = voices.find(v => v.name.includes('Natural') || v.name.includes('Premium'))
-                                      || voices.find(v => v.lang.startsWith('en-AU'))
-                                      || voices.find(v => v.lang.startsWith('en'));
+                    const voices = widgetBrowserVoices.length > 0 ? widgetBrowserVoices : window.speechSynthesis.getVoices();
+                    // Filter to English voices first
+                    const enVoices = voices.filter(v => v.lang.startsWith('en'));
+                    let candidates = enVoices;
+
+                    // Try to match preferred gender
+                    if (preferredGender) {
+                        const isFemale = preferredGender.toLowerCase() === 'female';
+                        const femalePattern = /zira|jenny|natasha|catherine|aria|sara|libby|hazel|susan|emma|michelle|sonia|clara|emily|carly|elsie|freya|joanne|kim|tina|annette|nicole|karen|fiona|moira|samantha|female/i;
+                        const malePattern = /david|mark|ryan|guy|william|james|sam|liam|sean|darren|duncan|ken|neil|roger|george|christopher|daniel|thomas|male(?!fe)/i;
+                        const genderFiltered = candidates.filter(v => {
+                            if (isFemale) return femalePattern.test(v.name);
+                            else return malePattern.test(v.name);
+                        });
+                        if (genderFiltered.length > 0) candidates = genderFiltered;
+                    }
+
+                    const naturalVoice = candidates.find(v => v.lang === 'en-AU' && (v.name.includes('Natural') || v.name.includes('Premium')))
+                                      || candidates.find(v => v.lang === 'en-AU')
+                                      || candidates.find(v => v.name.includes('Natural') || v.name.includes('Premium'))
+                                      || candidates.find(v => v.lang.startsWith('en'));
                     if (naturalVoice) {
                         utterance.voice = naturalVoice;
                     }
@@ -1307,6 +1561,7 @@
 
             // Send message
             async function sendMessage() {
+                unlockWidgetAudio();
                 const message = input.value.trim();
                 if (!message) return;
 
@@ -1328,15 +1583,26 @@
 
                 try {
                     // Call public chatbot API
+                    const requestBody = { query: message };
+                    // Include thread_id for conversation persistence
+                    if (widgetThreadId) {
+                        requestBody.thread_id = widgetThreadId;
+                    }
+
                     const response = await fetch('/api/public/chatbot', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify({ query: message })
+                        body: JSON.stringify(requestBody)
                     });
 
                     const data = await response.json();
+
+                    // Store thread_id for conversation continuity
+                    if (data.thread_id) {
+                        widgetThreadId = data.thread_id;
+                    }
 
                     // Remove typing indicator
                     document.getElementById(typingId).remove();
@@ -1370,8 +1636,30 @@
 
                         addMessage(responseText, 'assistant');
                         speakWidgetMessage(responseText);
+
+                        // Display delivery photos if included in response (NOT lodgement photos - customer policy)
+                        if (data.delivery_photos && data.delivery_photos.length > 0) {
+                            data.delivery_photos.forEach((photo, index) => {
+                                const photoDiv = document.createElement('div');
+                                photoDiv.className = 'chat-widget-message assistant';
+                                photoDiv.innerHTML = `
+                                    <div class="chat-widget-message-bubble" style="padding: 4px;">
+                                        <div style="font-size: 11px; font-weight: bold; margin-bottom: 4px;">📸 Delivery Photo ${index + 1}</div>
+                                        <img src="data:image/png;base64,${photo.photo_data}"
+                                             alt="Delivery Photo ${index + 1}"
+                                             style="max-width: 100%; border-radius: 4px; border: 1px solid #ddd;">
+                                        <div style="font-size: 10px; color: #666; margin-top: 2px;">
+                                            ${photo.uploaded_by || 'Driver'} - ${photo.timestamp || ''}
+                                        </div>
+                                    </div>
+                                `;
+                                messagesContainer.appendChild(photoDiv);
+                            });
+                            scrollToBottom();
+                        }
                     } else {
-                        const errorMsg = 'Sorry, I encountered an error. Please try again.';
+                        // Try to use response body message even on non-OK status
+                        const errorMsg = (data && data.response) ? data.response : 'Sorry, I encountered an error. Please try again.';
                         addMessage(errorMsg, 'assistant');
                         speakWidgetMessage(errorMsg);
                     }
@@ -1408,11 +1696,13 @@
             // End chat
             function clearChat() {
                 // Stop any playing audio
-                if (window.currentAudio) {
-                    window.currentAudio.pause();
-                    window.currentAudio = null;
-                }
+                stopWidgetAudioSource();
+                if (window.speechSynthesis) window.speechSynthesis.cancel();
 
+                // Reset conversation thread
+                widgetThreadId = null;
+
+                // Reset messages to welcome screen
                 messagesContainer.innerHTML = `
                     <div class="chat-widget-welcome">
                         <img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot" style="width: 64px; height: 64px; margin-bottom: 10px;">
@@ -1420,7 +1710,14 @@
                         <p>Ask me about deliveries, tracking, or general inquiries.</p>
                     </div>
                 `;
-                console.log('🗑️ Chat cleared and audio stopped');
+
+                // Close the widget window
+                isOpen = false;
+                chatWindow.classList.remove('open');
+                toggleBtn.classList.remove('active');
+                document.body.classList.remove('chat-widget-open');
+
+                console.log('🗑️ Chat ended, conversation cleared and widget closed');
             }
 
             // Event listeners
