@@ -109,9 +109,6 @@ module frontend 'modules/frontend.bicep' = {
     appServiceSku: appServiceSku
     logAnalyticsId: sharedServices.outputs.logAnalyticsId
   }
-  dependsOn: [
-    sharedServices
-  ]
 }
 
 // 3. Middleware (depends on Frontend for Application Insights)
@@ -124,9 +121,6 @@ module middleware 'modules/middleware.bicep' = {
     environment: environment
     appInsightsId: frontend.outputs.appInsightsId
   }
-  dependsOn: [
-    frontend
-  ]
 }
 
 // 4. Backend (can be deployed independently)
@@ -144,142 +138,86 @@ module backend 'modules/backend.bicep' = {
 // Cross-Resource Group RBAC Assignments
 // =============================================================================
 
-// Cosmos DB Data Contributor for App Service
-resource cosmosRoleAssignment 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2023-11-15' = {
-  name: guid(backend.outputs.cosmosDbAccountId, frontend.outputs.appServicePrincipalId, 'cosmosdb-contributor')
-  scope: resourceGroup(backendRgName)
-  properties: {
-    roleDefinitionId: '${backend.outputs.cosmosDbAccountId}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002'
-    principalId: frontend.outputs.appServicePrincipalId
-    scope: backend.outputs.cosmosDbAccountId
+// Cosmos DB Data Contributor for App Service (deployed to Backend RG)
+module cosmosRoleAssignment 'modules/rbac/cosmosDbDataContributor.bicep' = {
+  scope: backendRg
+  name: 'cosmos-appservice-rbac'
+  params: {
+    appServicePrincipalId: frontend.outputs.appServicePrincipalId
+    cosmosAccountName: backend.outputs.cosmosDbAccountName
   }
-  dependsOn: [
-    frontend
-    backend
-  ]
 }
 
-// Cognitive Services OpenAI User for App Service
+// Cognitive Services OpenAI User for App Service (deployed to Middleware RG)
 module openAIAppServiceRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
   scope: middlewareRg
   name: 'openai-appservice-rbac'
   params: {
     principalId: frontend.outputs.appServicePrincipalId
-    resourceId: middleware.outputs.openAIServiceId
+    cognitiveServiceName: middleware.outputs.openAIServiceName
   }
-  dependsOn: [
-    frontend
-    middleware
-  ]
 }
 
-// Cognitive Services OpenAI User for AI Hub
+// Cognitive Services OpenAI User for AI Hub (deployed to Middleware RG)
 module openAIHubRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
   scope: middlewareRg
   name: 'openai-hub-rbac'
   params: {
     principalId: middleware.outputs.aiHubPrincipalId
-    resourceId: middleware.outputs.openAIServiceId
+    cognitiveServiceName: middleware.outputs.openAIServiceName
   }
-  dependsOn: [
-    middleware
-  ]
 }
 
-// Cognitive Services OpenAI User for AI Project
+// Cognitive Services OpenAI User for AI Project (deployed to Middleware RG)
 module openAIProjectRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
   scope: middlewareRg
   name: 'openai-project-rbac'
   params: {
     principalId: middleware.outputs.aiProjectPrincipalId
-    resourceId: middleware.outputs.openAIServiceId
+    cognitiveServiceName: middleware.outputs.openAIServiceName
   }
-  dependsOn: [
-    middleware
-  ]
 }
 
-// Cognitive Services User for AI Hub (for Speech/Vision)
-module aiHubSharedRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
-  scope: middlewareRg
-  name: 'aihub-shared-rbac'
-  params: {
-    principalId: middleware.outputs.aiHubPrincipalId
-    resourceId: middleware.outputs.openAIServiceId
-  }
-  dependsOn: [
-    middleware
-  ]
-}
-
-// Cognitive Services User for App Service to Speech Service
+// Cognitive Services User for App Service to Speech Service (deployed to Shared RG)
 module speechAppServiceRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
   scope: sharedRg
   name: 'speech-appservice-rbac'
   params: {
     principalId: frontend.outputs.appServicePrincipalId
-    resourceId: sharedServices.outputs.speechServiceId
+    cognitiveServiceName: sharedServices.outputs.speechServiceName
   }
-  dependsOn: [
-    frontend
-    sharedServices
-  ]
 }
 
-// Cognitive Services User for App Service to Vision Service
+// Cognitive Services User for App Service to Vision Service (deployed to Shared RG)
 module visionAppServiceRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
   scope: sharedRg
   name: 'vision-appservice-rbac'
   params: {
     principalId: frontend.outputs.appServicePrincipalId
-    resourceId: sharedServices.outputs.visionServiceId
+    cognitiveServiceName: sharedServices.outputs.visionServiceName
   }
-  dependsOn: [
-    frontend
-    sharedServices
-  ]
 }
 
 // =============================================================================
 // Update App Service Configuration with Cross-Resource Group Endpoints
 // =============================================================================
 
-resource appService 'Microsoft.Web/sites@2023-01-01' existing = {
+// Update App Service config with endpoints from all resource groups (deployed to Frontend RG)
+module appServiceConfig 'modules/appServiceConfig.bicep' = {
   scope: frontendRg
-  name: frontend.outputs.appServiceName
-}
-
-resource appServiceConfig 'Microsoft.Web/sites/config@2023-01-01' = {
-  parent: appService
-  name: 'appsettings'
-  properties: {
-    SCM_DO_BUILD_DURING_DEPLOYMENT: 'true'
-    USE_MANAGED_IDENTITY: 'true'
-    FLASK_ENV: 'production'
-    FLASK_SECRET_KEY: uniqueString(subscription().id, frontend.outputs.appServiceName)
-    APPLICATIONINSIGHTS_CONNECTION_STRING: frontend.outputs.appInsightsConnectionString
-    
-    // Backend - Cosmos DB
-    COSMOS_DB_ENDPOINT: backend.outputs.cosmosDbEndpoint
-    COSMOS_DB_DATABASE_NAME: 'logisticstracking'
-    
-    // Middleware - Azure OpenAI & AI
-    AZURE_OPENAI_ENDPOINT: middleware.outputs.openAIServiceEndpoint
-    AZURE_AI_PROJECT_ENDPOINT: middleware.outputs.aiProjectEndpoint
-    AZURE_AI_MODEL_DEPLOYMENT_NAME: 'gpt-4o'
-    
-    // Shared Services
-    AZURE_MAPS_SUBSCRIPTION_KEY: sharedServices.outputs.mapsSubscriptionKey
-    AZURE_SPEECH_ENDPOINT: sharedServices.outputs.speechServiceEndpoint
-    AZURE_SPEECH_REGION: location
-    AZURE_VISION_ENDPOINT: sharedServices.outputs.visionServiceEndpoint
+  name: 'appservice-config'
+  params: {
+    appServiceName: frontend.outputs.appServiceName
+    cosmosDbEndpoint: backend.outputs.cosmosDbEndpoint
+    azureOpenAIEndpoint: middleware.outputs.openAIServiceEndpoint
+    aiProjectEndpoint: middleware.outputs.aiProjectEndpoint
+    azureMapsSubscriptionKey: sharedServices.outputs.mapsSubscriptionKey
+    speechServiceEndpoint: sharedServices.outputs.speechServiceEndpoint
+    visionServiceEndpoint: sharedServices.outputs.visionServiceEndpoint
+    location: location
+    flaskSecretKey: uniqueString(subscription().id, frontend.outputs.appServiceName)
+    appInsightsConnectionString: frontend.outputs.appInsightsConnectionString
   }
-  dependsOn: [
-    frontend
-    middleware
-    backend
-    sharedServices
-  ]
 }
 
 // =============================================================================
@@ -319,3 +257,19 @@ output shared object = {
 }
 
 output nextSteps string = '''
+✅ Multi-Resource Group Infrastructure Deployed Successfully!
+
+RESOURCE GROUPS:
+- Frontend: ${frontendRgName}
+- Middleware: ${middlewareRgName}
+- Backend: ${backendRgName}
+- Shared Services: ${sharedRgName}
+
+NEXT STEPS:
+
+1. Create 8 AI Agents (automated in deployment script)
+2. Agent IDs will be configured in App Service settings
+3. Demo data will be initialized automatically
+
+Access your application at: ${frontend.outputs.appServiceUrl}
+'''
