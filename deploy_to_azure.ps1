@@ -511,42 +511,61 @@ try {
 # Task 3: Initialize default users
 Write-Host "  👤 Initializing default user accounts..." -ForegroundColor Cyan
 Write-Host "     (This requires Cosmos DB RBAC permissions to be active)" -ForegroundColor Gray
-try {
-    # Check if Python is available
-    if (Get-Command python -ErrorAction SilentlyContinue) {
-        # Run setup_users.py to create default accounts
-        $setupOutput = python utils/setup/setup_users.py 2>&1
-        if ($LASTEXITCODE -eq 0 -and $setupOutput -match "SUCCESS") {
-            Write-Host "  ✓ Default users created successfully" -ForegroundColor Green
-            Write-Host "    Login at: https://$($webApp.defaultHostName)/login" -ForegroundColor Gray
-            Write-Host "    Username: admin | Password: admin123" -ForegroundColor Gray
-        } else {
-            # Check if it's a permission error
-            if ($setupOutput -match "Forbidden|RBAC|readMetadata") {
-                Write-Host "  ⚠ RBAC permissions not yet active - waiting additional 30 seconds..." -ForegroundColor Yellow
-                Start-Sleep -Seconds 30
-                
-                # Retry once
-                $retryOutput = python utils/setup/setup_users.py 2>&1
-                if ($LASTEXITCODE -eq 0 -and $retryOutput -match "SUCCESS") {
-                    Write-Host "  ✓ Default users created successfully (after retry)" -ForegroundColor Green
-                } else {
-                    Write-Host "  ⚠ User initialization failed - RBAC may need more time to propagate" -ForegroundColor Yellow
-                    Write-Host "    Users will be auto-created on first login attempt" -ForegroundColor Gray
-                    Write-Host "    Or run manually: python utils/setup/setup_users.py" -ForegroundColor Gray
-                }
+
+# Validate Cosmos DB exists before attempting user initialization
+$cosmosAccountName = $bicepOutputJson.backend.value.cosmosDbAccountName
+Write-Host "    🔍 Validating Cosmos DB: $cosmosAccountName..." -ForegroundColor Cyan
+
+$cosmosCheck = az cosmosdb show `
+    --name $cosmosAccountName `
+    --resource-group $backendRgName `
+    --query "name" `
+    -o tsv 2>$null
+
+if (-not $cosmosCheck) {
+    Write-Host "    ✗ ERROR: Cosmos DB account '$cosmosAccountName' not found!" -ForegroundColor Red
+    Write-Host "    ℹ  Skipping user initialization - database not accessible" -ForegroundColor Yellow
+    Write-Host ""
+} else {
+    Write-Host "    ✓ Cosmos DB validated: $cosmosAccountName" -ForegroundColor Green
+    
+    try {
+        # Check if Python is available
+        if (Get-Command python -ErrorAction SilentlyContinue) {
+            # Run setup_users.py to create default accounts
+            $setupOutput = python utils/setup/setup_users.py 2>&1
+            if ($LASTEXITCODE -eq 0 -and $setupOutput -match "SUCCESS") {
+                Write-Host "  ✓ Default users created successfully" -ForegroundColor Green
+                Write-Host "    Login at: https://$($webApp.defaultHostName)/login" -ForegroundColor Gray
+                Write-Host "    Username: admin | Password: admin123" -ForegroundColor Gray
             } else {
-                Write-Host "  ⚠ User initialization may have failed" -ForegroundColor Yellow
-                Write-Host "    Run manually: python utils/setup/setup_users.py" -ForegroundColor Gray
+                # Check if it's a permission error
+                if ($setupOutput -match "Forbidden|RBAC|readMetadata") {
+                    Write-Host "  ⚠ RBAC permissions not yet active - waiting additional 30 seconds..." -ForegroundColor Yellow
+                    Start-Sleep -Seconds 30
+                    
+                    # Retry once
+                    $retryOutput = python utils/setup/setup_users.py 2>&1
+                    if ($LASTEXITCODE -eq 0 -and $retryOutput -match "SUCCESS") {
+                        Write-Host "  ✓ Default users created successfully (after retry)" -ForegroundColor Green
+                    } else {
+                        Write-Host "  ⚠ User initialization failed - RBAC may need more time to propagate" -ForegroundColor Yellow
+                        Write-Host "    Users will be auto-created on first login attempt" -ForegroundColor Gray
+                        Write-Host "    Or run manually: python utils/setup/setup_users.py" -ForegroundColor Gray
+                    }
+                } else {
+                    Write-Host "  ⚠ User initialization may have failed" -ForegroundColor Yellow
+                    Write-Host "    Run manually: python utils/setup/setup_users.py" -ForegroundColor Gray
+                }
             }
+        } else {
+            Write-Host "  ⚠ Python not found - skipping user initialization" -ForegroundColor Yellow
+            Write-Host "    Users will be auto-created on first login attempt" -ForegroundColor Gray
         }
-    } else {
-        Write-Host "  ⚠ Python not found - skipping user initialization" -ForegroundColor Yellow
+    } catch {
+        Write-Host "  ⚠ Could not initialize users: $($_.Exception.Message)" -ForegroundColor Yellow
         Write-Host "    Users will be auto-created on first login attempt" -ForegroundColor Gray
     }
-} catch {
-    Write-Host "  ⚠ Could not initialize users: $($_.Exception.Message)" -ForegroundColor Yellow
-    Write-Host "    Users will be auto-created on first login attempt" -ForegroundColor Gray
 }
 
 # Task 4: Generate demo data for full-featured demo
@@ -554,17 +573,38 @@ Write-Host "  📦 Generating demo data (parcels, manifests, dispatcher data)...
 Write-Host "     (Requires temporary Cosmos DB local auth for data generation)" -ForegroundColor Gray
 try {
     if (Get-Command python -ErrorAction SilentlyContinue) {
-        # Get Cosmos DB account name from Bicep output or use default
-        $cosmosAccountName = if ($bicepOutputJson) { 
-            $bicepOutputJson.cosmosDbAccountName.value 
-        } else { 
-            "zava-dev-cosmos-lrqies" 
+        # Get Cosmos DB account name from Bicep output
+        $cosmosAccountName = $bicepOutputJson.backend.value.cosmosDbAccountName
+        $subscriptionId = $account.id
+        
+        # Validate that Cosmos DB account exists before proceeding
+        Write-Host "    🔍 Validating Cosmos DB account exists: $cosmosAccountName..." -ForegroundColor Cyan
+        $cosmosExists = az cosmosdb check-name-exists --name $cosmosAccountName
+        
+        if ($cosmosExists -eq "false") {
+            Write-Host "    ✗ ERROR: Cosmos DB account '$cosmosAccountName' does not exist!" -ForegroundColor Red
+            Write-Host "    ℹ  The deployment may have failed during infrastructure creation." -ForegroundColor Yellow
+            Write-Host "    ℹ  Run the deployment again or check Azure portal for the account." -ForegroundColor Yellow
+            throw "Cosmos DB account validation failed"
         }
+        
+        # Verify the account is in the correct resource group
+        $cosmosDetails = az cosmosdb show `
+            --name $cosmosAccountName `
+            --resource-group $backendRgName `
+            --query "{name:name, endpoint:documentEndpoint}" `
+            -o json 2>$null | ConvertFrom-Json
+            
+        if (-not $cosmosDetails) {
+            Write-Host "    ✗ ERROR: Cosmos DB account '$cosmosAccountName' not found in resource group '$backendRgName'!" -ForegroundColor Red
+            throw "Cosmos DB account not accessible"
+        }
+        
+        Write-Host "    ✓ Cosmos DB account validated: $cosmosAccountName" -ForegroundColor Green
+        Write-Host "      Endpoint: $($cosmosDetails.endpoint)" -ForegroundColor Gray
         
         # Step 1: Temporarily enable local auth for data generation
         Write-Host "    🔓 Temporarily enabling Cosmos DB local authentication..." -ForegroundColor Cyan
-        $subscriptionId = $account.id
-        $cosmosAccountName = $bicepOutputJson.backend.value.cosmosDbAccountName
         $cosmosResourceId = "/subscriptions/$subscriptionId/resourceGroups/$backendRgName/providers/Microsoft.DocumentDB/databaseAccounts/$cosmosAccountName"
         
         az resource update `
