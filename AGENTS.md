@@ -327,6 +327,40 @@ az webapp log tail --name <webapp-name> --resource-group RG-Zava-Logistics
 - Use async/await for database and agent operations
 - Prefix internal functions with underscore: `_helper_function()`
 
+### Agent Prompts (✨ NEW: Centralized Management)
+**All agent system prompts are now managed in the `Agent-Skills/` folder:**
+
+```
+Agent-Skills/
+  customer-service/
+    system-prompt.md  # Base agent behavior and instructions
+    SKILLS.md         # Capabilities documentation
+  dispatcher/
+    system-prompt.md
+    SKILLS.md
+  ... (other agents)
+```
+
+**Loading Prompts in Code:**
+```python
+from agents.prompt_loader import get_agent_prompt, get_agent_skills
+
+# Load system prompt for an agent
+prompt = get_agent_prompt("customer-service")
+skills = get_agent_skills("customer-service")
+
+# List all available agents
+from agents.prompt_loader import list_available_agents
+agents = list_available_agents()
+```
+
+**Key Benefits:**
+- ✅ Single source of truth for agent behavior
+- ✅ No duplicated prompts across codebase
+- ✅ Easy to update agent instructions without code changes
+- ✅ Version control for agent prompts
+- ✅ Automatic validation on import
+
 ### Agent Functions
 ```python
 async def agent_name(request_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -554,15 +588,44 @@ result = await fraud_detection_to_customer_service_workflow(
 ## Updating Agents
 
 ### Update Agent Instructions
+
+**✨ NEW: Edit Markdown Files (Recommended)**
 ```bash
-# Method 1: Update base.py (immediate effect)
-# Edit: agents/base.py:662-730 (Customer Service example)
+# Edit the system prompt file directly
+# File: Agent-Skills/{agent-name}/system-prompt.md
 
-# Method 2: Update Azure AI Foundry (persistent)
+# Changes take effect immediately on next agent call
+# No code changes or redeployment needed!
+```
+
+**Example: Update Customer Service Agent**
+```bash
+# 1. Edit the prompt file
+code Agent-Skills/customer-service/system-prompt.md
+
+# 2. Changes apply immediately (prompts are loaded dynamically)
+# Test the updated agent
+python test_agent.py customer-service
+```
+
+**Alternative Methods:**
+
+**Method 1: Local Testing (Immediate Effect)**
+```bash
+# Edit Agent-Skills/{agent-name}/system-prompt.md
+# Restart your application to pick up changes
+```
+
+**Method 2: Register with Azure AI Foundry (Persistent)**
+```bash
+# After editing system-prompt.md files, register with Azure
 python register_agent_tools.py
+```
 
-# Method 3: Update in Azure portal
+**Method 3: Update in Azure Portal**
+```bash
 # Visit: https://ai.azure.com → Your Project → Agents → Edit
+# Note: Local system-prompt.md files will override on next registration
 ```
 
 ### Add New Agent Tools

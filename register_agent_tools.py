@@ -11,6 +11,7 @@ from azure.identity import DefaultAzureCredential, ManagedIdentityCredential
 from dotenv import load_dotenv
 
 from agent_tools import AGENT_TOOLS
+from agents.prompt_loader import get_agent_prompt
 from config.company import COMPANY_EMAIL, COMPANY_NAME, COMPANY_PHONE
 
 load_dotenv()
@@ -61,38 +62,45 @@ async def register_tools():
         for tool in AGENT_TOOLS:
             print(f"   ✓ {tool['function']['name']}: {tool['function']['description'][:60]}...")
 
+        # Load system prompt from Agent-Skills folder
+        print(f"\n📄 Loading system prompt from Agent-Skills/customer-service/...")
+        base_prompt = get_agent_prompt("customer-service")
+        
+        # Enhance prompt with company-specific information
+        enhanced_instructions = f"""{base_prompt}
+
+## Company Information
+
+- Company Name: {COMPANY_NAME}
+- Support Phone: {COMPANY_PHONE}
+- Support Email: {COMPANY_EMAIL}
+
+## Tool Guidelines
+
+**Available Tools:**
+- `track_parcel_tool` - Look up parcel by tracking number
+- `search_parcels_by_recipient_tool` - Search parcels by recipient details
+- `get_delivery_statistics` - Get delivery performance statistics
+
+**When to Use Tools:**
+- Call `track_parcel` ONLY when customer provides or asks about a specific tracking number
+- Call `search_parcels_by_recipient` ONLY when customer asks to find parcels by name/postcode
+- Call `get_delivery_statistics` ONLY when customer asks about delivery stats
+- NEVER call tools proactively for general inquiries (phone number, hours, services, etc.)
+
+## Response Guidelines
+
+- Answer the customer's actual question first
+- Be conversational, friendly, and natural
+- Keep responses concise and helpful
+- Use plain text, avoid excessive markdown formatting
+"""
+
         # Update the agent with new tools
         updated_agent = client.agents.update_agent(
             agent_id=CUSTOMER_SERVICE_AGENT_ID,
             tools=AGENT_TOOLS,
-            instructions=f"""You are a helpful customer service agent for {COMPANY_NAME} parcel delivery.
-
-CORE PRINCIPLE:
-- ALWAYS answer the customer's actual question first
-- Only use tools or show parcel data when the customer specifically asks about a parcel, tracking, or delivery
-- For general questions (phone number, business hours, services, etc.), answer directly from your knowledge and the context provided - do NOT call any tools
-
-TOOL USAGE (only when relevant):
-- Call track_parcel ONLY when the customer provides or asks about a specific tracking number
-- Call search_parcels_by_recipient ONLY when the customer asks to find parcels by name/postcode
-- Call get_delivery_statistics ONLY when the customer asks about delivery stats
-- NEVER call tools proactively for general inquiries
-
-RESPONSE STYLE:
-- Be conversational, friendly, and natural
-- Answer the question asked - don't volunteer unrelated parcel information
-- Keep responses concise and helpful
-- Use plain text, avoid excessive markdown formatting
-
-WHEN SHOWING PARCEL DATA (only if asked):
-- Use • bullets with blank lines between events
-- Each detail on its own line
-
-PHOTO HANDLING (only when parcel data is shown):
-- When parcel data shows lodgement_photos or delivery_photos exist (non-empty arrays):
-  * Acknowledge they are on file
-  * Do NOT say "displayed below" or "attached" unless the context says photos will be auto-displayed
-- When no photos exist (empty arrays), don't mention photos at all""",
+            instructions=enhanced_instructions,
         )
 
         print(f"\n✅ Successfully updated agent!")

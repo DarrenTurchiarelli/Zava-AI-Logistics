@@ -23,6 +23,7 @@ from openai import AzureOpenAI
 from azure.identity import AzureCliCredential, DefaultAzureCredential, ManagedIdentityCredential, get_bearer_token_provider
 from dotenv import load_dotenv
 
+from agents.prompt_loader import get_agent_prompt
 from config.company import COMPANY_EMAIL, COMPANY_NAME, COMPANY_PHONE
 
 load_dotenv()
@@ -309,45 +310,42 @@ async def parcel_intake_agent(parcel_data: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Validation results with recommendations, warnings, and insights
     """
-    message = f"""
-    Process new parcel registration and provide comprehensive validation:
+    # Load base system prompt from Agent-Skills folder
+    base_prompt = get_agent_prompt("parcel-intake")
+    
+    message = f"""{base_prompt}
 
-    PARCEL INFORMATION:
-    Tracking Number: {parcel_data.get('tracking_number')}
-    Service Type: {parcel_data.get('service_type', 'standard')}
-    Weight: {parcel_data.get('weight_kg', 'Unknown')} kg
-    Dimensions: {parcel_data.get('dimensions', 'Unknown')}
-    Declared Value: ${parcel_data.get('declared_value', 0)}
+## New Parcel Registration
 
-    SENDER:
-    Name: {parcel_data.get('sender_name')}
-    Address: {parcel_data.get('sender_address')}
+**Parcel Information:**
+- Tracking Number: {parcel_data.get('tracking_number')}
+- Service Type: {parcel_data.get('service_type', 'standard')}
+- Weight: {parcel_data.get('weight_kg', 'Unknown')} kg
+- Dimensions: {parcel_data.get('dimensions', 'Unknown')}
+- Declared Value: ${parcel_data.get('declared_value', 0)}
 
-    RECIPIENT:
-    Name: {parcel_data.get('recipient_name')}
-    Address: {parcel_data.get('recipient_address')}
-    Postcode: {parcel_data.get('destination_postcode')}
-    State: {parcel_data.get('destination_state', 'Unknown')}
+**Sender:**
+- Name: {parcel_data.get('sender_name')}
+- Address: {parcel_data.get('sender_address')}
 
-    SPECIAL INSTRUCTIONS: {parcel_data.get('special_instructions', 'None')}
+**Recipient:**
+- Name: {parcel_data.get('recipient_name')}
+- Address: {parcel_data.get('recipient_address')}
+- Postcode: {parcel_data.get('destination_postcode')}
+- State: {parcel_data.get('destination_state', 'Unknown')}
 
-    PLEASE ANALYZE AND PROVIDE:
-    1. Service Type Recommendation: Based on weight, value, and destination, is '{parcel_data.get('service_type')}' the optimal choice?
-       Consider if Express/Overnight is needed for high-value items, or if Standard is sufficient.
+**Special Instructions:** {parcel_data.get('special_instructions', 'None')}
 
-    2. Address Validation: Check if addresses are complete and properly formatted.
-       Flag any missing elements (street number, suburb, state).
+## Analysis Required
 
-    3. Delivery Complications: Identify potential issues:
-       - Remote/rural destination requiring special handling
-       - Oversized/overweight requiring freight upgrade
-       - High-value requiring insurance or signature
-       - Fragile items needing special care
+Please validate this parcel registration and provide:
+1. Service type recommendation (is '{parcel_data.get('service_type')}' optimal?)
+2. Address validation and completeness check
+3. Potential delivery complications
+4. Data quality assessment
 
-    4. Data Quality: Flag any missing or suspicious information.
-
-    Provide concise, actionable feedback in a friendly tone.
-    """
+Provide concise, actionable feedback in a friendly tone.
+"""
 
     return await call_azure_agent(PARCEL_INTAKE_AGENT_ID, message, parcel_data)
 
@@ -495,19 +493,24 @@ async def sorting_facility_agent(parcel_info: Dict[str, Any], intake_results: Op
     Returns:
         Routing decision and any exceptions
     """
-    message = f"""
-    Review parcel for sorting and routing:
+    # Load base system prompt from Agent-Skills folder
+    base_prompt = get_agent_prompt("sorting-facility")
+    
+    message = f"""{base_prompt}
 
-    Tracking Number: {parcel_info.get('tracking_number')}
-    Destination: {parcel_info.get('destination_address')}
-    Destination Postcode: {parcel_info.get('destination_postcode')}
-    Service Type: {parcel_info.get('service_type', 'standard')}
-    Special Handling: {parcel_info.get('special_handling', 'None')}
+## Parcel Sorting Task
 
-    {"Intake Results: " + intake_results if intake_results else ""}
+**Parcel Details:**
+- Tracking Number: {parcel_info.get('tracking_number')}
+- Destination: {parcel_info.get('destination_address')}
+- Destination Postcode: {parcel_info.get('destination_postcode')}
+- Service Type: {parcel_info.get('service_type', 'standard')}
+- Special Handling: {parcel_info.get('special_handling', 'None')}
 
-    Determine routing decision and identify any exceptions.
-    """
+{f"**Intake Results:** {intake_results}" if intake_results else ""}
+
+Determine routing decision and identify any exceptions.
+"""
 
     return await call_azure_agent(SORTING_FACILITY_AGENT_ID, message, parcel_info)
 
@@ -525,18 +528,23 @@ async def delivery_coordination_agent(
     Returns:
         Delivery assignment and coordination details
     """
-    message = f"""
-    Coordinate delivery assignment:
+    # Load base system prompt from Agent-Skills folder
+    base_prompt = get_agent_prompt("delivery-coordination")
+    
+    message = f"""{base_prompt}
 
-    Tracking Number: {routing_info.get('tracking_number')}
-    Route: {routing_info.get('route', 'Unknown')}
-    Priority: {routing_info.get('priority', 'normal')}
-    Special Instructions: {routing_info.get('special_instructions', 'None')}
+## Delivery Coordination Task
 
-    {"Sorting Results: " + sorting_results if sorting_results else ""}
+**Delivery Details:**
+- Tracking Number: {routing_info.get('tracking_number')}
+- Route: {routing_info.get('route', 'Unknown')}
+- Priority: {routing_info.get('priority', 'normal')}
+- Special Instructions: {routing_info.get('special_instructions', 'None')}
 
-    Assign to appropriate driver and confirm delivery plan.
-    """
+{f"**Sorting Results:** {sorting_results}" if sorting_results else ""}
+
+Assign to appropriate driver and confirm delivery plan.
+"""
 
     return await call_azure_agent(DELIVERY_COORDINATION_AGENT_ID, message, routing_info)
 
@@ -551,20 +559,25 @@ async def dispatcher_agent(route_data: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Optimized route assignments and driver allocations
     """
-    message = f"""
-    Optimize route assignments and driver allocation:
+    # Load base system prompt from Agent-Skills folder
+    base_prompt = get_agent_prompt("dispatcher")
+    
+    message = f"""{base_prompt}
 
-    Number of Parcels: {route_data.get('parcel_count', 0)}
-    Available Drivers: {route_data.get('available_drivers', [])}
-    Service Level: {route_data.get('service_level', 'standard')}
-    Delivery Window: {route_data.get('delivery_window', 'standard')}
-    Geographic Zone: {route_data.get('zone', 'Unknown')}
+## Current Route Assignment Task
 
-    Parcels Summary:
-    {json.dumps(route_data.get('parcels', []), indent=2)}
+**Overview:**
+- Number of Parcels: {route_data.get('parcel_count', 0)}
+- Available Drivers: {route_data.get('available_drivers', [])}
+- Service Level: {route_data.get('service_level', 'standard')}
+- Delivery Window: {route_data.get('delivery_window', 'standard')}
+- Geographic Zone: {route_data.get('zone', 'Unknown')}
 
-    Provide optimized route manifest with driver assignments and capacity utilization.
-    """
+**Parcels Summary:**
+{json.dumps(route_data.get('parcels', []), indent=2)}
+
+Provide optimized route manifest with driver assignments and capacity utilization.
+"""
 
     return await call_azure_agent(DISPATCHER_AGENT_ID, message, route_data)
 
@@ -579,20 +592,25 @@ async def driver_agent(delivery_action: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Delivery status and next action required
     """
-    message = f"""
-    Process delivery action:
+    # Load base system prompt from Agent-Skills folder
+    base_prompt = get_agent_prompt("driver")
+    
+    message = f"""{base_prompt}
 
-    Action Type: {delivery_action.get('action_type', 'scan')}
-    Tracking Number: {delivery_action.get('tracking_number')}
-    Location: {delivery_action.get('location', 'Unknown')}
-    Scan Type: {delivery_action.get('scan_type', 'Unknown')}
-    Driver ID: {delivery_action.get('driver_id', 'Unknown')}
+## Current Delivery Action
 
-    {"Delivery Note: " + delivery_action.get('note', '') if delivery_action.get('note') else ""}
-    {"Exception: " + delivery_action.get('exception', '') if delivery_action.get('exception') else ""}
+**Action Details:**
+- Action Type: {delivery_action.get('action_type', 'scan')}
+- Tracking Number: {delivery_action.get('tracking_number')}
+- Location: {delivery_action.get('location', 'Unknown')}
+- Scan Type: {delivery_action.get('scan_type', 'Unknown')}
+- Driver ID: {delivery_action.get('driver_id', 'Unknown')}
 
-    Process scan and provide next action required.
-    """
+{f"**Delivery Note:** {delivery_action.get('note', '')}" if delivery_action.get('note') else ""}
+{f"**Exception:** {delivery_action.get('exception', '')}" if delivery_action.get('exception') else ""}
+
+Process scan and provide next action required.
+"""
 
     return await call_azure_agent(DRIVER_AGENT_ID, message, delivery_action)
 
@@ -607,22 +625,27 @@ async def optimization_agent(route_conditions: Dict[str, Any]) -> Dict[str, Any]
     Returns:
         Updated ETAs, route changes, optimization recommendations
     """
-    message = f"""
-    Optimize route and predict ETAs:
+    # Load base system prompt from Agent-Skills folder
+    base_prompt = get_agent_prompt("optimization")
+    
+    message = f"""{base_prompt}
 
-    Route ID: {route_conditions.get('route_id', 'Unknown')}
-    Current Location: {route_conditions.get('current_location', 'Unknown')}
-    Remaining Stops: {route_conditions.get('remaining_stops', 0)}
-    Traffic Conditions: {route_conditions.get('traffic', 'normal')}
-    Weather: {route_conditions.get('weather', 'clear')}
+## Current Route Analysis Task
 
-    {"Disruptions: " + route_conditions.get('disruptions', '') if route_conditions.get('disruptions') else ""}
+**Route Information:**
+- Route ID: {route_conditions.get('route_id', 'Unknown')}
+- Current Location: {route_conditions.get('current_location', 'Unknown')}
+- Remaining Stops: {route_conditions.get('remaining_stops', 0)}
+- Traffic Conditions: {route_conditions.get('traffic', 'normal')}
+- Weather: {route_conditions.get('weather', 'clear')}
 
-    Stops:
-    {json.dumps(route_conditions.get('stops', []), indent=2)}
+{f"**Disruptions:** {route_conditions.get('disruptions', '')}" if route_conditions.get('disruptions') else ""}
 
-    Provide updated ETAs and optimization recommendations.
-    """
+**Stops:**
+{json.dumps(route_conditions.get('stops', []), indent=2)}
+
+Provide updated ETAs and optimization recommendations.
+"""
 
     return await call_azure_agent(OPTIMIZATION_AGENT_ID, message, route_conditions)
 
@@ -638,63 +661,51 @@ async def customer_service_agent(customer_request: Dict[str, Any], thread_id: Op
     Returns:
         Resolution options and customer communication
     """
+    # Load base system prompt from Agent-Skills folder
+    base_prompt = get_agent_prompt("customer-service")
+    
     # Check if this is a public chat request (from chat widget)
     is_chat_request = "public_mode" in customer_request.get("details", "")
 
     if is_chat_request:
-        # Simpler, more conversational prompt for chat widget
-        message = f"""
-        You're Alex, a helpful customer service team member at {COMPANY_NAME}. You're having a real conversation with a customer who needs help.
+        # Conversational mode for chat widget - combine base prompt with context
+        message = f"""{base_prompt}
 
-        Customer's Question:
-        {customer_request.get('details', 'No details provided')}
+## Current Customer Request
 
-        Guidelines for your response:
-        - ALWAYS answer the customer's actual question first - if they ask about phone numbers, hours, services, etc., answer that directly
-        - Only discuss parcel tracking if the customer specifically asks about a parcel or provides a tracking number
-        - Talk like a real person, not a robot - use natural language and be warm
-        - Keep it conversational - avoid bullet points, asterisks, or formatted lists
-        - Be concise but friendly - get to the point without being cold
-        - If tracking a parcel, weave the details into your response naturally (e.g., "I can see your parcel is currently at our Melbourne Prahran store and should arrive by November 19th")
-        - Only mention contacting support ({COMPANY_PHONE} or {COMPANY_EMAIL}) if there's actually a problem or you can't help
-        - Use contractions (I'll, you're, it's) to sound more natural
-        - Add personality - show empathy if there's a delay, enthusiasm when things are on track
-        - Don't end every message asking if there's anything else - sometimes just sign off naturally
-        - Do NOT call any tools unless the customer specifically asks about a parcel or tracking number
-        - IMPORTANT PHOTO HANDLING: When you see lodgement_photos or delivery_photos in the tracking data:
-          * If photos exist, acknowledge they are ON FILE and available
-          * Tell the customer: "We have a [lodgement/delivery] photo on file for your parcel. If you'd like a copy, please contact our customer service team at {COMPANY_PHONE} or {COMPANY_EMAIL}"
-          * Do NOT say "displayed below" or "attached" - the public chat cannot show images
-          * Never say photos are "unavailable" when the data shows they exist
+**Customer's Question:**
+{customer_request.get('details', 'No details provided')}
 
-        Remember: You're a person helping another person, not an AI assistant writing a formal report.
-        """
+## Additional Context
+
+- Company: {COMPANY_NAME}
+- Support Phone: {COMPANY_PHONE}
+- Support Email: {COMPANY_EMAIL}
+
+**Remember:** This is a public chat - photos cannot be displayed directly. If photos exist in tracking data, tell the customer they are on file and can be requested via customer service.
+"""
     else:
         # Structured format for internal customer service representatives
-        message = f"""
-        Handle customer request:
+        message = f"""{base_prompt}
 
-        Customer: {customer_request.get('customer_name', 'Unknown')}
-        Issue Type: {customer_request.get('issue_type', 'inquiry')}
-        Tracking Number: {customer_request.get('tracking_number', 'N/A')}
+## Internal Customer Service Request
 
-        Request Details:
-        {customer_request.get('details', 'No details provided')}
+**Customer Details:**
+- Name: {customer_request.get('customer_name', 'Unknown')}
+- Issue Type: {customer_request.get('issue_type', 'inquiry')}
+- Tracking Number: {customer_request.get('tracking_number', 'N/A')}
 
-        {"Preferred Resolution: " + customer_request.get('preferred_resolution', '') if customer_request.get('preferred_resolution') else ""}
+**Request Details:**
+{customer_request.get('details', 'No details provided')}
 
-        CRITICAL: Answer the customer's actual question first. If they ask a general question (phone number, hours, services, pricing, etc.), answer it directly using the company information provided in the request details. Only look up parcel data or use tools when the question is specifically about a parcel or tracking.
+{f"**Preferred Resolution:** {customer_request.get('preferred_resolution', '')}" if customer_request.get('preferred_resolution') else ""}
 
-        Do NOT call tools (track_parcel, search_parcels_by_recipient, etc.) unless the customer explicitly asks about a parcel, tracking number, or delivery status.
+**Company Information:**
+- Phone: {COMPANY_PHONE}
+- Email: {COMPANY_EMAIL}
 
-        Provide resolution options and customer communication message.
-
-        IMPORTANT PHOTO GUIDANCE:
-        - When tracking data includes lodgement_photos or delivery_photos, these are AUTOMATICALLY displayed to the customer
-        - Acknowledge photos naturally (e.g., "The lodgement photo is displayed below" or "You can see the delivery photo attached")
-        - Never say photos are "unavailable" or need to be accessed through "internal systems" when the data shows they exist
-        - If no photos exist in the data (empty arrays), then it's appropriate to say photos are not available
-        """
+**Internal Note:** When tracking data includes photos, they are automatically displayed to internal staff and customers. Acknowledge them naturally in your response.
+"""
 
     return await call_azure_agent(CUSTOMER_SERVICE_AGENT_ID, message, customer_request, thread_id=thread_id)
 
@@ -709,26 +720,27 @@ async def fraud_risk_agent(suspicious_activity: Dict[str, Any]) -> Dict[str, Any
     Returns:
         Risk assessment and recommended actions
     """
+    # Load base system prompt from Agent-Skills folder
+    base_prompt = get_agent_prompt("fraud-detection")
+    
     # Build message content dynamically
-    message_parts = [
-        "Analyze potential fraud or security risk:",
-        "",
-        f"Activity Type: {suspicious_activity.get('activity_type', 'message')}",
-        f"Source: {suspicious_activity.get('source', 'Unknown')}",
-        "",
-    ]
+    message_parts = [base_prompt, "", "## Current Security Analysis Task", ""]
+    
+    message_parts.append(f"**Activity Type:** {suspicious_activity.get('activity_type', 'message')}")
+    message_parts.append(f"**Source:** {suspicious_activity.get('source', 'Unknown')}")
+    message_parts.append("")
 
     if suspicious_activity.get("message"):
-        message_parts.append("Message Content:")
+        message_parts.append("**Message Content:**")
         message_parts.append(suspicious_activity.get("message", ""))
         message_parts.append("")
 
     if suspicious_activity.get("pattern"):
-        message_parts.append("Activity Pattern:")
+        message_parts.append("**Activity Pattern:**")
         message_parts.append(suspicious_activity.get("pattern", ""))
         message_parts.append("")
 
-    message_parts.append("Sender Information:")
+    message_parts.append("**Sender Information:**")
     message_parts.append(json.dumps(suspicious_activity.get("sender_info", {}), indent=2))
     message_parts.append("")
     message_parts.append("Assess risk level and provide recommended actions.")
@@ -748,20 +760,25 @@ async def identity_agent(verification_request: Dict[str, Any]) -> Dict[str, Any]
     Returns:
         Verification status and compliance assessment
     """
-    message = f"""
-    Verify courier identity and authentication:
+    # Load base system prompt from Agent-Skills folder
+    base_prompt = get_agent_prompt("identity-verification")
+    
+    message = f"""{base_prompt}
 
-    Courier ID: {verification_request.get('courier_id', 'Unknown')}
-    Name: {verification_request.get('name', 'Unknown')}
-    Role: {verification_request.get('role', 'driver')}
-    Employment Status: {verification_request.get('employment_status', 'Unknown')}
-    Authorized Zone: {verification_request.get('authorized_zone', 'Unknown')}
+## Current Verification Request
 
-    {"Credentials: " + str(verification_request.get('credentials', '')) if verification_request.get('credentials') else ""}
-    {"Verification Method: " + verification_request.get('verification_method', 'standard') if verification_request.get('verification_method') else ""}
+**Courier Information:**
+- Courier ID: {verification_request.get('courier_id', 'Unknown')}
+- Name: {verification_request.get('name', 'Unknown')}
+- Role: {verification_request.get('role', 'driver')}
+- Employment Status: {verification_request.get('employment_status', 'Unknown')}
+- Authorized Zone: {verification_request.get('authorized_zone', 'Unknown')}
 
-    Verify identity and provide authentication status.
-    """
+{f"**Credentials:** {str(verification_request.get('credentials', ''))}" if verification_request.get('credentials') else ""}
+{f"**Verification Method:** {verification_request.get('verification_method', 'standard')}" if verification_request.get('verification_method') else ""}
+
+Verify identity and provide authentication status.
+"""
 
     try:
         # Add timeout for agent call - don't block login if agent is slow

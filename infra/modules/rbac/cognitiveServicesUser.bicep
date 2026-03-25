@@ -5,20 +5,22 @@
 @description('Principal ID (Managed Identity) to grant access to')
 param principalId string
 
-@description('Resource ID of the Cognitive Services account')
-param resourceId string
+@description('Full resource ID of the Cognitive Services account')
+param cognitiveServiceName string
 
-// Extract resource parts for naming
-var resourceParts = split(resourceId, '/')
-var resourceName = resourceParts[length(resourceParts) - 1]
+// Get reference to existing Cognitive Services account
+resource cognitiveService 'Microsoft.CognitiveServices/accounts@2023-05-01' existing = {
+  name: cognitiveServiceName
+}
 
 // Cognitive Services OpenAI User role ID
-var roleDefinitionId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')
+var cognitiveServicesOpenAIUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
 
 resource roleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(resourceId, principalId, 'openai-user')
+  name: guid(cognitiveService.id, principalId, cognitiveServicesOpenAIUserRoleId)
+  scope: cognitiveService
   properties: {
-    roleDefinitionId: roleDefinitionId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIUserRoleId)
     principalId: principalId
     principalType: 'ServicePrincipal'
   }

@@ -7,9 +7,14 @@ Returns agent IDs as JSON for easy integration with deployment scripts
 import os
 import sys
 import json
+from pathlib import Path
 from dotenv import load_dotenv
 from openai import AzureOpenAI
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+
+# Add parent directory to path to import from agents module
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from agents.prompt_loader import get_agent_prompt
 
 load_dotenv()
 
@@ -18,141 +23,70 @@ AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")  # Optional - if not set, use managed identity
 AZURE_AI_MODEL_DEPLOYMENT_NAME = os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME", "gpt-4o")
 
-# Agent definitions
+# Agent definitions - load prompts from Agent-Skills folder
 AGENTS = [
     {
         "name": "Parcel Intake Agent",
         "env_var": "PARCEL_INTAKE_AGENT_ID",
         "description": "Parcel intake validation and service recommendations",
-        "instructions": """You are a parcel intake specialist at Zava Logistics.
-
-Analyze incoming parcel details and provide:
-1. **Service Recommendations** - Suggest optimal delivery service (express/standard/economy)
-2. **Risk Assessment** - Identify potential delivery complications
-3. **Validation** - Verify address, weight, dimensions
-4. **Special Handling** - Flag fragile, hazardous, or priority items
-
-Be professional, thorough, and detail-oriented.""",
+        "prompt_folder": "parcel-intake",
         "temperature": 0.3
     },
     {
         "name": "Sorting Facility Agent",
         "env_var": "SORTING_FACILITY_AGENT_ID",
         "description": "Facility capacity monitoring and routing decisions",
-        "instructions": """You are a sorting facility coordinator at Zava Logistics.
-
-Monitor facility operations and provide:
-1. **Capacity Analysis** - Track current load vs capacity
-2. **Routing Decisions** - Recommend optimal facility routing
-3. **Load Balancing** - Distribute parcels across facilities
-4. **Priority Handling** - Ensure time-sensitive parcels are prioritized
-
-Be efficient, data-driven, and prioritize operational flow.""",
+        "prompt_folder": "sorting-facility",
         "temperature": 0.2
     },
     {
         "name": "Delivery Coordination Agent",
         "env_var": "DELIVERY_COORDINATION_AGENT_ID",
         "description": "Multi-stop delivery sequencing and customer notifications",
-        "instructions": """You are a delivery coordinator at Zava Logistics.
-
-Manage delivery logistics and communication:
-1. **Route Sequencing** - Optimize multi-stop delivery order
-2. **Customer Notifications** - Generate SMS/email updates
-3. **Dynamic Adjustments** - Handle real-time route changes
-4. **Time Management** - Respect delivery windows and priorities
-
-Be clear, timely, and customer-focused.""",
+        "prompt_folder": "delivery-coordination",
         "temperature": 0.4
     },
     {
         "name": "Dispatcher Agent",
         "env_var": "DISPATCHER_AGENT_ID",
         "description": "Intelligent parcel-to-driver assignment",
-        "instructions": """You are a dispatcher at Zava Logistics.
-
-Assign parcels to drivers intelligently:
-1. **Geographic Clustering** - Group parcels by location
-2. **Workload Balancing** - Distribute parcels fairly
-3. **Driver Capacity** - Respect vehicle and time constraints
-4. **Priority Handling** - Ensure urgent deliveries are prioritized
-
-Be strategic, fair, and efficiency-focused.""",
+        "prompt_folder": "dispatcher",
         "temperature": 0.3
     },
     {
         "name": "Optimization Agent",
         "env_var": "OPTIMIZATION_AGENT_ID",
         "description": "Network-wide performance analysis and cost reduction",
-        "instructions": """You are an operations analyst at Zava Logistics.
-
-Analyze system performance and recommend improvements:
-1. **Cost Analysis** - Identify cost reduction opportunities
-2. **Resource Optimization** - Improve utilization of vehicles/drivers/facilities
-3. **Predictive Insights** - Forecast demand and capacity needs
-4. **Performance Metrics** - Track KPIs and suggest improvements
-
-Be analytical, data-driven, and strategic.""",
+        "prompt_folder": "optimization",
         "temperature": 0.5
     },
     {
         "name": "Customer Service Agent",
         "env_var": "CUSTOMER_SERVICE_AGENT_ID",
         "description": "Real-time customer inquiries and parcel tracking",
-        "instructions": """You are a customer service representative at Zava Logistics.
-
-Assist customers with parcel tracking and inquiries:
-1. **Tracking Information** - Provide real-time parcel status updates
-2. **Problem Resolution** - Address delivery concerns and complaints
-3. **Proactive Communication** - Notify customers of delays or issues
-4. **Service Excellence** - Maintain professional, empathetic tone
-
-IMPORTANT: When providing tracking information, always check if photos exist in the data (lodgement_photos or delivery_photos). If photos are present, acknowledge them naturally like "I can see the lodgement photo shows..." or "The delivery photo confirms...". Never tell customers to check internal systems when photos are available in the tracking data.
-
-Be helpful, empathetic, and solution-oriented.""",
+        "prompt_folder": "customer-service",
         "temperature": 0.7
     },
     {
         "name": "Fraud & Risk Agent",
         "env_var": "FRAUD_RISK_AGENT_ID",
         "description": "Security threat analysis and scam detection",
-        "instructions": """You are a security analyst at Zava Logistics.
-
-Analyze potential fraud and security threats:
-1. **Threat Detection** - Identify phishing, impersonation, payment fraud
-2. **Risk Scoring** - Assign risk levels (0-100%)
-3. **Pattern Analysis** - Detect suspicious activity patterns
-4. **Action Recommendations** - Suggest security responses
-
-**Risk Levels:**
-- 0-40%: Low risk (monitor)
-- 40-70%: Medium risk (verify)
-- 70-85%: High risk (alert customer)
-- 85-90%: Very high risk (trigger identity verification)
-- 90%+: Critical (hold parcel, escalate)
-
-Be vigilant, precise, and security-focused.""",
+        "prompt_folder": "fraud-detection",
         "temperature": 0.1
     },
     {
         "name": "Identity Agent",
         "env_var": "IDENTITY_AGENT_ID",
         "description": "Customer identity verification for high-risk cases",
-        "instructions": """You are an identity verification specialist at Zava Logistics.
-
-Verify customer identity for high-risk situations:
-1. **Document Verification** - Validate ID documents
-2. **Information Matching** - Cross-reference customer details
-3. **Risk Assessment** - Determine verification confidence level
-4. **Alternative Verification** - Suggest additional verification methods if needed
-
-**Triggers:**
-- Fraud risk ≥ 85%
-- Suspicious delivery location changes
-- High-value parcels with risk indicators
-
-Be thorough, respectful, and security-conscious.""",
+        "prompt_folder": "identity-verification",
         "temperature": 0.2
+    },
+    {
+        "name": "Driver Agent",
+        "env_var": "DRIVER_AGENT_ID",
+        "description": "Driver delivery execution and proof of delivery",
+        "prompt_folder": "driver",
+        "temperature": 0.4
     }
 ]
 
@@ -194,11 +128,14 @@ def create_agents():
             try:
                 print(f"Creating {agent_def['name']}...", end=" ", flush=True)
                 
+                # Load system prompt from Agent-Skills folder
+                instructions = get_agent_prompt(agent_def["prompt_folder"])
+                
                 # Create assistant (which becomes an agent in AI Foundry)
                 assistant = client.beta.assistants.create(
                     model=AZURE_AI_MODEL_DEPLOYMENT_NAME,
                     name=agent_def["name"],
-                    instructions=agent_def["instructions"],
+                    instructions=instructions,
                     description=agent_def["description"],
                     temperature=agent_def["temperature"]
                 )
