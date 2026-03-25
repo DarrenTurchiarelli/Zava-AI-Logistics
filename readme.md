@@ -448,9 +448,17 @@ pip install -r requirements.txt
 - `python-dotenv>=1.0.0` - Environment variable management
 - `pytesseract>=0.3.10` - Text extraction from images
 
-### 6. Generate Demo Data (First-Time Setup)
+### 6. Generate Demo Data
 
-After deployment or initial setup, generate sample parcels and driver manifests:
+**✅ Demo data is automatically generated during deployment** via [deploy_to_azure.ps1](deploy_to_azure.ps1).
+
+The deployment script automatically creates:
+- ✅ Sample parcels distributed across Australian states (NSW, VIC, QLD, SA, WA, ACT)
+- ✅ Driver manifests for all drivers (driver-001 through driver-057)
+- ✅ Realistic Sydney addresses and delivery details
+- ✅ Parcels ready for dispatcher assignment
+
+**Manual regeneration** (optional - only if you need to reset demo data):
 
 ```powershell
 # Navigate to generators directory
@@ -466,14 +474,7 @@ python generate_demo_manifests.py --large-default
 python generate_demo_manifests.py --large 200
 ```
 
-**What this creates:**
-
-- ✅ Sample parcels distributed across Australian states (NSW, VIC, QLD, SA, WA, ACT)
-- ✅ Driver manifests for 57 drivers (driver-001 through driver-057)
-- ✅ Realistic Sydney addresses and delivery details
-- ✅ Ready-to-use demo environment for testing
-
-**Note**: Run this after every fresh deployment to populate the database with demo data.
+**Note**: Manual generation requires local `.env` file with `COSMOS_CONNECTION_STRING`. For Azure deployments, demo data is created automatically during [deploy_to_azure.ps1](deploy_to_azure.ps1) with proper authentication handling.
 
 ### 7. Database Initialization
 
@@ -703,11 +704,16 @@ success = db.approve_request_sync(request_id, "supervisor_001")
 
 ## 🔐 Security & Compliance
 
-### Authentication Options
+### Authentication
 
-- **Key-based**: Primary/secondary keys (development)
-- **Azure AD**: RBAC with built-in data roles (production recommended)
-- **Connection security**: TLS encryption for all communications
+**Zava uses Azure Managed Identity exclusively for all production operations** - zero API keys or connection strings are stored in configuration.
+
+- **Managed Identity** (Production): All Azure services authenticate via system-assigned managed identities
+- **Azure CLI** (Local Development): Uses your Azure login credentials
+- **Connection Security**: TLS encryption for all communications
+- **RBAC**: Fine-grained permissions for each service
+
+See [Managed Identity Authentication Guide](Guides/MANAGED_IDENTITY_AUTH.md) for complete security architecture and best practices.
 
 ### Data Protection
 
@@ -715,6 +721,7 @@ success = db.approve_request_sync(request_id, "supervisor_001")
 - Audit trail logging for all operations
 - GDPR compliance features
 - Data retention policies
+- Zero secrets in environment variables or code
 
 ## 📁 Project Structure
 
@@ -989,7 +996,28 @@ cat .env | Select-String "AZURE"
 
 ## 📄 License
 
-This project uses Azure AI services and follows Microsoft licensing terms.
+**Non-Commercial Open Source License**
+
+This software is free to use for personal, educational, non-profit, and internal business purposes. 
+
+✅ **Permitted Uses:**
+- Personal projects and learning
+- Academic and educational purposes
+- Non-profit organizations
+- Internal business use (not for resale)
+- Portfolio demonstrations
+
+❌ **Commercial Use Requires Permission:**
+- Selling the software or derivatives
+- Offering as a paid service (SaaS)
+- Including in commercial products for resale
+- Charging for access to functionality
+
+For commercial licensing inquiries, contact: darren.turchiarelli@microsoft.com
+
+See [LICENSE](LICENSE) for full terms.
+
+*Note: This project uses Azure AI services which are subject to Microsoft's licensing terms.*
 
 ---
 

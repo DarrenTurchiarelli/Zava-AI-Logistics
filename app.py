@@ -5102,15 +5102,24 @@ def render_map(manifest_id):
         if not addresses:
             return "No addresses to display", 404
 
-        # Geocode addresses
+        # Geocode addresses with better error logging
         coordinates = []
+        failed_addresses = []
         for addr in addresses:
             coords = router.geocode_address(addr)
             if coords:
                 coordinates.append(coords)
+            else:
+                print(f"⚠️ Failed to geocode: {addr}")
+                failed_addresses.append(addr)
 
+        # If SOME addresses geocoded successfully, continue (don't require ALL)
         if not coordinates:
-            return "Failed to geocode addresses", 500
+            error_msg = f"Failed to geocode all addresses. Failed: {', '.join(failed_addresses[:3])}"
+            print(f"❌ Map render error: {error_msg}")
+            return error_msg, 500
+        elif failed_addresses:
+            print(f"⚠️ Warning: {len(failed_addresses)} addresses failed to geocode (continuing with {len(coordinates)} valid addresses)")
 
         # Get subscription key
         subscription_key = router.subscription_key

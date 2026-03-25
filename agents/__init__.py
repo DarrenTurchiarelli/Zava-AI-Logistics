@@ -3,7 +3,7 @@ Agents package - AI agent implementations for Zava
 """
 
 from .base import (
-    AzureAIAgentClient,
+    AzureOpenAIAgentClient,
     call_agent_sync,
     call_azure_agent,
     customer_service_agent,
@@ -17,7 +17,7 @@ from .fraud import analyze_with_fraud_agent, fraud_risk_agent
 from .manifest import ManifestGenerationAgent
 
 __all__ = [
-    "AzureAIAgentClient",
+    "AzureOpenAIAgentClient",
     "call_azure_agent",
     "call_agent_sync",
     "parcel_intake_agent",

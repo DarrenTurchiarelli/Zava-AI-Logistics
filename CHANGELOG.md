@@ -9,6 +9,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Azure OpenAI Integration**: Added Azure OpenAI service to infrastructure
+  - GPT-4o model deployment (GlobalStandard SKU, 10 capacity)
+  - **Managed identity authentication (API keys disabled by default)**
+  - API key temporarily enabled during deployment for agent creation only
+  - Connection from AI Hub to Azure OpenAI service
+  - RBAC permissions for App Service, AI Hub, and AI Project
+  - Resource automatically created in `infra/main.bicep`
+
+- **Automated Azure AI Agent Creation**: Deployment script now automatically creates all 8 required agents
+  - New script `Scripts/create_foundry_agents_openai.py` using Azure OpenAI Assistants API
+  - More reliable than azure.ai.projects SDK (which had "Not Found" errors)
+  - Supports both API key and managed identity authentication
+  - **Security**: API keys temporarily enabled for 30 seconds during agent creation, then immediately disabled
+  - Agents created during deployment (step 4.5/7)
+  - Agent IDs automatically configured in App Service settings
+  - No manual agent creation required - fully automated deployment
+  - Parcel Intake, Sorting Facility, Delivery Coordination agents
+  - Dispatcher, Optimization, Customer Service agents
+  - Fraud & Risk, Identity verification agents
+  
+- **Automated Demo Data Generation**: Deployment script now automatically generates demo data
+  - Fresh test parcels with valid DC assignments (`generate_fresh_test_data.py`)
+  - Parcels ready for dispatcher assignment (`generate_dispatcher_demo_data.py`)
+  - Driver manifests with delivery parcels (`generate_demo_manifests.py`)
+  - Demo is fully functional immediately after deployment
+  - No manual data generation steps required
+
+## [1.2.5] - 2026-03-25
+
+### Fixed
+
+- **CRITICAL**: Fixed users container partition key mismatch causing all logins to fail after Azure deployment
+  - Changed Bicep template to create users container with `/username` partition key (was `/user_type`)
+  - All authentication now works correctly with admin, driver, and other account types
+  - Deployment process updated to ensure correct container schema
+  - Verified managed identity RBAC permissions are properly configured for Cosmos DB access
+
+### Technical Details
+
+- Updated `infra/main.bicep` line 188-203: Changed users container partition key from `/user_type` to `/username`
+- All user queries in `user_manager.py` use `username` as partition key
+- Container recreation during deployment ensures schema consistency
+
+### Added
+
 - AGENTS.md documentation for AI coding agents
 - SECURITY.md with comprehensive security policies
 - CHANGELOG.md (this file)

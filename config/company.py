@@ -8,7 +8,7 @@ Update these values once and they will be applied throughout the application
 COMPANY_NAME = "Zava Logistics"
 COMPANY_NAME_SHORT = "Zava"
 COMPANY_TAGLINE = "Fast, Reliable, Trusted Delivery"
-BROWSER_TITLE = "Think Digital and Data"
+BROWSER_TITLE = "Zava Logistics"
 COMPANY_ABN = "12 345 678 901"
 
 # Contact Information

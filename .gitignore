@@ -20,6 +20,18 @@ azureauth.json
 infra/*.json
 !infra/README.md
 
+# Deployment temporary files
+agent_output.txt
+agent_error.txt
+dt-logistics-deploy.zip
+
+# Deployment packages and logs
+*.zip
+webapplogs.zip
+webapp-logs.zip
+deploy-*.zip
+maps-*.zip
+
 # Temporary test and debug files
 test_*.py
 check_*.py
@@ -117,3 +129,6 @@ tmp/
 # Generated reports and CSV files
 static/reports/*.csv
 *.csv
+
+# Azure App Service logs
+webapp-logs/

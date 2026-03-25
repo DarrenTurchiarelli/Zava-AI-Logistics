@@ -28,8 +28,10 @@ cp .env.example .env  # Then edit with your Azure credentials
 # Initialize database
 python parcel_tracking_db.py
 
-# Generate demo data (first time only)
-python utils/generators/generate_demo_manifests.py --all
+# Generate demo data
+python utils/generators/generate_fresh_test_data.py
+python utils/generators/generate_dispatcher_demo_data.py
+python utils/generators/generate_demo_manifests.py
 ```
 
 ### Development
@@ -381,18 +383,37 @@ async with ParcelTrackingDB() as db:
 
 ### Deployment Script Actions
 The deployment script automatically:
-1. ✅ Creates/updates Azure resources (App Service, Cosmos DB, AI Hub, etc.)
-2. ✅ Enables managed identity on all services (Cosmos DB, Speech, Vision)
-3. ✅ Configures RBAC permissions (no API keys needed)
-4. ✅ Deploys application code
-5. ✅ Sets all environment variables from Bicep outputs
-6. ✅ **Initializes default user accounts** (admin, drivers, depot_mgr, support)
-7. ✅ Tests endpoint connectivity
+1. ✅ Creates/updates Azure resources (App Service, Cosmos DB, AI Hub, **Azure OpenAI**, etc.)
+2. ✅ Deploys GPT-4o model to Azure OpenAI (GlobalStandard SKU)
+3. ✅ Enables managed identity on all services (Cosmos DB, Speech, Vision, OpenAI)
+4. ✅ **Configures all RBAC permissions via Bicep template:**
+   - Cosmos DB Built-in Data Contributor (data plane access)
+   - Cognitive Services OpenAI User (for App Service, AI Hub, AI Project)
+   - Cognitive Services User (Speech & Vision services)
+   - **Waits 60 seconds for RBAC replication across Azure regions**
+   - **Retries operations if permissions not immediately available**
+5. ✅ **Creates all 8 Azure AI Foundry agents automatically using Azure OpenAI Assistants API** 🆕
+   - Temporarily enables API key authentication for agent creation only
+   - Creates all 8 agents via Assistants API
+   - **Immediately disables API key authentication (switches back to managed identity)**
+6. ✅ Deploys application code
+7. ✅ Sets all environment variables including agent IDs
+8. ✅ **Initializes default user accounts** (admin, drivers, depot_mgr, support)
+9. ✅ **Generates demo data automatically (with secure auth handling):**
+   - Temporarily enables Cosmos DB local auth for data generation
+   - Fresh test parcels with valid DC assignments
+   - Parcels ready for dispatcher assignment (at depot)
+   - **Driver manifests with delivery parcels (all drivers)**
+   - **Immediately re-secures Cosmos DB (managed identity only)**
+10. ✅ Tests endpoint connectivity
 
-**Note:** Demo manifest generation is optional. Run manually after deployment:
-```bash
-python utils/generators/generate_demo_manifests.py --all
-```
+**Security Note**: 
+- Cosmos DB local auth is temporarily enabled **only** during demo data generation (30 seconds), then immediately disabled
+- API key authentication is temporarily enabled **only** during agent creation (30 seconds), then immediately disabled
+- All runtime operations use managed identity exclusively - no keys are stored in environment variables or configuration
+- **All identity/RBAC management is consolidated in the Bicep template and deployment script** - no manual role assignments needed
+
+The deployment is fully automated - no manual steps required for a working demo!
 
 ### Authentication Methods
 
@@ -480,14 +501,30 @@ pip install -r requirements.txt
 ```
 
 ### RBAC Permission Errors (Azure)
+**✅ RBAC permissions are automatically configured by `deploy_to_azure.ps1`**
+
+The deployment script automatically:
+- Assigns **Cosmos DB Built-in Data Contributor** role via Bicep template
+- Assigns **Cognitive Services OpenAI User** role for Azure OpenAI access
+- Assigns **Cognitive Services User** role for Speech & Vision services
+- Waits 60 seconds for Azure RBAC replication across regions
+- Retries user initialization if permissions aren't immediately available
+
+**If you still see permission errors:**
 ```bash
-# Wait 2-5 minutes after deployment for propagation
-# Manually assign roles if needed:
-az role assignment create \
-  --assignee-object-id <managed-identity-id> \
-  --role "Cognitive Services OpenAI Contributor" \
-  --scope <ai-hub-resource-id>
+# Wait additional time (RBAC can take up to 5 minutes to fully propagate)
+Start-Sleep -Seconds 120
+
+# Restart the web app to refresh managed identity credentials
+az webapp restart --name <webapp-name> --resource-group RG-Zava-Logistics
+
+# Verify role assignments exist
+az cosmosdb sql role assignment list \
+  --account-name <cosmos-account-name> \
+  --resource-group RG-Zava-Logistics
 ```
+
+**Note:** All identity management is consolidated in the Bicep template (`infra/main.bicep`) and deployment script. No manual role assignments should be necessary.
 
 ## Workflows
 

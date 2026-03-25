@@ -38,6 +38,7 @@ var appServicePlanName = '${resourcePrefix}-plan'
 var appServiceName = '${resourcePrefix}-web-${uniqueSuffix}'
 var aiHubName = '${resourcePrefix}-aihub-${uniqueSuffix}'
 var aiProjectName = '${resourcePrefix}-aiproject-${uniqueSuffix}'
+var openAIServiceName = '${resourcePrefix}-openai-${uniqueSuffix}'
 var mapsAccountName = '${resourcePrefix}-maps-${uniqueSuffix}'
 var speechServiceName = '${resourcePrefix}-speech-${uniqueSuffix}'
 var visionServiceName = '${resourcePrefix}-vision-${uniqueSuffix}'
@@ -193,7 +194,7 @@ resource usersContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/cont
       id: 'users'
       partitionKey: {
         paths: [
-          '/user_type'
+          '/username'
         ]
         kind: 'Hash'
       }
@@ -276,6 +277,45 @@ resource visionService 'Microsoft.CognitiveServices/accounts@2023-05-01' = {
 }
 
 // =============================================================================
+// 7.5. Azure OpenAI Service (for AI agents)
+// =============================================================================
+
+resource openAIService 'Microsoft.CognitiveServices/accounts@2023-05-01' = {
+  name: '${resourcePrefix}-openai-${uniqueSuffix}'
+  location: location
+  sku: {
+    name: 'S0'
+  }
+  kind: 'OpenAI'
+  identity: {
+    type: 'SystemAssigned'
+  }
+  properties: {
+    customSubDomainName: '${resourcePrefix}-openai-${uniqueSuffix}'
+    publicNetworkAccess: 'Enabled'
+    disableLocalAuth: true  // Managed identity only (deployment script temporarily enables keys for agent creation)
+  }
+}
+
+// Deploy GPT-4o model
+resource gpt4oDeployment 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
+  parent: openAIService
+  name: 'gpt-4o'
+  sku: {
+    name: 'GlobalStandard'
+    capacity: 10
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: 'gpt-4o'
+      version: '2024-08-06'
+    }
+    raiPolicyName: 'Microsoft.Default'
+  }
+}
+
+// =============================================================================
 // 8. Azure AI Foundry Hub
 // =============================================================================
 
@@ -317,6 +357,23 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-04-01' = {
     friendlyName: 'Zava AI Project'
     description: 'AI Project for Zava with Customer Service, Fraud Detection, and operational agents'
     hubResourceId: aiHub.id
+  }
+}
+
+// Connection from AI Hub to Azure OpenAI
+resource openAIConnection 'Microsoft.MachineLearningServices/workspaces/connections@2024-04-01' = {
+  parent: aiHub
+  name: 'aoai-connection'
+  properties: {
+    category: 'AzureOpenAI'
+    target: openAIService.properties.endpoint
+    authType: 'AAD'
+    isSharedToAll: true
+    metadata: {
+      ApiVersion: '2024-02-01'
+      ApiType: 'Azure'
+      ResourceId: openAIService.id
+    }
   }
 }
 
@@ -461,6 +518,39 @@ resource visionRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-0
   }
 }
 
+// Cognitive Services OpenAI User for App Service (to call agents/models)
+resource openAIAppServiceRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(openAIService.id, appService.id, 'openai-user')
+  scope: openAIService
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')
+    principalId: appService.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Cognitive Services OpenAI User for AI Hub (to use models)
+resource openAIHubRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(openAIService.id, aiHub.id, 'openai-hub')
+  scope: openAIService
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')
+    principalId: aiHub.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Cognitive Services OpenAI User for AI Project (to use models)
+resource openAIProjectRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(openAIService.id, aiProject.id, 'openai-project')
+  scope: openAIService
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')
+    principalId: aiProject.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 // =============================================================================
 // Outputs
 // =============================================================================
@@ -472,6 +562,8 @@ output cosmosDbAccountName string = cosmosDbAccount.name
 output aiHubName string = aiHub.name
 output aiProjectName string = aiProject.name
 output aiProjectEndpoint string = aiProject.properties.discoveryUrl
+output openAIServiceName string = openAIService.name
+output openAIServiceEndpoint string = openAIService.properties.endpoint
 output mapsAccountName string = mapsAccount.name
 output speechServiceEndpoint string = speechService.properties.endpoint
 output visionServiceEndpoint string = visionService.properties.endpoint
@@ -482,13 +574,10 @@ Infrastructure deployed successfully!
 
 NEXT STEPS:
 
-1. Deploy GPT-4o model in AI Foundry:
-   - Visit: https://ai.azure.com
-   - Select your project: ${aiProjectName}
-   - Go to "Deployments" -> "Deploy Model"
-   - Deploy "gpt-4o" model
+1. ✅ GPT-4o model - DEPLOYED AUTOMATICALLY
+   Deployment: gpt-4o (Standard, 10 capacity)
 
-2. Create 8 AI Agents in AI Foundry:
+2. Create 8 AI Agents (automated in deployment script):
    - Customer Service Agent
    - Fraud Detection Agent
    - Identity Verification Agent
@@ -498,19 +587,9 @@ NEXT STEPS:
    - Delivery Coordination Agent
    - Optimization Agent
 
-3. Update App Service settings with agent IDs:
-   az webapp config appsettings set --name ${appServiceName} --resource-group ${resourceGroupName} --settings \\
-     CUSTOMER_SERVICE_AGENT_ID=asst_xxx \\
-     FRAUD_RISK_AGENT_ID=asst_xxx \\
-     ... (remaining 6 agent IDs)
+3. Agent IDs will be configured automatically in App Service settings
 
-4. Deploy application code:
-   cd <repo-directory>
-   az webapp up --name ${appServiceName} --resource-group ${resourceGroupName}
-
-5. Initialize database and demo data:
-   Visit: https://${appService.properties.defaultHostName}/setup
-   Or run manually: python parcel_tracking_db.py && python utils/generators/generate_demo_manifests.py
+4. Demo data will be initialized automatically
 
 Access your application at: https://${appService.properties.defaultHostName}
 '''

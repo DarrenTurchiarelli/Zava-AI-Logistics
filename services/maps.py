@@ -30,13 +30,8 @@ class BingMapsRouter:
     """
 
     def __init__(self, geocode_cache=None, cache_lock=None):
-        # Managed identity support
-        self._credential = None
-        self._use_managed_identity = os.getenv("USE_MANAGED_IDENTITY", "false").lower() == "true"
-        self._cached_token = None
-        self._cached_token_expiry = 0
-
-        # Legacy API key support (fallback)
+        # Azure Maps only supports subscription key authentication
+        # Managed identity is NOT supported by Azure Maps API
         self.subscription_key = os.getenv("AZURE_MAPS_SUBSCRIPTION_KEY", "")
 
         self.base_url = "https://atlas.microsoft.com"
@@ -45,47 +40,19 @@ class BingMapsRouter:
         self.geocode_cache = geocode_cache if geocode_cache is not None else {}
         self.cache_lock = cache_lock
         self.cache_ttl = 86400  # 24 hours in seconds
-
-        # Initialize credential if using managed identity
-        if self._use_managed_identity:
-            try:
-                from azure.identity import DefaultAzureCredential
-
-                self._credential = DefaultAzureCredential()
-                print("[MAPS] Using managed identity authentication")
-            except Exception as e:
-                print(f"[WARN] Managed identity init failed: {e}")
-                self._use_managed_identity = False
-
-    def _get_access_token(self) -> Optional[str]:
-        """Get Azure Maps access token via managed identity"""
-        if not self._use_managed_identity or not self._credential:
-            return None
-
-        # Return cached token if still valid (refresh 2 minutes before expiry)
-        now = time.time()
-        if self._cached_token and self._cached_token_expiry > now + 120:
-            return self._cached_token
-
-        try:
-            # Azure Maps scope
-            token = self._credential.get_token("https://atlas.microsoft.com/.default")
-            self._cached_token = token.token
-            self._cached_token_expiry = token.expires_on
-            return self._cached_token
-        except Exception as e:
-            print(f"[ERROR] Failed to get Azure Maps token: {e}")
-            return None
+        
+        if self.subscription_key:
+            print(f"[MAPS] ✓ Initialized with subscription key (length: {len(self.subscription_key)})")
+        else:
+            print("[MAPS] ⚠️ WARNING: Azure Maps subscription key not configured - geocoding will fail")
+            print("[MAPS]    Set AZURE_MAPS_SUBSCRIPTION_KEY environment variable")
 
     def _get_auth_headers(self) -> Dict[str, str]:
-        """Get authentication headers (Bearer token or subscription-key)"""
-        if self._use_managed_identity:
-            token = self._get_access_token()
-            if token:
-                return {"Authorization": f"Bearer {token}"}
-
-        # Fallback to subscription key
-        return {"Ocp-Apim-Subscription-Key": self.subscription_key} if self.subscription_key else {}
+        """Get authentication headers for Azure Maps (subscription key only)"""
+        if not self.subscription_key:
+            print("[ERROR] Azure Maps subscription key not configured")
+            return {}
+        return {"Ocp-Apim-Subscription-Key": self.subscription_key}
 
     def _geographic_optimization(self, waypoints: List[str]) -> List[str]:
         """Optimize route using nearest-neighbor algorithm based on coordinates
@@ -202,6 +169,7 @@ class BingMapsRouter:
                 route_params = self._get_route_params(route_type)
                 params = {
                     "api-version": self.api_version,
+                    "subscription-key": self.subscription_key,
                     "query": query_coords,
                     "traffic": "true" if route_type == "fastest" else "false",
                     "travelMode": "car",
@@ -210,7 +178,7 @@ class BingMapsRouter:
                     "language": "en-US",
                 }
 
-                response = requests.get(route_url, params=params, headers=self._get_auth_headers(), timeout=30)
+                response = requests.get(route_url, params=params, timeout=30)
                 response.raise_for_status()
                 route_data = response.json()
 
@@ -291,13 +259,12 @@ class BingMapsRouter:
             - route_type: The type of route optimization used
         """
         # Check authentication is configured
-        if not self._use_managed_identity and not self.subscription_key:
+        if not self.subscription_key:
             print("[WARN] Azure Maps not configured. Using mock route optimization.")
-            print("       Set USE_MANAGED_IDENTITY=true (preferred) or AZURE_MAPS_SUBSCRIPTION_KEY")
+            print("       Set AZURE_MAPS_SUBSCRIPTION_KEY in environment variables")
             return self._mock_optimization(addresses, start_location)
 
-        auth_method = "managed identity" if self._use_managed_identity else f"API key {self.subscription_key[:10]}..."
-        print(f"[OK] Azure Maps using {auth_method}")
+        print(f"[OK] Azure Maps using subscription key ({self.subscription_key[:10]}...)")
 
         if not addresses or len(addresses) == 0:
             return None
@@ -346,10 +313,11 @@ class BingMapsRouter:
                 "instructionsType": "text",
                 "avoid": route_params.get("avoid", ""),
                 "language": "en-US",
+                "subscription-key": self.subscription_key,
             }
 
             # Make API request
-            response = requests.get(route_url, params=params, headers=self._get_auth_headers(), timeout=15)
+            response = requests.get(route_url, params=params, timeout=15)
             response.raise_for_status()
             data = response.json()
 
@@ -781,13 +749,14 @@ class BingMapsRouter:
 
             params = {
                 "api-version": self.api_version,
+                "subscription-key": self.subscription_key,
                 "query": query,
                 "travelMode": "car",
                 "routeType": "shortest",  # Changed from 'safest' which may not be valid
                 "instructionsType": "text",
             }
 
-            response = requests.get(route_url, params=params, headers=self._get_auth_headers(), timeout=10)
+            response = requests.get(route_url, params=params, timeout=10)
             response.raise_for_status()
             data = response.json()
 
@@ -868,7 +837,9 @@ class BingMapsRouter:
         Returns:
             Tuple of (latitude, longitude) or None if geocoding fails
         """
+        # Check if Azure Maps is configured
         if not self.subscription_key:
+            print("[ERROR] Azure Maps subscription key not configured - geocoding unavailable")
             return None
 
         # Check cache first
@@ -897,13 +868,14 @@ class BingMapsRouter:
             search_url = f"{self.base_url}/search/address/json"
             params = {
                 "api-version": self.api_version,
+                "subscription-key": self.subscription_key,  # Pass key as query parameter
                 "query": address,
                 "limit": 1,
                 "countrySet": "AU",  # Bias to Australia
                 "view": "Auto",
             }
 
-            response = requests.get(search_url, params=params, headers=self._get_auth_headers(), timeout=5)
+            response = requests.get(search_url, params=params, timeout=5)
             response.raise_for_status()
             data = response.json()
 
@@ -923,11 +895,13 @@ class BingMapsRouter:
                 score = result.get("score", 0)
                 entity_type = result.get("type", "")
 
-                # Reject low confidence matches
-                # High confidence is typically > 0.8, but we'll accept 0.7+
-                if score < 0.7:
-                    print(f"⚠️ Low confidence match ({score}): {address}")
+                # Reject very low confidence matches
+                # Lower threshold to 0.6 to be more permissive (was 0.7)
+                if score < 0.6:
+                    print(f"⚠️ Very low confidence match (score={score}): {address}")
                     return None
+                elif score < 0.8:
+                    print(f"⚠️ Low-medium confidence match (score={score}): {address} - accepting anyway")
 
                 # Reject if it's not a specific address type
                 # Common types: 'Point Address', 'Address Range', 'Street'
@@ -976,14 +950,21 @@ class BingMapsRouter:
         """
         import re
 
+        # Check if Azure Maps is configured
         if not self.subscription_key:
-            return {"valid": False, "message": "Azure Maps API key not configured"}
+            return {"valid": False, "message": "Azure Maps subscription key not configured"}
 
         try:
             search_url = f"{self.base_url}/search/address/json"
-            params = {"api-version": self.api_version, "query": address, "limit": 1, "countrySet": "AU"}
+            params = {
+                "api-version": self.api_version,
+                "subscription-key": self.subscription_key,
+                "query": address,
+                "limit": 1,
+                "countrySet": "AU"
+            }
 
-            response = requests.get(search_url, params=params, headers=self._get_auth_headers(), timeout=5)
+            response = requests.get(search_url, params=params, timeout=5)
             response.raise_for_status()
             data = response.json()
 

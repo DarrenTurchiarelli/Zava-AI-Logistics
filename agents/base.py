@@ -19,16 +19,17 @@ import json
 import os
 from typing import Any, Dict, List, Optional
 
-from azure.ai.projects import AIProjectClient
-from azure.identity import AzureCliCredential, DefaultAzureCredential, ManagedIdentityCredential
+from openai import AzureOpenAI
+from azure.identity import AzureCliCredential, DefaultAzureCredential, ManagedIdentityCredential, get_bearer_token_provider
 from dotenv import load_dotenv
 
 from config.company import COMPANY_EMAIL, COMPANY_NAME, COMPANY_PHONE
 
 load_dotenv()
 
-# Azure AI Project Configuration
-AZURE_AI_PROJECT_ENDPOINT = os.getenv("AZURE_AI_PROJECT_ENDPOINT")
+# Azure OpenAI Configuration  
+AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
+AZURE_AI_MODEL_DEPLOYMENT_NAME = os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME", "gpt-4o")
 
 # All 9 Azure AI Foundry Agent IDs
 PARCEL_INTAKE_AGENT_ID = os.getenv("PARCEL_INTAKE_AGENT_ID")
@@ -42,8 +43,8 @@ FRAUD_RISK_AGENT_ID = os.getenv("FRAUD_RISK_AGENT_ID")
 IDENTITY_AGENT_ID = os.getenv("IDENTITY_AGENT_ID")
 
 
-class AzureAIAgentClient:
-    """Singleton client for Azure AI Foundry agents"""
+class AzureOpenAIAgentClient:
+    """Singleton client for Azure OpenAI Assistants (used as agents)"""
 
     _instance = None
     _client = None
@@ -53,23 +54,45 @@ class AzureAIAgentClient:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def get_client(self) -> AIProjectClient:
-        """Get or create Azure AI Project client"""
+    def get_client(self) -> AzureOpenAI:
+        """Get or create Azure Open AI client for Assistants API  
+        
+        This uses the Azure OpenAI Assistants API directly, which is compatible
+        with Azure AI Foundry agents created via the Assistants API.
+        """
         if self._client is None:
-            # Use Managed Identity when explicitly enabled (Azure deployment)
+            api_version = "2024-05-01-preview"  # Assistants API version
+            
+            # Use Managed Identity when explicitly enabled (Azure deployment)  
             if os.getenv("USE_MANAGED_IDENTITY", "false").lower() == "true":
                 # Running in Azure with managed identity
                 credential = ManagedIdentityCredential()
-            else:
-                # Running locally - use DefaultAzureCredential for better timeout handling
-                # It will try: Environment -> ManagedIdentity -> AzureCLI -> etc.
-                credential = DefaultAzureCredential(
-                    exclude_managed_identity_credential=True,  # Don't try managed identity locally
-                    exclude_visual_studio_code_credential=True,  # Skip VSCode auth
-                    additionally_allowed_tenants=["*"],  # Allow any tenant
+                token_provider = get_bearer_token_provider(
+                    credential, 
+                    "https://cognitiveservices.azure.com/.default"
                 )
-
-            self._client = AIProjectClient(endpoint=AZURE_AI_PROJECT_ENDPOINT, credential=credential)
+                self._client = AzureOpenAI(
+                    azure_endpoint=AZURE_OPENAI_ENDPOINT,
+                    azure_ad_token_provider=token_provider,
+                    api_version=api_version
+                )
+            else:
+                # Running locally - use DefaultAzureCredential  
+                credential = DefaultAzureCredential(
+                    exclude_managed_identity_credential=True,
+                    exclude_visual_studio_code_credential=True,
+                    additionally_allowed_tenants=["*"],
+                )
+                token_provider = get_bearer_token_provider(
+                    credential,
+                    "https://cognitiveservices.azure.com/.default"
+                )
+                self._client = AzureOpenAI(
+                    azure_endpoint=AZURE_OPENAI_ENDPOINT,
+                    azure_ad_token_provider=token_provider,
+                    api_version=api_version
+                )
+        
         return self._client
 
 
@@ -77,10 +100,10 @@ async def call_azure_agent(
     agent_id: str, message: str, context: Optional[Dict[str, Any]] = None, thread_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Universal function to call any Azure AI Foundry agent
+    Universal function to call any Azure OpenAI Assistant (agent)
 
     Args:
-        agent_id: The Azure AI agent ID (asst_XXX)
+        agent_id: The Azure OpenAI Assistant ID (asst_XXX)
         message: The user message to send to the agent
         context: Optional context dictionary for additional information
         thread_id: Optional existing thread ID to continue a conversation
@@ -88,12 +111,12 @@ async def call_azure_agent(
     Returns:
         Dictionary with agent response and metadata
     """
-    print(f"\n🤖 Calling Azure AI Agent: {agent_id}")
-    print(f"📍 Endpoint: {AZURE_AI_PROJECT_ENDPOINT}")
+    print(f"\n🤖 Calling Azure OpenAI Assistant: {agent_id}")
+    print(f"📍 Endpoint: {AZURE_OPENAI_ENDPOINT}")
     print(f"📝 Message length: {len(message)} chars")
 
-    if not AZURE_AI_PROJECT_ENDPOINT:
-        error_msg = "AZURE_AI_PROJECT_ENDPOINT not configured in environment variables"
+    if not AZURE_OPENAI_ENDPOINT:
+        error_msg = "AZURE_OPENAI_ENDPOINT not configured in environment variables"
         print(f"❌ {error_msg}")
         return {"success": False, "agent_id": agent_id, "error": error_msg, "response": None}
 
@@ -103,8 +126,8 @@ async def call_azure_agent(
         return {"success": False, "agent_id": agent_id, "error": error_msg, "response": None}
 
     try:
-        client = AzureAIAgentClient().get_client()
-        print("✅ Azure AI client initialized")
+        client = AzureOpenAIAgentClient().get_client()
+        print("✅ Azure OpenAI client initialized")
 
         # Add context to message if provided
         if context:
@@ -113,7 +136,7 @@ async def call_azure_agent(
         else:
             full_message = message
 
-        # Create thread and run agent with tool support
+        # Create thread and run assistant with tool support
         print(f"🔄 Creating thread and processing run...")
 
         # Import tool handlers if available
@@ -126,21 +149,20 @@ async def call_azure_agent(
             has_tools = False
             print("⚠️ Agent tools not available")
 
-        # Create or reuse thread with explicit parameters - DON'T use create_thread_and_process_run
-        # because it tries to auto-execute tools. We need manual control.
+        # Create or reuse thread
         if thread_id:
             print(f"🧵 Reusing existing thread: {thread_id}")
             thread = type("Thread", (), {"id": thread_id})()
         else:
             print(f"🧵 Creating new thread...")
-            thread = client.agents.threads.create()
+            thread = client.beta.threads.create()
         print(f"   Thread ID: {thread.id}")
 
         print(f"📝 Adding message to thread...")
-        client.agents.messages.create(thread_id=thread.id, role="user", content=full_message)
+        client.beta.threads.messages.create(thread_id=thread.id, role="user", content=full_message)
 
         print(f"▶️ Creating run...")
-        run = client.agents.runs.create(thread_id=thread.id, agent_id=agent_id)
+        run = client.beta.threads.runs.create(thread_id=thread.id, assistant_id=agent_id)
 
         print(f"⏳ Polling run status...")
         import time
@@ -149,7 +171,7 @@ async def call_azure_agent(
         iteration = 0
 
         while iteration < max_iterations:
-            run = client.agents.runs.get(thread_id=thread.id, run_id=run.id)
+            run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
             print(f"   Status: {run.status} (iteration {iteration + 1}/{max_iterations})")
 
             if run.status == "requires_action":
@@ -203,7 +225,7 @@ async def call_azure_agent(
                     # Submit tool outputs
                     if tool_outputs:
                         print(f"   📤 Submitting {len(tool_outputs)} tool outputs...")
-                        run = client.agents.runs.submit_tool_outputs(
+                        run = client.beta.threads.runs.submit_tool_outputs(
                             thread_id=thread.id, run_id=run.id, tool_outputs=tool_outputs
                         )
                         print(f"   ✅ Tool outputs submitted, continuing run...")
@@ -227,62 +249,25 @@ async def call_azure_agent(
         print(f"🔍 Run status type: {type(run_result.status)}")
         print(f"🔍 Run status value: {run_result.status}")
 
-        # DEBUG: List all messages in thread
+        # List all messages in thread
         print(f"🔍 Listing all messages in thread...")
-        all_messages = client.agents.messages.list(thread_id=thread.id)
+        all_messages = client.beta.threads.messages.list(thread_id=thread.id)
         print(f"🔍 Total messages in thread: {len(all_messages.data) if hasattr(all_messages, 'data') else 'unknown'}")
-        for idx, msg in enumerate(all_messages.data[:5] if hasattr(all_messages, "data") else []):
-            print(f"   Message {idx}: Role={msg.role}, Content type={type(msg.content)}")
-            if hasattr(msg.content, "__iter__"):
-                for content in msg.content:
-                    print(f"      Content: {type(content)} - {str(content)[:100]}")
 
-        # Get agent response
-        response_obj = client.agents.messages.get_last_message_text_by_role(thread_id=thread.id, role="assistant")
-
-        print(f"📨 Response object type: {type(response_obj)}")
-        print(f"📨 Response object: {response_obj}")
-
-        # Extract text from MessageTextContent object (nested structure)
+        # Get the last assistant message
         response_text = None
-
-        # Try to access as dict-like object (Azure SDK models often behave like dicts)
-        try:
-            if hasattr(response_obj, "__getitem__"):
-                # Object supports dictionary-style access
-                if "text" in response_obj and isinstance(response_obj["text"], dict):
-                    response_text = response_obj["text"].get("value", "")
-                elif "value" in response_obj:
-                    response_text = response_obj["value"]
-        except (KeyError, TypeError):
-            pass
-
-        # Try as object with attributes
-        if not response_text and hasattr(response_obj, "text"):
-            text_obj = response_obj.text
-            if hasattr(text_obj, "value"):
-                response_text = text_obj.value
-            elif isinstance(text_obj, dict):
-                response_text = text_obj.get("value", "")
-
-        # Try direct value attribute
-        if not response_text and hasattr(response_obj, "value"):
-            response_text = response_obj.value
-
-        # Try as plain dict
-        if not response_text and isinstance(response_obj, dict):
-            if "text" in response_obj and isinstance(response_obj["text"], dict):
-                response_text = response_obj["text"].get("value", "")
-            elif "value" in response_obj:
-                response_text = response_obj["value"]
-
-        # Try as string
-        if not response_text and isinstance(response_obj, str):
-            response_text = response_obj
-
-        # Last resort - convert to string (but this shouldn't happen)
+        for msg in all_messages.data:
+            if msg.role == "assistant":
+                # Get the first text content from the message
+                for content in msg.content:
+                    if content.type == "text":
+                        response_text = content.text.value
+                        break
+                if response_text:
+                    break
+        
         if not response_text:
-            response_text = str(response_obj)
+            response_text = "No response from assistant"
 
         print(f"✅ Extracted response text ({len(response_text)} chars): {response_text[:200]}...")
 
@@ -295,7 +280,7 @@ async def call_azure_agent(
         }
 
     except Exception as e:
-        print(f"❌ Error calling Azure AI agent: {str(e)}")
+        print(f"❌ Error calling Azure OpenAI assistant: {str(e)}")
         import traceback
 
         traceback.print_exc()

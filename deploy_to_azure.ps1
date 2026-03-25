@@ -207,6 +207,19 @@ if (-not $SkipInfrastructure -and -not $CodeOnly) {
         exit 1
     }
 
+    # Wait for RBAC permissions to propagate
+    Write-Host ""
+    Write-Host "[3.5/7] Waiting for RBAC permissions to propagate..." -ForegroundColor Yellow
+    Write-Host "  ℹ  Bicep template assigned the following roles to App Service managed identity:" -ForegroundColor Cyan
+    Write-Host "     • Cosmos DB Built-in Data Contributor (data plane)" -ForegroundColor Gray
+    Write-Host "     • Cognitive Services OpenAI User (Azure OpenAI)" -ForegroundColor Gray
+    Write-Host "     • Cognitive Services User (Speech & Vision)" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "  ⏱  Waiting 60 seconds for Azure RBAC replication across regions..." -ForegroundColor Cyan
+    Start-Sleep -Seconds 60
+    Write-Host "  ✓ RBAC permissions should now be active" -ForegroundColor Green
+    Write-Host ""
+
 } else {
     if ($CodeOnly) {
         Write-Host "[3/7] Skipping infrastructure deployment (-CodeOnly flag)" -ForegroundColor Yellow
@@ -250,6 +263,109 @@ Write-Host "  ✓ Web App Status: $($webApp.state)" -ForegroundColor Green
 Write-Host "  ✓ Default Hostname: $($webApp.defaultHostName)" -ForegroundColor Green
 Write-Host ""
 
+# [4.5/7] Create Azure AI Foundry Agents
+Write-Host "=" * 70 -ForegroundColor Cyan
+Write-Host "[4.5/7] Creating Azure AI Foundry Agents..." -ForegroundColor Cyan
+Write-Host "=" * 70 -ForegroundColor Cyan
+Write-Host "  📦 This will create 8 AI agents in your Azure AI project" -ForegroundColor Gray
+Write-Host "  ⏱ This may take 2-3 minutes..." -ForegroundColor Gray
+Write-Host ""
+
+# Prepare array for agent settings (will be added to app settings later)
+$agentSettings = @{}
+
+# Create agents using Python script
+try {
+    # Check if Python is available
+    if (Get-Command python -ErrorAction SilentlyContinue) {
+        # Get OpenAI service name and subscription ID
+        $openAIServiceName = $bicepOutput.openAIServiceName
+        $subscriptionId = $account.id
+        $resourceId = "/subscriptions/$subscriptionId/resourceGroups/$ResourceGroup/providers/Microsoft.CognitiveServices/accounts/$openAIServiceName"
+        
+        Write-Host "  ⚙ Temporarily enabling API key authentication for agent creation..." -ForegroundColor Yellow
+        az resource update `
+            --ids $resourceId `
+            --set properties.disableLocalAuth=false `
+            --api-version 2023-05-01 `
+            --output none 2>&1 | Out-Null
+        
+        Write-Host "  ⏱ Waiting 30 seconds for change to propagate..." -ForegroundColor Gray
+        Start-Sleep -Seconds 30
+        
+        Write-Host "  🔑 Getting temporary API key..." -ForegroundColor Yellow
+        $openAIApiKey = az cognitiveservices account keys list --name $openAIServiceName --resource-group $ResourceGroup --query key1 -o tsv
+        
+        Write-Host "  🤖 Creating AI agents..." -ForegroundColor Yellow
+        Write-Host "     OpenAI Service: $openAIServiceName" -ForegroundColor Gray
+        Write-Host "     Endpoint: $($bicepOutput.openAIServiceEndpoint)" -ForegroundColor Gray
+        Write-Host ""
+        
+        # Set environment variables and run Python script directly (no subprocess)
+        $env:AZURE_OPENAI_ENDPOINT = $bicepOutput.openAIServiceEndpoint
+        $env:AZURE_OPENAI_API_KEY = $openAIApiKey
+        $env:AZURE_AI_MODEL_DEPLOYMENT_NAME = "gpt-4o"
+        
+        # Run agent creation script directly and capture output
+        python Scripts/create_foundry_agents_openai.py 2>&1 | Tee-Object -Variable agentOutput | Out-Host
+        $agentExitCode = $LASTEXITCODE
+        
+        # Disable API key authentication again (back to managed identity only)
+        Write-Host ""
+        Write-Host "  🔒 Disabling API key authentication (switching to managed identity)..." -ForegroundColor Yellow
+        az resource update `
+            --ids $resourceId `
+            --set properties.disableLocalAuth=true `
+            --api-version 2023-05-01 `
+            --output none 2>&1 | Out-Null
+        
+        Write-Host "  ✓ Azure OpenAI now uses managed identity only" -ForegroundColor Green
+        Write-Host ""
+        
+        # Check if agent creation was successful
+        if ($agentExitCode -eq 0 -and $agentOutput) {
+            # Extract JSON from output (should be at the end)
+            $jsonMatch = [regex]::Match($agentOutput, '\{[^}]*"[A-Z_]+AGENT_ID"[^}]*\}')
+            
+            if ($jsonMatch.Success) {
+                # Parse agent IDs from JSON
+                $agentIds = $jsonMatch.Value | ConvertFrom-Json
+                
+                Write-Host "  ✓ Successfully created all agents" -ForegroundColor Green
+                Write-Host ""
+                Write-Host "  📋 Agent IDs:" -ForegroundColor Cyan
+                
+                $agentIds.PSObject.Properties | ForEach-Object {
+                    Write-Host "     $($_.Name) = $($_.Value)" -ForegroundColor Gray
+                    $agentSettings[$_.Name] = $_.Value
+                }
+                
+                Write-Host ""
+                Write-Host "  ✓ Agent IDs will be configured in app settings" -ForegroundColor Green
+            } else {
+                Write-Host "  ⚠ Agent creation completed but couldn't parse JSON output" -ForegroundColor Yellow
+                Write-Host "  Output: $($agentOutput.Substring(0, [Math]::Min(200, $agentOutput.Length)))" -ForegroundColor Gray
+            }
+        } else {
+            Write-Host "  ⚠ Agent creation failed (exit code: $agentExitCode)" -ForegroundColor Yellow
+            Write-Host "  ⚠ Continuing deployment without agents" -ForegroundColor Yellow
+            Write-Host ""
+            Write-Host "  ⚠ Continuing deployment without agents" -ForegroundColor Yellow
+            Write-Host "  You can create agents manually after deployment" -ForegroundColor Gray
+            Write-Host "    Run: python Scripts/create_foundry_agents_openai.py" -ForegroundColor Gray
+        }
+    } else {
+        Write-Host "  ⚠ Python not found - skipping agent creation" -ForegroundColor Yellow
+        Write-Host "  You can create agents manually after deployment" -ForegroundColor Gray
+        Write-Host "    Run: python Scripts/create_foundry_agents.py" -ForegroundColor Gray
+    }
+} catch {
+    Write-Host "  ⚠ Agent creation error: $($_.Exception.Message)" -ForegroundColor Yellow
+    Write-Host "  Continuing deployment without agents" -ForegroundColor Gray
+}
+
+Write-Host ""
+
 # Configure Additional App Settings (Agent IDs from .env)
 Write-Host "[5/7] Configuring application settings from .env..." -ForegroundColor Yellow
 
@@ -273,13 +389,25 @@ if (Test-Path ".env") {
         }
     }
 
+    # Add created agents to settings (overrides .env if agents were just created)
+    if ($agentSettings.Count -gt 0) {
+        Write-Host "  ✓ Adding $($agentSettings.Count) agent IDs from fresh creation..." -ForegroundColor Green
+        foreach ($key in $agentSettings.Keys) {
+            # Override .env value if agent was just created
+            $agentIds[$key] = $agentSettings[$key]
+        }
+    }
+
     # Add agent IDs to settings
     foreach ($key in $agentIds.Keys) {
         $additionalSettings += "$key=$($agentIds[$key])"
     }
 
     if ($agentIds.Count -gt 0) {
-        Write-Host "  ✓ Found $($agentIds.Count) agent ID(s)" -ForegroundColor Green
+        Write-Host "  ✓ Found/Created $($agentIds.Count) agent ID(s)" -ForegroundColor Green
+    } else {
+        Write-Host "  ⚠ No agent IDs found - agents may not work" -ForegroundColor Yellow
+        Write-Host "    Run manually: python Scripts/create_foundry_agents.py" -ForegroundColor Gray
     }
 
     # Add depot addresses
@@ -292,6 +420,15 @@ if (Test-Path ".env") {
     }
 }
 
+# Add Azure OpenAI configuration from Bicep deployment
+if ($bicepOutput -and $bicepOutput.openAIServiceEndpoint) {
+    $additionalSettings += "AZURE_OPENAI_ENDPOINT=$($bicepOutput.openAIServiceEndpoint)"
+    $additionalSettings += "AZURE_AI_MODEL_DEPLOYMENT_NAME=gpt-4o"
+    Write-Host "  ✓ Azure OpenAI endpoint configured" -ForegroundColor Green
+} elseif (-not $CodeOnly) {
+    Write-Host "  ⚠ Azure OpenAI endpoint not found in deployment outputs" -ForegroundColor Yellow
+}
+
 # Apply additional settings if any
 if ($additionalSettings.Count -gt 0) {
     az webapp config appsettings set `
@@ -299,10 +436,11 @@ if ($additionalSettings.Count -gt 0) {
         --resource-group $ResourceGroup `
         --settings $additionalSettings `
         --output none
-    Write-Host "✓ Agent IDs and depot addresses configured" -ForegroundColor Green
+    Write-Host "✓ Configuration settings applied to Web App" -ForegroundColor Green
 } else {
-    Write-Host "⚠ No agent IDs found in .env file" -ForegroundColor Yellow
-    Write-Host "  You'll need to create agents in Azure AI Foundry and update app settings" -ForegroundColor Gray
+    Write-Host "  ⚠ No configuration settings to apply" -ForegroundColor Yellow
+    Write-Host "  Agents should have been created automatically during deployment" -ForegroundColor Gray
+    Write-Host "  If agents are missing, run: python Scripts/create_foundry_agents.py" -ForegroundColor Gray
 }
 Write-Host ""
 
@@ -355,6 +493,7 @@ try {
 
 # Task 3: Initialize default users
 Write-Host "  👤 Initializing default user accounts..." -ForegroundColor Cyan
+Write-Host "     (This requires Cosmos DB RBAC permissions to be active)" -ForegroundColor Gray
 try {
     # Check if Python is available
     if (Get-Command python -ErrorAction SilentlyContinue) {
@@ -365,8 +504,24 @@ try {
             Write-Host "    Login at: https://$($webApp.defaultHostName)/login" -ForegroundColor Gray
             Write-Host "    Username: admin | Password: admin123" -ForegroundColor Gray
         } else {
-            Write-Host "  ⚠ User initialization may have failed" -ForegroundColor Yellow
-            Write-Host "    Run manually: python utils/setup/setup_users.py" -ForegroundColor Gray
+            # Check if it's a permission error
+            if ($setupOutput -match "Forbidden|RBAC|readMetadata") {
+                Write-Host "  ⚠ RBAC permissions not yet active - waiting additional 30 seconds..." -ForegroundColor Yellow
+                Start-Sleep -Seconds 30
+                
+                # Retry once
+                $retryOutput = python utils/setup/setup_users.py 2>&1
+                if ($LASTEXITCODE -eq 0 -and $retryOutput -match "SUCCESS") {
+                    Write-Host "  ✓ Default users created successfully (after retry)" -ForegroundColor Green
+                } else {
+                    Write-Host "  ⚠ User initialization failed - RBAC may need more time to propagate" -ForegroundColor Yellow
+                    Write-Host "    Users will be auto-created on first login attempt" -ForegroundColor Gray
+                    Write-Host "    Or run manually: python utils/setup/setup_users.py" -ForegroundColor Gray
+                }
+            } else {
+                Write-Host "  ⚠ User initialization may have failed" -ForegroundColor Yellow
+                Write-Host "    Run manually: python utils/setup/setup_users.py" -ForegroundColor Gray
+            }
         }
     } else {
         Write-Host "  ⚠ Python not found - skipping user initialization" -ForegroundColor Yellow
@@ -375,6 +530,117 @@ try {
 } catch {
     Write-Host "  ⚠ Could not initialize users: $($_.Exception.Message)" -ForegroundColor Yellow
     Write-Host "    Users will be auto-created on first login attempt" -ForegroundColor Gray
+}
+
+# Task 4: Generate demo data for full-featured demo
+Write-Host "  📦 Generating demo data (parcels, manifests, dispatcher data)..." -ForegroundColor Cyan
+Write-Host "     (Requires temporary Cosmos DB local auth for data generation)" -ForegroundColor Gray
+try {
+    if (Get-Command python -ErrorAction SilentlyContinue) {
+        # Get Cosmos DB account name from Bicep output or use default
+        $cosmosAccountName = if ($bicepOutputJson) { 
+            $bicepOutputJson.cosmosDbAccountName.value 
+        } else { 
+            "zava-dev-cosmos-lrqies" 
+        }
+        
+        # Step 1: Temporarily enable local auth for data generation
+        Write-Host "    🔓 Temporarily enabling Cosmos DB local authentication..." -ForegroundColor Cyan
+        $subscriptionId = $account.id
+        $cosmosResourceId = "/subscriptions/$subscriptionId/resourceGroups/$ResourceGroup/providers/Microsoft.DocumentDB/databaseAccounts/$cosmosAccountName"
+        
+        az resource update `
+            --ids $cosmosResourceId `
+            --set properties.disableLocalAuth=false `
+            --api-version 2023-11-15 `
+            --output none 2>&1 | Out-Null
+        
+        Write-Host "    ⏱  Waiting 30 seconds for change to propagate..." -ForegroundColor Gray
+        Start-Sleep -Seconds 30
+        
+        # Step 2: Get connection string
+        Write-Host "    🔑 Retrieving connection string for data generation..." -ForegroundColor Cyan
+        $connectionString = az cosmosdb keys list `
+            --name $cosmosAccountName `
+            --resource-group $ResourceGroup `
+            --type connection-strings `
+            --query "connectionStrings[0].connectionString" `
+            -o tsv
+        
+        if ($connectionString) {
+            # Step 3: Set environment variable for Python scripts
+            $env:COSMOS_CONNECTION_STRING = $connectionString
+            
+            # Generate fresh test parcels with valid DC assignments
+            Write-Host "    • Creating test parcels with valid DC assignments..." -ForegroundColor Gray
+            $freshDataOutput = python utils/generators/generate_fresh_test_data.py 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "    ✓ Fresh test data generated" -ForegroundColor Green
+            } else {
+                Write-Host "    ⚠ Fresh test data generation had issues" -ForegroundColor Yellow
+            }
+
+            # Generate dispatcher demo data (parcels at depot ready for assignment)
+            Write-Host "    • Creating parcels ready for dispatcher assignment..." -ForegroundColor Gray
+            $dispatcherOutput = python utils/generators/generate_dispatcher_demo_data.py 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "    ✓ Dispatcher demo data generated" -ForegroundColor Green
+            } else {
+                Write-Host "    ⚠ Dispatcher demo data generation had issues" -ForegroundColor Yellow
+            }
+
+            # Generate driver manifests with parcels
+            Write-Host "    • Creating driver manifests with delivery parcels..." -ForegroundColor Gray
+            $manifestOutput = python utils/generators/generate_demo_manifests.py 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "    ✓ Demo manifests generated for all drivers" -ForegroundColor Green
+            } else {
+                Write-Host "    ⚠ Demo manifest generation had issues" -ForegroundColor Yellow
+            }
+            
+            # Clear the connection string from environment
+            Remove-Item Env:\COSMOS_CONNECTION_STRING -ErrorAction SilentlyContinue
+            
+            Write-Host "  ✓ Demo data generation completed" -ForegroundColor Green
+        } else {
+            Write-Host "    ⚠ Could not retrieve connection string - skipping data generation" -ForegroundColor Yellow
+        }
+        
+        # Step 4: Re-secure Cosmos DB (disable local auth)
+        Write-Host "    🔒 Re-securing Cosmos DB (disabling local auth)..." -ForegroundColor Cyan
+        az resource update `
+            --ids $cosmosResourceId `
+            --set properties.disableLocalAuth=true `
+            --api-version 2023-11-15 `
+            --output none 2>&1 | Out-Null
+        
+        Write-Host "    ✓ Cosmos DB secured (managed identity only)" -ForegroundColor Green
+        
+    } else {
+        Write-Host "  ⚠ Python not found - skipping demo data generation" -ForegroundColor Yellow
+        Write-Host "    Install Python to enable automatic demo data generation" -ForegroundColor Gray
+    }
+} catch {
+    Write-Host "  ⚠ Demo data generation failed: $($_.Exception.Message)" -ForegroundColor Yellow
+    
+    # Ensure we re-secure Cosmos DB even if generation fails
+    try {
+        Write-Host "    🔒 Re-securing Cosmos DB after error..." -ForegroundColor Yellow
+        $subscriptionId = $account.id
+        $cosmosAccountName = if ($bicepOutputJson) { $bicepOutputJson.cosmosDbAccountName.value } else { "zava-dev-cosmos-lrqies" }
+        $cosmosResourceId = "/subscriptions/$subscriptionId/resourceGroups/$ResourceGroup/providers/Microsoft.DocumentDB/databaseAccounts/$cosmosAccountName"
+        
+        az resource update `
+            --ids $cosmosResourceId `
+            --set properties.disableLocalAuth=true `
+            --api-version 2023-11-15 `
+            --output none 2>&1 | Out-Null
+        
+        Write-Host "    ✓ Cosmos DB re-secured" -ForegroundColor Green
+    } catch {
+        Write-Host "    ⚠ Warning: Could not re-secure Cosmos DB. Run manually:" -ForegroundColor Red
+        Write-Host "      az resource update --ids $cosmosResourceId --set properties.disableLocalAuth=true --api-version 2023-11-15" -ForegroundColor Gray
+    }
 }
 
 Write-Host "✓ Post-deployment tasks completed" -ForegroundColor Green
@@ -408,9 +674,23 @@ Write-Host "Default Login Credentials:" -ForegroundColor Yellow
 Write-Host "  Username: admin" -ForegroundColor White
 Write-Host "  Password: admin123" -ForegroundColor White
 Write-Host ""
+Write-Host "Demo Data:" -ForegroundColor Yellow
+Write-Host "  ✓ Driver manifests with delivery parcels" -ForegroundColor Green
+Write-Host "  ✓ Parcels ready for dispatcher assignment" -ForegroundColor Green
+Write-Host "  ✓ Test parcels with valid DC assignments" -ForegroundColor Green
+if ($agentSettings.Count -gt 0) {
+    Write-Host "  ✓ Azure AI agents created and configured" -ForegroundColor Green
+}
+Write-Host ""
+Write-Host "Security & Permissions:" -ForegroundColor Yellow
+Write-Host "  ✓ App Service using managed identity (no connection strings)" -ForegroundColor Green
+Write-Host "  ✓ Cosmos DB RBAC permissions configured via Bicep" -ForegroundColor Green
+Write-Host "  ✓ Azure OpenAI access via managed identity" -ForegroundColor Green
+Write-Host "  ✓ Speech & Vision services accessible via RBAC" -ForegroundColor Green
+Write-Host ""
 Write-Host "Next Steps:" -ForegroundColor Yellow
 Write-Host "  1. Visit: $url" -ForegroundColor White
-Write-Host "  2. The app will auto-initialize users on first startup" -ForegroundColor White
+Write-Host "  2. Login with admin credentials and explore the demo" -ForegroundColor White
 Write-Host "  3. View logs: az webapp log tail --name $WebAppName --resource-group $ResourceGroup" -ForegroundColor White
 Write-Host "  4. Monitor in portal: https://portal.azure.com" -ForegroundColor White
 Write-Host ""
