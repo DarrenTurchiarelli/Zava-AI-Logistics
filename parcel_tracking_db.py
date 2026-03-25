@@ -207,7 +207,7 @@ class ParcelTrackingDB:
             raise
 
     async def _create_containers(self):
-        """Create containers with appropriate partition keys"""
+        """Create ALL containers with appropriate partition keys"""
         containers = [
             {
                 "id": self.parcels_container,
@@ -241,6 +241,22 @@ class ParcelTrackingDB:
             },
             {
                 "id": self.address_history_container,
+                "partition_key": PartitionKey(path="/address_normalized"),
+                "indexing_policy": {"indexingMode": "consistent", "automatic": True, "includedPaths": [{"path": "/*"}]},
+            },
+            # Additional containers previously created by separate scripts
+            {
+                "id": "users",
+                "partition_key": PartitionKey(path="/username"),
+                "indexing_policy": {"indexingMode": "consistent", "automatic": True, "includedPaths": [{"path": "/*"}]},
+            },
+            {
+                "id": "Manifests",
+                "partition_key": PartitionKey(path="/manifest_id"),
+                "indexing_policy": {"indexingMode": "consistent", "automatic": True, "includedPaths": [{"path": "/*"}]},
+            },
+            {
+                "id": "address_notes",
                 "partition_key": PartitionKey(path="/address_normalized"),
                 "indexing_policy": {"indexingMode": "consistent", "automatic": True, "includedPaths": [{"path": "/*"}]},
             },

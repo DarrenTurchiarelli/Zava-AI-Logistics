@@ -524,10 +524,15 @@ $cosmosCheck = az cosmosdb show `
 
 if (-not $cosmosCheck) {
     Write-Host "    ✗ ERROR: Cosmos DB account '$cosmosAccountName' not found!" -ForegroundColor Red
-    Write-Host "    ℹ  Skipping user initialization - database not accessible" -ForegroundColor Yellow
+    Write-Host "    ℹ  Skipping database initialization - database not accessible" -ForegroundColor Yellow
     Write-Host ""
 } else {
     Write-Host "    ✓ Cosmos DB validated: $cosmosAccountName" -ForegroundColor Green
+    
+    # Initialize default users (containers will be created during demo data generation phase)
+    Write-Host "  👤 Initializing default user accounts..." -ForegroundColor Cyan
+    # Step 2: Initialize default users
+    Write-Host "  👤 Initializing default user accounts..." -ForegroundColor Cyan
     
     try {
         # Check if Python is available
@@ -617,7 +622,7 @@ try {
         Start-Sleep -Seconds 30
         
         # Step 2: Get connection string
-        Write-Host "    🔑 Retrieving connection string for data generation..." -ForegroundColor Cyan
+        Write-Host "    🔑 Retrieving connection string for initialization..." -ForegroundColor Cyan
         $connectionString = az cosmosdb keys list `
             --name $cosmosAccountName `
             --resource-group $backendRgName `
@@ -628,6 +633,18 @@ try {
         if ($connectionString) {
             # Step 3: Set environment variable for Python scripts
             $env:COSMOS_CONNECTION_STRING = $connectionString
+            
+            # Step 3a: Initialize all database containers FIRST
+            Write-Host "    📦 Initializing all 10 database containers..." -ForegroundColor Cyan
+            $containerOutput = python Scripts/initialize_all_containers.py 2>&1
+            if ($LASTEXITCODE -eq 0 -and $containerOutput -match "SUCCESS") {
+                Write-Host "    ✓ All database containers created successfully" -ForegroundColor Green
+            } else {
+                Write-Host "    ⚠ Container initialization had issues (containers may already exist)" -ForegroundColor Yellow
+            }
+            
+            # Step 3b: Generate demo data
+            Write-Host "    📊 Generating demo data..." -ForegroundColor Cyan
             
             # Generate fresh test parcels with valid DC assignments
             Write-Host "    • Creating test parcels with valid DC assignments..." -ForegroundColor Gray
