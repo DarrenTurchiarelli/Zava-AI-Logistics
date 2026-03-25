@@ -1,9 +1,8 @@
 # =============================================================================
-# Deploy Zava to Azure with Complete Infrastructure via Bicep
+# Deploy Zava to Azure with Multi-Resource Group Infrastructure via Bicep
 # =============================================================================
 
 param(
-    [string]$ResourceGroup = "RG-Zava-Logistics",
     [string]$Location = "australiaeast",
     [string]$Environment = "dev",
     [string]$Sku = "B2",
@@ -15,9 +14,21 @@ param(
 $deploymentConfigFile = ".azure-deployment.json"
 $bicepTemplate = "infra/main.bicep"
 
+# Resource group names (will be created by Bicep)
+$frontendRgName = "RG-Zava-Frontend-$Environment"
+$middlewareRgName = "RG-Zava-Middleware-$Environment"
+$backendRgName = "RG-Zava-Backend-$Environment"
+$sharedRgName = "RG-Zava-Shared-$Environment"
+
 Write-Host "======================================================================" -ForegroundColor Cyan
-Write-Host " Zava - Complete Azure Infrastructure Deployment" -ForegroundColor Cyan
+Write-Host " Zava - Multi-Resource Group Infrastructure Deployment" -ForegroundColor Cyan
 Write-Host "======================================================================" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "  📦 Architecture:" -ForegroundColor Cyan
+Write-Host "     Frontend RG:     $frontendRgName" -ForegroundColor Gray
+Write-Host "     Middleware RG:   $middlewareRgName" -ForegroundColor Gray
+Write-Host "     Backend RG:      $backendRgName" -ForegroundColor Gray
+Write-Host "     Shared RG:       $sharedRgName" -ForegroundColor Gray
 Write-Host ""
 
 # Check for existing deployment
@@ -33,7 +44,7 @@ if ((Test-Path $deploymentConfigFile) -and -not $Force) {
         $isRedeployment = $true
 
         Write-Host "✓ Will redeploy to existing App Service: $WebAppName" -ForegroundColor Green
-        Write-Host "  Resource Group: $($existingDeployment.ResourceGroup)" -ForegroundColor Gray
+        Write-Host "  Frontend RG: $frontendRgName" -ForegroundColor Gray
     } catch {
         Write-Host "⚠ Could not read existing deployment config" -ForegroundColor Yellow
     }
@@ -120,29 +131,25 @@ if ($registrationNeeded) {
 }
 Write-Host ""
 
-# Create Resource Group
-Write-Host "[2/7] Creating/Verifying Resource Group: $ResourceGroup..." -ForegroundColor Yellow
-$rgExists = az group exists --name $ResourceGroup
-if ($rgExists -eq "true") {
-    Write-Host "✓ Resource Group exists" -ForegroundColor Green
-} else {
-    az group create --name $ResourceGroup --location $Location --output none
-    Write-Host "✓ Resource Group created" -ForegroundColor Green
-}
-Write-Host ""
-
-# Deploy Bicep Infrastructure
+# Deploy Bicep Infrastructure at Subscription Level
 if (-not $SkipInfrastructure -and -not $CodeOnly) {
-    Write-Host "[3/7] Deploying complete infrastructure via Bicep..." -ForegroundColor Yellow
-    Write-Host "  📦 This will create:" -ForegroundColor Cyan
-    Write-Host "     • Cosmos DB (serverless) with all containers" -ForegroundColor Gray
-    Write-Host "     • Azure AI Hub & Project for Foundry agents" -ForegroundColor Gray
-    Write-Host "     • Azure Maps, Speech, Vision services" -ForegroundColor Gray
-    Write-Host "     • App Service & Plan (Linux Python 3.11)" -ForegroundColor Gray
-    Write-Host "     • Application Insights & Log Analytics" -ForegroundColor Gray
-    Write-Host "     • Storage Account for AI Hub" -ForegroundColor Gray
-    Write-Host "     • RBAC role assignments (managed identity)" -ForegroundColor Gray
-    Write-Host "  ⏱ This may take 5-10 minutes..." -ForegroundColor Gray
+    Write-Host "[3/7] Deploying multi-resource group infrastructure via Bicep..." -ForegroundColor Yellow
+    Write-Host "  📦 This will create 4 resource groups with:" -ForegroundColor Cyan
+    Write-Host "     Frontend:" -ForegroundColor White
+    Write-Host "       • App Service & Plan (Linux Python 3.11)" -ForegroundColor Gray
+    Write-Host "       • Application Insights" -ForegroundColor Gray
+    Write-Host "     Middleware:" -ForegroundColor White
+    Write-Host "       • Azure OpenAI Service (GPT-4o)" -ForegroundColor Gray
+    Write-Host "       • Azure AI Hub & Project for Foundry agents" -ForegroundColor Gray
+    Write-Host "       • Storage Account for AI Hub" -ForegroundColor Gray
+    Write-Host "     Backend:" -ForegroundColor White
+    Write-Host "       • Cosmos DB (serverless) with all containers" -ForegroundColor Gray
+    Write-Host "     Shared Services:" -ForegroundColor White
+   Write-Host "       • Azure Maps (Gen2), Speech, Vision services" -ForegroundColor Gray
+    Write-Host "       • Log Analytics Workspace" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "  🔐 RBAC will be configured automatically across resource groups" -ForegroundColor Cyan
+    Write-Host "  ⏱  This may take 8-12 minutes..." -ForegroundColor Gray
     Write-Host ""
 
     if (-not (Test-Path $bicepTemplate)) {
@@ -151,15 +158,15 @@ if (-not $SkipInfrastructure -and -not $CodeOnly) {
         exit 1
     }
 
-    # Deploy Bicep template
+    # Deploy Bicep template at subscription scope
     $deploymentName = "zava-deployment-$(Get-Date -Format 'yyyyMMddHHmmss')"
 
-    Write-Host "  🚀 Starting Bicep deployment: $deploymentName" -ForegroundColor Cyan
+    Write-Host "  🚀 Starting subscription-level Bicep deployment: $deploymentName" -ForegroundColor Cyan
 
-    # Note: Not using 2>&1 to avoid mixing errors with JSON output
-    $bicepOutput = az deployment group create `
+    # Deploy at subscription scope (creates resource groups and resources)
+    $bicepOutput = az deployment sub create `
         --name $deploymentName `
-        --resource-group $ResourceGroup `
+        --location $Location `
         --template-file $bicepTemplate `
         --parameters location=$Location environment=$Environment appServiceSku=$Sku `
         --query properties.outputs `
@@ -167,7 +174,7 @@ if (-not $SkipInfrastructure -and -not $CodeOnly) {
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "  ✗ Infrastructure deployment failed" -ForegroundColor Red
-        Write-Host "  Run 'az deployment group show --name $deploymentName --resource-group $ResourceGroup' for details" -ForegroundColor Yellow
+        Write-Host "  Run 'az deployment sub show --name $deploymentName' for details" -ForegroundColor Yellow
         exit 1
     }
 
@@ -180,9 +187,8 @@ if (-not $SkipInfrastructure -and -not $CodeOnly) {
         Write-Host ""
         Write-Host "  Attempting to retrieve deployment outputs manually..." -ForegroundColor Yellow
 
-        $bicepOutputJson = az deployment group show `
+        $bicepOutputJson = az deployment sub show `
             --name $deploymentName `
-            --resource-group $ResourceGroup `
             --query properties.outputs `
             --output json | ConvertFrom-Json
     }
@@ -190,15 +196,24 @@ if (-not $SkipInfrastructure -and -not $CodeOnly) {
     Write-Host "  ✓ Infrastructure deployed successfully!" -ForegroundColor Green
     Write-Host ""
     Write-Host "  📋 Deployment Details:" -ForegroundColor Cyan
-    Write-Host "     App Service: $($bicepOutputJson.appServiceName.value)" -ForegroundColor Gray
-    Write-Host "     URL: $($bicepOutputJson.appServiceUrl.value)" -ForegroundColor Gray
-    Write-Host "     Cosmos DB: $($bicepOutputJson.cosmosDbAccountName.value)" -ForegroundColor Gray
-    Write-Host "     AI Hub: $($bicepOutputJson.aiHubName.value)" -ForegroundColor Gray
-    Write-Host "     AI Project: $($bicepOutputJson.aiProjectName.value)" -ForegroundColor Gray
+    Write-Host "     Frontend Resource Group: $frontendRgName" -ForegroundColor White
+    Write-Host "       App Service: $($bicepOutputJson.frontend.value.appServiceName)" -ForegroundColor Gray
+    Write-Host "       URL: $($bicepOutputJson.frontend.value.appServiceUrl)" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "     Middleware Resource Group: $middlewareRgName" -ForegroundColor White
+    Write-Host "       Azure OpenAI: $($bicepOutputJson.middleware.value.openAIServiceName)" -ForegroundColor Gray
+    Write-Host "       AI Hub: $($bicepOutputJson.middleware.value.aiHubName)" -ForegroundColor Gray
+    Write-Host "       AI Project: $($bicepOutputJson.middleware.value.aiProjectName)" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "     Backend Resource Group: $backendRgName" -ForegroundColor White
+    Write-Host "       Cosmos DB: $($bicepOutputJson.backend.value.cosmosDbAccountName)" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "     Shared Resource Group: $sharedRgName" -ForegroundColor White
+    Write-Host "       Azure Maps: $($bicepOutputJson.shared.value.mapsAccountName)" -ForegroundColor Gray
     Write-Host ""
 
     # Store deployment info
-    $WebAppName = $bicepOutputJson.appServiceName.value
+    $WebAppName = $bicepOutputJson.frontend.value.appServiceName
 
     # Validate we got the app name
     if (-not $WebAppName) {
@@ -209,11 +224,12 @@ if (-not $SkipInfrastructure -and -not $CodeOnly) {
 
     # Wait for RBAC permissions to propagate
     Write-Host ""
-    Write-Host "[3.5/7] Waiting for RBAC permissions to propagate..." -ForegroundColor Yellow
-    Write-Host "  ℹ  Bicep template assigned the following roles to App Service managed identity:" -ForegroundColor Cyan
-    Write-Host "     • Cosmos DB Built-in Data Contributor (data plane)" -ForegroundColor Gray
-    Write-Host "     • Cognitive Services OpenAI User (Azure OpenAI)" -ForegroundColor Gray
-    Write-Host "     • Cognitive Services User (Speech & Vision)" -ForegroundColor Gray
+    Write-Host "[3.5/7] Waiting for cross-resource group RBAC permissions to propagate..." -ForegroundColor Yellow
+    Write-Host "  ℹ  Bicep template assigned the following roles across resource groups:" -ForegroundColor Cyan
+    Write-Host "     • App Service → Cosmos DB Built-in Data Contributor (Backend RG)" -ForegroundColor Gray
+    Write-Host "     • App Service → Cognitive Services OpenAI User (Middleware RG)" -ForegroundColor Gray
+    Write-Host "     • App Service → Cognitive Services User for Speech/Vision (Shared RG)" -ForegroundColor Gray
+    Write-Host "     • AI Hub/Project → Cognitive Services OpenAI User (Middleware RG)" -ForegroundColor Gray
     Write-Host ""
     Write-Host "  ⏱  Waiting 60 seconds for Azure RBAC replication across regions..." -ForegroundColor Cyan
     Start-Sleep -Seconds 60
@@ -247,15 +263,15 @@ if (-not $WebAppName) {
     exit 1
 }
 
-Write-Host "  Checking App Service: $WebAppName" -ForegroundColor Gray
-$webApp = az webapp show --name $WebAppName --resource-group $ResourceGroup --output json 2>&1
+Write-Host "  Checking App Service: $WebAppName (in $frontendRgName)" -ForegroundColor Gray
+$webApp = az webapp show --name $WebAppName --resource-group $frontendRgName --output json 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  ✗ Could not retrieve Web App '$WebAppName'" -ForegroundColor Red
     Write-Host "  Error: $webApp" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "  Troubleshooting:" -ForegroundColor Cyan
-    Write-Host "    - Verify app service exists: az webapp list --resource-group $ResourceGroup" -ForegroundColor Gray
-    Write-Host "    - Check resource group: az group show --name $ResourceGroup" -ForegroundColor Gray
+    Write-Host "    - Verify app service exists: az webapp list --resource-group $frontendRgName" -ForegroundColor Gray
+    Write-Host "    - Check resource group: az group show --name $frontendRgName" -ForegroundColor Gray
     exit 1
 }
 $webApp = $webApp | ConvertFrom-Json
@@ -278,10 +294,10 @@ $agentSettings = @{}
 try {
     # Check if Python is available
     if (Get-Command python -ErrorAction SilentlyContinue) {
-        # Get OpenAI service name and subscription ID
-        $openAIServiceName = $bicepOutput.openAIServiceName
+        # Get OpenAI service name and subscription ID (from Middleware RG)
+        $openAIServiceName = $bicepOutputJson.middleware.value.openAIServiceName
         $subscriptionId = $account.id
-        $resourceId = "/subscriptions/$subscriptionId/resourceGroups/$ResourceGroup/providers/Microsoft.CognitiveServices/accounts/$openAIServiceName"
+        $resourceId = "/subscriptions/$subscriptionId/resourceGroups/$middlewareRgName/providers/Microsoft.CognitiveServices/accounts/$openAIServiceName"
         
         Write-Host "  ⚙ Temporarily enabling API key authentication for agent creation..." -ForegroundColor Yellow
         az resource update `
@@ -294,15 +310,15 @@ try {
         Start-Sleep -Seconds 30
         
         Write-Host "  🔑 Getting temporary API key..." -ForegroundColor Yellow
-        $openAIApiKey = az cognitiveservices account keys list --name $openAIServiceName --resource-group $ResourceGroup --query key1 -o tsv
+        $openAIApiKey = az cognitiveservices account keys list --name $openAIServiceName --resource-group $middlewareRgName --query key1 -o tsv
         
         Write-Host "  🤖 Creating AI agents..." -ForegroundColor Yellow
         Write-Host "     OpenAI Service: $openAIServiceName" -ForegroundColor Gray
-        Write-Host "     Endpoint: $($bicepOutput.openAIServiceEndpoint)" -ForegroundColor Gray
+        Write-Host "     Endpoint: $($bicepOutputJson.middleware.value.openAIServiceEndpoint)" -ForegroundColor Gray
         Write-Host ""
         
         # Set environment variables and run Python script directly (no subprocess)
-        $env:AZURE_OPENAI_ENDPOINT = $bicepOutput.openAIServiceEndpoint
+        $env:AZURE_OPENAI_ENDPOINT = $bicepOutputJson.middleware.value.openAIServiceEndpoint
         $env:AZURE_OPENAI_API_KEY = $openAIApiKey
         $env:AZURE_AI_MODEL_DEPLOYMENT_NAME = "gpt-4o"
         
@@ -433,7 +449,7 @@ if ($bicepOutput -and $bicepOutput.openAIServiceEndpoint) {
 if ($additionalSettings.Count -gt 0) {
     az webapp config appsettings set `
         --name $WebAppName `
-        --resource-group $ResourceGroup `
+        --resource-group $frontendRgName `
         --settings $additionalSettings `
         --output none
     Write-Host "✓ Configuration settings applied to Web App" -ForegroundColor Green
@@ -459,12 +475,13 @@ Compress-Archive -Path * -DestinationPath $tempZip -Force -ErrorAction SilentlyC
 Write-Host "  Uploading to Azure..." -ForegroundColor Gray
 $deployResult = az webapp deployment source config-zip `
     --name $WebAppName `
-    --resource-group $ResourceGroup `
+    --resource-group $frontendRgName `
     --src $tempZip `
     --timeout 600 2>&1
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  ✗ Code deployment failed: $deployResult" -ForegroundColor Red
+    Write-Host "    Check logs with: az webapp log tail --name $WebAppName --resource-group $frontendRgName" -ForegroundColor Gray
 } else {
     Write-Host "✓ Application code deployed" -ForegroundColor Green
 }
@@ -488,7 +505,7 @@ try {
     }
 } catch {
     Write-Host "  ⚠ Application not yet responding (may need more time to start)" -ForegroundColor Yellow
-    Write-Host "    Check logs with: az webapp log tail --name $WebAppName --resource-group $ResourceGroup" -ForegroundColor Gray
+    Write-Host "    Check logs with: az webapp log tail --name $WebAppName --resource-group $frontendRgName" -ForegroundColor Gray
 }
 
 # Task 3: Initialize default users
@@ -547,7 +564,8 @@ try {
         # Step 1: Temporarily enable local auth for data generation
         Write-Host "    🔓 Temporarily enabling Cosmos DB local authentication..." -ForegroundColor Cyan
         $subscriptionId = $account.id
-        $cosmosResourceId = "/subscriptions/$subscriptionId/resourceGroups/$ResourceGroup/providers/Microsoft.DocumentDB/databaseAccounts/$cosmosAccountName"
+        $cosmosAccountName = $bicepOutputJson.backend.value.cosmosDbAccountName
+        $cosmosResourceId = "/subscriptions/$subscriptionId/resourceGroups/$backendRgName/providers/Microsoft.DocumentDB/databaseAccounts/$cosmosAccountName"
         
         az resource update `
             --ids $cosmosResourceId `
@@ -562,7 +580,7 @@ try {
         Write-Host "    🔑 Retrieving connection string for data generation..." -ForegroundColor Cyan
         $connectionString = az cosmosdb keys list `
             --name $cosmosAccountName `
-            --resource-group $ResourceGroup `
+            --resource-group $backendRgName `
             --type connection-strings `
             --query "connectionStrings[0].connectionString" `
             -o tsv
@@ -627,8 +645,8 @@ try {
     try {
         Write-Host "    🔒 Re-securing Cosmos DB after error..." -ForegroundColor Yellow
         $subscriptionId = $account.id
-        $cosmosAccountName = if ($bicepOutputJson) { $bicepOutputJson.cosmosDbAccountName.value } else { "zava-dev-cosmos-lrqies" }
-        $cosmosResourceId = "/subscriptions/$subscriptionId/resourceGroups/$ResourceGroup/providers/Microsoft.DocumentDB/databaseAccounts/$cosmosAccountName"
+        $cosmosAccountName = $bicepOutputJson.backend.value.cosmosDbAccountName
+        $cosmosResourceId = "/subscriptions/$subscriptionId/resourceGroups/$backendRgName/providers/Microsoft.DocumentDB/databaseAccounts/$cosmosAccountName"
         
         az resource update `
             --ids $cosmosResourceId `
@@ -649,7 +667,10 @@ Write-Host ""
 # Save deployment configuration
 $deploymentInfo = @{
     AppServiceName = $WebAppName
-    ResourceGroup = $ResourceGroup
+    FrontendResourceGroup = $frontendRgName
+    MiddlewareResourceGroup = $middlewareRgName
+    BackendResourceGroup = $backendRgName
+    SharedResourceGroup = $sharedRgName
     Location = $Location
     Environment = $Environment
     Sku = $Sku
@@ -691,7 +712,7 @@ Write-Host ""
 Write-Host "Next Steps:" -ForegroundColor Yellow
 Write-Host "  1. Visit: $url" -ForegroundColor White
 Write-Host "  2. Login with admin credentials and explore the demo" -ForegroundColor White
-Write-Host "  3. View logs: az webapp log tail --name $WebAppName --resource-group $ResourceGroup" -ForegroundColor White
+Write-Host "  3. View logs: az webapp log tail --name $WebAppName --resource-group $frontendRgName" -ForegroundColor White
 Write-Host "  4. Monitor in portal: https://portal.azure.com" -ForegroundColor White
 Write-Host ""
 Write-Host "To redeploy code only (skip infrastructure):" -ForegroundColor Cyan

@@ -1,13 +1,15 @@
 // =============================================================================
-// Zava - Complete Infrastructure as Code (Bicep)
-// Deploys all Azure resources required for the solution
+// Zava - Multi-Resource Group Infrastructure Orchestrator
+// Deploys resources across 4 resource groups for better organization
 // =============================================================================
 
+targetScope = 'subscription'
+
 @description('Primary location for all resources')
-param location string = resourceGroup().location
+param location string = 'australiaeast'
 
 @description('Unique suffix for resource names')
-param uniqueSuffix string = substring(uniqueString(resourceGroup().id), 0, 6)
+param uniqueSuffix string = substring(uniqueString(subscription().id), 0, 6)
 
 @description('Environment name (dev, staging, production)')
 @allowed([
@@ -29,567 +31,291 @@ param environment string = 'dev'
 param appServiceSku string = 'B2'
 
 // =============================================================================
-// Variables
+// Resource Group Names
 // =============================================================================
 
-var resourcePrefix = 'zava-${environment}'
-var cosmosDbAccountName = '${resourcePrefix}-cosmos-${uniqueSuffix}'
-var appServicePlanName = '${resourcePrefix}-plan'
-var appServiceName = '${resourcePrefix}-web-${uniqueSuffix}'
-var aiHubName = '${resourcePrefix}-aihub-${uniqueSuffix}'
-var aiProjectName = '${resourcePrefix}-aiproject-${uniqueSuffix}'
-var openAIServiceName = '${resourcePrefix}-openai-${uniqueSuffix}'
-var mapsAccountName = '${resourcePrefix}-maps-${uniqueSuffix}'
-var speechServiceName = '${resourcePrefix}-speech-${uniqueSuffix}'
-var visionServiceName = '${resourcePrefix}-vision-${uniqueSuffix}'
-var storageAccountName = 'zava${environment}st${uniqueSuffix}'
-var logAnalyticsName = '${resourcePrefix}-logs-${uniqueSuffix}'
-var appInsightsName = '${resourcePrefix}-insights-${uniqueSuffix}'
+var frontendRgName = 'RG-Zava-Frontend-${environment}'
+var middlewareRgName = 'RG-Zava-Middleware-${environment}'
+var backendRgName = 'RG-Zava-Backend-${environment}'
+var sharedRgName = 'RG-Zava-Shared-${environment}'
 
 // =============================================================================
-// 1. Log Analytics Workspace (for monitoring)
+// Resource Groups
 // =============================================================================
 
-resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
-  name: logAnalyticsName
+resource frontendRg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
+  name: frontendRgName
   location: location
-  properties: {
-    sku: {
-      name: 'PerGB2018'
-    }
-    retentionInDays: 30
+  tags: {
+    Environment: environment
+    Layer: 'Frontend'
+    Project: 'Zava-Logistics'
   }
 }
 
-// =============================================================================
-// 2. Application Insights
-// =============================================================================
-
-resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
-  name: appInsightsName
+resource middlewareRg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
+  name: middlewareRgName
   location: location
-  kind: 'web'
-  properties: {
-    Application_Type: 'web'
-    WorkspaceResourceId: logAnalytics.id
+  tags: {
+    Environment: environment
+    Layer: 'Middleware'
+    Project: 'Zava-Logistics'
   }
 }
 
-// =============================================================================
-// 3. Storage Account (for AI Hub)
-// =============================================================================
-
-resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
-  name: storageAccountName
+resource backendRg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
+  name: backendRgName
   location: location
-  sku: {
-    name: 'Standard_LRS'
-  }
-  kind: 'StorageV2'
-  properties: {
-    accessTier: 'Hot'
-    allowBlobPublicAccess: false
-    minimumTlsVersion: 'TLS1_2'
-    supportsHttpsTrafficOnly: true
+  tags: {
+    Environment: environment
+    Layer: 'Backend'
+    Project: 'Zava-Logistics'
   }
 }
 
-// =============================================================================
-// 4. Cosmos DB Account
-// =============================================================================
-
-resource cosmosDbAccount 'Microsoft.DocumentDB/databaseAccounts@2023-11-15' = {
-  name: cosmosDbAccountName
+resource sharedRg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
+  name: sharedRgName
   location: location
-  kind: 'GlobalDocumentDB'
-  identity: {
-    type: 'SystemAssigned'
-  }
-  properties: {
-    databaseAccountOfferType: 'Standard'
-    consistencyPolicy: {
-      defaultConsistencyLevel: 'Session'
-    }
-    locations: [
-      {
-        locationName: location
-        failoverPriority: 0
-        isZoneRedundant: false
-      }
-    ]
-    capabilities: [
-      {
-        name: 'EnableServerless'
-      }
-    ]
-    disableLocalAuth: true  // Force RBAC authentication only
-  }
-}
-
-// Cosmos DB Database
-resource cosmosDatabase 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2023-11-15' = {
-  parent: cosmosDbAccount
-  name: 'logisticstracking'
-  properties: {
-    resource: {
-      id: 'logisticstracking'
-    }
-  }
-}
-
-// Cosmos DB Containers
-resource parcelsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2023-11-15' = {
-  parent: cosmosDatabase
-  name: 'parcels'
-  properties: {
-    resource: {
-      id: 'parcels'
-      partitionKey: {
-        paths: [
-          '/store_location'
-        ]
-        kind: 'Hash'
-      }
-    }
-  }
-}
-
-resource eventsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2023-11-15' = {
-  parent: cosmosDatabase
-  name: 'parcel_events'
-  properties: {
-    resource: {
-      id: 'parcel_events'
-      partitionKey: {
-        paths: [
-          '/barcode'
-        ]
-        kind: 'Hash'
-      }
-    }
-  }
-}
-
-resource manifestsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2023-11-15' = {
-  parent: cosmosDatabase
-  name: 'driver_manifests'
-  properties: {
-    resource: {
-      id: 'driver_manifests'
-      partitionKey: {
-        paths: [
-          '/driver_id'
-        ]
-        kind: 'Hash'
-      }
-    }
-  }
-}
-
-resource usersContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2023-11-15' = {
-  parent: cosmosDatabase
-  name: 'users'
-  properties: {
-    resource: {
-      id: 'users'
-      partitionKey: {
-        paths: [
-          '/username'
-        ]
-        kind: 'Hash'
-      }
-    }
-  }
-}
-
-resource addressNotesContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2023-11-15' = {
-  parent: cosmosDatabase
-  name: 'address_notes'
-  properties: {
-    resource: {
-      id: 'address_notes'
-      partitionKey: {
-        paths: [
-          '/address_hash'
-        ]
-        kind: 'Hash'
-      }
-    }
+  tags: {
+    Environment: environment
+    Layer: 'Shared Services'
+    Project: 'Zava-Logistics'
   }
 }
 
 // =============================================================================
-// 5. Azure Maps Account
+// Module Deployments
 // =============================================================================
 
-resource mapsAccount 'Microsoft.Maps/accounts@2023-06-01' = {
-  name: mapsAccountName
-  location: 'global'
-  sku: {
-    name: 'G2'
+// 1. Shared Services (deployed first - provides Log Analytics for others)
+module sharedServices 'modules/shared.bicep' = {
+  scope: sharedRg
+  name: 'sharedServices-${uniqueSuffix}'
+  params: {
+    location: location
+    uniqueSuffix: uniqueSuffix
+    environment: environment
   }
-  kind: 'Gen2'
-  properties: {
-    disableLocalAuth: false  // Maps Gen2 uses subscription key authentication
+}
+
+// 2. Frontend (depends on Shared Services for Log Analytics)
+module frontend 'modules/frontend.bicep' = {
+  scope: frontendRg
+  name: 'frontend-${uniqueSuffix}'
+  params: {
+    location: location
+    uniqueSuffix: uniqueSuffix
+    environment: environment
+    appServiceSku: appServiceSku
+    logAnalyticsId: sharedServices.outputs.logAnalyticsId
+  }
+  dependsOn: [
+    sharedServices
+  ]
+}
+
+// 3. Middleware (depends on Frontend for Application Insights)
+module middleware 'modules/middleware.bicep' = {
+  scope: middlewareRg
+  name: 'middleware-${uniqueSuffix}'
+  params: {
+    location: location
+    uniqueSuffix: uniqueSuffix
+    environment: environment
+    appInsightsId: frontend.outputs.appInsightsId
+  }
+  dependsOn: [
+    frontend
+  ]
+}
+
+// 4. Backend (can be deployed independently)
+module backend 'modules/backend.bicep' = {
+  scope: backendRg
+  name: 'backend-${uniqueSuffix}'
+  params: {
+    location: location
+    uniqueSuffix: uniqueSuffix
+    environment: environment
   }
 }
 
 // =============================================================================
-// 6. Speech Services
-// =============================================================================
-
-resource speechService 'Microsoft.CognitiveServices/accounts@2023-05-01' = {
-  name: speechServiceName
-  location: location
-  sku: {
-    name: 'S0'
-  }
-  kind: 'SpeechServices'
-  identity: {
-    type: 'SystemAssigned'
-  }
-  properties: {
-    customSubDomainName: speechServiceName
-    publicNetworkAccess: 'Enabled'
-    disableLocalAuth: true  // Force managed identity authentication
-  }
-}
-
-// =============================================================================
-// 7. Computer Vision (for OCR)
-// =============================================================================
-
-resource visionService 'Microsoft.CognitiveServices/accounts@2023-05-01' = {
-  name: visionServiceName
-  location: location
-  sku: {
-    name: 'S1'
-  }
-  kind: 'ComputerVision'
-  identity: {
-    type: 'SystemAssigned'
-  }
-  properties: {
-    customSubDomainName: visionServiceName
-    publicNetworkAccess: 'Enabled'
-    disableLocalAuth: true  // Force managed identity authentication
-  }
-}
-
-// =============================================================================
-// 7.5. Azure OpenAI Service (for AI agents)
-// =============================================================================
-
-resource openAIService 'Microsoft.CognitiveServices/accounts@2023-05-01' = {
-  name: '${resourcePrefix}-openai-${uniqueSuffix}'
-  location: location
-  sku: {
-    name: 'S0'
-  }
-  kind: 'OpenAI'
-  identity: {
-    type: 'SystemAssigned'
-  }
-  properties: {
-    customSubDomainName: '${resourcePrefix}-openai-${uniqueSuffix}'
-    publicNetworkAccess: 'Enabled'
-    disableLocalAuth: true  // Managed identity only (deployment script temporarily enables keys for agent creation)
-  }
-}
-
-// Deploy GPT-4o model
-resource gpt4oDeployment 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
-  parent: openAIService
-  name: 'gpt-4o'
-  sku: {
-    name: 'GlobalStandard'
-    capacity: 10
-  }
-  properties: {
-    model: {
-      format: 'OpenAI'
-      name: 'gpt-4o'
-      version: '2024-08-06'
-    }
-    raiPolicyName: 'Microsoft.Default'
-  }
-}
-
-// =============================================================================
-// 8. Azure AI Foundry Hub
-// =============================================================================
-
-resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-04-01' = {
-  name: aiHubName
-  location: location
-  sku: {
-    name: 'Basic'
-    tier: 'Basic'
-  }
-  kind: 'Hub'
-  identity: {
-    type: 'SystemAssigned'
-  }
-  properties: {
-    friendlyName: 'Zava AI Hub'
-    description: 'AI Hub for Zava logistics platform with 8 AI agents'
-    storageAccount: storageAccount.id
-    applicationInsights: appInsights.id
-  }
-}
-
-// =============================================================================
-// 9. Azure AI Foundry Project
-// =============================================================================
-
-resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-04-01' = {
-  name: aiProjectName
-  location: location
-  sku: {
-    name: 'Basic'
-    tier: 'Basic'
-  }
-  kind: 'Project'
-  identity: {
-    type: 'SystemAssigned'
-  }
-  properties: {
-    friendlyName: 'Zava AI Project'
-    description: 'AI Project for Zava with Customer Service, Fraud Detection, and operational agents'
-    hubResourceId: aiHub.id
-  }
-}
-
-// Connection from AI Hub to Azure OpenAI
-resource openAIConnection 'Microsoft.MachineLearningServices/workspaces/connections@2024-04-01' = {
-  parent: aiHub
-  name: 'aoai-connection'
-  properties: {
-    category: 'AzureOpenAI'
-    target: openAIService.properties.endpoint
-    authType: 'AAD'
-    isSharedToAll: true
-    metadata: {
-      ApiVersion: '2024-02-01'
-      ApiType: 'Azure'
-      ResourceId: openAIService.id
-    }
-  }
-}
-
-// =============================================================================
-// 10. App Service Plan
-// =============================================================================
-
-resource appServicePlan 'Microsoft.Web/serverfarms@2023-01-01' = {
-  name: appServicePlanName
-  location: location
-  sku: {
-    name: appServiceSku
-  }
-  kind: 'linux'
-  properties: {
-    reserved: true
-  }
-}
-
-// =============================================================================
-// 11. App Service (Web App)
-// =============================================================================
-
-resource appService 'Microsoft.Web/sites@2023-01-01' = {
-  name: appServiceName
-  location: location
-  identity: {
-    type: 'SystemAssigned'
-  }
-  properties: {
-    serverFarmId: appServicePlan.id
-    siteConfig: {
-      linuxFxVersion: 'PYTHON|3.11'
-      alwaysOn: true
-      ftpsState: 'Disabled'
-      minTlsVersion: '1.2'
-      appCommandLine: 'gunicorn --bind=0.0.0.0:8000 --timeout 600 --workers=4 app:app'
-      appSettings: [
-        {
-          name: 'SCM_DO_BUILD_DURING_DEPLOYMENT'
-          value: 'true'
-        }
-        {
-          name: 'COSMOS_DB_ENDPOINT'
-          value: cosmosDbAccount.properties.documentEndpoint
-        }
-        {
-          name: 'COSMOS_DB_DATABASE_NAME'
-          value: 'logisticstracking'
-        }
-        {
-          name: 'USE_MANAGED_IDENTITY'
-          value: 'true'
-        }
-        {
-          name: 'AZURE_MAPS_SUBSCRIPTION_KEY'
-          value: mapsAccount.listKeys().primaryKey
-        }
-        {
-          name: 'AZURE_SPEECH_ENDPOINT'
-          value: speechService.properties.endpoint
-        }
-        {
-          name: 'AZURE_SPEECH_REGION'
-          value: location
-        }
-        {
-          name: 'AZURE_VISION_ENDPOINT'
-          value: visionService.properties.endpoint
-        }
-        {
-          name: 'AZURE_AI_PROJECT_ENDPOINT'
-          value: aiProject.properties.discoveryUrl
-        }
-        {
-          name: 'AZURE_AI_MODEL_DEPLOYMENT_NAME'
-          value: 'gpt-4o'
-        }
-        {
-          name: 'FLASK_ENV'
-          value: 'production'
-        }
-        {
-          name: 'FLASK_SECRET_KEY'
-          value: uniqueString(resourceGroup().id, appServiceName)
-        }
-        {
-          name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
-          value: appInsights.properties.ConnectionString
-        }
-      ]
-    }
-    httpsOnly: true
-  }
-}
-
-// =============================================================================
-// 12. RBAC Role Assignments
+// Cross-Resource Group RBAC Assignments
 // =============================================================================
 
 // Cosmos DB Data Contributor for App Service
 resource cosmosRoleAssignment 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2023-11-15' = {
-  parent: cosmosDbAccount
-  name: guid(cosmosDbAccount.id, appService.id, 'cosmosdb-contributor')
+  name: guid(backend.outputs.cosmosDbAccountId, frontend.outputs.appServicePrincipalId, 'cosmosdb-contributor')
+  scope: resourceGroup(backendRgName)
   properties: {
-    roleDefinitionId: '${cosmosDbAccount.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002'
-    principalId: appService.identity.principalId
-    scope: cosmosDbAccount.id
+    roleDefinitionId: '${backend.outputs.cosmosDbAccountId}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002'
+    principalId: frontend.outputs.appServicePrincipalId
+    scope: backend.outputs.cosmosDbAccountId
   }
+  dependsOn: [
+    frontend
+    backend
+  ]
 }
 
-// Cognitive Services OpenAI User for AI Hub access
-resource aiRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(aiHub.id, appService.id, 'ai-user')
-  scope: aiHub
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')
-    principalId: appService.identity.principalId
-    principalType: 'ServicePrincipal'
+// Cognitive Services OpenAI User for App Service
+module openAIAppServiceRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
+  scope: middlewareRg
+  name: 'openai-appservice-rbac'
+  params: {
+    principalId: frontend.outputs.appServicePrincipalId
+    resourceId: middleware.outputs.openAIServiceId
   }
+  dependsOn: [
+    frontend
+    middleware
+  ]
 }
 
-// Cognitive Services User for Speech Service
-resource speechRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(speechService.id, appService.id, 'speech-user')
-  scope: speechService
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'a97b65f3-24c7-4388-baec-2e87135dc908')
-    principalId: appService.identity.principalId
-    principalType: 'ServicePrincipal'
+// Cognitive Services OpenAI User for AI Hub
+module openAIHubRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
+  scope: middlewareRg
+  name: 'openai-hub-rbac'
+  params: {
+    principalId: middleware.outputs.aiHubPrincipalId
+    resourceId: middleware.outputs.openAIServiceId
   }
+  dependsOn: [
+    middleware
+  ]
 }
 
-// Cognitive Services User for Vision Service
-resource visionRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(visionService.id, appService.id, 'vision-user')
-  scope: visionService
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'a97b65f3-24c7-4388-baec-2e87135dc908')
-    principalId: appService.identity.principalId
-    principalType: 'ServicePrincipal'
+// Cognitive Services OpenAI User for AI Project
+module openAIProjectRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
+  scope: middlewareRg
+  name: 'openai-project-rbac'
+  params: {
+    principalId: middleware.outputs.aiProjectPrincipalId
+    resourceId: middleware.outputs.openAIServiceId
   }
+  dependsOn: [
+    middleware
+  ]
 }
 
-// Cognitive Services OpenAI User for App Service (to call agents/models)
-resource openAIAppServiceRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(openAIService.id, appService.id, 'openai-user')
-  scope: openAIService
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')
-    principalId: appService.identity.principalId
-    principalType: 'ServicePrincipal'
+// Cognitive Services User for AI Hub (for Speech/Vision)
+module aiHubSharedRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
+  scope: middlewareRg
+  name: 'aihub-shared-rbac'
+  params: {
+    principalId: middleware.outputs.aiHubPrincipalId
+    resourceId: middleware.outputs.openAIServiceId
   }
+  dependsOn: [
+    middleware
+  ]
 }
 
-// Cognitive Services OpenAI User for AI Hub (to use models)
-resource openAIHubRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(openAIService.id, aiHub.id, 'openai-hub')
-  scope: openAIService
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')
-    principalId: aiHub.identity.principalId
-    principalType: 'ServicePrincipal'
+// Cognitive Services User for App Service to Speech Service
+module speechAppServiceRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
+  scope: sharedRg
+  name: 'speech-appservice-rbac'
+  params: {
+    principalId: frontend.outputs.appServicePrincipalId
+    resourceId: sharedServices.outputs.speechServiceId
   }
+  dependsOn: [
+    frontend
+    sharedServices
+  ]
 }
 
-// Cognitive Services OpenAI User for AI Project (to use models)
-resource openAIProjectRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(openAIService.id, aiProject.id, 'openai-project')
-  scope: openAIService
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')
-    principalId: aiProject.identity.principalId
-    principalType: 'ServicePrincipal'
+// Cognitive Services User for App Service to Vision Service
+module visionAppServiceRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
+  scope: sharedRg
+  name: 'vision-appservice-rbac'
+  params: {
+    principalId: frontend.outputs.appServicePrincipalId
+    resourceId: sharedServices.outputs.visionServiceId
   }
+  dependsOn: [
+    frontend
+    sharedServices
+  ]
+}
+
+// =============================================================================
+// Update App Service Configuration with Cross-Resource Group Endpoints
+// =============================================================================
+
+resource appService 'Microsoft.Web/sites@2023-01-01' existing = {
+  scope: frontendRg
+  name: frontend.outputs.appServiceName
+}
+
+resource appServiceConfig 'Microsoft.Web/sites/config@2023-01-01' = {
+  parent: appService
+  name: 'appsettings'
+  properties: {
+    SCM_DO_BUILD_DURING_DEPLOYMENT: 'true'
+    USE_MANAGED_IDENTITY: 'true'
+    FLASK_ENV: 'production'
+    FLASK_SECRET_KEY: uniqueString(subscription().id, frontend.outputs.appServiceName)
+    APPLICATIONINSIGHTS_CONNECTION_STRING: frontend.outputs.appInsightsConnectionString
+    
+    // Backend - Cosmos DB
+    COSMOS_DB_ENDPOINT: backend.outputs.cosmosDbEndpoint
+    COSMOS_DB_DATABASE_NAME: 'logisticstracking'
+    
+    // Middleware - Azure OpenAI & AI
+    AZURE_OPENAI_ENDPOINT: middleware.outputs.openAIServiceEndpoint
+    AZURE_AI_PROJECT_ENDPOINT: middleware.outputs.aiProjectEndpoint
+    AZURE_AI_MODEL_DEPLOYMENT_NAME: 'gpt-4o'
+    
+    // Shared Services
+    AZURE_MAPS_SUBSCRIPTION_KEY: sharedServices.outputs.mapsSubscriptionKey
+    AZURE_SPEECH_ENDPOINT: sharedServices.outputs.speechServiceEndpoint
+    AZURE_SPEECH_REGION: location
+    AZURE_VISION_ENDPOINT: sharedServices.outputs.visionServiceEndpoint
+  }
+  dependsOn: [
+    frontend
+    middleware
+    backend
+    sharedServices
+  ]
 }
 
 // =============================================================================
 // Outputs
 // =============================================================================
 
-output appServiceName string = appService.name
-output appServiceUrl string = 'https://${appService.properties.defaultHostName}'
-output cosmosDbEndpoint string = cosmosDbAccount.properties.documentEndpoint
-output cosmosDbAccountName string = cosmosDbAccount.name
-output aiHubName string = aiHub.name
-output aiProjectName string = aiProject.name
-output aiProjectEndpoint string = aiProject.properties.discoveryUrl
-output openAIServiceName string = openAIService.name
-output openAIServiceEndpoint string = openAIService.properties.endpoint
-output mapsAccountName string = mapsAccount.name
-output speechServiceEndpoint string = speechService.properties.endpoint
-output visionServiceEndpoint string = visionService.properties.endpoint
-output resourceGroupName string = resourceGroup().name
+output resourceGroups object = {
+  frontend: frontendRgName
+  middleware: middlewareRgName
+  backend: backendRgName
+  shared: sharedRgName
+}
+
+output frontend object = {
+  appServiceName: frontend.outputs.appServiceName
+  appServiceUrl: frontend.outputs.appServiceUrl
+  appInsightsId: frontend.outputs.appInsightsId
+}
+
+output middleware object = {
+  openAIServiceName: middleware.outputs.openAIServiceName
+  openAIServiceEndpoint: middleware.outputs.openAIServiceEndpoint
+  aiHubName: middleware.outputs.aiHubName
+  aiProjectName: middleware.outputs.aiProjectName
+  aiProjectEndpoint: middleware.outputs.aiProjectEndpoint
+}
+
+output backend object = {
+  cosmosDbAccountName: backend.outputs.cosmosDbAccountName
+  cosmosDbEndpoint: backend.outputs.cosmosDbEndpoint
+}
+
+output shared object = {
+  mapsAccountName: sharedServices.outputs.mapsAccountName
+  speechServiceEndpoint: sharedServices.outputs.speechServiceEndpoint
+  visionServiceEndpoint: sharedServices.outputs.visionServiceEndpoint
+}
 
 output nextSteps string = '''
-Infrastructure deployed successfully!
-
-NEXT STEPS:
-
-1. ✅ GPT-4o model - DEPLOYED AUTOMATICALLY
-   Deployment: gpt-4o (Standard, 10 capacity)
-
-2. Create 8 AI Agents (automated in deployment script):
-   - Customer Service Agent
-   - Fraud Detection Agent
-   - Identity Verification Agent
-   - Dispatcher Agent
-   - Parcel Intake Agent
-   - Sorting Facility Agent
-   - Delivery Coordination Agent
-   - Optimization Agent
-
-3. Agent IDs will be configured automatically in App Service settings
-
-4. Demo data will be initialized automatically
-
-Access your application at: https://${appService.properties.defaultHostName}
-'''
