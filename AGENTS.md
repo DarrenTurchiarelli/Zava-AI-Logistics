@@ -281,6 +281,48 @@ AZURE_VISION_ENDPOINT=https://your-account.cognitiveservices.azure.com
 AZURE_VISION_KEY=your-key
 ```
 
+## Demo Data Generation
+
+### Approval Agent Mode Demo Parcels
+
+Generate specialized parcels to demonstrate the AI-powered approval/denial system:
+
+```bash
+# Navigate to generators directory
+cd utils/generators
+
+# Run the generator
+python generate_sample_parcels.py
+
+# Select option 3: Generate APPROVAL DEMO parcels
+```
+
+**What it creates:**
+- ✅ **3 Auto-Approve parcels** - Low risk, verified, or delivered parcels
+- ❌ **4 Auto-Deny parcels** - High fraud risk, blacklisted, duplicate, or missing docs
+- ⚠️ **4 Manual Review parcels** - Medium risk, high value, or complex situations
+
+**Demo Instructions:**
+1. Login as `depot_mgr` (password: `depot123`)
+2. Navigate to Approvals page
+3. Enable Agent Mode with recommended settings:
+   - Low risk threshold: 10%
+   - High risk threshold: 70%
+   - Value threshold: $100
+   - Enable all checkboxes
+4. Click "Process with AI Agent"
+5. Observe automated decisions with explanations
+
+**Detailed Guide:** See [Guides/APPROVAL_DEMO_GUIDE.md](Guides/APPROVAL_DEMO_GUIDE.md) for complete walkthrough  
+**Quick Reference:** See [Guides/APPROVAL_DEMO_QUICK_REFERENCE.md](Guides/APPROVAL_DEMO_QUICK_REFERENCE.md) for demo script
+
+**Key Demo Points:**
+- Speed: Processes 11 requests in seconds
+- Consistency: Same criteria every time
+- Focus: Frees managers for complex cases
+- Audit: Every decision logged with AI reasoning
+- Flexibility: Adjustable thresholds for risk tolerance
+
 ## Testing
 
 ### Run Application Tests
@@ -671,6 +713,8 @@ python register_agent_tools.py
 - `readme.md` - User-focused overview
 - `AGENTS.md` - This file (developer/agent focused)
 - `Guides/DEMO_GUIDE.md` - Demo walkthrough
+- `Guides/APPROVAL_DEMO_GUIDE.md` - Approval agent mode demo (detailed)
+- `Guides/APPROVAL_DEMO_QUICK_REFERENCE.md` - Approval demo quick reference card
 - `Guides/AZURE_DEPLOYMENT.md` - Deployment details
 - `Guides/DISPATCHER_AGENT_GUIDE.md` - Dispatcher integration
 - `Guides/AGENT_COMMUNICATION_OPPORTUNITIES.md` - Workflow opportunities

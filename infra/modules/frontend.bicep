@@ -106,5 +106,6 @@ output appServiceUrl string = 'https://${appService.properties.defaultHostName}'
 output appServiceId string = appService.id
 output appServicePrincipalId string = appService.identity.principalId
 output appInsightsId string = appInsights.id
+@secure()
 output appInsightsConnectionString string = appInsights.properties.ConnectionString
 output appServicePlanName string = appServicePlan.name

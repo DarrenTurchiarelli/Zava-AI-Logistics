@@ -16,6 +16,17 @@ from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from agents.prompt_loader import get_agent_prompt
 
+# Fix Windows console encoding issues (PowerShell uses cp1252 by default)
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except (AttributeError, OSError):
+        # Python < 3.7 or reconfigure not supported
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 load_dotenv()
 
 # Get Azure OpenAI connection info
@@ -121,7 +132,7 @@ def create_agents():
                 api_version="2024-05-01-preview"  # Assistants API version
             )
         
-        print("🚀 Creating Azure AI Foundry Agents (via Azure OpenAI Assistants)...")
+        print(">>> Creating Azure AI Foundry Agents (via Azure OpenAI Assistants)...")
         print("=" * 60)
         
         for agent_def in AGENTS:
@@ -141,17 +152,17 @@ def create_agents():
                 )
                 
                 agent_ids[agent_def["env_var"]] = assistant.id
-                print(f"✓ {assistant.id}")
+                print(f"[OK] {assistant.id}")
                 
             except Exception as e:
-                print(f"✗ Failed: {e}", file=sys.stderr)
+                print(f"[FAIL] {e}", file=sys.stderr)
                 # Continue with other agents
         
         print("=" * 60)
-        print(f"✅ Created {len(agent_ids)}/{len(AGENTS)} agents successfully")
+        print(f"[SUCCESS] Created {len(agent_ids)}/{len(AGENTS)} agents successfully")
         
         if len(agent_ids) == len(AGENTS):
-            print("\n📋 Agent IDs:")
+            print("\nAgent IDs:")
             for env_var, agent_id in agent_ids.items():
                 print(f"  {env_var}={agent_id}")
         

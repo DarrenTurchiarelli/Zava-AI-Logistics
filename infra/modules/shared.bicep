@@ -95,6 +95,7 @@ resource visionService 'Microsoft.CognitiveServices/accounts@2023-05-01' = {
 // =============================================================================
 
 output mapsAccountName string = mapsAccount.name
+@secure()
 output mapsSubscriptionKey string = mapsAccount.listKeys().primaryKey
 output speechServiceName string = speechService.name
 output speechServiceEndpoint string = speechService.properties.endpoint

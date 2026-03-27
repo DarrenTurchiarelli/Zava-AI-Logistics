@@ -10,8 +10,467 @@ Usage:
 
 import asyncio
 import os
+import uuid
+from datetime import datetime, timezone
 
 from parcel_tracking_db import ParcelTrackingDB, initialize_company_information
+
+
+async def generate_approval_demo_parcels(db: ParcelTrackingDB) -> dict:
+    """
+    Generate specialized parcels for demonstrating the approval agent mode.
+    
+    Creates parcels with specific characteristics that trigger:
+    - Auto-approve scenarios (low risk, verified, standard)
+    - Auto-deny scenarios (dangerous goods, high fraud risk, blacklisted)
+    - Manual review scenarios (medium risk, high value, requires human judgment)
+    
+    Returns:
+        dict: Summary of created parcels and approval requests by category
+    """
+    print("\n🤖 Generating Approval Demo Parcels...")
+    print("=" * 60)
+    
+    # Get available DCs from the system
+    distribution_centers = [
+        "DC-SYD-001", "DC-SYD-002", "DC-MEL-001", "DC-MEL-002",
+        "DC-BNE-001", "DC-PER-001", "DC-ADL-001", "DC-CAN-001"
+    ]
+    
+    created_parcels = {
+        "auto_approve": [],
+        "auto_deny": [],
+        "manual_review": []
+    }
+    
+    # ==================== AUTO-APPROVE SCENARIOS ====================
+    print("\n✅ Creating AUTO-APPROVE parcels...")
+    
+    # 1. Low risk, low value parcel
+    parcel1 = await db.register_parcel(
+        barcode=f"AP{str(uuid.uuid4())[:8].upper()}AA",
+        sender_name="Sarah Johnson",
+        sender_address="45 Smith Street, Melbourne VIC 3000",
+        recipient_name="Michael Chen",
+        recipient_address="123 George Street, Sydney NSW 2000",
+        recipient_phone="+61412345678",
+        recipient_email="michael.chen@example.com",
+        service_type="standard",
+        weight_kg=0.5,
+        dimensions_cm="20x15x10",
+        declared_value=25.00,
+        store_location=distribution_centers[0]
+    )
+    parcel1["fraud_risk_score"] = 5.0
+    parcel1["origin_location"] = distribution_centers[0]
+    parcel1["current_status"] = "At Depot"
+    await db.parcels_container_client.upsert_item(parcel1)
+    
+    request1 = await db.request_approval(
+        parcel_barcode=parcel1["barcode"],
+        request_type="delivery_confirmation",
+        description="Standard delivery confirmation - Verified sender",
+        priority="low",
+        requested_by="System",
+        parcel_dc=distribution_centers[0],
+        parcel_status="At Depot"
+    )
+    created_parcels["auto_approve"].append({
+        "barcode": parcel1["barcode"],
+        "reason": "Low fraud risk (5%) + low value ($25) + verified sender",
+        "request_id": request1
+    })
+    
+    # 2. Delivered status with confirmation
+    parcel2 = await db.register_parcel(
+        barcode=f"AP{str(uuid.uuid4())[:8].upper()}AB",
+        sender_name="Emma Wilson",
+        sender_address="78 Park Avenue, Brisbane QLD 4000",
+        recipient_name="David Martinez",
+        recipient_address="456 Collins Street, Melbourne VIC 3000",
+        recipient_phone="+61423456789",
+        recipient_email="david.martinez@example.com",
+        service_type="express",
+        weight_kg=1.2,
+        dimensions_cm="30x20x15",
+        declared_value=75.00,
+        store_location=distribution_centers[1]
+    )
+    parcel2["fraud_risk_score"] = 8.0
+    parcel2["origin_location"] = distribution_centers[1]
+    parcel2["current_status"] = "Delivered"
+    parcel2["is_delivered"] = True
+    await db.parcels_container_client.upsert_item(parcel2)
+    
+    request2 = await db.request_approval(
+        parcel_barcode=parcel2["barcode"],
+        request_type="delivery_confirmation",
+        description="Delivery confirmation for completed parcel",
+        priority="low",
+        requested_by="Driver D001",
+        parcel_dc=distribution_centers[1],
+        parcel_status="Delivered"
+    )
+    created_parcels["auto_approve"].append({
+        "barcode": parcel2["barcode"],
+        "reason": "Delivered status + delivery_confirmation type",
+        "request_id": request2
+    })
+    
+    # 3. Verified recipient with low risk
+    parcel3 = await db.register_parcel(
+        barcode=f"AP{str(uuid.uuid4())[:8].upper()}AC",
+        sender_name="Tech Supplies Co",
+        sender_address="100 Business Park Drive, Sydney NSW 2000",
+        recipient_name="Alice Thompson",
+        recipient_address="789 Queen Street, Brisbane QLD 4000",
+        recipient_phone="+61434567890",
+        recipient_email="alice.thompson@example.com",
+        service_type="overnight",
+        weight_kg=2.0,
+        dimensions_cm="40x30x20",
+        declared_value=95.00,
+        store_location=distribution_centers[2]
+    )
+    parcel3["fraud_risk_score"] = 3.0
+    parcel3["origin_location"] = distribution_centers[2]
+    parcel3["current_status"] = "At Depot"
+    await db.parcels_container_client.upsert_item(parcel3)
+    
+    request3 = await db.request_approval(
+        parcel_barcode=parcel3["barcode"],
+        request_type="delivery_redirect",
+        description="Address update requested - Verified recipient contacted us directly",
+        priority="medium",
+        requested_by="Customer Service",
+        parcel_dc=distribution_centers[2],
+        parcel_status="At Depot"
+    )
+    created_parcels["auto_approve"].append({
+        "barcode": parcel3["barcode"],
+        "reason": "Verified recipient + low fraud risk (3%)",
+        "request_id": request3
+    })
+    
+    print(f"   ✅ Created {len(created_parcels['auto_approve'])} auto-approve parcels")
+    
+    # ==================== AUTO-DENY SCENARIOS ====================
+    print("\n❌ Creating AUTO-DENY parcels...")
+    
+    # 1. High fraud risk
+    parcel4 = await db.register_parcel(
+        barcode=f"AP{str(uuid.uuid4())[:8].upper()}DA",
+        sender_name="Suspicious Sender",
+        sender_address="Unknown Location, Sydney NSW 2000",
+        recipient_name="John Doe",
+        recipient_address="12 Fake Street, Melbourne VIC 3000",
+        recipient_phone="+61400000000",
+        recipient_email="fake@suspicious.com",
+        service_type="overnight",
+        weight_kg=5.0,
+        dimensions_cm="50x40x30",
+        declared_value=1500.00,
+        store_location=distribution_centers[3]
+    )
+    parcel4["fraud_risk_score"] = 85.0
+    parcel4["origin_location"] = distribution_centers[3]
+    parcel4["current_status"] = "At Depot"
+    await db.parcels_container_client.upsert_item(parcel4)
+    
+    request4 = await db.request_approval(
+        parcel_barcode=parcel4["barcode"],
+        request_type="exception_handling",
+        description="Multiple delivery address changes requested in short time",
+        priority="high",
+        requested_by="Security Team",
+        parcel_dc=distribution_centers[3],
+        parcel_status="At Depot"
+    )
+    created_parcels["auto_deny"].append({
+        "barcode": parcel4["barcode"],
+        "reason": "High fraud risk score (85%)",
+        "request_id": request4
+    })
+    
+    # 2. Blacklisted address
+    parcel5 = await db.register_parcel(
+        barcode=f"AP{str(uuid.uuid4())[:8].upper()}DB",
+        sender_name="Generic Company",
+        sender_address="555 Business Road, Perth WA 6000",
+        recipient_name="Robert Brown",
+        recipient_address="999 Known Fraud Street, Adelaide SA 5000",
+        recipient_phone="+61445678901",
+        recipient_email="robert.brown@example.com",
+        service_type="standard",
+        weight_kg=1.0,
+        dimensions_cm="25x20x10",
+        declared_value=200.00,
+        store_location=distribution_centers[4]
+    )
+    parcel5["fraud_risk_score"] = 45.0
+    parcel5["origin_location"] = distribution_centers[4]
+    parcel5["current_status"] = "At Depot"
+    await db.parcels_container_client.upsert_item(parcel5)
+    
+    request5 = await db.request_approval(
+        parcel_barcode=parcel5["barcode"],
+        request_type="delivery_redirect",
+        description="Delivery to blacklist address - multiple previous fraud incidents",
+        priority="critical",
+        requested_by="Depot Manager",
+        parcel_dc=distribution_centers[4],
+        parcel_status="At Depot"
+    )
+    created_parcels["auto_deny"].append({
+        "barcode": parcel5["barcode"],
+        "reason": "Blacklisted address detected",
+        "request_id": request5
+    })
+    
+    # 3. Duplicate request (suspicious)
+    parcel6 = await db.register_parcel(
+        barcode=f"AP{str(uuid.uuid4())[:8].upper()}DC",
+        sender_name="Online Retailer Ltd",
+        sender_address="200 Commerce Street, Canberra ACT 2600",
+        recipient_name="Lisa Anderson",
+        recipient_address="321 Main Road, Sydney NSW 2000",
+        recipient_phone="+61456789012",
+        recipient_email="lisa.anderson@example.com",
+        service_type="express",
+        weight_kg=0.8,
+        dimensions_cm="20x15x8",
+        declared_value=150.00,
+        store_location=distribution_centers[5]
+    )
+    parcel6["fraud_risk_score"] = 35.0
+    parcel6["origin_location"] = distribution_centers[5]
+    parcel6["current_status"] = "In Transit"
+    await db.parcels_container_client.upsert_item(parcel6)
+    
+    request6 = await db.request_approval(
+        parcel_barcode=parcel6["barcode"],
+        request_type="delivery_redirect",
+        description="Duplicate address change request - already processed twice today",
+        priority="high",
+        requested_by="System",
+        parcel_dc=distribution_centers[5],
+        parcel_status="In Transit"
+    )
+    created_parcels["auto_deny"].append({
+        "barcode": parcel6["barcode"],
+        "reason": "Duplicate request detected",
+        "request_id": request6
+    })
+    
+    # 4. Missing documentation
+    parcel7 = await db.register_parcel(
+        barcode=f"AP{str(uuid.uuid4())[:8].upper()}DD",
+        sender_name="Import Export Company",
+        sender_address="88 Port Road, Adelaide SA 5000",
+        recipient_name="James Wilson",
+        recipient_address="567 Beach Road, Gold Coast QLD 4217",
+        recipient_phone="+61467890123",
+        recipient_email="james.wilson@example.com",
+        service_type="registered",
+        weight_kg=10.0,
+        dimensions_cm="60x50x40",
+        declared_value=3000.00,
+        store_location=distribution_centers[6]
+    )
+    parcel7["fraud_risk_score"] = 25.0
+    parcel7["origin_location"] = distribution_centers[6]
+    parcel7["current_status"] = "At Depot"
+    await db.parcels_container_client.upsert_item(parcel7)
+    
+    request7 = await db.request_approval(
+        parcel_barcode=parcel7["barcode"],
+        request_type="damage_claim",
+        description="Damage claim missing required photos and customs documentation",
+        priority="medium",
+        requested_by="Claims Department",
+        parcel_dc=distribution_centers[6],
+        parcel_status="At Depot"
+    )
+    created_parcels["auto_deny"].append({
+        "barcode": parcel7["barcode"],
+        "reason": "Missing required documentation",
+        "request_id": request7
+    })
+    
+    print(f"   ❌ Created {len(created_parcels['auto_deny'])} auto-deny parcels")
+    
+    # ==================== MANUAL REVIEW SCENARIOS ====================
+    print("\n⚠️  Creating MANUAL REVIEW parcels...")
+    
+    # 1. Medium fraud risk + high value (requires human judgment)
+    parcel8 = await db.register_parcel(
+        barcode=f"AP{str(uuid.uuid4())[:8].upper()}MA",
+        sender_name="Electronics Warehouse",
+        sender_address="150 Tech Park, Melbourne VIC 3000",
+        recipient_name="Patricia Davis",
+        recipient_address="789 Residential Street, Perth WA 6000",
+        recipient_phone="+61478901234",
+        recipient_email="patricia.davis@example.com",
+        service_type="express",
+        weight_kg=3.5,
+        dimensions_cm="45x35x25",
+        declared_value=2500.00,
+        store_location=distribution_centers[7]
+    )
+    parcel8["fraud_risk_score"] = 45.0
+    parcel8["origin_location"] = distribution_centers[7]
+    parcel8["current_status"] = "At Depot"
+    await db.parcels_container_client.upsert_item(parcel8)
+    
+    request8 = await db.request_approval(
+        parcel_barcode=parcel8["barcode"],
+        request_type="exception_handling",
+        description="High value electronics - recipient requests alternative delivery location",
+        priority="high",
+        requested_by="Customer Service",
+        parcel_dc=distribution_centers[7],
+        parcel_status="At Depot"
+    )
+    created_parcels["manual_review"].append({
+        "barcode": parcel8["barcode"],
+        "reason": "Medium fraud risk (45%) + high value ($2500) - needs human review",
+        "request_id": request8
+    })
+    
+    # 2. Complex delivery situation
+    parcel9 = await db.register_parcel(
+        barcode=f"AP{str(uuid.uuid4())[:8].upper()}MB",
+        sender_name="Medical Supplies Pty Ltd",
+        sender_address="22 Health Drive, Brisbane QLD 4000",
+        recipient_name="Dr. Thomas Lee",
+        recipient_address="456 Hospital Road, Sydney NSW 2000",
+        recipient_phone="+61489012345",
+        recipient_email="thomas.lee@hospital.com.au",
+        service_type="overnight",
+        weight_kg=2.5,
+        dimensions_cm="35x30x20",
+        declared_value=1200.00,
+        store_location=distribution_centers[0]
+    )
+    parcel9["fraud_risk_score"] = 12.0
+    parcel9["origin_location"] = distribution_centers[0]
+    parcel9["current_status"] = "In Transit"
+    await db.parcels_container_client.upsert_item(parcel9)
+    
+    request9 = await db.request_approval(
+        parcel_barcode=parcel9["barcode"],
+        request_type="delivery_redirect",
+        description="Time-sensitive medical supplies - recipient traveling, requests delivery to clinic instead of hospital",
+        priority="critical",
+        requested_by="Medical Team",
+        parcel_dc=distribution_centers[0],
+        parcel_status="In Transit"
+    )
+    created_parcels["manual_review"].append({
+        "barcode": parcel9["barcode"],
+        "reason": "Time-sensitive medical delivery with location change - needs approval",
+        "request_id": request9
+    })
+    
+    # 3. Borderline fraud risk with unusual circumstances
+    parcel10 = await db.register_parcel(
+        barcode=f"AP{str(uuid.uuid4())[:8].upper()}MC",
+        sender_name="Private Seller",
+        sender_address="Private Residence, Adelaide SA 5000",
+        recipient_name="Jennifer Taylor",
+        recipient_address="12 Apartment Block, Darwin NT 0800",
+        recipient_phone="+61490123456",
+        recipient_email="jennifer.taylor@example.com",
+        service_type="registered",
+        weight_kg=1.5,
+        dimensions_cm="30x25x15",
+        declared_value=800.00,
+        store_location=distribution_centers[1]
+    )
+    parcel10["fraud_risk_score"] = 38.0
+    parcel10["origin_location"] = distribution_centers[1]
+    parcel10["current_status"] = "At Depot"
+    await db.parcels_container_client.upsert_item(parcel10)
+    
+    request10 = await db.request_approval(
+        parcel_barcode=parcel10["barcode"],
+        request_type="return_to_sender",
+        description="Recipient claims never ordered - private sale dispute, sender wants parcel held pending investigation",
+        priority="medium",
+        requested_by="Customer Service",
+        parcel_dc=distribution_centers[1],
+        parcel_status="At Depot"
+    )
+    created_parcels["manual_review"].append({
+        "barcode": parcel10["barcode"],
+        "reason": "Purchase dispute between private parties - requires investigation",
+        "request_id": request10
+    })
+    
+    # 4. Lost package claim - needs verification
+    parcel11 = await db.register_parcel(
+        barcode=f"AP{str(uuid.uuid4())[:8].upper()}MD",
+        sender_name="Fashion Boutique",
+        sender_address="300 Shopping Plaza, Sydney NSW 2000",
+        recipient_name="Michelle Garcia",
+        recipient_address="678 Suburb Street, Hobart TAS 7000",
+        recipient_phone="+61401234567",
+        recipient_email="michelle.garcia@example.com",
+        service_type="standard",
+        weight_kg=0.6,
+        dimensions_cm="30x25x10",
+        declared_value=450.00,
+        store_location=distribution_centers[2]
+    )
+    parcel11["fraud_risk_score"] = 22.0
+    parcel11["origin_location"] = distribution_centers[2]
+    parcel11["current_status"] = "In Transit"
+    await db.parcels_container_client.upsert_item(parcel11)
+    
+    request11 = await db.request_approval(
+        parcel_barcode=parcel11["barcode"],
+        request_type="lost_package",
+        description="Recipient claims package not received after 10 days, tracking shows delivered to mail room",
+        priority="high",
+        requested_by="Claims Department",
+        parcel_dc=distribution_centers[2],
+        parcel_status="In Transit"
+    )
+    created_parcels["manual_review"].append({
+        "barcode": parcel11["barcode"],
+        "reason": "Lost package claim conflicts with tracking - needs investigation",
+        "request_id": request11
+    })
+    
+    print(f"   ⚠️  Created {len(created_parcels['manual_review'])} manual review parcels")
+    
+    # ==================== SUMMARY ====================
+    print("\n" + "=" * 60)
+    print("✅ Approval Demo Parcels Created Successfully!")
+    print("=" * 60)
+    print(f"\n📊 Summary:")
+    print(f"   ✅ Auto-Approve: {len(created_parcels['auto_approve'])} parcels")
+    print(f"      - Low risk + low value")
+    print(f"      - Delivered + confirmation")
+    print(f"      - Verified sender/recipient")
+    print(f"\n   ❌ Auto-Deny: {len(created_parcels['auto_deny'])} parcels")
+    print(f"      - High fraud risk (>70%)")
+    print(f"      - Blacklisted addresses")
+    print(f"      - Duplicate requests")
+    print(f"      - Missing documentation")
+    print(f"\n   ⚠️  Manual Review: {len(created_parcels['manual_review'])} parcels")
+    print(f"      - Medium fraud risk + high value")
+    print(f"      - Complex delivery situations")
+    print(f"      - Disputes requiring investigation")
+    print(f"      - Claims needing verification")
+    
+    print(f"\n💡 Demo Instructions:")
+    print(f"   1. Navigate to the Approvals page in the web app")
+    print(f"   2. Enable 'Agent Mode' with your desired settings")
+    print(f"   3. Click 'Process with AI Agent' to see automated decisions")
+    print(f"   4. Observe how the agent auto-approves, auto-denies, or flags for manual review")
+    
+    return created_parcels
 
 
 async def generate_test_data(num_parcels: int = 30, num_approvals: int = 10):
@@ -222,11 +681,12 @@ async def main():
         print("\n📋 Options:")
         print("  1. Generate test data (30 parcels + 10 approvals)")
         print("  2. Generate custom amount of test data")
-        print("  3. Delete only approval requests")
-        print("  4. Delete all test data")
-        print("  5. Exit")
+        print("  3. Generate APPROVAL DEMO parcels (for Agent Mode demonstration)")
+        print("  4. Delete only approval requests")
+        print("  5. Delete all test data")
+        print("  6. Exit")
 
-        choice = input("\n👉 Enter your choice (1-5): ").strip()
+        choice = input("\n👉 Enter your choice (1-6): ").strip()
 
         if choice == "1":
             await generate_test_data(30, 10)
@@ -238,10 +698,18 @@ async def main():
             except ValueError:
                 print("❌ Invalid input. Please enter numbers only.")
         elif choice == "3":
-            await cleanup_approval_requests()
+            try:
+                async with ParcelTrackingDB() as db:
+                    await generate_approval_demo_parcels(db)
+            except Exception as e:
+                print(f"❌ Error generating approval demo parcels: {e}")
+                import traceback
+                traceback.print_exc()
         elif choice == "4":
-            await cleanup_test_data()
+            await cleanup_approval_requests()
         elif choice == "5":
+            await cleanup_test_data()
+        elif choice == "6":
             print("\n👋 Goodbye!")
             break
         else:

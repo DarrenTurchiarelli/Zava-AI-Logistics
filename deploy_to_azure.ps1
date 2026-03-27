@@ -618,8 +618,9 @@ try {
             --api-version 2023-11-15 `
             --output none 2>&1 | Out-Null
         
-        Write-Host "    ⏱  Waiting 30 seconds for change to propagate..." -ForegroundColor Gray
-        Start-Sleep -Seconds 30
+        Write-Host "    ⏱  Waiting 60 seconds for auth change to fully propagate across Azure..." -ForegroundColor Gray
+        Write-Host "      (Azure configuration changes can take 45-60 seconds to apply globally)" -ForegroundColor Gray
+        Start-Sleep -Seconds 60
         
         # Step 2: Get connection string
         Write-Host "    🔑 Retrieving connection string for initialization..." -ForegroundColor Cyan
@@ -671,6 +672,15 @@ try {
                 Write-Host "    ✓ Demo manifests generated for all drivers" -ForegroundColor Green
             } else {
                 Write-Host "    ⚠ Demo manifest generation had issues" -ForegroundColor Yellow
+            }
+
+            # Create approval demo requests
+            Write-Host "    • Creating approval demo requests for existing parcels..." -ForegroundColor Gray
+            $approvalOutput = python create_approval_requests.py 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "    ✓ Approval demo requests created" -ForegroundColor Green
+            } else {
+                Write-Host "    ⚠ Approval request creation had issues (non-critical)" -ForegroundColor Yellow
             }
             
             # Clear the connection string from environment
