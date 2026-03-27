@@ -796,6 +796,100 @@ if ($agentSettings.Count -gt 0) {
     Write-Host "  ✓ Azure AI agents created and configured" -ForegroundColor Green
 }
 Write-Host ""
+
+# Optional: Generate bulk realistic data
+Write-Host "📦 Optional: Bulk Realistic Data Generation" -ForegroundColor Cyan
+Write-Host "Generate thousands of realistic parcels for comprehensive testing?" -ForegroundColor Yellow
+Write-Host "This creates:" -ForegroundColor Gray
+Write-Host "  • Specific demo parcels for Voice & Text Examples (RG857954, DT202512170037, etc.)" -ForegroundColor Gray
+Write-Host "  • Thousands of parcels across all Australian states" -ForegroundColor Gray
+Write-Host "  • Full event histories and photo proofs" -ForegroundColor Gray
+Write-Host "  • Driver assignments for manifest testing" -ForegroundColor Gray
+Write-Host "  • Data for approval system and statistics queries" -ForegroundColor Gray
+Write-Host ""
+$generateBulkData = Read-Host "Generate bulk data? (y/N)"
+
+if ($generateBulkData -eq 'y' -or $generateBulkData -eq 'Y') {
+    Write-Host ""
+    $parcelCount = Read-Host "How many parcels to generate? (default: 2000)"
+    if ([string]::IsNullOrWhiteSpace($parcelCount)) {
+        $parcelCount = "2000"
+    }
+    
+    Write-Host ""
+    Write-Host "🚀 Generating $parcelCount realistic parcels..." -ForegroundColor Cyan
+    Write-Host "   (This may take 5-10 minutes depending on count)" -ForegroundColor Gray
+    Write-Host ""
+    
+    # Temporarily enable Cosmos DB local auth again for bulk generation
+    try {
+        Write-Host "  🔓 Temporarily enabling Cosmos DB local auth..." -ForegroundColor Cyan
+        $subscriptionId = $account.id
+        $cosmosAccountName = $bicepOutputJson.backend.value.cosmosDbAccountName
+        $cosmosResourceId = "/subscriptions/$subscriptionId/resourceGroups/$backendRgName/providers/Microsoft.DocumentDB/databaseAccounts/$cosmosAccountName"
+        
+        az resource update `
+            --ids $cosmosResourceId `
+            --set properties.disableLocalAuth=false `
+            --api-version 2023-11-15 `
+            --output none 2>&1 | Out-Null
+        
+        Write-Host "  ⏱  Waiting 60 seconds for auth propagation..." -ForegroundColor Gray
+        Start-Sleep -Seconds 60
+        
+        # Get connection string
+        $connectionString = az cosmosdb keys list `
+            --name $cosmosAccountName `
+            --resource-group $backendRgName `
+            --type connection-strings `
+            --query "connectionStrings[0].connectionString" `
+            -o tsv
+        
+        if ($connectionString) {
+            $env:COSMOS_CONNECTION_STRING = $connectionString
+            
+            # Run bulk data generator
+            $bulkOutput = python utils/generators/generate_bulk_realistic_data.py --count $parcelCount 2>&1
+            Write-Host $bulkOutput
+            
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "  ✓ Bulk data generation completed!" -ForegroundColor Green
+            } else {
+                Write-Host "  ⚠ Bulk data generation had issues (check output above)" -ForegroundColor Yellow
+            }
+            
+            # Clear connection string
+            Remove-Item Env:\COSMOS_CONNECTION_STRING -ErrorAction SilentlyContinue
+        } else {
+            Write-Host "  ⚠ Could not retrieve connection string - skipping bulk generation" -ForegroundColor Yellow
+        }
+        
+        # Re-secure Cosmos DB
+        Write-Host "  🔒 Re-securing Cosmos DB..." -ForegroundColor Cyan
+        az resource update `
+            --ids $cosmosResourceId `
+            --set properties.disableLocalAuth=true `
+            --api-version 2023-11-15 `
+            --output none 2>&1 | Out-Null
+        
+        Write-Host "  ✓ Cosmos DB re-secured" -ForegroundColor Green
+        
+        # Restart App Service again to refresh credentials
+        Write-Host "  🔄 Restarting App Service..." -ForegroundColor Cyan
+        az webapp restart --name $WebAppName --resource-group $frontendRgName --output none 2>&1 | Out-Null
+        Write-Host "  ✓ App Service restarted" -ForegroundColor Green
+        
+    } catch {
+        Write-Host "  ⚠ Bulk data generation failed: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+    Write-Host ""
+} else {
+    Write-Host "  ⊘ Skipped bulk data generation" -ForegroundColor Gray
+    Write-Host "  You can run it later with:" -ForegroundColor Gray
+    Write-Host "    python utils/generators/generate_bulk_realistic_data.py --count 2000" -ForegroundColor White
+    Write-Host ""
+}
+
 Write-Host "Security & Permissions:" -ForegroundColor Yellow
 Write-Host "  ✓ App Service using managed identity (no connection strings)" -ForegroundColor Green
 Write-Host "  ✓ Cosmos DB RBAC permissions configured via Bicep" -ForegroundColor Green

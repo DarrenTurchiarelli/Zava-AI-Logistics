@@ -323,6 +323,64 @@ python generate_sample_parcels.py
 - Audit: Every decision logged with AI reasoning
 - Flexibility: Adjustable thresholds for risk tolerance
 
+### Bulk Realistic Data (Production-Scale Testing)
+
+Generate thousands of realistic parcels for comprehensive testing and demos:
+
+```bash
+# Generate 2,000 realistic parcels (default)
+python utils/generators/generate_bulk_realistic_data.py
+
+# Generate custom amount
+python utils/generators/generate_bulk_realistic_data.py --count 5000
+```
+
+**What it creates:**
+- 🎤 **Specific demo parcels** for Voice & Text Examples:
+  - `RG857954` - Dr. Emma Wilson (Sydney NSW) - Out For Delivery
+  - `DT202512170037` - Sarah Johnson (Perth WA) - Delivered with photo proof
+  - Full event histories, photos, sender data
+  
+- 📦 **Thousands of realistic parcels** distributed across:
+  - All 8 Australian states (NSW, VIC, QLD, WA, SA, TAS, ACT, NT)
+  - Proportional to population (32% NSW, 26% VIC, 20% QLD, etc.)
+  - Major cities (Sydney, Melbourne, Brisbane, Perth, Adelaide, etc.)
+  
+- 📊 **Complete data for testing:**
+  - Driver manifests (57 drivers with assigned parcels)
+  - Approval system (parcels at various risk levels)
+  - Event histories (tracking timeline)
+  - Photo proofs (lodgement and delivery photos)
+  - Statistics queries (parcels by state, status, etc.)
+
+**Voice & Text Examples (Ready to Test):**
+```
+"Track parcel RG857954"
+"Photo proof for parcel DT202512170037"
+"Show me the full history for RG857954"
+"Who sent parcel RG857954?"
+"Find parcels for Dr. Emma Wilson"
+"Show me delivery statistics for Western Australia"
+```
+
+**Automated Deployment:**
+The deployment script (`deploy_to_azure.ps1`) will prompt you to generate bulk data after deployment completes. Just answer 'y' and specify the count (default: 2000 parcels).
+
+**Generation Time:**
+- 1,000 parcels: ~3-5 minutes
+- 2,000 parcels: ~5-10 minutes
+- 5,000 parcels: ~15-20 minutes
+
+**Distribution Weights:**
+- NSW: 32% (most populous state)
+- VIC: 26%
+- QLD: 20%
+- WA: 11%
+- SA: 7%
+- TAS: 2%
+- ACT: 2%
+- NT: 1%
+
 ## Testing
 
 ### Run Application Tests
