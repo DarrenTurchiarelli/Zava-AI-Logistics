@@ -701,6 +701,24 @@ try {
         
         Write-Host "    ✓ Cosmos DB secured (managed identity only)" -ForegroundColor Green
         
+        # Step 5: Restart App Service to refresh managed identity token with new RBAC permissions
+        Write-Host "    🔄 Restarting App Service to refresh managed identity credentials..." -ForegroundColor Cyan
+        Write-Host "      (Ensures fresh tokens with proper Cosmos DB access)" -ForegroundColor Gray
+        
+        $webAppName = $bicepOutputJson.frontend.value.webAppName
+        $restartResult = az webapp restart `
+            --name $webAppName `
+            --resource-group $frontendRgName `
+            2>&1
+        
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "    ✓ App Service restarted successfully" -ForegroundColor Green
+            Write-Host "      Managed identity now has fresh credentials with RBAC permissions" -ForegroundColor Gray
+        } else {
+            Write-Host "    ⚠ App Service restart had issues (non-critical)" -ForegroundColor Yellow
+            Write-Host "      You may need to restart manually if you see auth errors" -ForegroundColor Gray
+        }
+        
     } else {
         Write-Host "  ⚠ Python not found - skipping demo data generation" -ForegroundColor Yellow
         Write-Host "    Install Python to enable automatic demo data generation" -ForegroundColor Gray
@@ -722,6 +740,14 @@ try {
             --output none 2>&1 | Out-Null
         
         Write-Host "    ✓ Cosmos DB re-secured" -ForegroundColor Green
+        
+        # Restart App Service even after errors to refresh credentials
+        Write-Host "    🔄 Restarting App Service to refresh managed identity credentials..." -ForegroundColor Cyan
+        $webAppName = $bicepOutputJson.frontend.value.webAppName
+        $frontendRgName = "RG-Zava-Frontend-$environment"
+        az webapp restart --name $webAppName --resource-group $frontendRgName --output none 2>&1 | Out-Null
+        Write-Host "    ✓ App Service restarted" -ForegroundColor Green
+        
     } catch {
         Write-Host "    ⚠ Warning: Could not re-secure Cosmos DB. Run manually:" -ForegroundColor Red
         Write-Host "      az resource update --ids $cosmosResourceId --set properties.disableLocalAuth=true --api-version 2023-11-15" -ForegroundColor Gray

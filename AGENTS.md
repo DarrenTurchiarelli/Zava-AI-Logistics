@@ -584,20 +584,29 @@ The deployment script automatically:
 - Assigns **Cognitive Services OpenAI User** role for Azure OpenAI access
 - Assigns **Cognitive Services User** role for Speech & Vision services
 - Waits 60 seconds for Azure RBAC replication across regions
+- **Restarts App Service to refresh managed identity credentials** (prevents "Unauthorized" errors on first use)
 - Retries user initialization if permissions aren't immediately available
 
-**If you still see permission errors:**
+**Why the restart is needed:**
+When App Service starts, it caches the managed identity token. If RBAC permissions haven't propagated yet, the cached token lacks necessary permissions. The automatic restart after RBAC assignment ensures fresh credentials with proper access.
+
+**Common symptoms this fixes:**
+- "Unauthorized" errors when accessing driver manifest page
+- "The input authorization token can't serve the request" errors
+- MAC signature verification failures on Cosmos DB operations
+
+**If you still see permission errors after deployment:**
 ```bash
 # Wait additional time (RBAC can take up to 5 minutes to fully propagate)
 Start-Sleep -Seconds 120
 
 # Restart the web app to refresh managed identity credentials
-az webapp restart --name <webapp-name> --resource-group RG-Zava-Logistics
+az webapp restart --name <webapp-name> --resource-group RG-Zava-Frontend-dev
 
 # Verify role assignments exist
 az cosmosdb sql role assignment list \
   --account-name <cosmos-account-name> \
-  --resource-group RG-Zava-Logistics
+  --resource-group RG-Zava-Backend-dev
 ```
 
 **Note:** All identity management is consolidated in the Bicep template (`infra/main.bicep`) and deployment script. No manual role assignments should be necessary.
