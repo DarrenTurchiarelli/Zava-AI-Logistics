@@ -119,26 +119,38 @@ async def create_demo_parcel(db: ParcelTrackingDB, parcel_spec: Dict) -> str:
     """Create a specific demo parcel with full history and photos"""
     barcode = generate_barcode()
     
-    # Register parcel
+    # Extract address components
+    address_parts = parcel_spec['address'].split()
+    postcode = address_parts[-1] if address_parts else '2000'
+    state = parcel_spec['state']
+    city = parcel_spec['city']
+    
+    # Register parcel (tracking number is auto-generated)
     parcel_doc = await db.register_parcel(
         barcode=barcode,
-        tracking_number=parcel_spec['tracking_number'],
         sender_name=parcel_spec['sender_name'],
-        sender_address=f"Warehouse, {parcel_spec['city']} {parcel_spec['state']}",
+        sender_address=f"Warehouse, {city} {state}",
         sender_phone=fake.phone_number(),
         recipient_name=parcel_spec['recipient_name'],
         recipient_address=parcel_spec['address'],
         recipient_phone=parcel_spec['phone'],
-        recipient_postcode=parcel_spec['address'].split()[-1] if len(parcel_spec['address'].split()) > 0 else '2000',
+        destination_postcode=postcode,
+        destination_state=state,
+        destination_city=city,
         weight=round(random.uniform(0.5, 25.0), 2),
         dimensions=f"{random.randint(10,50)}x{random.randint(10,50)}x{random.randint(5,30)}",
         service_type=random.choice(['standard', 'express', 'same-day']),
-        store_location=f"DC-{parcel_spec['state']}-01"
+        store_location=f"DC-{state}-01"
     )
     
     if not parcel_doc:
-        print(f"  ⚠ Failed to create demo parcel {parcel_spec['tracking_number']}")
+        print(f"  ⚠ Failed to create demo parcel for {parcel_spec['recipient_name']}")
         return None
+    
+    # Update with custom tracking number for demo purposes
+    container = db.database.get_container_client(db.parcels_container)
+    parcel_doc['tracking_number'] = parcel_spec['tracking_number']
+    await container.upsert_item(parcel_doc)
     
     # Add lodgement photo if specified
     if parcel_spec.get('has_photo'):
@@ -193,8 +205,6 @@ async def create_demo_parcel(db: ParcelTrackingDB, parcel_spec: Dict) -> str:
 async def create_realistic_parcel(db: ParcelTrackingDB, state: str, city: str, index: int) -> str:
     """Create a realistic parcel for a specific state/city"""
     
-    tracking_prefix = random.choice(['RG', 'DT', 'LP', 'EX'])
-    tracking_number = generate_tracking_number(tracking_prefix)
     barcode = generate_barcode()
     
     recipient_name = random.choice(COMMON_RECIPIENTS + [fake.name() for _ in range(3)])
@@ -217,17 +227,18 @@ async def create_realistic_parcel(db: ParcelTrackingDB, state: str, city: str, i
     ]
     status = random.choices([s[0] for s in statuses], weights=[s[1] for s in statuses])[0]
     
-    # Register parcel
+    # Register parcel (tracking number is auto-generated)
     parcel_doc = await db.register_parcel(
         barcode=barcode,
-        tracking_number=tracking_number,
         sender_name=sender_name,
         sender_address=f"Warehouse, {city} {state}",
         sender_phone=fake.phone_number(),
         recipient_name=recipient_name,
         recipient_address=address,
         recipient_phone=fake.phone_number(),
-        recipient_postcode=str(postcode),
+        destination_postcode=str(postcode),
+        destination_state=state,
+        destination_city=city,
         weight=round(random.uniform(0.1, 30.0), 2),
         dimensions=f"{random.randint(10,60)}x{random.randint(10,60)}x{random.randint(5,40)}",
         service_type=random.choice(['standard', 'express', 'express', 'same-day']),  # More express
