@@ -562,6 +562,98 @@ The deployment is fully automated - no manual steps required for a working demo!
 
 ## Troubleshooting
 
+### Cosmos DB Authentication Errors (Unauthorized) ⚠️ CRITICAL
+**Symptom:** "The input authorization token can't serve the request" or "Unauthorized" errors when accessing parcels/data
+
+**Root Cause:** Managed identity token is stale/cached, or RBAC permissions haven't propagated (takes 2-5 minutes after deployment)
+
+**Solution 1 - Standard Fix (Try First):**
+```powershell
+# 1. Diagnose the issue
+.\Scripts\diagnose_cosmos_auth.ps1
+
+# 2. Fix authentication issues
+.\Scripts\fix_cosmos_auth.ps1
+```
+
+**Solution 2 - Aggressive Fix (If Standard Fix Doesn't Work):**
+```powershell
+# This does a complete reset:
+# - Removes ALL key-based auth environment variables
+# - Completely stops and restarts the app
+# - Waits 90 seconds for RBAC propagation
+.\Scripts\force_fix_auth.ps1
+```
+
+**Manual Solution (Last Resort):**
+```powershell
+# 1. Remove key-based auth environment variables
+az webapp config appsettings delete `
+  --name <webapp-name> `
+  --resource-group RG-Zava-Frontend-dev `
+  --setting-names COSMOS_DB_KEY COSMOS_CONNECTION_STRING
+
+# 2. Set managed identity mode
+az webapp config appsettings set `
+  --name <webapp-name> `
+  --resource-group RG-Zava-Frontend-dev `
+  --settings USE_MANAGED_IDENTITY=true
+
+# 3. Check RBAC role assignment
+az cosmosdb sql role assignment list `
+  --account-name <cosmos-name> `
+  --resource-group RG-Zava-Backend-dev
+
+# 4. STOP the app completely
+az webapp stop --name <webapp-name> --resource-group RG-Zava-Frontend-dev
+
+# 5. Wait for RBAC propagation
+Start-Sleep -Seconds 90
+
+# 6. START the app with fresh credentials
+az webapp start --name <webapp-name> --resource-group RG-Zava-Frontend-dev
+
+# 7. Wait for app to initialize
+Start-Sleep -Seconds 45
+
+# 8. Test: https://<webapp-name>.azurewebsites.net/parcels
+```
+
+**Why This Happens:**
+1. App Service caches managed identity tokens when it starts
+2. If RBAC permissions are assigned after app startup, the cached token lacks permissions
+3. Environment variables with `COSMOS_DB_KEY` or `COSMOS_CONNECTION_STRING` override managed identity
+4. Regular restart doesn't clear all cached credentials - need full stop/start
+5. RBAC propagation across Azure regions can take 2-5 minutes
+
+**Common Causes of Persistent Errors:**
+- ❌ App still has `COSMOS_DB_KEY` or `COSMOS_CONNECTION_STRING` environment variables
+- ❌ RBAC role not yet propagated (wait full 5 minutes)
+- ❌ App was restarted but not stopped - cached credentials remain
+- ❌ Multiple managed identities configured (system vs user-assigned)
+- ❌ Cosmos DB local auth was re-enabled accidentally
+
+**✅ Fixed in v1.2.5:** Deployment script now automatically restarts the app after RBAC assignment
+
+### Cosmos DB Resource Not Found Errors
+**Symptom:** "Resource Not Found" errors when trying to register parcels or access data
+
+**Root Cause:** Required Cosmos DB containers don't exist in the database
+
+**Solution (Automated):**
+```powershell
+# 1. Diagnose which containers are missing
+python Scripts/diagnose_containers.py
+
+# 2. Fix missing containers (creates all 10 required containers)
+.\Scripts\fix_azure_containers.ps1
+
+# 3. Restart app
+az webapp restart --name <webapp-name> --resource-group RG-Zava-Frontend-dev
+```
+
+**✅ Fixed in v1.2.5:** Deployment script now validates containers exist before proceeding with data generation
+
 ### Agent Not Responding
 ```bash
 # Verify agent ID is set
@@ -574,7 +666,7 @@ az account show
 # Visit: https://ai.azure.com → Your Project → Agents
 ```
 
-### Database Connection Errors
+### Database Connection Errors (General)
 ```bash
 # Test connection
 python parcel_tracking_db.py

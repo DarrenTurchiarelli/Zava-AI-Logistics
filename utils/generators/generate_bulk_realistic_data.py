@@ -154,7 +154,11 @@ async def create_demo_parcel(db: ParcelTrackingDB, parcel_spec: Dict) -> str:
     
     # Add lodgement photo if specified
     if parcel_spec.get('has_photo'):
-        await db.add_lodgement_photos(barcode, [generate_dummy_photo()])
+        # Add lodgement photos
+        try:
+            await db.store_lodgement_photo(barcode, generate_dummy_photo(), "sender")
+        except Exception as e:
+            print(f"    ⚠️  Warning: Could not add lodgement photo: {e}")
     
     # Create event history if specified
     if parcel_spec.get('has_history'):
@@ -183,12 +187,12 @@ async def create_demo_parcel(db: ParcelTrackingDB, parcel_spec: Dict) -> str:
         base_time = datetime.now() - timedelta(days=2)
         for i, (description, location, days_ago) in enumerate(events):
             event_time = base_time + timedelta(days=days_ago, hours=i)
-            await db.log_event(
+            event_status = parcel_spec['status'] if i == len(events)-1 else 'In Transit'
+            await db.create_tracking_event(
                 barcode=barcode,
-                event_timestamp=event_time,
-                event_description=description,
-                event_location=location,
-                event_status=parcel_spec['status'] if i == len(events)-1 else 'In Transit'
+                event_type=event_status,
+                location=location,
+                description=f"{description} at {event_time.strftime('%Y-%m-%d %H:%M')}"
             )
     
     # Assign to driver if specified
@@ -251,22 +255,21 @@ async def create_realistic_parcel(db: ParcelTrackingDB, state: str, city: str, i
     # Add realistic event history (50% of parcels)
     if random.random() < 0.5:
         base_time = datetime.now() - timedelta(days=random.randint(1, 7))
-        await db.log_event(
+        await db.create_tracking_event(
             barcode=barcode,
-            event_timestamp=base_time,
-            event_description='Parcel Registered',
-            event_location='Sender',
-            event_status='Pending'
+            event_type='Pending',
+            location='Sender',
+            description=f'Parcel Registered at {base_time.strftime("%Y-%m-%d %H:%M")}'
         )
         
         # Add more events for parcels in later stages
         if status in ['Delivered', 'Out For Delivery']:
-            await db.log_event(
+            event_time = base_time + timedelta(hours=6)
+            await db.create_tracking_event(
                 barcode=barcode,
-                event_timestamp=base_time + timedelta(hours=6),
-                event_description='Arrived at Sorting Facility',
-                event_location=f"DC-{state}-01",
-                event_status='Sorting'
+                event_type='Sorting',
+                location=f"DC-{state}-01",
+                description=f'Arrived at Sorting Facility at {event_time.strftime("%Y-%m-%d %H:%M")}'
             )
     
     # Add photos for delivered parcels (30% chance)

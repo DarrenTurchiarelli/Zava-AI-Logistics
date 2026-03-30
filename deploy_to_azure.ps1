@@ -489,6 +489,25 @@ if ($LASTEXITCODE -ne 0) {
 Remove-Item $tempZip -Force
 Write-Host ""
 
+# =============================================================================
+# [7/7] Post-deployment tasks (Demo Data with Secure Auth)
+# =============================================================================
+# DEPLOYMENT FLOW WITH DEPENDENCIES:
+#   1. Temporarily enable Cosmos DB local auth (key-based)
+#   2. CREATE & VALIDATE containers (CRITICAL DEPENDENCY)
+#      ├─ Creates all 10 required Cosmos DB containers
+#      ├─ Validates containers exist via diagnose script  
+#      ├─ Retries once if initial creation fails (RBAC propagation delay)
+#      └─ DEPLOYMENT FAILS if containers cannot be created/validated
+#   3. Generate demo data (DEPENDS ON: containers exist)
+#      ├─ Fresh test parcels with DC assignments
+#      ├─ Dispatcher demo data (parcels at depot)
+#      ├─ Driver manifests with delivery parcels
+#      └─ Approval demo requests
+#   4. Re-secure Cosmos DB (disable local auth → managed identity only)
+#   5. Restart App Service (refresh managed identity tokens with RBAC)
+# =============================================================================
+
 # Post-Deployment Tasks
 Write-Host "[7/7] Running post-deployment tasks..." -ForegroundColor Yellow
 
@@ -529,7 +548,7 @@ if (-not $cosmosCheck) {
 } else {
     Write-Host "    ✓ Cosmos DB validated: $cosmosAccountName" -ForegroundColor Green
     
-    # Initialize default users (containers will be created during demo data generation phase)
+    # Initialize default users (containers must be created first - validated in post-deployment)
     Write-Host "  👤 Initializing default user accounts..." -ForegroundColor Cyan
     # Step 2: Initialize default users
     Write-Host "  👤 Initializing default user accounts..." -ForegroundColor Cyan
@@ -632,16 +651,96 @@ try {
             -o tsv
         
         if ($connectionString) {
-            # Step 3: Set environment variable for Python scripts
+            # Step 3: Set environment variables for Python scripts
             $env:COSMOS_CONNECTION_STRING = $connectionString
+            $env:COSMOS_DB_DATABASE_NAME = "logisticstracking"
+            $env:PYTHONPATH = $PWD  # Required for approval requests module imports
             
-            # Step 3a: Initialize all database containers FIRST
+            # Step 3a: Initialize all database containers FIRST (CRITICAL DEPENDENCY)
             Write-Host "    📦 Initializing all 10 database containers..." -ForegroundColor Cyan
             $containerOutput = python Scripts/initialize_all_containers.py 2>&1
+            
             if ($LASTEXITCODE -eq 0 -and $containerOutput -match "SUCCESS") {
                 Write-Host "    ✓ All database containers created successfully" -ForegroundColor Green
+                
+                # Step 3a.1: VALIDATE containers exist (critical validation)
+                Write-Host "    🔍 Validating all containers exist..." -ForegroundColor Cyan
+                $validateOutput = python Scripts/diagnose_containers.py 2>&1
+                
+                if ($LASTEXITCODE -eq 0 -and $validateOutput -match "All containers exist") {
+                    Write-Host "    ✓ Container validation passed - all 10 containers confirmed" -ForegroundColor Green
+                } else {
+                    Write-Host "    ❌ Container validation failed - retrying..." -ForegroundColor Red
+                    Write-Host "      Waiting 5 seconds for RBAC propagation..." -ForegroundColor Yellow
+                    Start-Sleep -Seconds 5
+                    
+                    # Retry container creation once
+                    Write-Host "    🔄 Retrying container initialization..." -ForegroundColor Cyan
+                    $retryOutput = python Scripts/initialize_all_containers.py 2>&1
+                    $retryValidate = python Scripts/diagnose_containers.py 2>&1
+                    
+                    if ($LASTEXITCODE -eq 0 -and $retryValidate -match "All containers exist") {
+                        Write-Host "    ✓ Container validation passed on retry" -ForegroundColor Green
+                    } else {
+                        Write-Host "" -ForegroundColor Red
+                        Write-Host "    ❌ CRITICAL ERROR: Cannot create/validate Cosmos DB containers" -ForegroundColor Red
+                        Write-Host "    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Red
+                        Write-Host "    This is a blocking issue - deployment cannot proceed without containers." -ForegroundColor Yellow
+                        Write-Host "" -ForegroundColor Yellow
+                        Write-Host "    Diagnostic output:" -ForegroundColor Gray
+                        Write-Host $retryValidate -ForegroundColor Gray
+                        Write-Host "" -ForegroundColor Red
+                        Write-Host "    Possible causes:" -ForegroundColor Yellow
+                        Write-Host "      • RBAC permissions not propagated (takes 2-5 min)" -ForegroundColor Gray
+                        Write-Host "      • Cosmos DB account not fully provisioned" -ForegroundColor Gray
+                        Write-Host "      • Network connectivity issues" -ForegroundColor Gray
+                        Write-Host "" -ForegroundColor Yellow
+                        Write-Host "    Manual fix:" -ForegroundColor Yellow
+                        Write-Host "      1. Wait 2-3 more minutes for RBAC propagation" -ForegroundColor Gray
+                        Write-Host "      2. Run: .\Scripts\fix_azure_containers.ps1" -ForegroundColor Gray
+                        Write-Host "      3. Verify: python Scripts\diagnose_containers.py" -ForegroundColor Gray
+                        Write-Host "    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Red
+                        Write-Host "" -ForegroundColor Red
+                        
+                        # Re-secure Cosmos DB before exiting
+                        Write-Host "    🔒 Re-securing Cosmos DB before exit..." -ForegroundColor Yellow
+                        az resource update `
+                            --ids $cosmosResourceId `
+                            --set properties.disableLocalAuth=true `
+                            --api-version 2023-11-15 `
+                            --output none 2>&1 | Out-Null
+                        
+                        throw "Container validation failed - cannot proceed with deployment"
+                    }
+                }
             } else {
-                Write-Host "    ⚠ Container initialization had issues (containers may already exist)" -ForegroundColor Yellow
+                Write-Host "    ❌ Container initialization failed on first attempt" -ForegroundColor Red
+                Write-Host "      Waiting 5 seconds for RBAC propagation before retry..." -ForegroundColor Yellow
+                Start-Sleep -Seconds 5
+                
+                # Retry once
+                Write-Host "    🔄 Retrying container initialization..." -ForegroundColor Cyan
+                $retryOutput = python Scripts/initialize_all_containers.py 2>&1
+                
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Host "    ✓ Container creation succeeded on retry" -ForegroundColor Green
+                    
+                    # Validate after successful retry
+                    $validateOutput = python Scripts/diagnose_containers.py 2>&1
+                    if (-not ($validateOutput -match "All containers exist")) {
+                        Write-Host "    ❌ Container validation failed - see manual fix steps above" -ForegroundColor Red
+                        
+                        # Re-secure before exiting
+                        az resource update --ids $cosmosResourceId --set properties.disableLocalAuth=true --api-version 2023-11-15 --output none 2>&1 | Out-Null
+                        throw "Container validation failed after retry"
+                    }
+                } else {
+                    Write-Host "    ❌ Container initialization failed on retry" -ForegroundColor Red
+                    
+                    # Re-secure before exiting
+                    az resource update --ids $cosmosResourceId --set properties.disableLocalAuth=true --api-version 2023-11-15 --output none 2>&1 | Out-Null
+                    throw "Container initialization failed - cannot proceed"
+                }
             }
             
             # Step 3b: Generate demo data
@@ -676,15 +775,22 @@ try {
 
             # Create approval demo requests
             Write-Host "    • Creating approval demo requests for existing parcels..." -ForegroundColor Gray
-            $approvalOutput = python create_approval_requests.py 2>&1
+            $approvalOutput = python utils/generators/create_approval_requests.py 2>&1
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "    ✓ Approval demo requests created" -ForegroundColor Green
             } else {
                 Write-Host "    ⚠ Approval request creation had issues (non-critical)" -ForegroundColor Yellow
+                # Log error details if verbose
+                if ($approvalOutput -match "ModuleNotFoundError") {
+                    Write-Host "      Note: Ensure PYTHONPATH is set correctly" -ForegroundColor Gray
+                }
             }
             
-            # Clear the connection string from environment
+            # Clear the connection string and other sensitive data from environment
+            Write-Host "    🧹 Clearing temporary credentials from environment..." -ForegroundColor Cyan
             Remove-Item Env:\COSMOS_CONNECTION_STRING -ErrorAction SilentlyContinue
+            Remove-Item Env:\PYTHONPATH -ErrorAction SilentlyContinue
+            Write-Host "    ✓ Environment cleaned" -ForegroundColor Green
             
             Write-Host "  ✓ Demo data generation completed" -ForegroundColor Green
         } else {
@@ -701,22 +807,60 @@ try {
         
         Write-Host "    ✓ Cosmos DB secured (managed identity only)" -ForegroundColor Green
         
-        # Step 5: Restart App Service to refresh managed identity token with new RBAC permissions
-        Write-Host "    🔄 Restarting App Service to refresh managed identity credentials..." -ForegroundColor Cyan
-        Write-Host "      (Ensures fresh tokens with proper Cosmos DB access)" -ForegroundColor Gray
+        # Step 5: Remove any key-based auth environment variables to force managed identity
+        Write-Host "    🔧 Ensuring managed identity authentication..." -ForegroundColor Cyan
+        Write-Host "      (Removing any key-based auth environment variables)" -ForegroundColor Gray
         
         $webAppName = $bicepOutputJson.frontend.value.webAppName
-        $restartResult = az webapp restart `
+        
+        # Remove key-based auth variables if they exist (ignore errors if they don't exist)
+        az webapp config appsettings delete `
             --name $webAppName `
             --resource-group $frontendRgName `
-            2>&1
+            --setting-names COSMOS_DB_KEY COSMOS_CONNECTION_STRING `
+            --output none 2>$null
+        
+        Write-Host "    ✓ Managed identity authentication configured" -ForegroundColor Green
+        
+        # Step 6: STOP and START App Service (not restart) to fully clear credential cache
+        Write-Host "    🔄 Stopping App Service to clear credential cache..." -ForegroundColor Cyan
+        Write-Host "      (Full stop/start required for fresh managed identity tokens)" -ForegroundColor Gray
+        
+        $stopResult = az webapp stop `
+            --name $webAppName `
+            --resource-group $frontendRgName `
+            --output none 2>&1
         
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "    ✓ App Service restarted successfully" -ForegroundColor Green
-            Write-Host "      Managed identity now has fresh credentials with RBAC permissions" -ForegroundColor Gray
+            Write-Host "    ✓ App Service stopped successfully" -ForegroundColor Green
         } else {
-            Write-Host "    ⚠ App Service restart had issues (non-critical)" -ForegroundColor Yellow
-            Write-Host "      You may need to restart manually if you see auth errors" -ForegroundColor Gray
+            Write-Host "    ⚠ App Service stop had issues" -ForegroundColor Yellow
+        }
+        
+        # Wait for RBAC propagation across Azure regions (critical for fresh credentials)
+        Write-Host "    ⏱  Waiting 90 seconds for RBAC propagation across Azure..." -ForegroundColor Cyan
+        Write-Host "      (RBAC changes can take 2-5 minutes to fully propagate)" -ForegroundColor Gray
+        Start-Sleep -Seconds 90
+        
+        # START the app with fresh managed identity credentials
+        Write-Host "    🔄 Starting App Service with fresh credentials..." -ForegroundColor Cyan
+        
+        $startResult = az webapp start `
+            --name $webAppName `
+            --resource-group $frontendRgName `
+            --output none 2>&1
+        
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "    ✓ App Service started successfully" -ForegroundColor Green
+            Write-Host "      Managed identity now has fresh credentials with RBAC permissions" -ForegroundColor Gray
+            
+            # Wait for app to fully initialize
+            Write-Host "    ⏱  Waiting 45 seconds for app initialization..." -ForegroundColor Cyan
+            Start-Sleep -Seconds 45
+            Write-Host "    ✓ App initialization complete" -ForegroundColor Green
+        } else {
+            Write-Host "    ⚠ App Service start had issues (non-critical)" -ForegroundColor Yellow
+            Write-Host "      You may need to manually restart if you see auth errors" -ForegroundColor Gray
         }
         
     } else {
@@ -741,12 +885,19 @@ try {
         
         Write-Host "    ✓ Cosmos DB re-secured" -ForegroundColor Green
         
-        # Restart App Service even after errors to refresh credentials
-        Write-Host "    🔄 Restarting App Service to refresh managed identity credentials..." -ForegroundColor Cyan
+        # Stop and start App Service even after errors to refresh credentials
+        Write-Host "    🔄 Stopping App Service to clear credential cache..." -ForegroundColor Cyan
         $webAppName = $bicepOutputJson.frontend.value.webAppName
         $frontendRgName = "RG-Zava-Frontend-$environment"
-        az webapp restart --name $webAppName --resource-group $frontendRgName --output none 2>&1 | Out-Null
-        Write-Host "    ✓ App Service restarted" -ForegroundColor Green
+        
+        az webapp stop --name $webAppName --resource-group $frontendRgName --output none 2>&1 | Out-Null
+        Write-Host "    ✓ App Service stopped" -ForegroundColor Green
+        
+        Write-Host "    ⏱  Waiting 90 seconds for RBAC propagation..." -ForegroundColor Cyan
+        Start-Sleep -Seconds 90
+        
+        az webapp start --name $webAppName --resource-group $frontendRgName --output none 2>&1 | Out-Null
+        Write-Host "    ✓ App Service started with fresh credentials" -ForegroundColor Green
         
     } catch {
         Write-Host "    ⚠ Warning: Could not re-secure Cosmos DB. Run manually:" -ForegroundColor Red
