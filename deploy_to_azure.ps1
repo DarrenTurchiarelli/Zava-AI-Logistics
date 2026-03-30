@@ -683,13 +683,19 @@ try {
                 if ($LASTEXITCODE -eq 0 -and $validateOutput -match "All containers exist") {
                     Write-Host "    ✓ Container validation passed - all 10 containers confirmed" -ForegroundColor Green
                 } else {
-                    Write-Host "    ❌ Container validation failed - retrying..." -ForegroundColor Red
-                    Write-Host "      Waiting 5 seconds for RBAC propagation..." -ForegroundColor Yellow
-                    Start-Sleep -Seconds 5
+                    Write-Host "    ⚠️  Container validation failed on first check" -ForegroundColor Yellow
+                    Write-Host "      Diagnostic output:" -ForegroundColor Gray
+                    Write-Host $validateOutput -ForegroundColor Gray
+                    Write-Host "" -ForegroundColor Yellow
+                    Write-Host "      Waiting 30 seconds for container creation to complete..." -ForegroundColor Yellow
+                    Write-Host "      (Container creation can be async - operations may still be in progress)" -ForegroundColor Gray
+                    Start-Sleep -Seconds 30
                     
-                    # Retry container creation once
+                    # Retry container creation AND validation
                     Write-Host "    🔄 Retrying container initialization..." -ForegroundColor Cyan
                     $retryOutput = python Scripts/initialize_all_containers.py 2>&1
+                    
+                    Write-Host "    🔍 Re-validating container count..." -ForegroundColor Cyan
                     $retryValidate = python Scripts/diagnose_containers.py 2>&1
                     
                     if ($LASTEXITCODE -eq 0 -and $retryValidate -match "All containers exist") {
@@ -704,12 +710,12 @@ try {
                         Write-Host $retryValidate -ForegroundColor Gray
                         Write-Host "" -ForegroundColor Red
                         Write-Host "    Possible causes:" -ForegroundColor Yellow
-                        Write-Host "      • RBAC permissions not propagated (takes 2-5 min)" -ForegroundColor Gray
+                        Write-Host "      • Connection string auth not fully propagated (wait 2-3 min)" -ForegroundColor Gray
                         Write-Host "      • Cosmos DB account not fully provisioned" -ForegroundColor Gray
                         Write-Host "      • Network connectivity issues" -ForegroundColor Gray
                         Write-Host "" -ForegroundColor Yellow
                         Write-Host "    Manual fix:" -ForegroundColor Yellow
-                        Write-Host "      1. Wait 2-3 more minutes for RBAC propagation" -ForegroundColor Gray
+                        Write-Host "      1. Wait 2-3 more minutes for Azure propagation" -ForegroundColor Gray
                         Write-Host "      2. Run: .\Scripts\fix_azure_containers.ps1" -ForegroundColor Gray
                         Write-Host "      3. Verify: python Scripts\diagnose_containers.py" -ForegroundColor Gray
                         Write-Host "    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Red
@@ -727,32 +733,76 @@ try {
                     }
                 }
             } else {
-                Write-Host "    ❌ Container initialization failed on first attempt" -ForegroundColor Red
-                Write-Host "      Waiting 5 seconds for RBAC propagation before retry..." -ForegroundColor Yellow
-                Start-Sleep -Seconds 5
+                Write-Host "    ⚠️  Container initialization failed on first attempt" -ForegroundColor Yellow
+                Write-Host "      Exit code: $LASTEXITCODE" -ForegroundColor Gray
+                Write-Host "      Output:" -ForegroundColor Gray
+                Write-Host $containerOutput -ForegroundColor Gray
+                Write-Host "" -ForegroundColor Yellow
+                Write-Host "      Waiting 60 seconds for connection string auth to fully propagate..." -ForegroundColor Yellow
+                Write-Host "      (Azure auth changes can take 60-90 seconds to apply globally)" -ForegroundColor Gray
+                Start-Sleep -Seconds 60
                 
-                # Retry once
-                Write-Host "    🔄 Retrying container initialization..." -ForegroundColor Cyan
+                # Retry with fresh connection
+                Write-Host "    🔄 Retrying container initialization (attempt 2/3)..." -ForegroundColor Cyan
                 $retryOutput = python Scripts/initialize_all_containers.py 2>&1
                 
-                if ($LASTEXITCODE -eq 0) {
+                if ($LASTEXITCODE -eq 0 -and $retryOutput -match "SUCCESS") {
                     Write-Host "    ✓ Container creation succeeded on retry" -ForegroundColor Green
                     
                     # Validate after successful retry
+                    Write-Host "    🔍 Validating container count..." -ForegroundColor Cyan
                     $validateOutput = python Scripts/diagnose_containers.py 2>&1
-                    if (-not ($validateOutput -match "All containers exist")) {
-                        Write-Host "    ❌ Container validation failed - see manual fix steps above" -ForegroundColor Red
+                    
+                    if ($LASTEXITCODE -eq 0 -and $validateOutput -match "All containers exist") {
+                        Write-Host "    ✓ Container validation passed - all 10 containers confirmed" -ForegroundColor Green
+                    } else {
+                        Write-Host "    ⚠️  Container count validation failed - attempting final retry..." -ForegroundColor Yellow
+                        Start-Sleep -Seconds 30
+                        
+                        # Final retry
+                        Write-Host "    🔄 Final retry of container initialization (attempt 3/3)..." -ForegroundColor Cyan
+                        $finalRetry = python Scripts/initialize_all_containers.py 2>&1
+                        $finalValidate = python Scripts/diagnose_containers.py 2>&1
+                        
+                        if (-not ($LASTEXITCODE -eq 0 -and $finalValidate -match "All containers exist")) {
+                            Write-Host "    ❌ Container validation failed after 3 attempts" -ForegroundColor Red
+                            Write-Host "      Diagnostic output:" -ForegroundColor Gray
+                            Write-Host $finalValidate -ForegroundColor Gray
+                            
+                            # Re-secure before exiting
+                            az resource update --ids $cosmosResourceId --set properties.disableLocalAuth=true --api-version 2023-11-15 --output none 2>&1 | Out-Null
+                            throw "Container validation failed after multiple retries"
+                        }
+                        
+                        Write-Host "    ✓ Container validation passed on final retry" -ForegroundColor Green
+                    }
+                } else {
+                    Write-Host "    ⚠️  Container initialization still failing - final attempt..." -ForegroundColor Yellow
+                    Write-Host "      Waiting additional 30 seconds..." -ForegroundColor Gray
+                    Start-Sleep -Seconds 30
+                    
+                    Write-Host "    🔄 Final retry of container initialization (attempt 3/3)..." -ForegroundColor Cyan
+                    $finalRetry = python Scripts/initialize_all_containers.py 2>&1
+                    
+                    if (-not ($LASTEXITCODE -eq 0 -and $finalRetry -match "SUCCESS")) {
+                        Write-Host "    ❌ Container initialization failed after 3 attempts" -ForegroundColor Red
+                        Write-Host "      Output:" -ForegroundColor Gray
+                        Write-Host $finalRetry -ForegroundColor Gray
                         
                         # Re-secure before exiting
                         az resource update --ids $cosmosResourceId --set properties.disableLocalAuth=true --api-version 2023-11-15 --output none 2>&1 | Out-Null
-                        throw "Container validation failed after retry"
+                        throw "Container initialization failed - cannot proceed"
                     }
-                } else {
-                    Write-Host "    ❌ Container initialization failed on retry" -ForegroundColor Red
                     
-                    # Re-secure before exiting
-                    az resource update --ids $cosmosResourceId --set properties.disableLocalAuth=true --api-version 2023-11-15 --output none 2>&1 | Out-Null
-                    throw "Container initialization failed - cannot proceed"
+                    # Validate final success
+                    $finalValidate = python Scripts/diagnose_containers.py 2>&1
+                    if (-not ($LASTEXITCODE -eq 0 -and $finalValidate -match "All containers exist")) {
+                        Write-Host "    ❌ Container validation failed" -ForegroundColor Red
+                        az resource update --ids $cosmosResourceId --set properties.disableLocalAuth=true --api-version 2023-11-15 --output none 2>&1 | Out-Null
+                        throw "Container validation failed"
+                    }
+                    
+                    Write-Host "    ✓ All containers validated successfully on final retry" -ForegroundColor Green
                 }
             }
             

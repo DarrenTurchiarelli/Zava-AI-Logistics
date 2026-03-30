@@ -55,7 +55,9 @@ az resource update `
     --api-version 2023-11-15 `
     --output none
 
-Start-Sleep -Seconds 5  # Wait for setting to propagate
+Write-Host "⏱  Waiting 60 seconds for auth change to propagate..." -ForegroundColor Gray
+Write-Host "   (Azure configuration changes can take 45-60 seconds to apply globally)" -ForegroundColor Gray
+Start-Sleep -Seconds 60  # Wait for setting to propagate
 
 # Get connection string
 $connectionString = az cosmosdb keys list --name $CosmosAccountName --resource-group $ResourceGroup --type connection-strings --query "connectionStrings[0].connectionString" -o tsv
@@ -76,17 +78,38 @@ $env:COSMOS_DB_DATABASE_NAME = "logisticstracking"
 python Scripts/initialize_all_containers.py
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ ERROR: Container initialization failed" -ForegroundColor Red
-    Write-Host "   Check the error output above" -ForegroundColor Yellow
+    Write-Host "❌ ERROR: Container initialization failed on first attempt" -ForegroundColor Red
+    Write-Host "   Retrying after 30 second wait..." -ForegroundColor Yellow
+    Start-Sleep -Seconds 30
     
-    # Still try to disable local auth
-    Write-Host "`nRe-disabling local auth..." -ForegroundColor Yellow
-    az resource update `
-        --ids $resourceId `
-        --set properties.disableLocalAuth=true `
-        --api-version 2023-11-15 `
-        --output none
-    exit 1
+    Write-Host "   Retry attempt 1/2..." -ForegroundColor Cyan
+    python Scripts/initialize_all_containers.py
+    
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "❌ ERROR: Container initialization failed on retry" -ForegroundColor Red
+        Write-Host "   Check the error output above" -ForegroundColor Yellow
+        
+        # Still try to disable local auth
+        Write-Host "`nRe-disabling local auth..." -ForegroundColor Yellow
+        az resource update `
+            --ids $resourceId `
+            --set properties.disableLocalAuth=true `
+            --api-version 2023-11-15 `
+            --output none
+        exit 1
+    }
+}
+
+# Validate all 10 containers exist
+Write-Host "   🔍 Validating all 10 containers..." -ForegroundColor Cyan
+$validateOutput = python Scripts/diagnose_containers.py 2>&1
+
+if ($LASTEXITCODE -eq 0 -and $validateOutput -match "All containers exist") {
+    Write-Host "   ✓ All 10 containers validated successfully" -ForegroundColor Green
+} else {
+    Write-Host "   ⚠️  Container validation check:" -ForegroundColor Yellow
+    Write-Host $validateOutput -ForegroundColor Gray
+    Write-Host "`n   If containers are missing, they will auto-create on first use" -ForegroundColor Gray
 }
 
 Write-Host ""
