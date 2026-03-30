@@ -458,6 +458,12 @@ if ($bicepOutput -and $bicepOutput.openAIServiceEndpoint) {
     Write-Host "  ⚠ Azure OpenAI endpoint not found in deployment outputs" -ForegroundColor Yellow
 }
 
+# Add critical App Service configuration (REQUIRED for Flask apps on Azure)
+Write-Host "  ✓ Adding critical App Service configuration..." -ForegroundColor Gray
+$additionalSettings += "WEBSITES_PORT=8000"  # Tell Azure which port the app listens on
+$additionalSettings += "PORT=8000"  # Backup port variable for Flask
+$additionalSettings += "USE_MANAGED_IDENTITY=true"  # Use managed identity for Cosmos DB auth
+
 # Apply additional settings if any
 if ($additionalSettings.Count -gt 0) {
     az webapp config appsettings set `
