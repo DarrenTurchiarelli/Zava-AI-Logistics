@@ -133,6 +133,174 @@ global_state_manager = StateManager()
 setup_warning_suppression()
 
 
+# ============================================================================
+# Customer Service Agent Helper
+# ============================================================================
+async def call_customer_service_agent(
+    query: str,
+    tracking_number: str = None,
+    thread_id: str = None,
+    is_public: bool = False,
+    customer_name: str = "Customer",
+    additional_context: Dict[str, Any] = None,
+) -> Dict[str, Any]:
+    """
+    Simplified helper to call customer service agent directly
+    
+    This replaces the CustomerServiceChatbot class with a simple function.
+    The agent handles tracking number extraction and data fetching via its own tools.
+    
+    Args:
+        query: User's question
+        tracking_number: Optional tracking number for context  
+        thread_id: Optional conversation thread ID for persistence
+        is_public: True for public chat widget, False for internal CS
+        customer_name: Customer name for personalization
+        additional_context: Any additional context to pass to agent
+        
+    Returns:
+        Agent response dictionary
+    """
+    from agents.base import customer_service_agent
+    
+    # Build agent request
+    context = {
+        "customer_name": customer_name,
+        "issue_type": "inquiry",
+        "details": query,
+        "public_mode": is_public,
+    }
+    
+    # Add tracking number if provided
+    if tracking_number:
+        context["tracking_number"] = tracking_number
+    
+    # Merge additional context
+    if additional_context:
+        context.update(additional_context)
+    
+    # Call agent (it handles tracking lookup via tools, no pre-fetching needed)
+    return await customer_service_agent(context, thread_id=thread_id)
+
+
+async def track_parcel_direct(db: ParcelTrackingDB, tracking_number: str) -> Dict[str, Any]:
+    """
+    Direct database query to track a parcel (no AI agent needed)
+    
+    Args:
+        db: Database connection
+        tracking_number: Tracking number to lookup
+        
+    Returns:
+        Parcel information dict
+    """
+    try:
+        parcels_container = db.database.get_container_client("parcels")
+        
+        query = "SELECT * FROM c WHERE c.tracking_number = @tracking_number"
+        parameters = [{"name": "@tracking_number", "value": tracking_number}]
+        
+        items = []
+        async for item in parcels_container.query_items(query=query, parameters=parameters):
+            items.append(item)
+        
+        if not items:
+            return {"found": False, "message": f"No parcel found with tracking number: {tracking_number}"}
+        
+        parcel = items[0]
+        
+        # Get tracking events
+        events_container = db.database.get_container_client("tracking_events")
+        events_query = "SELECT * FROM c WHERE c.tracking_number = @tracking_number ORDER BY c.timestamp DESC"
+        
+        events = []
+        async for event in events_container.query_items(query=events_query, parameters=parameters):
+            events.append(event)
+        
+        return {
+            "found": True,
+            "tracking_number": tracking_number,
+            "status": parcel.get("status", "Unknown"),
+            "current_location": parcel.get("current_location", "Unknown"),
+            "origin": parcel.get("origin", "Unknown"),
+            "destination": parcel.get("destination", "Unknown"),
+            "recipient": parcel.get("recipient_name", "Unknown"),
+            "estimated_delivery": parcel.get("estimated_delivery"),
+            "weight": parcel.get("weight"),
+            "dimensions": parcel.get("dimensions"),
+            "last_update": events[0].get("timestamp") if events else None,
+            "recent_events": events[:5] if events else [],
+        }
+    except Exception as e:
+        return {"found": False, "error": str(e), "message": f"Error tracking parcel: {str(e)}"}
+
+
+async def check_frauds_direct(db: ParcelTrackingDB, limit: int = 20) -> List[Dict[str, Any]]:
+    """
+    Direct database query to get fraud reports (no AI agent needed)
+    
+    Args:
+        db: Database connection
+        limit: Maximum fraud reports to return
+        
+    Returns:
+        List of fraud reports
+    """
+    try:
+        suspicious_container = db.database.get_container_client("suspicious_messages")
+        
+        query = "SELECT * FROM c ORDER BY c.timestamp DESC OFFSET 0 LIMIT @limit"
+        parameters = [{"name": "@limit", "value": limit}]
+        
+        frauds = []
+        async for fraud in suspicious_container.query_items(query=query, parameters=parameters):
+            frauds.append(fraud)
+        
+        return frauds
+    except Exception as e:
+        return []
+
+
+async def get_parcel_location_status_direct(db: ParcelTrackingDB, tracking_number: str) -> Dict[str, Any]:
+    """
+    Direct database query to get parcel location status (no AI agent needed)
+    
+    Args:
+        db: Database connection
+        tracking_number: Tracking number to lookup
+        
+    Returns:
+        Location status dict
+    """
+    parcel_info = await track_parcel_direct(db, tracking_number)
+    
+    if not parcel_info.get("found"):
+        return parcel_info
+    
+    # Determine if in transit or at DC based on status
+    status = parcel_info.get("status", "").lower()
+    current_location = parcel_info.get("current_location", "")
+    
+    if "transit" in status or "out for delivery" in status:
+        return {
+            **parcel_info,
+            "location_type": "in_transit",
+            "message": f"Parcel is currently in transit: {current_location}",
+        }
+    elif "depot" in status or "distribution" in current_location.lower():
+        return {
+            **parcel_info,
+            "location_type": "at_distribution_center",
+            "message": f"Parcel is at distribution center: {current_location}",
+        }
+    else:
+        return {
+            **parcel_info,
+            "location_type": "other",
+            "message": f"Parcel status: {status} at {current_location}",
+        }
+
+
 # User initialization function
 async def ensure_users_initialized():
     """Ensure default users exist in database (auto-creates if missing)"""
@@ -1809,8 +1977,6 @@ def customer_service_chatbot():
 @login_required
 def chatbot_query():
     """Process chatbot query - Internal customer service use"""
-    from customer_service_chatbot import CustomerServiceChatbot
-
     user = session.get("user")
     if not user or user.get("role") not in [UserManager.ROLE_CUSTOMER_SERVICE, UserManager.ROLE_ADMIN]:
         return jsonify({"error": "Access denied"}), 403
@@ -1824,17 +1990,15 @@ def chatbot_query():
         return jsonify({"error": "Query is required"}), 400
 
     async def process():
-        async with ParcelTrackingDB() as db:
-            chatbot = CustomerServiceChatbot(db)
-
-            # Build context
-            context = {}
-            if tracking_number:
-                context["tracking_number"] = tracking_number
-
-            # Process query with thread persistence
-            response = await chatbot.process_query(query, context, thread_id=thread_id)
-            return response
+        # Call agent directly (no class needed)
+        response = await call_customer_service_agent(
+            query=query,
+            tracking_number=tracking_number,
+            thread_id=thread_id,
+            is_public=False,  # Internal CS mode
+            customer_name=user.get("full_name", user.get("username", "Agent")),
+        )
+        return response
 
     try:
         result = run_async(process())
@@ -1979,8 +2143,6 @@ def public_chat():
 @app.route("/api/public/chatbot", methods=["POST"])
 def public_chatbot():
     """Public chatbot for all users - Limited access, no internal data"""
-    from customer_service_chatbot import CustomerServiceChatbot
-
     print("\n" + "=" * 60)
     print("🤖 Public Chatbot API Called")
     print("=" * 60)
@@ -2007,30 +2169,28 @@ def public_chatbot():
         return jsonify({"error": "Query is required"}), 400
 
     async def process():
-        async with ParcelTrackingDB() as db:
-            chatbot = CustomerServiceChatbot(db)
-
-            # Limited context - available to all users
-            context = {
-                "customer_name": user.get("username") if (is_logged_in and user) else "Guest",
-                "user_role": user.get("role") if (is_logged_in and user) else "public",
-                "public_mode": True,  # Flag to limit responses
-                "is_authenticated": is_logged_in,
-            }
-
-            # Add tracking number to context if provided
-            if tracking_number:
-                context["tracking_number"] = tracking_number
-
-            # Process query with restricted access and thread persistence
-            response = await chatbot.process_query(query, context, thread_id=thread_id)
-            print(f"\n📦 Raw response from chatbot: {response}")
-            print(f"📦 Response type: {type(response)}")
-            if isinstance(response, dict):
-                print(f"📦 Response keys: {response.keys()}")
-                print(f"📦 Success: {response.get('success')}")
-                print(f"📦 Response field: {response.get('response')}")
-            return response
+        # Call agent directly (no class needed)
+        customer_name = user.get("username") if (is_logged_in and user) else "Guest"
+        additional_context = {
+            "user_role": user.get("role") if (is_logged_in and user) else "public",
+            "is_authenticated": is_logged_in,
+        }
+        
+        response = await call_customer_service_agent(
+            query=query,
+            tracking_number=tracking_number,
+            thread_id=thread_id,
+            is_public=True,  # Public mode
+            customer_name=customer_name,
+            additional_context=additional_context,
+        )
+        print(f"\n📦 Raw response from agent: {response}")
+        print(f"📦 Response type: {type(response)}")
+        if isinstance(response, dict):
+            print(f"📦 Response keys: {response.keys()}")
+            print(f"📦 Success: {response.get('success')}")
+            print(f"📦 Response field: {response.get('response')}")
+        return response
 
     try:
         result = run_async(process())
@@ -2219,16 +2379,13 @@ def public_chatbot():
 @login_required
 def chatbot_track_parcel(tracking_number):
     """Track parcel via chatbot API"""
-    from customer_service_chatbot import CustomerServiceChatbot
-
     user = session.get("user")
     if not user or user.get("role") not in [UserManager.ROLE_CUSTOMER_SERVICE, UserManager.ROLE_ADMIN]:
         return jsonify({"error": "Access denied"}), 403
 
     async def track():
         async with ParcelTrackingDB() as db:
-            chatbot = CustomerServiceChatbot(db)
-            return await chatbot.track_parcel(tracking_number)
+            return await track_parcel_direct(db, tracking_number)
 
     try:
         result = run_async(track())
@@ -2241,8 +2398,6 @@ def chatbot_track_parcel(tracking_number):
 @login_required
 def chatbot_check_frauds():
     """Get fraud reports via chatbot API"""
-    from customer_service_chatbot import CustomerServiceChatbot
-
     user = session.get("user")
     if not user or user.get("role") not in [UserManager.ROLE_CUSTOMER_SERVICE, UserManager.ROLE_ADMIN]:
         return jsonify({"error": "Access denied"}), 403
@@ -2251,8 +2406,7 @@ def chatbot_check_frauds():
 
     async def get_frauds():
         async with ParcelTrackingDB() as db:
-            chatbot = CustomerServiceChatbot(db)
-            return await chatbot.check_frauds(limit)
+            return await check_frauds_direct(db, limit)
 
     try:
         result = run_async(get_frauds())
@@ -2265,16 +2419,13 @@ def chatbot_check_frauds():
 @login_required
 def chatbot_parcel_location(tracking_number):
     """Get detailed parcel location status"""
-    from customer_service_chatbot import CustomerServiceChatbot
-
     user = session.get("user")
     if not user or user.get("role") not in [UserManager.ROLE_CUSTOMER_SERVICE, UserManager.ROLE_ADMIN]:
         return jsonify({"error": "Access denied"}), 403
 
     async def get_location():
         async with ParcelTrackingDB() as db:
-            chatbot = CustomerServiceChatbot(db)
-            return await chatbot.get_parcel_location_status(tracking_number)
+            return await get_parcel_location_status_direct(db, tracking_number)
 
     try:
         result = run_async(get_location())
