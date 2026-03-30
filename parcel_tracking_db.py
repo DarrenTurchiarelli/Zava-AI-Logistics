@@ -148,6 +148,9 @@ class ParcelTrackingDB:
 
             # Try key-based authentication first
             if self.key:
+                # Check if we should force key-based auth (for data generation scripts)
+                force_key_auth = os.getenv("FORCE_KEY_AUTH", "false").lower() == "true"
+                
                 try:
                     # Use key-based authentication
                     self.client = CosmosClient(self.endpoint, self.key)
@@ -161,6 +164,12 @@ class ParcelTrackingDB:
                         print(f"✓ Connected to Cosmos DB using account key")
 
                 except Exception as key_error:
+                    # If forcing key auth, don't fall back to Azure AD
+                    if force_key_auth:
+                        print(f"[ERROR] Key-based authentication failed (FORCE_KEY_AUTH=true, not falling back to Azure AD)")
+                        print(f"[ERROR] {str(key_error)[:200]}")
+                        raise key_error
+                    
                     # If key auth fails, only try Azure AD if the error suggests it
                     if "Local Authorization is disabled" in str(key_error):
                         if os.getenv("DEBUG_MODE") == "true":
@@ -333,6 +342,10 @@ class ParcelTrackingDB:
         declared_value: Optional[float] = None,
         special_instructions: Optional[str] = None,
         store_location: str = "unknown",
+        current_status: Optional[str] = None,  # Allow setting initial status
+        origin_location: Optional[str] = None,  # Allow setting DC
+        current_location: Optional[str] = None,  # Allow setting initial location
+        fraud_risk_score: Optional[int] = None,  # Allow setting risk score
     ) -> Dict[str, Any]:
         """Register a new parcel into the logistics network"""
         container = self.database.get_container_client(self.parcels_container)
@@ -347,6 +360,10 @@ class ParcelTrackingDB:
 
         # Generate tracking number
         tracking_number = self._generate_tracking_number()
+
+        # Use provided values or defaults
+        status = current_status or "registered"
+        location = current_location or store_location
 
         parcel = {
             "id": str(uuid.uuid4()),
@@ -368,12 +385,18 @@ class ParcelTrackingDB:
             "special_instructions": special_instructions,
             "store_location": store_location,
             "registration_timestamp": datetime.now(timezone.utc).isoformat(),
-            "current_status": "registered",
-            "current_location": store_location,
+            "current_status": status,
+            "current_location": location,
             "estimated_delivery": self._calculate_estimated_delivery(service_type),
             "delivery_attempts": 0,
             "is_delivered": False,
         }
+
+        # Add optional fields if provided
+        if origin_location:
+            parcel["origin_location"] = origin_location
+        if fraud_risk_score is not None:
+            parcel["fraud_risk_score"] = fraud_risk_score
 
         try:
             created_parcel = await container.create_item(body=parcel)
@@ -2173,6 +2196,7 @@ class ParcelTrackingDB:
                 # Parcels at depot, sorting, or in transit get actual DC assignments
                 dc = random.choice(distribution_centers)
 
+            # Create parcel with correct status and DC from the start (no update needed)
             parcel = await self.register_parcel(
                 barcode=fake.ean13(),
                 sender_name=fake.name(),
@@ -2188,47 +2212,22 @@ class ParcelTrackingDB:
                 dimensions=f"{random.randint(10,50)}x{random.randint(10,50)}x{random.randint(5,30)}cm",
                 declared_value=round(random.uniform(10, 500), 2),
                 store_location=store,
+                # NEW: Set status and DC at creation time
+                current_status=status_info["status"],
+                origin_location=dc,
+                current_location=(
+                    dc if status_info["status"] in ["At Depot", "Sorting"]
+                    else f"{dc} - {status_info['location']}" if status_info["status"] == "In Transit"
+                    else status_info["location"]
+                ),
+                fraud_risk_score=random.randint(0, 100),
             )
 
-            # Update parcel with distribution center and realistic status
+            # Generate realistic parcel history based on current status
             try:
-                container = self.database.get_container_client(self.parcels_container)
-                parcel_doc = await container.read_item(item=parcel["id"], partition_key=parcel["store_location"])
-
-                # Set distribution center as origin (only if not Unknown DC)
-                parcel_doc["origin_location"] = dc
-
-                # Update current status and location based on progression
-                parcel_doc["current_status"] = status_info["status"]
-                if status_info["status"] in ["At Depot", "Sorting"]:
-                    parcel_doc["current_location"] = dc
-                elif status_info["status"] == "In Transit":
-                    parcel_doc["current_location"] = f"{dc} - {status_info['location']}"
-                elif status_info["status"] == "Out for Delivery":
-                    # Out for delivery uses local delivery vehicle, not DC
-                    parcel_doc["current_location"] = status_info["location"]
-                else:
-                    parcel_doc["current_location"] = status_info["location"]
-
-                # Add fraud risk score for agent processing
-                parcel_doc["fraud_risk_score"] = random.randint(0, 100)
-
-                await container.replace_item(item=parcel_doc["id"], body=parcel_doc)
-
-                parcel.update(
-                    {
-                        "origin_location": dc,
-                        "current_status": status_info["status"],
-                        "current_location": parcel_doc["current_location"],
-                        "fraud_risk_score": parcel_doc["fraud_risk_score"],
-                    }
-                )
-
-                # Generate realistic parcel history based on current status
                 await self._generate_parcel_history(parcel["barcode"], status_info["status"], dc, store)
-
             except Exception as e:
-                print(f"Warning: Could not update parcel {parcel['barcode']} with DC info: {e}")
+                print(f"Warning: Could not generate history for {parcel['barcode']}: {e}")
 
             parcels.append(parcel)
 
