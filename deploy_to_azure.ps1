@@ -160,23 +160,36 @@ if (-not $SkipInfrastructure -and -not $CodeOnly) {
 
     # Deploy Bicep template at subscription scope
     $deploymentName = "zava-deployment-$(Get-Date -Format 'yyyyMMddHHmmss')"
+    
+    # Generate new unique suffix to avoid soft-delete conflicts
+    $newSuffix = -join ((97..122) | Get-Random -Count 6 | ForEach-Object {[char]$_})
+    Write-Host "  🔑 Using new unique suffix: $newSuffix (avoids soft-delete conflicts)" -ForegroundColor Cyan
 
     Write-Host "  🚀 Starting subscription-level Bicep deployment: $deploymentName" -ForegroundColor Cyan
 
     # Deploy at subscription scope (creates resource groups and resources)
-    $bicepOutput = az deployment sub create `
+    # Don't query outputs immediately - check deployment succeeded first
+    az deployment sub create `
         --name $deploymentName `
         --location $Location `
         --template-file $bicepTemplate `
-        --parameters location=$Location environment=$Environment appServiceSku=$Sku `
-        --query properties.outputs `
-        --output json
+        --parameters location=$Location environment=$Environment appServiceSku=$Sku uniqueSuffix=$newSuffix `
+        --output none
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "  ✗ Infrastructure deployment failed" -ForegroundColor Red
         Write-Host "  Run 'az deployment sub show --name $deploymentName' for details" -ForegroundColor Yellow
         exit 1
     }
+
+    Write-Host "  ✓ Infrastructure deployment succeeded" -ForegroundColor Green
+    Write-Host "  Retrieving deployment outputs..." -ForegroundColor Cyan
+
+    # Get deployment outputs after successful deployment
+    $bicepOutput = az deployment sub show `
+        --name $deploymentName `
+        --query properties.outputs `
+        --output json
 
     # Parse JSON output
     try {
