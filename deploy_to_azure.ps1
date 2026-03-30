@@ -334,6 +334,7 @@ try {
         $env:AZURE_OPENAI_ENDPOINT = $bicepOutputJson.middleware.value.openAIServiceEndpoint
         $env:AZURE_OPENAI_API_KEY = $openAIApiKey
         $env:AZURE_AI_MODEL_DEPLOYMENT_NAME = "gpt-4o"
+        $env:PYTHONIOENCODING = "utf-8"  # Fix Windows Unicode encoding issues
         
         # Run agent creation script directly and capture output
         python Scripts/create_foundry_agents_openai.py 2>&1 | Tee-Object -Variable agentOutput | Out-Host
@@ -689,6 +690,9 @@ if (-not $cosmosCheck) {
     try {
         # Check if Python is available
         if (Get-Command python -ErrorAction SilentlyContinue) {
+            # Set encoding for Unicode output on Windows
+            $env:PYTHONIOENCODING = "utf-8"
+            
             # Run setup_users.py to create default accounts
             $setupOutput = python utils/setup/setup_users.py 2>&1
             if ($LASTEXITCODE -eq 0 -and $setupOutput -match "SUCCESS") {
@@ -788,6 +792,7 @@ try {
             $env:COSMOS_CONNECTION_STRING = $connectionString
             $env:COSMOS_DB_DATABASE_NAME = "logisticstracking"
             $env:PYTHONPATH = $PWD  # Required for approval requests module imports
+            $env:PYTHONIOENCODING = "utf-8"  # Fix Windows Unicode encoding issues
             
             # Step 3a: Initialize all database containers FIRST (CRITICAL DEPENDENCY)
             Write-Host "    📦 Initializing all 10 database containers..." -ForegroundColor Cyan
@@ -928,6 +933,9 @@ try {
             
             # Step 3b: Generate demo data
             Write-Host "    📊 Generating demo data..." -ForegroundColor Cyan
+            
+            # Set encoding for Unicode output on Windows
+            $env:PYTHONIOENCODING = "utf-8"
             
             # Generate fresh test parcels with valid DC assignments
             Write-Host "    • Creating test parcels with valid DC assignments..." -ForegroundColor Gray
@@ -1181,6 +1189,7 @@ if ($generateBulkData -eq 'y' -or $generateBulkData -eq 'Y') {
         
         if ($connectionString) {
             $env:COSMOS_CONNECTION_STRING = $connectionString
+            $env:PYTHONIOENCODING = "utf-8"  # Fix Windows Unicode encoding issues
             
             # Run bulk data generator
             $bulkOutput = python utils/generators/generate_bulk_realistic_data.py --count $parcelCount 2>&1
