@@ -473,33 +473,147 @@ if ($additionalSettings.Count -gt 0) {
 }
 Write-Host ""
 
-# Deploy Application Code
+# =============================================================================
+# [6/7] Deploy Application Code (Enterprise-Grade with Validation)
+# =============================================================================
 Write-Host "[6/7] Deploying application code..." -ForegroundColor Yellow
-Write-Host "  This may take 3-5 minutes..." -ForegroundColor Gray
+Write-Host "  This may take 3-5 minutes for Oryx build..." -ForegroundColor Gray
 
-# Create a deployment ZIP (excluding unnecessary files)
-$tempZip = "$env:TEMP\dt-logistics-deploy.zip"
+# Step 1: Create deployment package with proper exclusions
+$tempZip = "$env:TEMP\zava-logistics-deploy-$(Get-Date -Format 'yyyyMMddHHmmss').zip"
 if (Test-Path $tempZip) { Remove-Item $tempZip -Force }
 
-Write-Host "  Creating deployment package..." -ForegroundColor Gray
-Compress-Archive -Path * -DestinationPath $tempZip -Force -ErrorAction SilentlyContinue
+Write-Host "  📦 Creating deployment package..." -ForegroundColor Cyan
 
-# Deploy ZIP
-Write-Host "  Uploading to Azure..." -ForegroundColor Gray
-$deployResult = az webapp deployment source config-zip `
-    --name $WebAppName `
-    --resource-group $frontendRgName `
-    --src $tempZip `
-    --timeout 600 2>&1
+# Define exclusions (enterprise-grade - exclude dev/test files)
+$excludePatterns = @(
+    "*.git*", ".github", ".vscode", ".azure", ".deployment.json",
+    "*__pycache__*", "*.pyc", "*.pyo", "*.pyd",
+    ".env", ".env.*", "*.log",
+    "node_modules", ".venv", "venv", "env",
+    "*.zip", "deploy*.zip",
+    ".vs", "*.suo", "*.user",
+    "tests", "*test*.py", "Scripts/test*.py"
+)
 
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "  ✗ Code deployment failed: $deployResult" -ForegroundColor Red
-    Write-Host "    Check logs with: az webapp log tail --name $WebAppName --resource-group $frontendRgName" -ForegroundColor Gray
-} else {
-    Write-Host "✓ Application code deployed" -ForegroundColor Green
+# Get all files excluding patterns
+$files = Get-ChildItem -Recurse -File | Where-Object {
+    $file = $_
+    $shouldInclude = $true
+    foreach ($pattern in $excludePatterns) {
+        if ($file.FullName -like "*$pattern*") {
+            $shouldInclude = $false
+            break
+        }
+    }
+    $shouldInclude
 }
 
-Remove-Item $tempZip -Force
+Write-Host "    Including $($files.Count) files in deployment package" -ForegroundColor Gray
+
+# Create ZIP with relative paths
+$files | Compress-Archive -DestinationPath $tempZip -Force
+
+if (-not (Test-Path $tempZip)) {
+    Write-Host "  ❌ ERROR: Failed to create deployment package" -ForegroundColor Red
+    throw "Deployment package creation failed"
+}
+
+$zipSize = [math]::Round((Get-Item $tempZip).Length / 1MB, 2)
+Write-Host "    ✓ Package created: $zipSize MB" -ForegroundColor Green
+
+# Step 2: Deploy with retry logic (handles transient failures)
+$deployAttempts = 0
+$maxDeployAttempts = 2
+$deploySuccess = $false
+
+while ($deployAttempts -lt $maxDeployAttempts -and -not $deploySuccess) {
+    $deployAttempts++
+    
+    if ($deployAttempts -gt 1) {
+        Write-Host "`n  🔄 Retry attempt $deployAttempts/$maxDeployAttempts..." -ForegroundColor Yellow
+        Write-Host "    Waiting 30 seconds before retry..." -ForegroundColor Gray
+        Start-Sleep -Seconds 30
+    }
+    
+    Write-Host "  📤 Uploading to Azure App Service (attempt $deployAttempts/$maxDeployAttempts)..." -ForegroundColor Cyan
+    Write-Host "    This triggers Oryx build which can take 2-4 minutes" -ForegroundColor Gray
+    
+    # Use 'az webapp deploy' which is more reliable than 'config-zip'
+    $deployOutput = az webapp deploy `
+        --name $WebAppName `
+        --resource-group $frontendRgName `
+        --src-path $tempZip `
+        --type zip `
+        --async false `
+        --timeout 600 2>&1
+    
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "    ✓ Upload completed successfully" -ForegroundColor Green
+        $deploySuccess = $true
+    } else {
+        Write-Host "    ⚠️  Upload encountered issues" -ForegroundColor Yellow
+        Write-Host "    Output: $deployOutput" -ForegroundColor Gray
+        
+        if ($deployAttempts -ge $maxDeployAttempts) {
+            Write-Host "`n  ❌ Code deployment failed after $maxDeployAttempts attempts" -ForegroundColor Red
+            Write-Host "    Last error: $deployOutput" -ForegroundColor Gray
+        }
+    }
+}
+
+# Step 3: Validate deployment (CRITICAL - ensures code is actually deployed)
+if ($deploySuccess) {
+    Write-Host "`n  🔍 Validating deployment..." -ForegroundColor Cyan
+    Write-Host "    Waiting 45 seconds for app to initialize..." -ForegroundColor Gray
+    Start-Sleep -Seconds 45
+    
+    # Test 1: Check if app responds
+    Write-Host "    Testing web app endpoint..." -ForegroundColor Gray
+    try {
+        $response = Invoke-WebRequest -Uri "https://$WebAppName.azurewebsites.net" -TimeoutSec 30 -UseBasicParsing -ErrorAction Stop
+        if ($response.StatusCode -eq 200) {
+            Write-Host "    ✓ Web app is responding (HTTP $($response.StatusCode))" -ForegroundColor Green
+            
+            # Test 2: Check for Flask app indicators in response
+            $content = $response.Content
+            if ($content -match "Zava|Login|Dashboard|Parcels" -or $content -match "Flask") {
+                Write-Host "    ✓ Flask application detected in response" -ForegroundColor Green
+                Write-Host "`n✅ Application code deployed and validated successfully" -ForegroundColor Green -BackgroundColor DarkGreen
+            } else {
+                Write-Host "    ⚠️  WARNING: Response doesn't contain expected Flask app content" -ForegroundColor Yellow
+                Write-Host "    This might be a default Azure page - check manually" -ForegroundColor Gray
+            }
+        } else {
+            Write-Host "    ⚠️  Unexpected status code: $($response.StatusCode)" -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host "    ⚠️  WARNING: Could not validate web app response" -ForegroundColor Yellow
+        Write-Host "    Error: $($_.Exception.Message)" -ForegroundColor Gray
+        Write-Host "    The app may still be starting up - check manually" -ForegroundColor Gray
+    }
+    
+    # Test 3: Restart app to ensure fresh start with new code
+    Write-Host "`n  🔄 Restarting app to ensure fresh deployment..." -ForegroundColor Cyan
+    az webapp restart --name $WebAppName --resource-group $frontendRgName --output none
+    Start-Sleep -Seconds 20
+    Write-Host "    ✓ App restarted" -ForegroundColor Green
+    
+} else {
+    Write-Host "`n  ❌ CRITICAL: Code deployment failed" -ForegroundColor Red
+    Write-Host "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Red
+    Write-Host "  Infrastructure is deployed but application code deployment failed." -ForegroundColor Yellow
+    Write-Host "`n  Manual deployment required:" -ForegroundColor Yellow
+    Write-Host "    Option 1 (Recommended): Use VS Code Azure App Service extension" -ForegroundColor Gray
+    Write-Host "      • Right-click project → Deploy to Web App → $WebAppName" -ForegroundColor Gray
+    Write-Host "`n    Option 2: Manual CLI deployment" -ForegroundColor Gray
+    Write-Host "      • az webapp deploy --name $WebAppName --resource-group $frontendRgName --src-path $tempZip --type zip" -ForegroundColor Gray
+    Write-Host "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Red
+    Write-Host ""
+}
+
+# Cleanup
+if (Test-Path $tempZip) { Remove-Item $tempZip -Force }
 Write-Host ""
 
 # =============================================================================
