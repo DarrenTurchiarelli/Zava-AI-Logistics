@@ -749,7 +749,39 @@ if (-not $cosmosCheck) {
         if (Get-Command python -ErrorAction SilentlyContinue) {
             $env:PYTHONIOENCODING = "utf-8"
             
-            # Run container initialization
+            # CRITICAL: Get Cosmos DB connection from BICEP OUTPUTS, not from .env
+            # This ensures we connect to the NEW deployment, not old cached values
+            $cosmosEndpoint = $bicepOutputJson.backend.value.cosmosDbEndpoint
+            
+            # Temporarily enable local auth to get connection string
+            Write-Host "    🔑 Getting Cosmos DB connection string..." -ForegroundColor Gray
+            $cosmosResourceId = "/subscriptions/$subscriptionId/resourceGroups/$backendRgName/providers/Microsoft.DocumentDB/databaseAccounts/$cosmosAccountName"
+            
+            # Enable local auth temporarily (if not already enabled)
+            az resource update `
+                --ids $cosmosResourceId `
+                --set properties.disableLocalAuth=false `
+                --api-version 2023-11-15 `
+                --output none 2>&1 | Out-Null
+            
+            Start-Sleep -Seconds 10  # Wait for auth change to propagate
+            
+            # Get connection string
+            $cosmosKeys = az cosmosdb keys list `
+                --name $cosmosAccountName `
+                --resource-group $backendRgName `
+                --type connection-strings `
+                --query "connectionStrings[0].connectionString" `
+                -o tsv
+            
+            # Set environment variables for the Python script (overrides .env)
+            $env:COSMOS_CONNECTION_STRING = $cosmosKeys
+            $env:COSMOS_DB_ENDPOINT = $cosmosEndpoint
+            $env:COSMOS_DB_DATABASE_NAME = "logisticstracking"
+            
+            Write-Host "    ✓ Using Cosmos DB: $cosmosEndpoint" -ForegroundColor Green
+            
+            # Run container initialization with correct environment
             $containerOutput = python Scripts/initialize_cosmos_containers.py 2>&1
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "  ✓ All 10 containers initialized successfully" -ForegroundColor Green
@@ -763,6 +795,17 @@ if (-not $cosmosCheck) {
                     Write-Host "    Error output: $containerOutput" -ForegroundColor Gray
                 }
             }
+            
+            # Re-secure Cosmos DB (disable local auth - back to managed identity only)
+            Write-Host "    🔒 Re-securing Cosmos DB (managed identity only)..." -ForegroundColor Gray
+            az resource update `
+                --ids $cosmosResourceId `
+                --set properties.disableLocalAuth=true `
+                --api-version 2023-11-15 `
+                --output none 2>&1 | Out-Null
+            
+            Write-Host "    ✓ Cosmos DB re-secured" -ForegroundColor Green
+            
         } else {
             Write-Host "  ⚠ Python not found - skipping container initialization" -ForegroundColor Yellow
             Write-Host "    Run manually: python Scripts/initialize_cosmos_containers.py" -ForegroundColor Gray
@@ -780,6 +823,15 @@ if (-not $cosmosCheck) {
         if (Get-Command python -ErrorAction SilentlyContinue) {
             # Set encoding for Unicode output on Windows
             $env:PYTHONIOENCODING = "utf-8"
+            
+            # CRITICAL: Ensure environment variables are set for user initialization
+            # (Inherits from container initialization, but verify they're still set)
+            if (-not $env:COSMOS_DB_ENDPOINT) {
+                $env:COSMOS_DB_ENDPOINT = $bicepOutputJson.backend.value.cosmosDbEndpoint
+                $env:COSMOS_DB_DATABASE_NAME = "logisticstracking"
+            }
+            
+            Write-Host "    Using Cosmos DB: $env:COSMOS_DB_ENDPOINT" -ForegroundColor Gray
             
             # Run setup_users.py to create default accounts
             $setupOutput = python utils/setup/setup_users.py 2>&1
