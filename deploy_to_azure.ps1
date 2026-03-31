@@ -5,7 +5,7 @@
 param(
     [string]$Location = "australiaeast",
     [string]$Environment = "dev",
-    [string]$Sku = "B2",
+    [string]$Sku = "B3",
     [switch]$Force,
     [switch]$SkipInfrastructure,
     [switch]$CodeOnly
@@ -450,13 +450,62 @@ if (Test-Path ".env") {
     }
 }
 
-# Add Azure OpenAI configuration from Bicep deployment
-if ($bicepOutput -and $bicepOutput.openAIServiceEndpoint) {
-    $additionalSettings += "AZURE_OPENAI_ENDPOINT=$($bicepOutput.openAIServiceEndpoint)"
-    $additionalSettings += "AZURE_AI_MODEL_DEPLOYMENT_NAME=gpt-4o"
-    Write-Host "  ✓ Azure OpenAI endpoint configured" -ForegroundColor Green
-} elseif (-not $CodeOnly) {
-    Write-Host "  ⚠ Azure OpenAI endpoint not found in deployment outputs" -ForegroundColor Yellow
+# Add Azure configuration from Bicep deployment (PRIORITY: Use deployment outputs over .env)
+if ($bicepOutputJson -and -not $CodeOnly) {
+    Write-Host "  🔧 Configuring from Bicep deployment outputs (overrides .env)..." -ForegroundColor Cyan
+    
+    # Azure OpenAI configuration
+    if ($bicepOutputJson.middleware.value.openAIServiceEndpoint) {
+        $additionalSettings += "AZURE_OPENAI_ENDPOINT=$($bicepOutputJson.middleware.value.openAIServiceEndpoint)"
+        $additionalSettings += "AZURE_AI_MODEL_DEPLOYMENT_NAME=gpt-4o"
+        Write-Host "  ✓ Azure OpenAI endpoint configured: $($bicepOutputJson.middleware.value.openAIServiceEndpoint)" -ForegroundColor Green
+    } else {
+        Write-Host "  ⚠ Azure OpenAI endpoint not found in deployment outputs" -ForegroundColor Yellow
+    }
+    
+    # AI Project endpoint
+    if ($bicepOutputJson.middleware.value.aiProjectEndpoint) {
+        $additionalSettings += "AZURE_AI_PROJECT_ENDPOINT=$($bicepOutputJson.middleware.value.aiProjectEndpoint)"
+        Write-Host "  ✓ AI Project endpoint configured: $($bicepOutputJson.middleware.value.aiProjectEndpoint)" -ForegroundColor Green
+    }
+    
+    # Cosmos DB endpoint
+    if ($bicepOutputJson.backend.value.cosmosDbEndpoint) {
+        $additionalSettings += "COSMOS_DB_ENDPOINT=$($bicepOutputJson.backend.value.cosmosDbEndpoint)"
+        $additionalSettings += "COSMOS_DB_DATABASE_NAME=logisticstracking"
+        Write-Host "  ✓ Cosmos DB endpoint configured: $($bicepOutputJson.backend.value.cosmosDbEndpoint)" -ForegroundColor Green
+    }
+    
+    # Agent IDs from deployment (CRITICAL: Use fresh agent IDs, not old .env values)
+    $deploymentAgentIds = @{
+        'PARCEL_INTAKE_AGENT_ID' = $bicepOutputJson.middleware.value.parcelIntakeAgentId
+        'SORTING_FACILITY_AGENT_ID' = $bicepOutputJson.middleware.value.sortingFacilityAgentId
+        'DELIVERY_COORDINATION_AGENT_ID' = $bicepOutputJson.middleware.value.deliveryCoordinationAgentId
+        'DISPATCHER_AGENT_ID' = $bicepOutputJson.middleware.value.dispatcherAgentId
+        'OPTIMIZATION_AGENT_ID' = $bicepOutputJson.middleware.value.optimizationAgentId
+        'CUSTOMER_SERVICE_AGENT_ID' = $bicepOutputJson.middleware.value.customerServiceAgentId
+        'FRAUD_RISK_AGENT_ID' = $bicepOutputJson.middleware.value.fraudRiskAgentId
+        'IDENTITY_AGENT_ID' = $bicepOutputJson.middleware.value.identityAgentId
+    }
+    
+    # Override .env agent IDs with deployment agent IDs
+    $agentCount = 0
+    foreach ($key in $deploymentAgentIds.Keys) {
+        $value = $deploymentAgentIds[$key]
+        if ($value) {
+            # Remove old .env value from settings
+            $additionalSettings = $additionalSettings | Where-Object { $_ -notmatch "^$key=" }
+            # Add new deployment value
+            $additionalSettings += "$key=$value"
+            $agentCount++
+        }
+    }
+    
+    if ($agentCount -gt 0) {
+        Write-Host "  ✓ Configured $agentCount agent IDs from deployment" -ForegroundColor Green
+    } else {
+        Write-Host "  ⚠ No agent IDs found in deployment outputs - using .env values" -ForegroundColor Yellow
+    }
 }
 
 # Add critical App Service configuration (REQUIRED for Flask apps on Azure)
@@ -472,12 +521,22 @@ if ($additionalSettings.Count -gt 0) {
         --resource-group $frontendRgName `
         --settings $additionalSettings `
         --output none
-    Write-Host "✓ Configuration settings applied to Web App" -ForegroundColor Green
+    Write-Host "✓ Configuration settings applied to Web App ($($additionalSettings.Count) settings)" -ForegroundColor Green
 } else {
     Write-Host "  ⚠ No configuration settings to apply" -ForegroundColor Yellow
     Write-Host "  Agents should have been created automatically during deployment" -ForegroundColor Gray
     Write-Host "  If agents are missing, run: python Scripts/create_foundry_agents.py" -ForegroundColor Gray
 }
+
+# Set startup command for Flask/Gunicorn (CRITICAL for Linux App Service)
+Write-Host "  🚀 Configuring startup command..." -ForegroundColor Cyan
+az webapp config set `
+    --name $WebAppName `
+    --resource-group $frontendRgName `
+    --startup-file "gunicorn --bind=0.0.0.0 --timeout 600 app:app" `
+    --output none
+
+Write-Host "  ✓ Startup command: gunicorn --bind=0.0.0.0 --timeout 600 app:app" -ForegroundColor Green
 Write-Host ""
 
 # =============================================================================
@@ -682,9 +741,38 @@ if (-not $cosmosCheck) {
 } else {
     Write-Host "    ✓ Cosmos DB validated: $cosmosAccountName" -ForegroundColor Green
     
-    # Initialize default users (containers must be created first - validated in post-deployment)
-    Write-Host "  👤 Initializing default user accounts..." -ForegroundColor Cyan
-    # Step 2: Initialize default users
+    # Step 1: Initialize Cosmos DB containers (REQUIRED before any data operations)
+    Write-Host "  🗄️  Initializing Cosmos DB containers..." -ForegroundColor Cyan
+    Write-Host "     (Creating 10 required containers with proper partition keys)" -ForegroundColor Gray
+    
+    try {
+        if (Get-Command python -ErrorAction SilentlyContinue) {
+            $env:PYTHONIOENCODING = "utf-8"
+            
+            # Run container initialization
+            $containerOutput = python Scripts/initialize_cosmos_containers.py 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "  ✓ All 10 containers initialized successfully" -ForegroundColor Green
+            } else {
+                # Check if containers already exist (not an error)
+                if ($containerOutput -match "already exists|Conflict") {
+                    Write-Host "  ✓ Containers already exist (OK)" -ForegroundColor Green
+                } else {
+                    Write-Host "  ⚠ Container initialization may have failed" -ForegroundColor Yellow
+                    Write-Host "    Run manually: python Scripts/initialize_cosmos_containers.py" -ForegroundColor Gray
+                    Write-Host "    Error output: $containerOutput" -ForegroundColor Gray
+                }
+            }
+        } else {
+            Write-Host "  ⚠ Python not found - skipping container initialization" -ForegroundColor Yellow
+            Write-Host "    Run manually: python Scripts/initialize_cosmos_containers.py" -ForegroundColor Gray
+        }
+    } catch {
+        Write-Host "  ⚠ Could not initialize containers: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "    Run manually: python Scripts/initialize_cosmos_containers.py" -ForegroundColor Gray
+    }
+    
+    # Step 2: Initialize default users (containers must be created first)
     Write-Host "  👤 Initializing default user accounts..." -ForegroundColor Cyan
     
     try {
@@ -774,9 +862,19 @@ try {
             --api-version 2023-11-15 `
             --output none 2>&1 | Out-Null
         
-        Write-Host "    ⏱  Waiting 60 seconds for auth change to fully propagate across Azure..." -ForegroundColor Gray
-        Write-Host "      (Azure configuration changes can take 45-60 seconds to apply globally)" -ForegroundColor Gray
-        Start-Sleep -Seconds 60
+        Write-Host "    ⏱  Waiting 120 seconds for auth change to fully propagate across Azure..." -ForegroundColor Gray
+        Write-Host "      (Azure configuration changes can take 90-120 seconds to apply globally)" -ForegroundColor Gray
+        Start-Sleep -Seconds 120
+        
+        # Verify local auth is enabled
+        Write-Host "    🔍 Verifying local auth is enabled..." -ForegroundColor Cyan
+        $authStatus = az cosmosdb show --name $cosmosAccountName --resource-group $backendRgName --query "disableLocalAuth" -o tsv
+        if ($authStatus -eq "false") {
+            Write-Host "    ✓ Local auth confirmed enabled" -ForegroundColor Green
+        } else {
+            Write-Host "    ⚠️  Local auth not yet enabled - waiting additional 60 seconds..." -ForegroundColor Yellow
+            Start-Sleep -Seconds 60
+        }
         
         # Step 2: Get connection string
         Write-Host "    🔑 Retrieving connection string for initialization..." -ForegroundColor Cyan
@@ -1176,8 +1274,19 @@ if ($generateBulkData -eq 'y' -or $generateBulkData -eq 'Y') {
             --api-version 2023-11-15 `
             --output none 2>&1 | Out-Null
         
-        Write-Host "  ⏱  Waiting 60 seconds for auth propagation..." -ForegroundColor Gray
-        Start-Sleep -Seconds 60
+        Write-Host "  ⏱  Waiting 120 seconds for auth propagation..." -ForegroundColor Gray
+        Write-Host "     (Azure needs time to replicate auth changes across regions)" -ForegroundColor Gray
+        Start-Sleep -Seconds 120
+        
+        # Verify local auth is enabled
+        Write-Host "  🔍 Verifying local auth is enabled..." -ForegroundColor Cyan
+        $authStatus = az cosmosdb show --name $cosmosAccountName --resource-group $backendRgName --query "disableLocalAuth" -o tsv
+        if ($authStatus -eq "false") {
+            Write-Host "  ✓ Local auth confirmed enabled" -ForegroundColor Green
+        } else {
+            Write-Host "  ⚠️  Local auth not yet enabled - waiting additional 60 seconds..." -ForegroundColor Yellow
+            Start-Sleep -Seconds 60
+        }
         
         # Get connection string
         $connectionString = az cosmosdb keys list `
@@ -1238,6 +1347,84 @@ Write-Host "  ✓ App Service using managed identity (no connection strings)" -F
 Write-Host "  ✓ Cosmos DB RBAC permissions configured via Bicep" -ForegroundColor Green
 Write-Host "  ✓ Azure OpenAI access via managed identity" -ForegroundColor Green
 Write-Host "  ✓ Speech & Vision services accessible via RBAC" -ForegroundColor Green
+Write-Host ""
+
+# Update .env file with current deployment endpoints
+Write-Host "📝 Updating .env file with current deployment endpoints..." -ForegroundColor Cyan
+
+try {
+    $envFilePath = Join-Path $PSScriptRoot ".env"
+    
+    if (Test-Path $envFilePath) {
+        # Read current .env file
+        $envContent = Get-Content $envFilePath -Raw
+        
+        # Get connection string for local development
+        $cosmosAccountName = $bicepOutputJson.backend.value.cosmosDbAccountName
+        $cosmosConnectionString = ""
+        try {
+            $cosmosConnectionString = az cosmosdb keys list `
+                --name $cosmosAccountName `
+                --resource-group $backendRgName `
+                --type connection-strings `
+                --query "connectionStrings[0].connectionString" `
+                -o tsv 2>$null
+        } catch {
+            Write-Host "  ⚠ Could not retrieve Cosmos connection string (local auth may be disabled)" -ForegroundColor Yellow
+        }
+        
+        # Update Cosmos DB settings
+        $cosmosEndpoint = $bicepOutputJson.backend.value.cosmosDbEndpoint
+        $envContent = $envContent -replace 'COSMOS_DB_ENDPOINT=.*', "COSMOS_DB_ENDPOINT=$cosmosEndpoint"
+        
+        if ($cosmosConnectionString) {
+            $envContent = $envContent -replace 'COSMOS_CONNECTION_STRING=.*', "COSMOS_CONNECTION_STRING=$cosmosConnectionString"
+        }
+        
+        # Update Azure OpenAI endpoint
+        $openAIEndpoint = $bicepOutputJson.middleware.value.openAIServiceEndpoint
+        $envContent = $envContent -replace 'AZURE_OPENAI_ENDPOINT=.*', "AZURE_OPENAI_ENDPOINT=$openAIEndpoint"
+        
+        # Update AI Project endpoint
+        $aiProjectEndpoint = $bicepOutputJson.middleware.value.aiProjectEndpoint
+        $envContent = $envContent -replace 'AZURE_AI_PROJECT_ENDPOINT=.*', "AZURE_AI_PROJECT_ENDPOINT=$aiProjectEndpoint"
+        
+        # Update all agent IDs
+        $agentIds = @{
+            'PARCEL_INTAKE_AGENT_ID' = $bicepOutputJson.middleware.value.parcelIntakeAgentId
+            'SORTING_FACILITY_AGENT_ID' = $bicepOutputJson.middleware.value.sortingFacilityAgentId
+            'DELIVERY_COORDINATION_AGENT_ID' = $bicepOutputJson.middleware.value.deliveryCoordinationAgentId
+            'DISPATCHER_AGENT_ID' = $bicepOutputJson.middleware.value.dispatcherAgentId
+            'OPTIMIZATION_AGENT_ID' = $bicepOutputJson.middleware.value.optimizationAgentId
+            'CUSTOMER_SERVICE_AGENT_ID' = $bicepOutputJson.middleware.value.customerServiceAgentId
+            'FRAUD_RISK_AGENT_ID' = $bicepOutputJson.middleware.value.fraudRiskAgentId
+            'IDENTITY_AGENT_ID' = $bicepOutputJson.middleware.value.identityAgentId
+        }
+        
+        foreach ($key in $agentIds.Keys) {
+            $value = $agentIds[$key]
+            if ($value) {
+                $envContent = $envContent -replace "$key=.*", "$key=$value"
+            }
+        }
+        
+        # Add timestamp comment
+        $timestamp = Get-Date -Format "MMMM dd, yyyy HH:mm"
+        $envContent = $envContent -replace '# Azure AI Agents \(Updated:.*\)', "# Azure AI Agents (Updated: $timestamp - Auto-generated by deploy_to_azure.ps1)"
+        
+        # Write updated content
+        Set-Content -Path $envFilePath -Value $envContent -NoNewline
+        
+        Write-Host "  ✓ .env file updated with current deployment endpoints" -ForegroundColor Green
+        Write-Host "    Local development now configured for deployment: $suffix" -ForegroundColor Gray
+    } else {
+        Write-Host "  ⚠ .env file not found - skipping update" -ForegroundColor Yellow
+    }
+} catch {
+    Write-Host "  ⚠ Could not update .env file: $($_.Exception.Message)" -ForegroundColor Yellow
+    Write-Host "    You may need to manually update .env for local development" -ForegroundColor Gray
+}
+
 Write-Host ""
 Write-Host "Next Steps:" -ForegroundColor Yellow
 Write-Host "  1. Visit: $url" -ForegroundColor White

@@ -197,11 +197,10 @@ async def create_demo_parcel(db: ParcelTrackingDB, parcel_spec: Dict) -> str:
     
     # Assign to driver if specified
     if parcel_spec.get('assigned_driver'):
-        await db.update_parcel_status(
-            barcode=barcode,
-            new_status=parcel_spec['status'],
-            assigned_driver=parcel_spec['assigned_driver']
-        )
+        container = db.database.get_container_client(db.parcels_container)
+        parcel_doc['assigned_driver'] = parcel_spec['assigned_driver']
+        parcel_doc['current_status'] = parcel_spec['status']
+        await container.upsert_item(parcel_doc)
     
     print(f"  ✓ Created demo parcel: {parcel_spec['tracking_number']} - {parcel_spec['recipient_name']}")
     return barcode
@@ -286,11 +285,11 @@ async def create_realistic_parcel(db: ParcelTrackingDB, state: str, city: str, i
     if status in ['Out For Delivery', 'Delivered']:
         driver_num = random.randint(1, 57)
         driver_id = f"driver-{driver_num:03d}"
-        await db.update_parcel_status(
-            barcode=barcode,
-            new_status=status,
-            assigned_driver=driver_id
-        )
+        # Update parcel to assign driver
+        container = db.database.get_container_client(db.parcels_container)
+        parcel_doc['assigned_driver'] = driver_id
+        parcel_doc['current_status'] = status
+        await container.upsert_item(parcel_doc)
     
     return barcode
 
