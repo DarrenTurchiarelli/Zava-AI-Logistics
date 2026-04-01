@@ -584,8 +584,28 @@ $files = Get-ChildItem -Recurse -File | Where-Object {
 
 Write-Host "    Including $($files.Count) files in deployment package" -ForegroundColor Gray
 
-# Create ZIP with relative paths
-$files | Compress-Archive -DestinationPath $tempZip -Force
+# CRITICAL: Create ZIP preserving folder structure
+# Use temporary staging directory to maintain paths
+$stagingDir = "$env:TEMP\zava-deploy-staging-$(Get-Date -Format 'yyyyMMddHHmmss')"
+if (Test-Path $stagingDir) { Remove-Item $stagingDir -Recurse -Force }
+New-Item -Path $stagingDir -ItemType Directory -Force | Out-Null
+
+# Copy files preserving structure
+foreach ($file in $files) {
+    $relativePath = $file.FullName.Substring((Get-Location).Path.Length + 1)
+    $targetPath = Join-Path $stagingDir $relativePath
+    $targetDir = Split-Path $targetPath -Parent
+    if (-not (Test-Path $targetDir)) {
+        New-Item -Path $targetDir -ItemType Directory -Force | Out-Null
+    }
+    Copy-Item $file.FullName -Destination $targetPath -Force
+}
+
+# Create ZIP from staging directory (preserves structure)
+Compress-Archive -Path "$stagingDir\*" -DestinationPath $tempZip -Force
+
+# Cleanup staging
+Remove-Item $stagingDir -Recurse -Force
 
 if (-not (Test-Path $tempZip)) {
     Write-Host "  ❌ ERROR: Failed to create deployment package" -ForegroundColor Red
