@@ -313,11 +313,18 @@ try {
         $resourceId = "/subscriptions/$subscriptionId/resourceGroups/$middlewareRgName/providers/Microsoft.CognitiveServices/accounts/$openAIServiceName"
         
         Write-Host "  ⚙ Temporarily enabling API key authentication for agent creation..." -ForegroundColor Yellow
-        az resource update `
+        $enableResult = az resource update `
             --ids $resourceId `
             --set properties.disableLocalAuth=false `
             --api-version 2023-05-01 `
-            --output none 2>&1 | Out-Null
+            --output json 2>&1
+        
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "  ⚠️  Failed to enable API key auth: $enableResult" -ForegroundColor Yellow
+            Write-Host "  Continuing anyway (may already be enabled)..." -ForegroundColor Gray
+        } else {
+            Write-Host "  ✓ API key auth enabled" -ForegroundColor Green
+        }
         
         Write-Host "  ⏱ Waiting 30 seconds for change to propagate..." -ForegroundColor Gray
         Start-Sleep -Seconds 30
@@ -754,17 +761,26 @@ if (-not $cosmosCheck) {
             $cosmosEndpoint = $bicepOutputJson.backend.value.cosmosDbEndpoint
             
             # Temporarily enable local auth to get connection string
-            Write-Host "    🔑 Getting Cosmos DB connection string..." -ForegroundColor Gray
+            Write-Host "    🔑 Enabling local auth temporarily..." -ForegroundColor Gray
             $cosmosResourceId = "/subscriptions/$subscriptionId/resourceGroups/$backendRgName/providers/Microsoft.DocumentDB/databaseAccounts/$cosmosAccountName"
             
             # Enable local auth temporarily (if not already enabled)
-            az resource update `
+            $enableResult = az resource update `
                 --ids $cosmosResourceId `
                 --set properties.disableLocalAuth=false `
                 --api-version 2023-11-15 `
-                --output none 2>&1 | Out-Null
+                --output json 2>&1
             
-            Start-Sleep -Seconds 10  # Wait for auth change to propagate
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "    ⚠️  Failed to enable local auth: $enableResult" -ForegroundColor Yellow
+                Write-Host "    Continuing anyway (may already be enabled)..." -ForegroundColor Gray
+            } else {
+                Write-Host "    ✓ Local auth enabled" -ForegroundColor Green
+            }
+            
+            # CRITICAL: Wait for auth change to propagate globally
+            Write-Host "    ⏳ Waiting 120 seconds for auth propagation..." -ForegroundColor Gray
+            Start-Sleep -Seconds 120
             
             # Get connection string
             $cosmosKeys = az cosmosdb keys list `
@@ -798,13 +814,22 @@ if (-not $cosmosCheck) {
             
             # Re-secure Cosmos DB (disable local auth - back to managed identity only)
             Write-Host "    🔒 Re-securing Cosmos DB (managed identity only)..." -ForegroundColor Gray
-            az resource update `
+            $disableResult = az resource update `
                 --ids $cosmosResourceId `
                 --set properties.disableLocalAuth=true `
                 --api-version 2023-11-15 `
-                --output none 2>&1 | Out-Null
+                --output json 2>&1
             
-            Write-Host "    ✓ Cosmos DB re-secured" -ForegroundColor Green
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "    ⚠️  Failed to disable local auth: $disableResult" -ForegroundColor Yellow
+                Write-Host "    SECURITY WARNING: Local auth may still be enabled!" -ForegroundColor Red
+            } else {
+                Write-Host "    ✓ Cosmos DB re-secured (managed identity only)" -ForegroundColor Green
+            }
+            
+            # Wait for auth change to propagate
+            Write-Host "    ⏳ Waiting 120 seconds for auth propagation..." -ForegroundColor Gray
+            Start-Sleep -Seconds 120
             
         } else {
             Write-Host "  ⚠ Python not found - skipping container initialization" -ForegroundColor Yellow

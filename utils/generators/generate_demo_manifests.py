@@ -4,7 +4,7 @@ Generate sample driver manifests for demonstration
 Creates realistic delivery data with Sydney addresses
 
 Usage:
-    # Generate regular demo manifests for all drivers (driver-001 through driver-057)
+    # Generate demo manifests for first 3 drivers (driver-001, driver-002, driver-003)
     python generate_demo_manifests.py
 
     # Generate large scalability test manifest for driver-004 with 120 parcels
@@ -338,7 +338,7 @@ SAMPLE_ADDRESSES_ACT = [
     },
 ]
 
-# Sample drivers - 57 drivers distributed across Australian states and cities
+# Sample drivers - 57 drivers available, but deployment uses first 3 for speed (driver-001, driver-002, driver-003)
 # NSW: 25 drivers (Sydney), VIC: 12 drivers (Melbourne), QLD: 10 drivers (Brisbane), SA: 6 drivers (Adelaide), WA: 3 drivers (Perth), ACT: 1 driver (Canberra)
 SAMPLE_DRIVERS = [
     # NSW Drivers (25) - Sydney
@@ -617,12 +617,15 @@ async def create_driver_manifests(db: ParcelTrackingDB, state_barcodes: dict):
     import random
     from datetime import datetime
 
-    print(f"\n🚚 Creating driver manifests for {len(SAMPLE_DRIVERS)} drivers across states...")
+    # Limit to first 3 drivers for faster deployment/demo
+    DEMO_DRIVERS = SAMPLE_DRIVERS[:3]
+    
+    print(f"\n🚚 Creating driver manifests for {len(DEMO_DRIVERS)} drivers across states...")
 
     # Distribute parcels with variation (30-50 per driver)
     manifests_created = 0
 
-    for driver in SAMPLE_DRIVERS:
+    for driver in DEMO_DRIVERS:
         driver_state = driver.get("state", "NSW")
         driver_location = driver.get("location", driver_state)
 
@@ -708,15 +711,15 @@ async def create_driver_manifests(db: ParcelTrackingDB, state_barcodes: dict):
             print(f"      ❌ Error: {e}")
 
     # Calculate total parcels distributed
-    total_distributed = len(SAMPLE_DRIVERS) * 40  # approximate
+    total_distributed = len(DEMO_DRIVERS) * 40  # approximate
 
     print(f"\n   📊 Summary:")
     print(f"      Created: {manifests_created} manifests")
-    print(f"      Total drivers: {len(SAMPLE_DRIVERS)}")
+    print(f"      Total drivers: {len(DEMO_DRIVERS)}")
 
     # Show breakdown by state
     state_counts = {}
-    for driver in SAMPLE_DRIVERS:
+    for driver in DEMO_DRIVERS:
         state = driver.get("state", "NSW")
         state_counts[state] = state_counts.get(state, 0) + 1
 
@@ -769,7 +772,7 @@ async def main():
     print()
     print(f"Generated:")
     print(f"   • {total_parcels} parcels")
-    print(f"   • {len(SAMPLE_DRIVERS)} driver manifests")
+    print(f"   • 3 driver manifests (driver-001, driver-002, driver-003)")
     print(f"   • 30-50 parcels per driver (randomized)")
     print()
     print("Next steps:")
@@ -777,10 +780,9 @@ async def main():
     print("2. Navigate to 'Admin > View Manifests' to see all manifests")
     print("3. Navigate to 'Drivers > My Manifest' to see individual driver views")
     print()
-    print("Sample drivers (first 5):")
-    for driver in SAMPLE_DRIVERS[:5]:
+    print("Sample drivers:")
+    for driver in SAMPLE_DRIVERS[:3]:
         print(f"   - {driver['name']}: {driver['id']}")
-    print(f"   ... and {len(SAMPLE_DRIVERS) - 5} more drivers")
     print()
     print("💡 Tip: Add AZURE_MAPS_SUBSCRIPTION_KEY to .env for route optimization")
     print()
