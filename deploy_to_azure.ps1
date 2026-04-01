@@ -1159,6 +1159,20 @@ try {
                 Write-Host "    ⚠ Demo manifest generation had issues" -ForegroundColor Yellow
             }
 
+            # Generate Voice & Text Example demo parcels + small realistic dataset
+            Write-Host "    • Creating Voice & Text Example demo parcels (RG857954, DT202512170037)..." -ForegroundColor Gray
+            Write-Host "      (Also creating 100 realistic parcels for demonstration)" -ForegroundColor Gray
+            $bulkDemoOutput = python utils/generators/generate_bulk_realistic_data.py --count 100 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "    ✓ Voice & Text Example demo parcels created" -ForegroundColor Green
+                Write-Host "      ✓ Try: 'Track parcel RG857954' or 'Find parcels for Dr. Emma Wilson'" -ForegroundColor Cyan
+            } else {
+                Write-Host "    ⚠ Demo parcel generation had issues" -ForegroundColor Yellow
+                if ($bulkDemoOutput) {
+                    Write-Host "      Error: $($bulkDemoOutput | Select-String -Pattern 'Error|Exception' | Select-Object -First 1)" -ForegroundColor Gray
+                }
+            }
+
             # Create approval demo requests
             Write-Host "    • Creating approval demo requests for existing parcels..." -ForegroundColor Gray
             $approvalOutput = python utils/generators/create_approval_requests.py 2>&1

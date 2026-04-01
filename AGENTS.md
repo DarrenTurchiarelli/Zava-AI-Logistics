@@ -336,10 +336,11 @@ python utils/generators/generate_bulk_realistic_data.py --count 5000
 ```
 
 **What it creates:**
-- 🎤 **Specific demo parcels** for Voice & Text Examples:
+- 🎤 **Specific demo parcels** for Voice & Text Examples (ALWAYS CREATED):
   - `RG857954` - Dr. Emma Wilson (Sydney NSW) - Out For Delivery
   - `DT202512170037` - Sarah Johnson (Perth WA) - Delivered with photo proof
   - Full event histories, photos, sender data
+  - **NOTE**: These 2 parcels are also auto-created during deployment (with 100 additional realistic parcels)
   
 - 📦 **Thousands of realistic parcels** distributed across:
   - All 8 Australian states (NSW, VIC, QLD, WA, SA, TAS, ACT, NT)
