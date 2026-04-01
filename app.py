@@ -441,38 +441,24 @@ def inject_company_info():
 
 # Helper function to run async functions in Flask
 def run_async(coro):
-    """Run async coroutine in Flask context with proper cleanup"""
+    """
+    Optimized async runner for Flask routes
+    
+    Uses asyncio.run() which is more efficient than creating/destroying loops.
+    Note: asyncio.run() automatically handles cleanup and is the recommended approach
+    for running async code from synchronous contexts in Python 3.7+.
+    """
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            result = loop.run_until_complete(coro)
-            # IMPORTANT: Give a moment for any background cleanup tasks to complete
-            # (e.g., Azure SDK connection cleanup) before forcibly shutting down
-            loop.run_until_complete(asyncio.sleep(0.05))
-            return result
-        finally:
-            # Only cancel tasks that are still pending after main coroutine completes
-            # Don't be too aggressive - let SDK cleanup tasks finish naturally
+        return asyncio.run(coro)
+    except RuntimeError as e:
+        if "cannot schedule new futures after shutdown" in str(e) or "no running event loop" in str(e):
+            # Fallback: create new loop only if absolutely necessary
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
             try:
-                pending = [task for task in asyncio.all_tasks(loop) if not task.done()]
-                if pending:
-                    # Give background tasks a moment to finish instead of immediate cancellation
-                    loop.run_until_complete(asyncio.sleep(0.1))
-                    # Re-check after waiting
-                    still_pending = [task for task in asyncio.all_tasks(loop) if not task.done()]
-                    for task in still_pending:
-                        task.cancel()
-                    if still_pending:
-                        loop.run_until_complete(asyncio.gather(*still_pending, return_exceptions=True))
-            except Exception:
-                pass
+                return loop.run_until_complete(coro)
             finally:
                 loop.close()
-    except RuntimeError as e:
-        if "cannot schedule new futures after shutdown" in str(e):
-            # Event loop already shut down, return None gracefully
-            return None
         raise
 
 
