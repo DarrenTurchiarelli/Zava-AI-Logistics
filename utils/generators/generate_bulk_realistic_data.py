@@ -175,12 +175,10 @@ async def create_demo_parcel(db: ParcelTrackingDB, parcel_spec: Dict) -> str:
         if parcel_spec['status'] == 'Delivered':
             events.append(('Delivered', parcel_spec.get('assigned_driver', 'driver-001'), 0))
             # Add delivery photo
-            await db.add_delivery_proof(
+            await db.store_delivery_photo(
                 barcode=barcode,
-                photo_data=generate_dummy_photo(),
-                signature_data=None,
-                delivered_to=parcel_spec['recipient_name'],
-                notes="Delivered successfully"
+                photo_base64=generate_dummy_photo(),
+                uploaded_by=parcel_spec.get('assigned_driver', 'driver-001')
             )
         
         # Add events with realistic timestamps
