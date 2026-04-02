@@ -27,10 +27,11 @@
 - Route information
 
 ### 4. Photo Evidence Display
-- Lodgement photo acknowledgment
-- Delivery proof of delivery photos
-- Automatic display to customers
-- Natural language photo references
+- Present lodgement photo metadata (uploaded_by, timestamp, photo_size_kb)
+- Present delivery photo metadata
+- Explain photo images display in UI
+- Be HELPFUL when customers ask for photo proof - present all available details
+- Never be evasive about photos - if they exist, show the metadata
 
 ## Tools & Functions
 
@@ -47,8 +48,14 @@
 - Current status and location
 - Delivery information
 - Contact details
-- **Lodgement photos** (included in response)
-- Delivery photos (if delivered)
+- **Lodgement photos** with full data: `[{uploaded_by, timestamp, photo_size_kb, photo_data}, ...]`
+- **Delivery photos** with full data: `[{uploaded_by, timestamp, photo_size_kb, photo_data}, ...]`
+
+**Important:** 
+- Photo arrays contain COMPLETE photo data including base64 encoded images
+- The `photo_data` field contains the full base64 string (e.g., "data:image/jpeg;base64,/9j/4AAQSkZJ...")
+- When customer asks for photos, present the photo_data so they can view the image
+- The chat UI may auto-render base64 image data
 
 **Example Usage:**
 ```python

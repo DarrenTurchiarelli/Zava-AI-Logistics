@@ -155,6 +155,7 @@ module openAIAppServiceRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
   params: {
     principalId: frontend.outputs.appServicePrincipalId
     cognitiveServiceName: middleware.outputs.openAIServiceName
+    serviceType: 'openai'
   }
 }
 
@@ -165,6 +166,7 @@ module openAIHubRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
   params: {
     principalId: middleware.outputs.aiHubPrincipalId
     cognitiveServiceName: middleware.outputs.openAIServiceName
+    serviceType: 'openai'
   }
 }
 
@@ -175,6 +177,7 @@ module openAIProjectRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
   params: {
     principalId: middleware.outputs.aiProjectPrincipalId
     cognitiveServiceName: middleware.outputs.openAIServiceName
+    serviceType: 'openai'
   }
 }
 
@@ -185,6 +188,7 @@ module speechAppServiceRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
   params: {
     principalId: frontend.outputs.appServicePrincipalId
     cognitiveServiceName: sharedServices.outputs.speechServiceName
+    serviceType: 'speech'
   }
 }
 
@@ -195,6 +199,7 @@ module visionAppServiceRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
   params: {
     principalId: frontend.outputs.appServicePrincipalId
     cognitiveServiceName: sharedServices.outputs.visionServiceName
+    serviceType: 'vision'
   }
 }
 

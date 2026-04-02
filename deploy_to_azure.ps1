@@ -347,18 +347,6 @@ try {
         python Scripts/create_foundry_agents_openai.py 2>&1 | Tee-Object -Variable agentOutput | Out-Host
         $agentExitCode = $LASTEXITCODE
         
-        # Disable API key authentication again (back to managed identity only)
-        Write-Host ""
-        Write-Host "  🔒 Disabling API key authentication (switching to managed identity)..." -ForegroundColor Yellow
-        az resource update `
-            --ids $resourceId `
-            --set properties.disableLocalAuth=true `
-            --api-version 2023-05-01 `
-            --output none 2>&1 | Out-Null
-        
-        Write-Host "  ✓ Azure OpenAI now uses managed identity only" -ForegroundColor Green
-        Write-Host ""
-        
         # Check if agent creation was successful
         if ($agentExitCode -eq 0 -and $agentOutput) {
             # Extract JSON from output (should be at the end)
@@ -368,29 +356,77 @@ try {
                 # Parse agent IDs from JSON
                 $agentIds = $jsonMatch.Value | ConvertFrom-Json
                 
+                Write-Host ""
                 Write-Host "  ✓ Successfully created all agents" -ForegroundColor Green
                 Write-Host ""
                 Write-Host "  📋 Agent IDs:" -ForegroundColor Cyan
                 
+                # Store agent IDs in both $agentSettings and environment variables
                 $agentIds.PSObject.Properties | ForEach-Object {
                     Write-Host "     $($_.Name) = $($_.Value)" -ForegroundColor Gray
                     $agentSettings[$_.Name] = $_.Value
+                    # Set as environment variable for tool registration script
+                    Set-Item -Path "env:$($_.Name)" -Value $_.Value
                 }
                 
                 Write-Host ""
-                Write-Host "  ✓ Agent IDs will be configured in app settings" -ForegroundColor Green
+                Write-Host "  ✓ Agent IDs captured and ready for tool registration" -ForegroundColor Green
+                
+                # Register tools with Customer Service Agent (API key auth still enabled)
+                Write-Host ""
+                Write-Host "  🔧 Registering Cosmos DB tools with Customer Service Agent..." -ForegroundColor Cyan
+                Write-Host "     Agent ID: $($agentSettings['CUSTOMER_SERVICE_AGENT_ID'])" -ForegroundColor Gray
+                Write-Host ""
+                
+                # Environment variables already set (API key, endpoint, agent IDs)
+                python Scripts/register_agent_tools_openai.py 2>&1 | Tee-Object -Variable toolOutput | Out-Host
+                $toolExitCode = $LASTEXITCODE
+                
+                if ($toolExitCode -eq 0) {
+                    Write-Host ""
+                    Write-Host "  ✓ Successfully registered agent tools" -ForegroundColor Green
+                    
+                    # Validate tool registration
+                    Write-Host ""
+                    Write-Host "  ✅ Validating tool registration..." -ForegroundColor Cyan
+                    python Scripts/validate_agent_tools.py 2>&1 | Out-Host
+                    $validateExitCode = $LASTEXITCODE
+                    
+                    if ($validateExitCode -eq 0) {
+                        Write-Host "  ✓ Tool registration validated successfully" -ForegroundColor Green
+                    } else {
+                        Write-Host "  ⚠ Tool validation failed - agent may not work correctly" -ForegroundColor Yellow
+                    }
+                } else {
+                    Write-Host ""
+                    Write-Host "  ⚠ Tool registration failed (exit code: $toolExitCode)" -ForegroundColor Yellow
+                    Write-Host "  Agent will not be able to access Cosmos DB" -ForegroundColor Yellow
+                }
+                
             } else {
+                Write-Host ""
                 Write-Host "  ⚠ Agent creation completed but couldn't parse JSON output" -ForegroundColor Yellow
                 Write-Host "  Output: $($agentOutput.Substring(0, [Math]::Min(200, $agentOutput.Length)))" -ForegroundColor Gray
             }
         } else {
+            Write-Host ""
             Write-Host "  ⚠ Agent creation failed (exit code: $agentExitCode)" -ForegroundColor Yellow
             Write-Host "  ⚠ Continuing deployment without agents" -ForegroundColor Yellow
             Write-Host ""
-            Write-Host "  ⚠ Continuing deployment without agents" -ForegroundColor Yellow
             Write-Host "  You can create agents manually after deployment" -ForegroundColor Gray
             Write-Host "    Run: python Scripts/create_foundry_agents_openai.py" -ForegroundColor Gray
         }
+        
+        # NOW disable API key authentication (after tool registration)
+        Write-Host ""
+        Write-Host "  🔒 Disabling API key authentication (switching to managed identity)..." -ForegroundColor Yellow
+        az resource update `
+            --ids $resourceId `
+            --set properties.disableLocalAuth=true `
+            --api-version 2023-05-01 `
+            --output none 2>&1 | Out-Null
+        
+        Write-Host "  ✓ Azure OpenAI now uses managed identity only" -ForegroundColor Green
     } else {
         Write-Host "  ⚠ Python not found - skipping agent creation" -ForegroundColor Yellow
         Write-Host "  You can create agents manually after deployment" -ForegroundColor Gray
@@ -442,9 +478,74 @@ if (Test-Path ".env") {
 
     if ($agentIds.Count -gt 0) {
         Write-Host "  ✓ Found/Created $($agentIds.Count) agent ID(s)" -ForegroundColor Green
+        
+        # Register tools if Customer Service Agent exists and tools weren't just registered
+        if ($agentIds.ContainsKey("CUSTOMER_SERVICE_AGENT_ID") -and $agentSettings.Count -eq 0) {
+            Write-Host ""
+            Write-Host "  🔧 Verifying agent tools are registered..." -ForegroundColor Cyan
+            Write-Host "     Agent ID: $($agentIds['CUSTOMER_SERVICE_AGENT_ID'])" -ForegroundColor Gray
+            
+            # Temporarily enable API key auth for validation and registration
+            Write-Host ""
+            Write-Host "  ⚙ Temporarily enabling API key authentication..." -ForegroundColor Yellow
+            $resourceId = az cognitiveservices account show --name $openAIServiceName --resource-group $middlewareRgName --query id -o tsv
+            
+            # Use REST API for reliable enable
+            $body = @{properties=@{disableLocalAuth=$false}} | ConvertTo-Json -Compress
+            az rest --method PATCH --uri "$resourceId`?api-version=2023-05-01" --headers "Content-Type=application/json" --body $body --output none
+            
+            Write-Host "  ⏱ Waiting 15 seconds for propagation..." -ForegroundColor Yellow
+            Start-Sleep -Seconds 15
+            
+            # Get API key
+            Write-Host "  🔑 Retrieving API key..." -ForegroundColor Yellow
+            $openAIApiKey = az cognitiveservices account keys list --name $openAIServiceName --resource-group $middlewareRgName --query key1 -o tsv
+            
+            # Set environment variables for all agent IDs
+            $env:AZURE_OPENAI_ENDPOINT = $bicepOutputJson.middleware.value.openAIServiceEndpoint
+            $env:AZURE_OPENAI_API_KEY = $openAIApiKey
+            foreach ($key in $agentIds.Keys) {
+                Set-Item -Path "env:$key" -Value $agentIds[$key]
+            }
+            
+            Write-Host ""
+            # First validate if tools are already registered
+            python Scripts/validate_agent_tools.py 2>&1 | Out-Host
+            $validateExitCode = $LASTEXITCODE
+            
+            if ($validateExitCode -ne 0) {
+                # Tools not registered or validation failed - register them
+                Write-Host ""
+                Write-Host "  🔧 Registering Cosmos DB tools..." -ForegroundColor Cyan
+                python Scripts/register_agent_tools_openai.py 2>&1 | Out-Host
+                $toolExitCode = $LASTEXITCODE
+                
+                if ($toolExitCode -eq 0) {
+                    Write-Host ""
+                    Write-Host "  ✓ Agent tools registered successfully" -ForegroundColor Green
+                    
+                    # Validate again
+                    Write-Host ""
+                    python Scripts/validate_agent_tools.py 2>&1 | Out-Host
+                } else {
+                    Write-Host ""
+                    Write-Host "  ⚠ Tool registration failed (exit code: $toolExitCode)" -ForegroundColor Yellow
+                }
+            } else {
+                Write-Host ""
+                Write-Host "  ✓ Agent tools already registered and validated" -ForegroundColor Green
+            }
+            
+            # Disable API key auth
+            Write-Host ""
+            Write-Host "  🔒 Disabling API key authentication..." -ForegroundColor Yellow
+            $body = @{properties=@{disableLocalAuth=$true}} | ConvertTo-Json -Compress
+            az rest --method PATCH --uri "$resourceId`?api-version=2023-05-01" --headers "Content-Type=application/json" --body $body --output none
+            Write-Host "  ✓ API key authentication disabled" -ForegroundColor Green
+        }
     } else {
         Write-Host "  ⚠ No agent IDs found - agents may not work" -ForegroundColor Yellow
-        Write-Host "    Run manually: python Scripts/create_foundry_agents.py" -ForegroundColor Gray
+        Write-Host "    Run manually: python Scripts/create_foundry_agents_openai.py" -ForegroundColor Gray
     }
 
     # Add depot addresses
@@ -1385,27 +1486,79 @@ if ($generateBulkData -eq 'y' -or $generateBulkData -eq 'Y') {
             --api-version 2023-11-15 `
             --output none 2>&1 | Out-Null
         
-        Write-Host "  ⏱  Waiting 120 seconds for auth propagation..." -ForegroundColor Gray
-        Write-Host "     (Azure needs time to replicate auth changes across regions)" -ForegroundColor Gray
-        Start-Sleep -Seconds 120
+        Write-Host "  ⏱  Waiting 180 seconds for auth propagation..." -ForegroundColor Gray
+        Write-Host "     (Data plane needs more time than control plane)" -ForegroundColor Gray
+        Start-Sleep -Seconds 180
         
-        # Verify local auth is enabled
-        Write-Host "  🔍 Verifying local auth is enabled..." -ForegroundColor Cyan
+        # Verify local auth is enabled (control plane check)
+        Write-Host "  🔍 Verifying local auth is enabled (control plane)..." -ForegroundColor Cyan
         $authStatus = az cosmosdb show --name $cosmosAccountName --resource-group $backendRgName --query "disableLocalAuth" -o tsv
         if ($authStatus -eq "false") {
-            Write-Host "  ✓ Local auth confirmed enabled" -ForegroundColor Green
+            Write-Host "  ✓ Local auth confirmed enabled (control plane)" -ForegroundColor Green
         } else {
             Write-Host "  ⚠️  Local auth not yet enabled - waiting additional 60 seconds..." -ForegroundColor Yellow
             Start-Sleep -Seconds 60
         }
         
-        # Get connection string
+        # Get connection string BEFORE testing
+        Write-Host "  🔑 Retrieving connection string..." -ForegroundColor Cyan
         $connectionString = az cosmosdb keys list `
             --name $cosmosAccountName `
             --resource-group $backendRgName `
             --type connection-strings `
             --query "connectionStrings[0].connectionString" `
             -o tsv
+        
+        # Test data plane connectivity (most important check)
+        Write-Host "  🔍 Testing data plane connectivity with connection string..." -ForegroundColor Cyan
+        $testSuccess = $false
+        $retryCount = 0
+        $maxRetries = 3
+        
+        while (-not $testSuccess -and $retryCount -lt $maxRetries) {
+            $retryCount++
+            
+            # Quick Python test that actually tries to connect to data plane
+            $env:COSMOS_CONNECTION_STRING = $connectionString
+            $testScript = @"
+import os, sys
+sys.path.insert(0, '.')
+try:
+    from parcel_tracking_db import ParcelTrackingDB
+    import asyncio
+    async def test():
+        async with ParcelTrackingDB() as db:
+            container = db.database.get_container_client('parcels')
+            query = 'SELECT TOP 1 c.id FROM c'
+            items = []
+            async for item in container.query_items(query=query):
+                items.append(item)
+                break
+            return True
+    asyncio.run(test())
+    print('SUCCESS')
+except Exception as e:
+    print(f'FAILED: {str(e)}')
+    sys.exit(1)
+"@
+            
+            $testOutput = python -c $testScript 2>&1
+            
+            if ($LASTEXITCODE -eq 0 -and $testOutput -match "SUCCESS") {
+                $testSuccess = $true
+                Write-Host "  ✓ Data plane connectivity confirmed" -ForegroundColor Green
+            } else {
+                if ($retryCount -lt $maxRetries) {
+                    Write-Host "  ⚠️  Data plane not ready (attempt $retryCount/$maxRetries) - waiting 30 seconds..." -ForegroundColor Yellow
+                    Write-Host "     Error: $($testOutput -join ' ')" -ForegroundColor Gray
+                    Start-Sleep -Seconds 30
+                } else {
+                    Write-Host "  ❌ Data plane still not ready after $maxRetries attempts" -ForegroundColor Red
+                    Write-Host "     Last error: $($testOutput -join ' ')" -ForegroundColor Gray
+                    Write-Host "     WARNING: Continuing anyway - bulk generation may use retry logic" -ForegroundColor Yellow
+                }
+            }
+        }
         
         if ($connectionString) {
             $env:COSMOS_CONNECTION_STRING = $connectionString

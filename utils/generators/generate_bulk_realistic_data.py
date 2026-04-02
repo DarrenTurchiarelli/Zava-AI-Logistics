@@ -22,6 +22,7 @@ import os
 import sys
 import random
 import base64
+import time
 from datetime import datetime, timedelta
 from typing import List, Dict
 import argparse
@@ -41,6 +42,54 @@ load_dotenv()
 
 # Initialize Faker for Australian data
 fake = Faker('en_AU')
+
+
+async def connect_with_retry(max_retries=5, initial_delay=15):
+    """
+    Try connecting to Cosmos DB with exponential backoff.
+    
+    This handles the case where local auth was just enabled but hasn't
+    propagated to the data plane yet. Retries with increasing delays.
+    
+    Args:
+        max_retries: Maximum number of connection attempts
+        initial_delay: Initial delay in seconds (doubles each retry)
+    
+    Returns:
+        ParcelTrackingDB instance (already entered context)
+    
+    Raises:
+        Exception: If all retries fail
+    """
+    for attempt in range(max_retries):
+        try:
+            print(f"  🔌 Connecting to Cosmos DB (attempt {attempt + 1}/{max_retries})...")
+            db = ParcelTrackingDB()
+            await db.__aenter__()
+            
+            # Test connectivity with actual query to data plane
+            container = db.database.get_container_client("parcels")
+            query = "SELECT TOP 1 c.id FROM c"
+            items = []
+            async for item in container.query_items(query=query):
+                items.append(item)
+                break
+            
+            print(f"  ✓ Connected to Cosmos DB successfully")
+            return db
+            
+        except Exception as e:
+            error_msg = str(e)
+            if attempt < max_retries - 1:
+                delay = initial_delay * (2 ** attempt)  # Exponential backoff: 15, 30, 60, 120, 240 seconds
+                print(f"  ⚠️  Connection failed (attempt {attempt + 1}/{max_retries})")
+                print(f"     Error: {error_msg[:150]}..." if len(error_msg) > 150 else f"     Error: {error_msg}")
+                print(f"     Retrying in {delay} seconds...")
+                time.sleep(delay)
+            else:
+                print(f"  ❌ Failed to connect after {max_retries} attempts")
+                print(f"     Last error: {error_msg}")
+                raise
 
 # Australian states and major cities
 AUSTRALIAN_LOCATIONS = {
@@ -271,12 +320,10 @@ async def create_realistic_parcel(db: ParcelTrackingDB, state: str, city: str, i
     
     # Add photos for delivered parcels (30% chance)
     if status == 'Delivered' and random.random() < 0.3:
-        await db.add_delivery_proof(
+        await db.store_delivery_photo(
             barcode=barcode,
-            photo_data=generate_dummy_photo(),
-            signature_data=None,
-            delivered_to=recipient_name,
-            notes="Delivered successfully"
+            photo_base64=generate_dummy_photo(),
+            uploaded_by="driver"
         )
     
     # Assign to drivers for out for delivery/delivered parcels
@@ -304,7 +351,9 @@ async def main():
     print(f"Target: {total_parcels:,} parcels across all Australian states")
     print()
     
-    async with ParcelTrackingDB() as db:
+    # Use retry logic for connection
+    db = await connect_with_retry(max_retries=5, initial_delay=15)
+    try:
         # Step 1: Create specific demo parcels for Voice & Text Examples
         print("📋 Step 1: Creating Demo Parcels for Voice & Text Examples")
         print("-" * 80)
@@ -421,7 +470,8 @@ async def main():
         print("  • 'Who sent parcel RG857954?'")
         print("  • 'Find parcels for Dr. Emma Wilson'")
         print("  • 'Show me delivery statistics for Western Australia'")
-        print()
-
+        print()    finally:
+        # Clean up database connection
+        await db.__aexit__(None, None, None)
 if __name__ == "__main__":
     asyncio.run(main())

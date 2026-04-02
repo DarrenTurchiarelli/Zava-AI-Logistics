@@ -72,6 +72,7 @@ async def track_parcel_tool(tracking_number: str) -> str:
                         "uploaded_by": photo.get("uploaded_by"),
                         "timestamp": photo.get("timestamp"),
                         "photo_size_kb": len(photo.get("photo_data", "")) // 1024 if photo.get("photo_data") else 0,
+                        "photo_data": photo.get("photo_data", ""),  # Include base64 image data
                     }
                     for photo in parcel.get("delivery_photos", [])
                 ],
@@ -80,6 +81,7 @@ async def track_parcel_tool(tracking_number: str) -> str:
                         "uploaded_by": photo.get("uploaded_by"),
                         "timestamp": photo.get("timestamp"),
                         "photo_size_kb": len(photo.get("photo_data", "")) // 1024 if photo.get("photo_data") else 0,
+                        "photo_data": photo.get("photo_data", ""),  # Include base64 image data
                     }
                     for photo in parcel.get("lodgement_photos", [])
                 ],

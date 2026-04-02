@@ -743,11 +743,20 @@ async function sendMessage() {
     }
 
     try {
+        // Auto-clear thread when tracking number changes (prevents context bleeding)
+        if (trackingNum && lastTrackingNumber && trackingNum !== lastTrackingNumber) {
+            console.log(`📌 New tracking number detected (${lastTrackingNumber} → ${trackingNum}), starting fresh conversation`);
+            currentThreadId = null;
+        }
+        if (trackingNum) {
+            lastTrackingNumber = trackingNum;
+        }
+
         const requestBody = {
             query: query,
             tracking_number: trackingNum
         };
-        // Include thread_id for conversation persistence
+        // Include thread_id ONLY for follow-up questions about same parcel
         if (currentThreadId) {
             requestBody.thread_id = currentThreadId;
         }
@@ -764,7 +773,7 @@ async function sendMessage() {
         removeLoading();
 
         if (response.ok) {
-            // Store thread_id for conversation continuity
+            // Store thread_id for conversation continuity (same parcel follow-ups)
             if (data.thread_id) {
                 currentThreadId = data.thread_id;
             }
@@ -1028,6 +1037,8 @@ let chatHistory = [];
 
 // Current conversation thread ID for persistence
 let currentThreadId = null;
+// Track last tracking number to detect when user switches parcels
+let lastTrackingNumber = null;
 
 function clearChat() {
     // Stop any ongoing speech
@@ -1035,6 +1046,7 @@ function clearChat() {
 
     // Clear conversation thread for new chat
     currentThreadId = null;
+    lastTrackingNumber = null;
 
     // Save current chat to history
     const chatMessages = document.getElementById('chatMessages');

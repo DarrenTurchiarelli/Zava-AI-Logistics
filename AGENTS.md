@@ -63,6 +63,9 @@ py app.py
 - ✅ Complete infrastructure via Bicep (Cosmos DB, AI Hub, Maps, etc.)
 - ✅ RBAC permissions configured automatically
 - ✅ Demo data and users initialized
+- ✅ **Agents created AND tools registered automatically**
+- ✅ **Agent IDs dynamically captured and validated**
+- ✅ **Tool registration validated before deployment completes**
 - ✅ No manual Azure portal configuration needed
 
 ## Azure AI Foundry Agents
@@ -90,6 +93,11 @@ py app.py
 - `track_parcel_tool` - Real-time parcel tracking by tracking number
 - `search_parcels_by_recipient_tool` - Search by name/postcode/address
 - `search_parcels_by_driver_tool` - Search by driver assignment
+
+**Tool Registration:**
+- ✅ **Automatically registered during deployment**
+- Tools enable agent to query Cosmos DB in real-time
+- No manual configuration needed
 
 **Prompt Locations:**
 - Base instructions: Azure AI Foundry portal or register_agent_tools.py:67-100
@@ -528,8 +536,12 @@ The deployment script automatically:
    - **Waits 60 seconds for RBAC replication across Azure regions**
    - **Retries operations if permissions not immediately available**
 5. ✅ **Creates all 8 Azure AI Foundry agents automatically using Azure OpenAI Assistants API** 🆕
-   - Temporarily enables API key authentication for agent creation only
+   - Temporarily enables API key authentication for agent creation and tool registration
    - Creates all 8 agents via Assistants API
+   - **Dynamically captures agent IDs from creation output** 🆕
+   - **Immediately updates App Service settings with correct agent IDs** 🆕
+   - **Registers Cosmos DB tools with Customer Service Agent** 🆕
+   - **Validates tool registration succeeded** 🆕
    - **Immediately disables API key authentication (switches back to managed identity)**
 6. ✅ Deploys application code
 7. ✅ Sets all environment variables including agent IDs

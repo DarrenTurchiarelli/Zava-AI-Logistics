@@ -4,7 +4,7 @@ Generate sample driver manifests for demonstration
 Creates realistic delivery data with Sydney addresses
 
 Usage:
-    # Generate demo manifests for first 3 drivers (driver-001, driver-002, driver-003)
+    # Generate demo manifests for first 5 drivers (driver-001 through driver-005)
     python generate_demo_manifests.py
 
     # Generate large scalability test manifest for driver-004 with 120 parcels
@@ -338,7 +338,7 @@ SAMPLE_ADDRESSES_ACT = [
     },
 ]
 
-# Sample drivers - 57 drivers available, but deployment uses first 3 for speed (driver-001, driver-002, driver-003)
+# Sample drivers - 57 drivers available, but deployment uses first 5 for speed (driver-001 through driver-005)
 # NSW: 25 drivers (Sydney), VIC: 12 drivers (Melbourne), QLD: 10 drivers (Brisbane), SA: 6 drivers (Adelaide), WA: 3 drivers (Perth), ACT: 1 driver (Canberra)
 SAMPLE_DRIVERS = [
     # NSW Drivers (25) - Sydney
@@ -617,12 +617,12 @@ async def create_driver_manifests(db: ParcelTrackingDB, state_barcodes: dict):
     import random
     from datetime import datetime
 
-    # Limit to first 3 drivers for faster deployment/demo
-    DEMO_DRIVERS = SAMPLE_DRIVERS[:3]
+    # Limit to first 5 drivers for faster deployment/demo (100 parcels total)
+    DEMO_DRIVERS = SAMPLE_DRIVERS[:5]
     
     print(f"\n🚚 Creating driver manifests for {len(DEMO_DRIVERS)} drivers across states...")
 
-    # Distribute parcels with variation (30-50 per driver)
+    # Distribute parcels with variation (15-25 per driver = ~100 parcels total)
     manifests_created = 0
 
     for driver in DEMO_DRIVERS:
@@ -646,7 +646,7 @@ async def create_driver_manifests(db: ParcelTrackingDB, state_barcodes: dict):
             city_barcodes.append(item["barcode"])
 
         # If not enough city-specific parcels, fall back to state
-        if len(city_barcodes) < 30:
+        if len(city_barcodes) < 15:
             query = """
                 SELECT c.barcode FROM c
                 WHERE c.destination_state = @state
@@ -669,8 +669,8 @@ async def create_driver_manifests(db: ParcelTrackingDB, state_barcodes: dict):
             print(f"\n   ⚠️  No parcels available for {driver['name']} in {driver_location}, {driver_state}")
             continue
 
-        # Random number of parcels between 30 and 50
-        num_parcels = min(random.randint(30, 50), len(available_barcodes))
+        # Random number of parcels between 15 and 25 (avg 20 per driver)
+        num_parcels = min(random.randint(15, 25), len(available_barcodes))
 
         # Get parcels for this driver
         driver_barcodes = available_barcodes[:num_parcels]
@@ -711,7 +711,7 @@ async def create_driver_manifests(db: ParcelTrackingDB, state_barcodes: dict):
             print(f"      ❌ Error: {e}")
 
     # Calculate total parcels distributed
-    total_distributed = len(DEMO_DRIVERS) * 40  # approximate
+    total_distributed = len(DEMO_DRIVERS) * 20  # approximate (5 drivers × 20 parcels)
 
     print(f"\n   📊 Summary:")
     print(f"      Created: {manifests_created} manifests")
@@ -772,8 +772,8 @@ async def main():
     print()
     print(f"Generated:")
     print(f"   • {total_parcels} parcels")
-    print(f"   • 3 driver manifests (driver-001, driver-002, driver-003)")
-    print(f"   • 30-50 parcels per driver (randomized)")
+    print(f"   • 5 driver manifests (driver-001 through driver-005)")
+    print(f"   • 15-25 parcels per driver (~100 total)")
     print()
     print("Next steps:")
     print("1. Open your browser to http://127.0.0.1:5000")
@@ -781,7 +781,7 @@ async def main():
     print("3. Navigate to 'Drivers > My Manifest' to see individual driver views")
     print()
     print("Sample drivers:")
-    for driver in SAMPLE_DRIVERS[:3]:
+    for driver in SAMPLE_DRIVERS[:5]:
         print(f"   - {driver['name']}: {driver['id']}")
     print()
     print("💡 Tip: Add AZURE_MAPS_SUBSCRIPTION_KEY to .env for route optimization")
