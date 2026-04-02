@@ -1,1031 +1,122 @@
 # 📦 Zava - AI-Powered Last Mile Delivery Platform
 
-A cutting-edge parcel tracking system powered by **8 Active Azure AI Foundry Agents** providing end-to-end intelligent automation for last-mile logistics. Built with Azure Cosmos DB, Azure Maps, Azure Speech Services, and the Microsoft Agent Framework.
-
-## ⭐ **Latest Updates** ⭐
-
-**February 10, 2026**
-
-- ✅ **Mobile-First Responsive UI**: Complete mobile optimization across all pages
-- ✅ **Mobile Bottom Navigation**: Touch-friendly nav bar with role-based links
-- ✅ **Mobile Card Views**: Tables convert to swipeable cards on small screens
-- ✅ **Address Notes Lifecycle**: Auto-categorised notes with TTL expiry (Safety 180d, Carded 30d)
-- ✅ **Note Dismiss System**: Drivers can remove stale/inaccurate address notes
-- ✅ **Expired Notes Cleanup**: Lazy pruning on read + scheduled bulk cleanup utility
-- ✅ **iOS/Android Optimizations**: Safe areas, viewport fixes, double-tap prevention
-
-**January 13, 2026**
-
-- ✅ **Customer Service Agent**: Lodgement photos now display correctly in tracking
-
-**December 18, 2025**
-
-- ✅ **8 Active AI Agents**: All core agents deployed and operational
-- ✅ **Agent Performance Dashboard**: Real-time monitoring with 344+ decisions tracked
-- ✅ **Optimization Agent**: Network-wide cost reduction and predictive analytics
-- ✅ **Sorting Facility Agent**: Real-time capacity monitoring and routing decisions
-- ✅ **Delivery Coordination Agent**: Customer notifications and route sequencing
-- ✅ **Fraud Detection Stats**: Enhanced metrics for decisions, confidence, and speed
-- ✅ **Modern Blue Theme**: Colorblind-accessible UI design
+Parcel tracking system powered by **8 Azure AI Foundry Agents** with end-to-end intelligent automation. Built with Azure Cosmos DB, Azure Maps, Azure Speech Services, and Microsoft Agent Framework.
 
 ## 🚀 Quick Start
 
-### **Web Application (Recommended)**
-
 ```powershell
-# Production mode (debug OFF for best performance)
+# Web application
 py app.py
 
-# OR with development environment variable (debug still OFF)
-$env:FLASK_ENV='development'; py app.py
-```
-
-Access at: **<http://127.0.0.1:5000>**
-
-**To enable debug mode**: `$env:DEBUG_MODE='true'; py app.py`
-
-**Default Login:**
-
-- Username: `admin`
-- Password: `admin123`
-
-### **Command-Line Interface**
-
-```powershell
+# Command-line interface
 python main.py
 ```
 
----
-
-## 🌐 Web Application Features
-
-### **📊 AI Insights Dashboard** (Main Dashboard)
-
-- **Landing Page**: First screen upon login
-- **Performance Metrics**: Real-time parcel statistics with drill-down links
-- **8 Active AI Agents**: Status cards showing all Azure AI Foundry agents
-- **Optimization Recommendations**: Cost reduction and efficiency insights
-- **Sorting Facility Monitoring**: Real-time capacity and routing analytics
-- **Delivery Coordination Stats**: Customer notification tracking
-- **System Health**: Unified status bar (Cosmos DB, AI Agents, Fraud Detection, API)
-- **Human-in-the-Loop**: Interactive approval modals for critical decisions
-
-### **📦 Parcel Management**
-
-- **Register New Parcels**: Multi-section form with complete details
-- **Track Parcels**: Search by tracking number with full history
-- **View All Parcels**: Comprehensive listing with sorting/filtering
-- **Real-time Updates**: Live tracking information
-
-### **🚗 Driver Manifest System**
-
-- **Azure Maps Route Optimization**: Real-time traffic analysis
-- **Automated Route Planning**: Up to 20 parcels per driver with optimized sequence
-- **Interactive Maps**: Embedded Azure Maps with route visualization
-- **Proof of Delivery**: Mobile-friendly interface for drivers
-- **Admin Dashboard**: View all active manifests with progress tracking
-- **Address Notes Lifecycle**: Auto-categorised delivery notes (Safety, Carded, Access, Property)
-- **Note Expiry & Cleanup**: Carded notes expire after 30 days, safety/access/property after 180 days
-- **Driver Note Dismiss**: Drivers can dismiss inaccurate notes directly from the manifest
-
-### **🎙️ Voice-Enabled Customer Service**
-
-- **Azure Speech Services Integration**: Voice input and output
-- **AI-Powered Chatbot**: Customer service agent assistance
-- **Public Chat Widget**: Available on all pages for visitors
-- **Multi-modal Input**: Type or speak your questions
-
-### **🛡️ Intelligent Fraud Detection**
-
-- **AI Risk Analysis**: Azure AI Foundry fraud detection
-- **Automated Workflows**: High-risk fraud → Customer Service escalation
-- **Multi-Channel Notifications**: Email, SMS, phone warnings
-- **OCR Support**: Extract text from screenshots
-- **Email Analysis**: Upload .EML or .MSG files for scanning
-- **Identity Verification**: For very high-risk cases (≥85% risk score)
-- **Automatic Parcel Holds**: Critical fraud cases (≥90% risk score)
-
-### **📱 Mobile-First Responsive Design**
-
-- **Mobile-optimized UI**: All pages redesigned for mobile-first experience
-- **Bottom Navigation Bar**: Touch-friendly role-based navigation on mobile
-- **Card-based Table Views**: Tables convert to swipeable cards on small screens
-- **Touch Targets**: Minimum 44px touch targets throughout the app
-- **iOS Safe Areas**: Full support for notched devices and safe area insets
-- **Viewport Fixes**: Correct 100vh handling on iOS, prevents zoom on input focus
-- **Dual-View Manifests**: Desktop table + mobile card views for driver and admin manifests
-- **Collapsible Panels**: Chatbot side panels collapse on mobile for full-width chat
-- **Landscape Support**: Optimized layouts for landscape mobile orientation
+**Login:** admin / admin123 | **URL:** http://127.0.0.1:5000
 
 ---
 
-## 🏗️ Architecture & Project Structure
+## ✨ Key Features
 
-### **Modern Package Organization**
-
-```
-dt_item_scanner/
-├── agents/               # AI agent implementations
-│   ├── base.py          # Core AI agents (Customer Service, Identity)
-│   ├── fraud.py         # Fraud detection agent
-│   └── manifest.py      # Manifest generation agent
-│
-├── workflows/           # Agent-to-agent communication workflows
-│   └── fraud_to_customer_service.py  # Automated fraud escalation
-│
-├── services/            # External service integrations
-│   ├── maps.py         # Azure Maps route optimization
-│   └── speech.py       # Azure Speech Services (voice I/O)
-│
-├── config/              # Configuration management
-│   ├── company.py      # Centralized company branding
-│   └── depots.py       # Depot configuration
-│
-├── utils/               # Shared utilities
-│
-├── templates/           # Jinja2 HTML templates
-├── static/              # CSS, JavaScript, images
-│
-├── app.py              # Flask web application (main entry)
-├── main.py             # CLI interface
-├── parcel_tracking_db.py  # Cosmos DB operations
-└── requirements.txt    # Python dependencies
-```
-
-### **Core Application Modules**
-
-**Entry Points:**
-
-- `app.py` - Flask web application with all routes
-- `main.py` - Command-line interface with menu system
-
-**Logistics Operations:**
-
-- `logistics_core.py` - Parcel registration, tracking, scanning
-- `logistics_customer.py` - Customer experience features
-- `logistics_driver.py` - Driver operations and proof of delivery
-- `logistics_depot.py` - Depot management and manifests
-- `logistics_ai.py` - AI insights and route optimization
-- `logistics_admin.py` - Administration and approvals
-- `logistics_common.py` - Shared utilities and helpers
-
-### **Key Benefits**
-
-- **Modular Design**: Clear separation of concerns
-- **Easy Maintenance**: Changes isolated to specific packages
-- **Scalable**: Add new agents/workflows without affecting existing code
-- **Testable**: Each package can be tested independently
-- **Reusable**: Components shared across web and CLI interfaces
+- **8 Active AI Agents**: Customer service, fraud detection, dispatcher, optimization
+- **Voice-Enabled Chat**: Azure Speech Services
+- **Route Optimization**: Azure Maps with traffic analysis
+- **Mobile-First UI**: Responsive design
+- **Fraud Detection**: AI-powered threat analysis
+- **Driver Manifests**: Automated route planning
+- **Address Notes**: Auto-categorized delivery notes
 
 ---
 
-## 🤖 AI-Powered Intelligent Logistics
+## 🤖 AI Agents
 
-> **📚 For Developers:** See [AGENTS.md](AGENTS.md) for technical documentation, environment setup, code examples, troubleshooting, and agent architecture details.
+See [AGENTS.md](AGENTS.md) for technical details. Agent prompts in `Agent-Skills/` folder.
 
-### **8 Active Azure AI Foundry Agents**
-
-All agents deployed with full Azure AI Foundry telemetry and real-time performance monitoring.
-
-#### **1. Customer Service Agent** 🎧
-
-- Real-time parcel tracking via natural language queries
-- Cosmos DB function calling for live data access
-- Multi-format tracking support (DT, DTVIC, OV formats)
-- **Access**: Customer Service Chatbot page
-
-#### **2. Fraud Detection Agent** 🛡️
-
-- Multi-category threat analysis (phishing, impersonation, payment fraud)
-- Risk score calculation with confidence metrics
-- Educational content generation for customer awareness
-- **Access**: Report Fraud page
-
-#### **3. Identity Verification Agent** 🔐
-
-- Customer identity verification for high-risk fraud cases
-- Employment status validation and credential verification
-- Auto-triggered when fraud risk ≥85%
-- **Access**: Auto-triggered by fraud workflow
-
-#### **4. Dispatcher Agent** 📋
-
-- Intelligent parcel-to-driver assignment
-- Geographic clustering and workload balancing
-- Priority-based distribution algorithms
-- Capacity optimization across driver network
-- **Access**: Admin Manifests - AI Auto-Assign
-
-#### **5. Parcel Intake Agent** 📦
-
-- Service type recommendations based on weight, value, dimensions
-- Address validation and automatic corrections
-- Deli📊 AI Agent Performance Dashboard**
-- Real-time decision tracking across all 8 agents
-- **344+ total decisions** monitored and analyzed
-- Individual agent metrics:
-  - Parcel Intake Agent: 89 decisions
-  - Dispatcher Agent: 56 decisions
-  - Customer Service Agent: 47 decisions
-  - Sorting Facility Agent: 41 decisions
-  - Delivery Coordination Agent: 38 decisions
-  - Fraud Detection Agent: 32 decisions
-  - Optimization Agent: 23 decisions
-  - Identity Verification Agent: 18 decisions
-- Average confidence scores and response times
-- Success rate monitoring and trend analysis
-- **Access**: Admin → AI Agent Performance Dashboard
-- Network-wide performance analysis
-- Cost reduction insights and recommendations
-- Resource allocation optimization
-- Predictive analytics for route efficiency
-- **Access**: AI Insights Dashboard
-
-#### **7. Sorting Facility Agent** 🏭
-
-- Real-time facility capacity monitoring
-- Automated routing decisions across facilities
-- Load balancing and throughput optimization
-- Priority-based parcel routing
-- **Access**: AI Insights Dashboard - Sorting Section
-
-#### **8. Delivery Coordination Agent** 🚚
-
-- Multi-stop delivery sequencing
-- Automated customer notifications (SMS/Email)
-- Dynamic route adjustments
-- Delivery time window management
-- **Access**: Driver Manifest - Notify Customer
-
-### **🔄 Multi-Agent Workflows**
-
-**Fraud Detection → Identity Verification → Customer Notification**
-
-- Automatic high-risk fraud detection (score ≥70%)
-- Identity verification for very high risk (≥85%)
-- Personalized customer warnings via Customer Service Agent
-- Multi-channel notifications (email, SMS, phone)
-- Automatic parcel holds for critical cases (≥90%)
-- Complete audit trail and workflow logging
-
-### **View Telemetry**
-
-1. Visit: <https://ai.azure.com>
-2. Select your Azure AI Foundry project
-3. Navigate to: Tracing / Monitoring
-4. View: Agent invocations, thread IDs, and performance metrics
+1. **Customer Service** 🎧 - Real-time tracking
+2. **Fraud Detection** 🛡️ - Security analysis  
+3. **Identity Verification** 🔐 - High-risk validation
+4. **Dispatcher** 📋 - Driver assignment
+5. **Parcel Intake** 📦 - Service recommendations
+6. **Sorting Facility** 🏭 - Capacity monitoring
+7. **Delivery Coordination** 🚚 - Multi-stop sequencing
+8. **Optimization** 📊 - Performance analysis
 
 ---
 
-## 📦 Logistics Workflow
-
-1. **Store Intake** → Parcels registered at collection points
-2. **AI Validation** → Parcel Intake Agent validates data quality
-3. **Sorting** → Sorting Facility Agent optimizes routing
-4. **Assignment** → Dispatcher Agent creates optimized manifests
-5. **Delivery** → Driver Agent tracks real-time execution
-6. **Confirmation** → Proof of delivery with photo verification
-7. **Feedback** → Customer satisfaction tracking
-
-## 💻 Usage Examples
-
-### **Web Interface**
-
-1. **Register a Parcel**: Navigate to Parcels → Register New Parcel
-2. **Track Parcel**: Use tracking number in Track Parcel page
-3. **Report Fraud**: Submit suspicious messages for AI analysis
-4. **Create Manifest**: Admin → Generate Manifest with route optimization
-5. **Voice Chat**: Use microphone icon in chatbot for voice input
-
-### **Command-Line Interface**
-
-```bash
-python main.py
-```
-
-Menu-driven interface for:
-
-- Parcel registration and tracking
-- Location-aware scanning
-- AI agent workflows
-- Test data generation
-- Administrative functions
-
----
-
-## 📊 Database Architecture
-
-**Database**: `agent_workflow_db`
-
-### Containers & Partition Strategy
-
-#### 1. Parcels Container (Partition Key: `/store_location`)
-
-- Comprehensive parcel data with sender/recipient details
-- Tracking numbers, barcodes, and status information
-- Service types (standard, express, overnight, registered)
-- Special handling requirements
-
-#### 2. Tracking Events Container (Partition Key: `/barcode`)
-
-```json
-{
-  "id": "abc123-def456",
-  "barcode": "LP654321",
-  "tracking_number": "LP87654321AB",
-  "sender_name": "TechMart Electronics",
-  "sender_address": "45 Collins Street, Melbourne CBD, Melbourne VIC 3000",
-  "sender_phone": "+61 3 9123 4567",
-  "recipient_name": "Sarah Johnson",
-  "recipient_address": "123 George Street, Sydney CBD, Sydney NSW 2000",
-  "recipient_phone": "+61 2 8765 4321",
-  "destination_postcode": "2000",
-  "destination_state": "NSW",
-  "service_type": "express",
-  "weight": 1.2,
-  "dimensions": "25x20x8cm",
-  "declared_value": 299.99,
-  "special_instructions": "Fragile electronics - handle with care",
-  "store_location": "Store_Melbourne_CBD",
-  "registration_timestamp": "2024-11-14T10:30:00Z",
-  "current_status": "registered",
-  "current_location": "Store_Melbourne_CBD",
-  "estimated_delivery": "2024-11-16T17:00:00Z",
-  "delivery_attempts": 0,
-  "is_delivered": false
-}
-```
-
-- Complete event history for each parcel
-- Location updates and status changes
-- Scanner operations and timestamps
-
-#### 3. Approvals Container (Partition Key: `/barcode`)
-
-- Human approval workflows
-- Exception handling requests
-- Priority-based processing
-- Audit trail with comments
-
-## 🛠️ Setup Instructions
-
-### 1. Prerequisites
-
-- Python 3.11 or later
-- Azure subscription with Azure AI Foundry and Cosmos DB services
-- Azure CLI (for authentication)
-
-### 2. Azure Cosmos DB Setup
-
-1. Create a new Azure Cosmos DB account:
-   - Choose **Core (SQL)** API
-   - Select **Serverless** tier for development
-   - Note down the endpoint and primary key
-
-### 3. Azure AI Foundry Setup
-
-1. Create an Azure AI Foundry project
-2. Deploy a GPT-4o model
-3. Note down the project endpoint and connection string
-
-### 4. Environment Configuration
-
-Copy the template file and configure with your Azure resources:
+## 🛠️ Setup
 
 ```powershell
-# Copy the template
-Copy-Item .env.example .env
-
-# Edit .env with your Azure resource values
-notepad .env  # or use your preferred editor
-```
-
-**Required Configuration:**
-
-```env
-# Azure AI Foundry
-AZURE_AI_PROJECT_ENDPOINT="https://your-region.api.azureml.ms/discovery"
-AZURE_AI_MODEL_DEPLOYMENT_NAME="gpt-4o"
-
-# Azure Computer Vision
-AZURE_VISION_ENDPOINT="https://your-vision-service.cognitiveservices.azure.com/"
-
-# Azure Cosmos DB
-COSMOS_DB_ENDPOINT="https://your-cosmos-account.documents.azure.com:443/"
-COSMOS_DB_DATABASE_NAME="logisticstracking"
-USE_MANAGED_IDENTITY="false"  # Use "true" for Azure deployment
-
-# Azure Maps (Route Optimization)
-AZURE_MAPS_SUBSCRIPTION_KEY="your-azure-maps-key"
-
-# Azure Speech Services (Voice Features)
-AZURE_SPEECH_RESOURCE_ID="/subscriptions/xxx/resourceGroups/xxx/providers/Microsoft.CognitiveServices/accounts/xxx"
-AZURE_SPEECH_ENDPOINT="https://your-speech-service.cognitiveservices.azure.com/"
-AZURE_SPEECH_REGION="australiaeast"
-
-# Flask Configuration
-FLASK_SECRET_KEY="your-random-secret-key"
-FLASK_ENV="development"
-PORT="5000"
-```
-
-**Production Note**: For Azure App Service deployment, managed identity is automatically configured. See [Guides/DEPLOYMENT.md](Guides/DEPLOYMENT.md) for automated deployment with `deploy_to_azure.ps1`.
-
-### 5. Install Dependencies
-
-```bash
+# Install
 pip install -r requirements.txt
-```
 
-**Key Dependencies:**
+# Configure
+cp .env.example .env  # Edit with Azure credentials
 
-- `flask>=3.0.0` - Web framework
-- `gunicorn>=21.2.0` - Production WSGI server
-- `azure-cosmos>=4.5.0` - Cosmos DB client
-- `azure-ai-projects>=1.0.0` - Azure AI Foundry SDK
-- `azure-cognitiveservices-speech>=1.35.0` - Azure Speech Services (voice)
-- `azure-ai-vision-imageanalysis>=1.0.0` - OCR and image analysis
-- `python-dotenv>=1.0.0` - Environment variable management
-- `pytesseract>=0.3.10` - Text extraction from images
-
-### 6. Generate Demo Data
-
-**✅ Demo data is automatically generated during deployment** via [deploy_to_azure.ps1](deploy_to_azure.ps1).
-
-The deployment script automatically creates:
-- ✅ Sample parcels distributed across Australian states (NSW, VIC, QLD, SA, WA, ACT)
-- ✅ Driver manifests for all drivers (driver-001 through driver-057)
-- ✅ Realistic Sydney addresses and delivery details
-- ✅ Parcels ready for dispatcher assignment
-
-**Manual regeneration** (optional - only if you need to reset demo data):
-
-```powershell
-# Navigate to generators directory
-cd utils/generators
-
-# Generate demo manifests for all 57 drivers (30-50 parcels each)
-python generate_demo_manifests.py
-
-# OR generate large scalability test for driver-004 (120 parcels)
-python generate_demo_manifests.py --large-default
-
-# OR generate custom large manifest
-python generate_demo_manifests.py --large 200
-```
-
-**Note**: Manual generation requires local `.env` file with `COSMOS_CONNECTION_STRING`. For Azure deployments, demo data is created automatically during [deploy_to_azure.ps1](deploy_to_azure.ps1) with proper authentication handling.
-
-### 7. Database Initialization
-
-```bash
-# Initialize Cosmos DB with database and containers
-python parcel_tracking_db.py
-```
-
-This will:
-
-- ✅ Create the `agent_workflow_db` database
-- ✅ Create required containers with proper partitioning
-- ✅ Add sample test data for demonstration
-- ✅ Verify Azure authentication and connectivity
-
-### 8. Start the Application
-
-**Web Interface:**
-
-```powershell
-$env:FLASK_ENV='development'; py app.py
-```
-
-**CLI Interface:**
-
-```bash
-python main.py
-```
-
-### 9. RBAC Permissions (Optional - if using Azure AD auth)
-
-```bash
-# Assign Cosmos DB roles for Azure AD authentication
-az cosmosdb sql role assignment create \
-    --account-name your-cosmos-account \
-    --resource-group your-resource-group \
-    --scope "/" \
-    --principal-id your-user-object-id \
-    --role-definition-name "Cosmos DB Built-in Data Contributor"
-```
-
-## 💻 Usage Examples
-
-### **Web Interface**
-
-1. **Register a Parcel**: Navigate to Parcels → Register New Parcel
-2. **Track Parcel**: Use tracking number in Track Parcel page
-3. **Report Fraud**: Submit suspicious messages for AI analysis
-4. **Create Manifest**: Admin → Generate Manifest with route optimization
-5. **Voice Chat**: Use microphone icon in chatbot for voice input
-
-### **Command-Line Interface**
-
-```bash
-python main.py
-```
-
-Menu-driven interface for:
-
-- Parcel registration and tracking
-- Location-aware scanning
-- AI agent workflows
-- Test data generation
-- Administrative functions
-
-## 📋 Service Types & Status Tracking
-
-### Service Types
-
-- **standard** - 5 business day delivery
-- **express** - 2 business day delivery  
-- **overnight** - Next business day delivery
-- **registered** - 3 business day delivery with signature required
-
-### Parcel Statuses
-
-- `registered` - Initial registration at store
-- `in_transit` - Moving between facilities
-- `at_depot` - Arrived at sorting/distribution facility
-- `out_for_delivery` - Assigned to driver for delivery
-- `delivered` - Successfully delivered to customer
-- `exception` - Issue requiring attention
-
-### Event Types
-
-- `registered` - Parcel entered system
-- `in_transit` - Moving between locations
-- `at_depot` - Arrived at facility
-- `out_for_delivery` - On delivery vehicle
-- `delivered` - Successfully delivered
-- `delivery_attempt` - Attempted but failed delivery
-- `exception` - Issue or problem occurred
-
-## 🔧 API Reference
-
-### Core Parcel Operations
-
-```python
-from parcel_tracking_db import ParcelTrackingDB
-
-# Initialize database
-async with ParcelTrackingDB() as db:
-    # Register new parcel
-    parcel = await db.register_parcel(
-        barcode="LP123456",
-        sender_name="John Smith",
-        sender_address="N/A",
-        sender_phone=None,
-        recipient_name="Jane Doe",
-        recipient_address="123 Collins St, Melbourne VIC 3000",
-        recipient_phone=None,
-        destination_postcode="3000",
-        destination_state="VIC",
-        service_type="express",
-        weight=1.5,
-        declared_value=99.99,
-        store_location="Store_Melbourne_CBD"
-    )
-
-    # Track parcel
-    parcel = await db.get_parcel_by_barcode("LP123456")
-    tracking_history = await db.get_parcel_tracking_history("LP123456")
-
-    # Update status
-    await db.update_parcel_status(
-        barcode="LP123456",
-        status="out_for_delivery",
-        location="Delivery_Vehicle_001",
-        scanned_by="driver_001"
-    )
-```
-
-### Tracking Operations
-
-```python
-async with ParcelTrackingDB() as db:
-    # Create tracking event
-    await db.create_tracking_event(
-        barcode="LP123456",
-        event_type="in_transit",
-        location="Sorting_Facility_VIC",
-        description="Parcel sorted for delivery route",
-        scanned_by="logistics_001"
-    )
-
-    # Filter parcels by store
-    store_parcels = await db.get_parcels_by_store("Store_Melbourne_CBD")
-
-    # Get store statistics
-    stats = await db.get_store_statistics("Store_Melbourne_CBD")
-```
-
-### Approval Operations
-
-```python
-async with ParcelTrackingDB() as db:
-    # Request approval
-    request_id = await db.request_approval(
-        parcel_barcode="LP123456",
-        request_type="delivery_redirect",
-        description="Customer requested address change",
-        priority="medium"
-    )
-
-    # Check status
-    status = await db.get_approval_status(request_id)
-
-    # Approve/reject
-    await db.approve_request(request_id, "supervisor_001", "Address verified")
-    await db.reject_request(request_id, "supervisor_001", "Invalid address")
-```
-
-### Synchronous Wrappers (for backwards compatibility)
-
-```python
-# Initialize database
-db = ParcelTrackingDB()
-
-# Get all parcels
-parcels = db.get_all_scanned_items_sync()
-
-# Request approval
-request_id = db.request_human_approval_sync("LP123456", "special_handling", "Fragile item")
-
-# Approve request
-success = db.approve_request_sync(request_id, "supervisor_001")
-```
-
-## 🚦 Exception Handling & Supervisor Approvals
-
-### Approval Request Types
-
-- `exception_handling` - Process delivery exceptions
-- `return_to_sender` - Return undeliverable packages
-- `delivery_redirect` - Change delivery address
-- `damage_claim` - Process damage claims
-- `lost_package` - Handle lost package investigations
-- `special_handling` - Special handling requirements
-
-### Priority Levels
-
-- `low` - Standard processing
-- `medium` - Normal priority
-- `high` - Expedited processing
-- `critical` - Immediate attention required
-
-## 📈 Performance & Optimization
-
-### Partitioning Strategy
-
-- **Parcels**: Partitioned by store location for operational efficiency
-- **Tracking Events**: Partitioned by barcode for query optimization
-- **Delivery Attempts**: Partitioned by barcode for approval workflows
-
-### Cost Optimization
-
-- **Development**: Serverless tier for variable workloads
-- **Production**: Provisioned throughput with autoscale
-- **Indexing**: Optimized for frequently queried fields
-
-### Monitoring Key Metrics
-
-- Request Unit (RU) consumption
-- Query performance and latency
-- Storage usage and growth patterns
-- Error rates and exception handling
-
-## 🔐 Security & Compliance
-
-### Authentication
-
-**Zava uses Azure Managed Identity exclusively for all production operations** - zero API keys or connection strings are stored in configuration.
-
-- **Managed Identity** (Production): All Azure services authenticate via system-assigned managed identities
-- **Azure CLI** (Local Development): Uses your Azure login credentials
-- **Connection Security**: TLS encryption for all communications
-- **RBAC**: Fine-grained permissions for each service
-
-See [Managed Identity Authentication Guide](Guides/MANAGED_IDENTITY_AUTH.md) for complete security architecture and best practices.
-
-### Data Protection
-
-- Customer PII encryption at rest and in transit
-- Audit trail logging for all operations
-- GDPR compliance features
-- Data retention policies
-- Zero secrets in environment variables or code
-
-## 📁 Project Structure
-
-```
-dt_item_scanner/
-├── readme.md                                     # This consolidated documentation
-├── .env                                          # Environment configuration  
-├── requirements.txt                              # Python dependencies
-├── parcel_tracking_db.py                        # Consolidated database interface
-│
-├── 🌐 WEB APPLICATION (Recommended)
-├── app.py                                        # Flask web application
-├── startup.sh                                    # Azure App Service startup script
-├── azure.yaml                                    # Azure deployment configuration
-├── deploy_to_azure.ps1                          # Automated deployment script
-├── templates/                                    # Jinja2 HTML templates
-│   ├── base.html                                # Master layout with navigation
-│   ├── index.html                               # Landing page
-│   ├── login.html                               # Authentication
-│   ├── dashboard.html                           # Operations dashboard
-│   ├── register_parcel.html                     # Parcel registration form
-│   ├── track_parcel.html                        # Tracking interface
-│   ├── all_parcels.html                         # Parcel listing
-│   ├── report_fraud.html                        # Fraud reporting with AI
-│   ├── approvals.html                           # Approval workflows
-│   ├── ai_insights.html                         # Analytics dashboard
-│   └── error.html                               # Error pages
-├── static/                                       # Frontend assets
-│   ├── css/
-│   │   └── style.css                            # Custom styling
-│   └── js/
-│       └── app.js                               # Client-side JavaScript
-│
-├── 🚀 MODULAR CLI APPLICATION
-├── main.py                                       # Entry point and routing
-├── logistics_common.py                           # Shared utilities
-├── logistics_core.py                            # Core operations
-├── logistics_customer.py                        # Customer features
-├── logistics_driver.py                          # Driver operations
-├── logistics_depot.py                           # Depot management
-├── logistics_ai.py                              # AI features
-├── logistics_admin.py                           # Admin functions
-├── logistics_menu.py                            # Menu system
-├── logistics_parcel.py                          # Parcel data models
-├── customer_service_chatbot.py                  # AI chatbot agent
-│
-├── Scripts/                                      # AI Agent Framework
-│   ├── A01_Create_Multiple_Foundry_Agent_Persistent.py  # Create logistics agents
-│   └── W01_Sequential_Workflow_Human_Approval.py        # Main AI workflow
-└── __pycache__/                                 # Python cache files
-```
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-#### "Cannot run the event loop while another loop is running"
-
-This error occurs when AI agents try to use sync database methods within async context.
-**Solution**: The current system uses mock agent tools to avoid this issue. Real database operations happen at the workflow level.
-
-#### Authentication Errors
-
-```bash
-# Error: "Local Authorization is disabled"
-# Solution: Use Azure AD authentication or enable key-based auth
-az cosmosdb update --name your-account --resource-group your-rg --disable-local-auth false
-```
-
-#### Partition Key Errors
-
-- Ensure store_location is provided for parcel operations
-- Use barcode for tracking events and delivery attempts
-
-#### Performance Issues
-
-- Monitor RU consumption in Azure Portal
-- Optimize query patterns to avoid cross-partition queries
-- Consider increasing provisioned throughput
-
-### Debug Tools
-
-```bash
-# Test database connectivity and setup
-python Identity_Test_CosmosDB_connection.py
-
-# Initialize and test database with sample data
+# Initialize
 python parcel_tracking_db.py
 
-# Enable debug logging (if needed)
-export AZURE_LOG_LEVEL=DEBUG
+# Run
+py app.py
 ```
 
-## 🔄 Migration & Integration
-
-### Consolidated Architecture
-
-The system now uses a single consolidated database interface (`parcel_tracking_db.py`) that combines:
-
-- All Cosmos DB operations
-- Setup and testing utilities  
-- Synchronous wrappers for backwards compatibility
-- Australian localization features
-
-### External System Integration
-
-- REST APIs for real-time tracking
-- Webhook notifications for status changes
-- Bulk upload APIs for batch operations
-- Integration with store POS systems and driver mobile apps
-
-## 📊 Service Types & Status Tracking
-
-### **Service Types**
-
-- **Standard** - 5 business day delivery
-- **Express** - 2 business day delivery
-- **Overnight** - Next business day delivery
-- **Registered** - 3 business day delivery with signature required
-
-### **Parcel Statuses**
-
-- `registered` - Initial registration at store
-- `in_transit` - Moving between facilities
-- `at_depot` - At sorting/distribution facility
-- `out_for_delivery` - Assigned to driver
-- `delivered` - Successfully delivered
-- `exception` - Issue requiring attention
-
----
-
-## 🔧 API & Integration
-
-### **Cosmos DB Operations**
-
-```python
-from parcel_tracking_db import ParcelTrackingDB
-
-async with ParcelTrackingDB() as db:
-    # Register parcel
-    parcel = await db.register_parcel(
-        barcode="LP123456",
-        recipient_name="Jane Doe",
-        recipient_address="123 Collins St, Melbourne VIC 3000",
-        destination_postcode="3000",
-        destination_state="VIC",
-        service_type="express",
-        weight=1.5,
-        store_location="Store_Melbourne_CBD"
-    )
-
-    # Track parcel
-    tracking_history = await db.get_parcel_tracking_history("LP123456")
-
-    # Update status
-    await db.update_parcel_status(
-        barcode="LP123456",
-        status="out_for_delivery",
-        location="Delivery_Vehicle_001"
-    )
-```
-
-### **Agent Integration**
-
-```python
-from agents.fraud import fraud_risk_agent
-from agents.base import customer_service_agent
-
-# Analyze fraud
-result = await fraud_risk_agent({
-    "message": "Suspicious delivery request",
-    "sender": "unknown@example.com"
-})
-
-# Get customer service response
-response = await customer_service_agent({
-    "query": "Where is my parcel?",
-    "tracking_number": "LP123456"
-})
-```
-
-### **Workflow Automation**
-
-```python
-from workflows.fraud_to_customer_service import fraud_detection_to_customer_service_workflow
-
-# Trigger fraud → customer service workflow
-workflow_result = await fraud_detection_to_customer_service_workflow(
-    message_content="Suspicious SMS about delivery fees",
-    customer_name="John Smith",
-    customer_email="john@example.com"
-)
+**Environment (.env):**
+```env
+AZURE_AI_PROJECT_ENDPOINT="your-endpoint"
+AZURE_AI_MODEL_DEPLOYMENT_NAME="gpt-4o"
+COSMOS_DB_ENDPOINT="your-endpoint"
+COSMOS_DB_DATABASE_NAME="logisticstracking"
+AZURE_MAPS_SUBSCRIPTION_KEY="your-key"
 ```
 
 ---
 
-## 🚀 Deployment
-
-### **Azure App Service (Recommended)**
+## 🚀 Azure Deployment
 
 ```powershell
-# Deploy complete infrastructure + code using PowerShell + Bicep
+# One-command deployment
 .\deploy_to_azure.ps1
 
-# Or deploy code only (after infrastructure exists)
+# Code only
 .\deploy_to_azure.ps1 -CodeOnly
 ```
 
-**Automatically Deploys:**
-- ✅ All required Azure resource providers (works on fresh subscriptions)
-- ✅ Cosmos DB (serverless) with 5 containers
-- ✅ Azure AI Hub & Project (9 agents)
-- ✅ Azure Maps, Speech, Vision services
-- ✅ App Service with RBAC authentication
-- ✅ Demo data and user accounts
-
-**Zero manual Azure portal configuration required!**
-
-See [Guides/DEPLOYMENT.md](Guides/DEPLOYMENT.md) for complete instructions including:
-
-- Environment variable configuration
-- Manual deployment options
-- CI/CD setup
-- Monitoring and logging
-- Scaling options
+Deploys: Cosmos DB, AI Hub, OpenAI, Maps, Speech, Vision, 8 agents, RBAC, demo data.
 
 ---
 
 ## 🔧 Troubleshooting
 
-### **Common Issues**
-
-**Database Connection Errors**
-
-```bash
-# Test Cosmos DB connectivity
-python parcel_tracking_db.py
+**Access Denied:**
+```powershell
+az webapp restart --name <name> --resource-group RG-Zava-Frontend-dev
 ```
 
-**Agent Not Responding**
-
+**Database Connection:**
 ```bash
-# Verify Azure credentials
-az login
-
-# Check .env configuration
-cat .env | Select-String "AZURE"
+python parcel_tracking_db.py  # Test connectivity
 ```
 
-**Speech/Voice Features Not Working**
-
-- Verify `AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION` in `.env`
-- Check microphone permissions in browser
-- Test with `services/speech.py`
-
-**Azure Maps Not Optimizing Routes**
-
-- Validate `AZURE_MAPS_SUBSCRIPTION_KEY`
-- Run `Test Scripts/test_azure_maps.py`
-- Check API quota limits
+**Agent Issues:**
+```bash
+az login  # Verify credentials
+```
 
 ---
 
-## 📚 Additional Resources
+## 📚 Documentation
 
-- [Azure AI Foundry Documentation](https://learn.microsoft.com/en-us/azure/ai-studio/)
-- [Azure Cosmos DB Documentation](https://docs.microsoft.com/en-us/azure/cosmos-db/)
-- [Azure Maps Documentation](https://docs.microsoft.com/en-us/azure/azure-maps/)
-- [Azure Speech Services Documentation](https://docs.microsoft.com/en-us/azure/cognitive-services/speech-service/)
+- [AGENTS.md](AGENTS.md) - Technical agent documentation
+- [Guides/DEPLOYMENT.md](Guides/DEPLOYMENT.md) - Deployment guide
+- [Agent-Skills/README.md](Agent-Skills/README.md) - System prompts
+
+Telemetry: https://ai.azure.com → Tracing / Monitoring
 
 ---
 
 ## 📄 License
 
-**Non-Commercial Open Source License**
-
-This software is free to use for personal, educational, non-profit, and internal business purposes. 
-
-✅ **Permitted Uses:**
-- Personal projects and learning
-- Academic and educational purposes
-- Non-profit organizations
-- Internal business use (not for resale)
-- Portfolio demonstrations
-
-❌ **Commercial Use Requires Permission:**
-- Selling the software or derivatives
-- Offering as a paid service (SaaS)
-- Including in commercial products for resale
-- Charging for access to functionality
-
-For commercial licensing inquiries, contact: darren.turchiarelli@microsoft.com
-
-See [LICENSE](LICENSE) for full terms.
-
-*Note: This project uses Azure AI services which are subject to Microsoft's licensing terms.*
+Non-Commercial Open Source License
 
 ---
 
-**🚀 Get Started Now:**
-
-1. Configure `.env` with Azure credentials
-2. Run `python parcel_tracking_db.py` to initialize database
-3. Start web app: `$env:FLASK_ENV='development'; py app.py`
-4. Access <http://127.0.0.1:5000> (Login: admin/admin123)
-
-Experience the complete AI-powered logistics system with voice features, fraud detection workflows, and real-time route optimization!
+**Maintained by:** Microsoft Australia
