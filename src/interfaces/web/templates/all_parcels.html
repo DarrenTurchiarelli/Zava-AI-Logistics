@@ -18,7 +18,7 @@
             <p class="text-muted">
                 Showing {{ parcels|length }} of {{ total_parcels }} parcels
                 {% if status_filter or state_filter %}
-                <a href="{{ url_for('parcels.all_parcels') }}" class="ms-2"><i class="bi bi-x-circle"></i> Clear filters</a>
+                <a href="{{ url_for('parcels.list_parcels') }}" class="ms-2"><i class="bi bi-x-circle"></i> Clear filters</a>
                 {% endif %}
             </p>
         </div>
@@ -39,7 +39,7 @@
     <!-- Filters -->
     <div class="card shadow-sm mb-3">
         <div class="card-body">
-            <form method="GET" action="{{ url_for('parcels.all_parcels') }}" class="row g-3">
+            <form method="GET" action="{{ url_for('parcels.list_parcels') }}" class="row g-3">
                 <div class="col-md-4">
                     <label for="stateFilter" class="form-label">Filter by State</label>
                     <select class="form-select" id="stateFilter" name="state">
@@ -65,7 +65,7 @@
                     <button type="submit" class="btn btn-primary me-2">
                         <i class="bi bi-funnel"></i> Apply Filters
                     </button>
-                    <a href="{{ url_for('parcels.all_parcels') }}" class="btn btn-outline-secondary">
+                    <a href="{{ url_for('parcels.list_parcels') }}" class="btn btn-outline-secondary">
                         <i class="bi bi-x-circle"></i> Clear
                     </a>
                 </div>
@@ -103,7 +103,7 @@
                             </td>
                             <td data-label="Weight">{{ parcel.weight }} kg</td>
                             <td data-label="">
-                                <a href="{{ url_for('parcels.track_parcel_page', tracking_number=parcel.tracking_number) }}"
+                                <a href="{{ url_for('parcels.track_specific_parcel', tracking_number=parcel.tracking_number) }}"
                                    class="btn btn-sm btn-outline-primary">
                                     <i class="bi bi-search"></i> Track
                                 </a>
@@ -120,7 +120,7 @@
                 <ul class="pagination justify-content-center">
                     <!-- Previous Button -->
                     <li class="page-item {% if page <= 1 %}disabled{% endif %}">
-                        <a class="page-link" href="{{ url_for('parcels.all_parcels', page=page-1, status=status_filter, state=state_filter) if page > 1 else '#' }}">
+                        <a class="page-link" href="{{ url_for('parcels.list_parcels', page=page-1, status=status_filter, state=state_filter) if page > 1 else '#' }}">
                             <i class="bi bi-chevron-left"></i> Previous
                         </a>
                     </li>
@@ -131,7 +131,7 @@
 
                     {% if start_page > 1 %}
                     <li class="page-item">
-                        <a class="page-link" href="{{ url_for('parcels.all_parcels', page=1, status=status_filter, state=state_filter) }}">1</a>
+                        <a class="page-link" href="{{ url_for('parcels.list_parcels', page=1, status=status_filter, state=state_filter) }}">1</a>
                     </li>
                     {% if start_page > 2 %}
                     <li class="page-item disabled"><span class="page-link">...</span></li>
@@ -140,7 +140,7 @@
 
                     {% for p in range(start_page, end_page + 1) %}
                     <li class="page-item {% if p == page %}active{% endif %}">
-                        <a class="page-link" href="{{ url_for('parcels.all_parcels', page=p, status=status_filter, state=state_filter) }}">{{ p }}</a>
+                        <a class="page-link" href="{{ url_for('parcels.list_parcels', page=p, status=status_filter, state=state_filter) }}">{{ p }}</a>
                     </li>
                     {% endfor %}
 
@@ -149,13 +149,13 @@
                     <li class="page-item disabled"><span class="page-link">...</span></li>
                     {% endif %}
                     <li class="page-item">
-                        <a class="page-link" href="{{ url_for('parcels.all_parcels', page=total_pages, status=status_filter, state=state_filter) }}">{{ total_pages }}</a>
+                        <a class="page-link" href="{{ url_for('parcels.list_parcels', page=total_pages, status=status_filter, state=state_filter) }}">{{ total_pages }}</a>
                     </li>
                     {% endif %}
 
                     <!-- Next Button -->
                     <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
-                        <a class="page-link" href="{{ url_for('parcels.all_parcels', page=page+1, status=status_filter, state=state_filter) if page < total_pages else '#' }}">
+                        <a class="page-link" href="{{ url_for('parcels.list_parcels', page=page+1, status=status_filter, state=state_filter) if page < total_pages else '#' }}">
                             Next <i class="bi bi-chevron-right"></i>
                         </a>
                     </li>
