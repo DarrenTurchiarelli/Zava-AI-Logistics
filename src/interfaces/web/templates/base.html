@@ -1642,10 +1642,12 @@
                             data.delivery_photos.forEach((photo, index) => {
                                 const photoDiv = document.createElement('div');
                                 photoDiv.className = 'chat-widget-message assistant';
+                                // Detect JPEG from base64 header (/9j/ = JPEG magic bytes)
+                                const mime = photo.photo_data.startsWith('/9j/') ? 'image/jpeg' : 'image/png';
                                 photoDiv.innerHTML = `
                                     <div class="chat-widget-message-bubble" style="padding: 4px;">
                                         <div style="font-size: 11px; font-weight: bold; margin-bottom: 4px;">📸 Delivery Photo ${index + 1}</div>
-                                        <img src="data:image/png;base64,${photo.photo_data}"
+                                        <img src="data:${mime};base64,${photo.photo_data}"
                                              alt="Delivery Photo ${index + 1}"
                                              style="max-width: 100%; border-radius: 4px; border: 1px solid #ddd;">
                                         <div style="font-size: 10px; color: #666; margin-top: 2px;">

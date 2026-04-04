@@ -537,8 +537,11 @@ def _extract_photos_if_mentioned(response_text: str, query: str, tracking_number
     delivery_photos = []
     lodgement_photos = []
     
-    # Check if response mentions photos
-    if not ("photo" in response_text.lower() or "delivery photo" in response_text.lower() or "proof" in response_text.lower()):
+    # Check if response OR query mentions photos/proof
+    photo_keywords = ("photo", "delivery photo", "proof")
+    response_mentions_photo = any(kw in response_text.lower() for kw in photo_keywords)
+    query_mentions_photo = any(kw in query.lower() for kw in photo_keywords)
+    if not response_mentions_photo and not query_mentions_photo:
         return delivery_photos, lodgement_photos
     
     # Extract tracking number from query or parameter

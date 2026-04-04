@@ -154,10 +154,9 @@ def generate_tracking_number(prefix: str = 'RG') -> str:
     return f"{prefix}{random.randint(100000, 999999)}"
 
 def generate_barcode(prefix: str = 'LP') -> str:
-    """Generate barcode in LP format"""
-    timestamp = datetime.now().strftime('%Y%m%d')
-    sequence = random.randint(1000, 9999)
-    return f"{prefix}{timestamp}{sequence}"
+    """Generate barcode in LP format — uses microseconds for uniqueness"""
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S%f')
+    return f"{prefix}{timestamp}"
 
 def generate_dummy_photo() -> str:
     """Generate dummy base64-encoded photo data"""
@@ -166,32 +165,41 @@ def generate_dummy_photo() -> str:
 
 async def create_demo_parcel(db: ParcelTrackingDB, parcel_spec: Dict) -> str:
     """Create a specific demo parcel with full history and photos"""
-    barcode = generate_barcode()
-    
     # Extract address components
     address_parts = parcel_spec['address'].split()
     postcode = address_parts[-1] if address_parts else '2000'
     state = parcel_spec['state']
     city = parcel_spec['city']
-    
-    # Register parcel (tracking number is auto-generated)
-    parcel_doc = await db.register_parcel(
-        barcode=barcode,
-        sender_name=parcel_spec['sender_name'],
-        sender_address=f"Warehouse, {city} {state}",
-        sender_phone=fake.phone_number(),
-        recipient_name=parcel_spec['recipient_name'],
-        recipient_address=parcel_spec['address'],
-        recipient_phone=parcel_spec['phone'],
-        destination_postcode=postcode,
-        destination_state=state,
-        destination_city=city,
-        weight=round(random.uniform(0.5, 25.0), 2),
-        dimensions=f"{random.randint(10,50)}x{random.randint(10,50)}x{random.randint(5,30)}",
-        service_type=random.choice(['standard', 'express', 'same-day']),
-        store_location=f"DC-{state}-01"
-    )
-    
+
+    # Retry up to 5 times in the unlikely event of a barcode collision
+    parcel_doc = None
+    barcode = None
+    for attempt in range(5):
+        barcode = generate_barcode()
+        try:
+            parcel_doc = await db.register_parcel(
+                barcode=barcode,
+                sender_name=parcel_spec['sender_name'],
+                sender_address=f"Warehouse, {city} {state}",
+                sender_phone=fake.phone_number(),
+                recipient_name=parcel_spec['recipient_name'],
+                recipient_address=parcel_spec['address'],
+                recipient_phone=parcel_spec['phone'],
+                destination_postcode=postcode,
+                destination_state=state,
+                destination_city=city,
+                weight=round(random.uniform(0.5, 25.0), 2),
+                dimensions=f"{random.randint(10,50)}x{random.randint(10,50)}x{random.randint(5,30)}",
+                service_type=random.choice(['standard', 'express', 'same-day']),
+                store_location=f"DC-{state}-01"
+            )
+            break  # success
+        except ValueError as e:
+            if 'already exists' in str(e) and attempt < 4:
+                continue  # retry with new barcode
+            print(f"  ⚠ Failed to create demo parcel for {parcel_spec['recipient_name']}: {e}")
+            return None
+
     if not parcel_doc:
         print(f"  ⚠ Failed to create demo parcel for {parcel_spec['recipient_name']}")
         return None
@@ -277,26 +285,32 @@ async def create_realistic_parcel(db: ParcelTrackingDB, state: str, city: str, i
     ]
     status = random.choices([s[0] for s in statuses], weights=[s[1] for s in statuses])[0]
     
-    # Register parcel (tracking number is auto-generated)
-    parcel_doc = await db.register_parcel(
-        barcode=barcode,
-        sender_name=sender_name,
-        sender_address=f"Warehouse, {city} {state}",
-        sender_phone=fake.phone_number(),
-        recipient_name=recipient_name,
-        recipient_address=address,
-        recipient_phone=fake.phone_number(),
-        destination_postcode=str(postcode),
-        destination_state=state,
-        destination_city=city,
-        weight=round(random.uniform(0.1, 30.0), 2),
-        dimensions=f"{random.randint(10,60)}x{random.randint(10,60)}x{random.randint(5,40)}",
-        service_type=random.choice(['standard', 'express', 'express', 'same-day']),  # More express
-        store_location=f"DC-{state}-01"
-    )
-    
-    if not parcel_doc:
-        return None
+    # Register parcel — retry on barcode collision
+    parcel_doc = None
+    for attempt in range(3):
+        try:
+            parcel_doc = await db.register_parcel(
+                barcode=barcode,
+                sender_name=sender_name,
+                sender_address=f"Warehouse, {city} {state}",
+                sender_phone=fake.phone_number(),
+                recipient_name=recipient_name,
+                recipient_address=address,
+                recipient_phone=fake.phone_number(),
+                destination_postcode=str(postcode),
+                destination_state=state,
+                destination_city=city,
+                weight=round(random.uniform(0.1, 30.0), 2),
+                dimensions=f"{random.randint(10,60)}x{random.randint(10,60)}x{random.randint(5,40)}",
+                service_type=random.choice(['standard', 'express', 'express', 'same-day']),  # More express
+                store_location=f"DC-{state}-01"
+            )
+            break
+        except ValueError as e:
+            if 'already exists' in str(e) and attempt < 2:
+                barcode = generate_barcode()
+                continue
+            return None
     
     # Add realistic event history (50% of parcels)
     if random.random() < 0.5:
@@ -457,7 +471,19 @@ async def main():
                 print(f"    ✓ {demo_spec['tracking_number']:20} - {demo_spec['recipient_name']}")
             else:
                 print(f"    ✗ {demo_spec['tracking_number']:20} - NOT FOUND")
-        
+
+        # Step 4: Import real delivery photo for DT202512170037 if image file exists
+        print(f"\n  📸 Step 4: Real Delivery Photo for DT202512170037")
+        print("-" * 80)
+        from import_delivery_photo import _find_image_file, import_photo as _import_photo
+        real_image = _find_image_file(project_root)
+        if real_image:
+            print(f"  Found image: {real_image}")
+            await _import_photo("DT202512170037", real_image, uploaded_by="driver-003")
+        else:
+            print(f"  ⚠ No delivery_sample image found in static/images/ — skipping.")
+            print(f"    Save static/images/delivery_sample.jpg to include a real photo.")
+
         print()
         print("=" * 80)
         print("✅ BULK DATA GENERATION COMPLETE!")

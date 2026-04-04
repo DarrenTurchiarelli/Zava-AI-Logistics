@@ -2,6 +2,10 @@
 # Deploy Zava to Azure with Multi-Resource Group Infrastructure via Bicep
 # =============================================================================
 
+# Fix Unicode/emoji output encoding for Azure CLI responses
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
 param(
     [string]$Location = "australiaeast",
     [string]$Environment = "dev",
@@ -1388,7 +1392,26 @@ try {
                     Write-Host "      Note: Ensure PYTHONPATH is set correctly" -ForegroundColor Gray
                 }
             }
-            
+
+            # Import real delivery photo for DT202512170037 if image file exists
+            $deliveryPhotoPath = "static\images\delivery_sample.jpg"
+            $deliveryPhotoPng  = "static\images\delivery_sample.png"
+            if ((Test-Path $deliveryPhotoPath) -or (Test-Path $deliveryPhotoPng)) {
+                Write-Host "    • Importing real delivery photo for DT202512170037..." -ForegroundColor Gray
+                $photoOutput = python utils/generators/import_delivery_photo.py 2>&1
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Host "    ✓ Real delivery photo imported for DT202512170037" -ForegroundColor Green
+                } else {
+                    Write-Host "    ⚠ Delivery photo import had issues (non-critical)" -ForegroundColor Yellow
+                    if ($photoOutput) {
+                        Write-Host "      $($photoOutput | Select-String -Pattern 'Error|✗' | Select-Object -First 1)" -ForegroundColor Gray
+                    }
+                }
+            } else {
+                Write-Host "    ℹ No delivery_sample image found - skipping photo import" -ForegroundColor Gray
+                Write-Host "      (Save static\images\delivery_sample.jpg to include a real photo)" -ForegroundColor DarkGray
+            }
+
             # Clear the connection string and other sensitive data from environment
             Write-Host "    🧹 Clearing temporary credentials from environment..." -ForegroundColor Cyan
             Remove-Item Env:\COSMOS_CONNECTION_STRING -ErrorAction SilentlyContinue

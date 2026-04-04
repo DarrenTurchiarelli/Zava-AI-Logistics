@@ -811,13 +811,15 @@ async function sendMessage() {
                 addMessage(photosHtml);
 
                 data.delivery_photos.forEach((photo, index) => {
+                    // Detect JPEG from base64 header (/9j/ = JPEG magic bytes)
+                    const mime = photo.photo_data.startsWith('/9j/') ? 'image/jpeg' : 'image/png';
                     const photoHtml = `
                         <div class="card mt-2" style="max-width: 400px;">
                             <div class="card-header bg-success text-white">
                                 <small><strong>Delivery Photo ${index + 1}</strong> - Uploaded by ${photo.uploaded_by || 'unknown'} at ${photo.timestamp || 'unknown time'}</small>
                             </div>
                             <div class="card-body p-2">
-                                <img src="data:image/png;base64,${photo.photo_data}" class="img-fluid" alt="Delivery Photo ${index + 1}" style="max-width: 100%; border: 1px solid #ddd; border-radius: 4px;">
+                                <img src="data:${mime};base64,${photo.photo_data}" class="img-fluid" alt="Delivery Photo ${index + 1}" style="max-width: 100%; border: 1px solid #ddd; border-radius: 4px;">
                             </div>
                         </div>
                     `;
