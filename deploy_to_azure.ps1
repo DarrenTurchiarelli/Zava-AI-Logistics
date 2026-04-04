@@ -2,10 +2,6 @@
 # Deploy Zava to Azure with Multi-Resource Group Infrastructure via Bicep
 # =============================================================================
 
-# Fix Unicode/emoji output encoding for Azure CLI responses
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
-
 param(
     [string]$Location = "australiaeast",
     [string]$Environment = "dev",
@@ -14,6 +10,10 @@ param(
     [switch]$SkipInfrastructure,
     [switch]$CodeOnly
 )
+
+# Fix Unicode/emoji output encoding for Azure CLI responses
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
 
 $deploymentConfigFile = ".azure-deployment.json"
 $bicepTemplate = "infra/main.bicep"
