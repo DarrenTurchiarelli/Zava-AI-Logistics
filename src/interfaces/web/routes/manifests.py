@@ -90,7 +90,7 @@ def driver_manifest():
                             safest_route["waypoints"],
                             safest_route["total_duration_minutes"],
                             safest_route["total_distance_km"],
-                            optimized=safest_route.get("optimized", False),
+                            is_optimized=safest_route.get("optimized", False),
                             traffic_considered=safest_route.get("traffic_considered", False),
                         )
 

@@ -90,6 +90,7 @@ def public_chat():
 
 
 @chatbot_bp.route("/api/chatbot", methods=["POST"])
+@chatbot_bp.route("/api/chatbot/query", methods=["POST"])
 @login_required
 def chatbot_query():
     """
@@ -186,6 +187,70 @@ def chatbot_stream():
         yield "data: {\"type\": \"message\", \"content\": \"Streaming not yet implemented\"}\n\n"
     
     return Response(stream_with_context(generate()), mimetype="text/event-stream")
+
+
+@chatbot_bp.route("/api/chatbot/track/<tracking_number>")
+@login_required
+def chatbot_track(tracking_number):
+    """Direct parcel tracking lookup for the chatbot UI"""
+    user = session.get("user")
+    if not user or user.get("role") not in [UserManager.ROLE_CUSTOMER_SERVICE, UserManager.ROLE_ADMIN]:
+        return jsonify({"error": "Access denied"}), 403
+
+    async def lookup():
+        async with ParcelTrackingDB() as db:
+            parcel = await db.get_parcel_by_tracking_number(tracking_number)
+            if not parcel:
+                parcel = await db.get_parcel_by_barcode(tracking_number)
+            return parcel
+
+    try:
+        parcel = run_async(lookup())
+        if not parcel:
+            return jsonify({"error": f"Parcel {tracking_number} not found"}), 404
+
+        status = parcel.get("current_status", "Unknown")
+        location = parcel.get("current_location", "Unknown")
+        recipient = parcel.get("recipient_name", "Unknown")
+        response_text = (
+            f"Parcel **{tracking_number}** — Status: **{status}** | "
+            f"Location: {location} | Recipient: {recipient}"
+        )
+        return jsonify({"response": response_text, "parcel": parcel}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@chatbot_bp.route("/api/chatbot/location/<tracking_number>")
+@login_required
+def chatbot_location(tracking_number):
+    """Direct parcel location lookup for the chatbot UI"""
+    user = session.get("user")
+    if not user or user.get("role") not in [UserManager.ROLE_CUSTOMER_SERVICE, UserManager.ROLE_ADMIN]:
+        return jsonify({"error": "Access denied"}), 403
+
+    async def lookup():
+        async with ParcelTrackingDB() as db:
+            parcel = await db.get_parcel_by_tracking_number(tracking_number)
+            if not parcel:
+                parcel = await db.get_parcel_by_barcode(tracking_number)
+            return parcel
+
+    try:
+        parcel = run_async(lookup())
+        if not parcel:
+            return jsonify({"error": f"Parcel {tracking_number} not found"}), 404
+
+        location = parcel.get("current_location", "Unknown")
+        status = parcel.get("current_status", "Unknown")
+        eta = parcel.get("estimated_delivery", "Unknown")
+        response_text = (
+            f"Parcel **{tracking_number}** is currently at **{location}** "
+            f"(Status: {status}). Estimated delivery: {eta}."
+        )
+        return jsonify({"response": response_text}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @chatbot_bp.route("/api/public/chatbot", methods=["POST"])

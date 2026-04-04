@@ -8,10 +8,6 @@ from datetime import datetime, timezone
 import random
 
 from src.interfaces.web.middleware import login_required, depot_manager_required
-from src.application.commands import ApproveRequestCommand
-from src.application.queries import GetApprovalsQuery, GetParcelQuery
-from src.infrastructure.database import CosmosDBClient
-from src.infrastructure.database.repositories import ApprovalRepository, ParcelRepository
 from parcel_tracking_db import ParcelTrackingDB
 from utils.async_helpers import run_async
 
@@ -25,14 +21,7 @@ def list_approvals():
     try:
         async def get_approvals_with_parcels():
             async with ParcelTrackingDB() as db:
-                # Use query to get approvals
-                approval_repo = ApprovalRepository(db)
-                approval_query = GetApprovalsQuery(approval_repo)
-                pending = await approval_query.get_pending()
-                
-                # Enrich with parcel data
-                parcel_repo = ParcelRepository(db)
-                parcel_query = GetParcelQuery(parcel_repo)
+                pending = await db.get_all_pending_approvals()
                 
                 for approval in pending:
                     parcel_barcode = approval.get("parcel_barcode") or approval.get("parcel_id")
@@ -179,16 +168,10 @@ def process_approval(approval_id):
         
         async def process():
             async with ParcelTrackingDB() as db:
-                # Use CQRS command
-                approval_repo = ApprovalRepository(db)
-                command = ApproveRequestCommand(approval_repo)
-                
-                await command.execute(
-                    approval_id=approval_id,
-                    decision='approved' if decision == 'approve' else 'denied',
-                    reviewer_username=approver,
-                    reviewer_notes=notes,
-                )
+                if decision == 'approve':
+                    await db.approve_request(approval_id, approver, notes)
+                else:
+                    await db.reject_request(approval_id, approver, notes)
         
         run_async(process())
         flash(f"Request {decision}ed successfully!", "success")
@@ -226,19 +209,12 @@ def run_agent():
         
         async def process_with_agent():
             async with ParcelTrackingDB() as db:
-                approval_repo = ApprovalRepository(db)
-                parcel_repo = ParcelRepository(db)
-                
-                # Get pending approvals
-                approval_query = GetApprovalsQuery(approval_repo)
-                pending = await approval_query.get_pending()
+                pending = await db.get_all_pending_approvals()
                 
                 approved_count = 0
                 rejected_count = 0
                 skipped_count = 0
                 skipped_dc_count = 0
-                
-                command = ApproveRequestCommand(approval_repo)
                 
                 for approval in pending:
                     parcel_barcode = approval.get("parcel_barcode")
@@ -292,19 +268,17 @@ def run_agent():
                         reason_text = "Verified sender/recipient"
                     
                     if auto_approve:
-                        await command.execute(
-                            approval_id=approval["id"],
-                            decision='approved',
-                            reviewer_username=approver,
-                            reviewer_notes=f"AI Agent: {reason_text}",
+                        await db.approve_request(
+                            approval["id"],
+                            approver,
+                            f"AI Agent: {reason_text}",
                         )
                         approved_count += 1
                     elif auto_reject:
-                        await command.execute(
-                            approval_id=approval["id"],
-                            decision='denied',
-                            reviewer_username=approver,
-                            reviewer_notes=f"AI Agent: {reason_text}",
+                        await db.reject_request(
+                            approval["id"],
+                            approver,
+                            f"AI Agent: {reason_text}",
                         )
                         rejected_count += 1
                     else:
