@@ -1355,6 +1355,19 @@ try {
                 Write-Host "    ⚠ Dispatcher demo data generation had issues" -ForegroundColor Yellow
             }
 
+            # Generate bulk realistic parcels FIRST so manifests can assign them to drivers
+            Write-Host "    • Generating 2500 realistic parcels across all states..." -ForegroundColor Gray
+            Write-Host "      ⏳ This may take 5-10 minutes..." -ForegroundColor Gray
+            $bulkDemoOutput = python utils/generators/generate_bulk_realistic_data.py --count 2500 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "    ✓ 2500 realistic parcels generated across all Australian states" -ForegroundColor Green
+            } else {
+                Write-Host "    ⚠ Bulk parcel generation had issues" -ForegroundColor Yellow
+                if ($bulkDemoOutput) {
+                    Write-Host "      Error: $($bulkDemoOutput | Select-String -Pattern 'Error|Exception' | Select-Object -First 1)" -ForegroundColor Gray
+                }
+            }
+
             # Generate driver manifests with parcels
             Write-Host "    • Creating driver manifests with delivery parcels..." -ForegroundColor Gray
             $manifestOutput = python utils/generators/generate_demo_manifests.py 2>&1
@@ -1364,19 +1377,17 @@ try {
                 Write-Host "    ⚠ Demo manifest generation had issues" -ForegroundColor Yellow
             }
 
-            # Generate Voice & Text Example demo parcels + bulk realistic dataset (2500)
-            Write-Host "    • Creating Voice & Text Example demo parcels (RG857954, DT202512170037)..." -ForegroundColor Gray
-            Write-Host "      (Also generating 2500 realistic parcels for comprehensive demo)" -ForegroundColor Gray
-            Write-Host "      ⏳ This may take 5-10 minutes..." -ForegroundColor Gray
-            $bulkDemoOutput = python utils/generators/generate_bulk_realistic_data.py --count 2500 2>&1
+            # Generate Voice & Text Example demo parcels only (RG857954, DT202512170037)
+            # Bulk parcels were already created above — this just ensures the 2 keydemo parcels exist
+            Write-Host "    • Ensuring Voice & Text Example demo parcels exist (RG857954, DT202512170037)..." -ForegroundColor Gray
+            $demoParcelsOutput = python utils/generators/generate_bulk_realistic_data.py --demo-only 2>&1
             if ($LASTEXITCODE -eq 0) {
-                Write-Host "    ✓ Voice & Text Example demo parcels created" -ForegroundColor Green
-                Write-Host "    ✓ 2500 realistic parcels generated across all Australian states" -ForegroundColor Green
+                Write-Host "    ✓ Demo parcels verified (RG857954, DT202512170037)" -ForegroundColor Green
                 Write-Host "      ✓ Try: 'Track parcel RG857954' or 'Find parcels for Dr. Emma Wilson'" -ForegroundColor Cyan
             } else {
-                Write-Host "    ⚠ Demo parcel generation had issues" -ForegroundColor Yellow
-                if ($bulkDemoOutput) {
-                    Write-Host "      Error: $($bulkDemoOutput | Select-String -Pattern 'Error|Exception' | Select-Object -First 1)" -ForegroundColor Gray
+                Write-Host "    ⚠ Demo parcel creation had issues" -ForegroundColor Yellow
+                if ($demoParcelsOutput) {
+                    Write-Host "      Error: $($demoParcelsOutput | Select-String -Pattern 'Error|Exception' | Select-Object -First 1)" -ForegroundColor Gray
                 }
             }
 

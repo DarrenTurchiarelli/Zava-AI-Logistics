@@ -355,14 +355,19 @@ async def create_realistic_parcel(db: ParcelTrackingDB, state: str, city: str, i
 async def main():
     parser = argparse.ArgumentParser(description='Generate bulk realistic parcel data')
     parser.add_argument('--count', type=int, default=2000, help='Number of parcels to generate (default: 2000)')
+    parser.add_argument('--demo-only', action='store_true', help='Only create demo parcels (RG857954, DT202512170037), skip bulk generation')
     args = parser.parse_args()
     
     total_parcels = args.count
     
     print("=" * 80)
-    print("🚀 BULK REALISTIC DATA GENERATOR")
+    if args.demo_only:
+        print("🎯 DEMO PARCEL GENERATOR (demo-only mode)")
+    else:
+        print("🚀 BULK REALISTIC DATA GENERATOR")
     print("=" * 80)
-    print(f"Target: {total_parcels:,} parcels across all Australian states")
+    if not args.demo_only:
+        print(f"Target: {total_parcels:,} parcels across all Australian states")
     print()
     
     # Use retry logic for connection
@@ -380,6 +385,12 @@ async def main():
         
         print(f"\n✓ Created {demo_created} demo parcels")
         print()
+
+        if args.demo_only:
+            print("=" * 80)
+            print("✅ Demo parcels created — skipping bulk generation (--demo-only mode)")
+            print("=" * 80)
+            return
         
         # Step 2: Create bulk realistic parcels distributed across states
         print(f"📦 Step 2: Creating {total_parcels:,} Realistic Parcels")

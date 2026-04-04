@@ -753,25 +753,18 @@ async def main():
         # Delete existing manifests
         await delete_all_manifests(db)
 
-        # Create sample parcels by state
-        state_barcodes = await create_sample_parcels_by_state(db)
+        # Use existing parcels already in the database (registered by prior generation steps)
+        print("\n📋 Using existing parcels from database (no new parcels created)...")
+        print("   (Run generate_bulk_realistic_data.py first if the DB is empty)")
 
-        total_parcels = sum(len(barcodes) for barcodes in state_barcodes.values())
-        if total_parcels == 0:
-            print("\n❌ No parcels were created. Cannot generate manifests.")
-            return
-
-        print(f"\n✅ Created {total_parcels} sample parcels across {len(state_barcodes)} states")
-
-        # Create driver manifests
-        await create_driver_manifests(db, state_barcodes)
+        # Create driver manifests from existing DB parcels
+        await create_driver_manifests(db, {})
 
     print("\n" + "=" * 70)
     print("✅ Demo Data Generation Complete!")
     print("=" * 70)
     print()
     print(f"Generated:")
-    print(f"   • {total_parcels} parcels")
     print(f"   • 5 driver manifests (driver-001 through driver-005)")
     print(f"   • 15-25 parcels per driver (~100 total)")
     print()
