@@ -45,6 +45,7 @@ src/
 ## Architecture Principles
 
 ### 1. **Dependency Rule**
+
 Dependencies point inward. Domain layer has no external dependencies.
 
 ```
@@ -54,16 +55,19 @@ infrastructure
 ```
 
 ### 2. **Separation of Concerns**
+
 - **Domain**: Business logic, models, rules
 - **Application**: Use cases, orchestration
 - **Infrastructure**: External services, databases
 - **Interfaces**: Web, CLI, API
 
 ### 3. **CQRS Pattern**
+
 - **Commands**: Write operations that change state
 - **Queries**: Read operations that return data
 
 ### 4. **Type Safety**
+
 - Pydantic for configuration validation
 - Type hints throughout
 - Enums for constants
@@ -71,6 +75,7 @@ infrastructure
 ## Usage Examples
 
 ### Get Configuration
+
 ```python
 from src.config import get_settings
 
@@ -80,6 +85,7 @@ agent_id = settings.azure_ai.customer_service_agent_id
 ```
 
 ### Use Constants
+
 ```python
 from src.config import ParcelStatus, UserRole, ServiceType
 
@@ -93,6 +99,7 @@ if user.role == UserRole.ADMIN:
 ```
 
 ### Handle Domain Exceptions
+
 ```python
 from src.domain import ParcelNotFoundException
 
@@ -106,6 +113,7 @@ except ParcelNotFoundException as e:
 ## Migration from Old Structure
 
 The old `logistics_*.py` files will be gradually migrated:
+
 - `logistics_parcel.py` → `src/domain/models/parcel.py` + `src/domain/services/parcel_service.py`
 - `logistics_customer.py` → `src/interfaces/web/routes/customer.py`
 - `logistics_admin.py` → `src/interfaces/web/routes/admin.py`
@@ -115,6 +123,7 @@ The old `logistics_*.py` files will be gradually migrated:
 ## Testing Structure
 
 Tests mirror the source structure:
+
 ```
 tests/
 ├── unit/              # Fast tests, no external deps
@@ -128,7 +137,7 @@ tests/
 ## Key Files
 
 | File | Purpose |
-|------|---------|
+| --- | --- |
 | `config/settings.py` | Type-safe configuration with Pydantic |
 | `config/constants.py` | All enums and constants |
 | `domain/exceptions.py` | Domain-specific exceptions |

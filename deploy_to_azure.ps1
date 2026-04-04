@@ -1201,7 +1201,7 @@ try {
                 Write-Host "    🔍 Validating all containers exist..." -ForegroundColor Cyan
                 $validateOutput = python scripts/diagnose_containers.py 2>&1
                 
-                if ($LASTEXITCODE -eq 0 -and $validateOutput -match "All containers exist") {
+                if ($LASTEXITCODE -eq 0 -and $validateOutput -match "All containers present") {
                     Write-Host "    ✓ Container validation passed - all 10 containers confirmed" -ForegroundColor Green
                 } else {
                     Write-Host "    ⚠️  Container validation failed on first check" -ForegroundColor Yellow
@@ -1219,7 +1219,7 @@ try {
                     Write-Host "    🔍 Re-validating container count..." -ForegroundColor Cyan
                     $retryValidate = python scripts/diagnose_containers.py 2>&1
                     
-                    if ($LASTEXITCODE -eq 0 -and $retryValidate -match "All containers exist") {
+                    if ($LASTEXITCODE -eq 0 -and $retryValidate -match "All containers present") {
                         Write-Host "    ✓ Container validation passed on retry" -ForegroundColor Green
                     } else {
                         Write-Host "" -ForegroundColor Red
@@ -1274,7 +1274,7 @@ try {
                     Write-Host "    🔍 Validating container count..." -ForegroundColor Cyan
                     $validateOutput = python scripts/diagnose_containers.py 2>&1
                     
-                    if ($LASTEXITCODE -eq 0 -and $validateOutput -match "All containers exist") {
+                    if ($LASTEXITCODE -eq 0 -and $validateOutput -match "All containers present") {
                         Write-Host "    ✓ Container validation passed - all 10 containers confirmed" -ForegroundColor Green
                     } else {
                         Write-Host "    ⚠️  Container count validation failed - attempting final retry..." -ForegroundColor Yellow
@@ -1285,7 +1285,7 @@ try {
                         $finalRetry = python scripts/initialize_all_containers.py 2>&1
                         $finalValidate = python scripts/diagnose_containers.py 2>&1
                         
-                        if (-not ($LASTEXITCODE -eq 0 -and $finalValidate -match "All containers exist")) {
+                        if (-not ($LASTEXITCODE -eq 0 -and $finalValidate -match "All containers present")) {
                             Write-Host "    ❌ Container validation failed after 3 attempts" -ForegroundColor Red
                             Write-Host "      Diagnostic output:" -ForegroundColor Gray
                             Write-Host $finalValidate -ForegroundColor Gray
@@ -1317,7 +1317,7 @@ try {
                     
                     # Validate final success
                     $finalValidate = python scripts/diagnose_containers.py 2>&1
-                    if (-not ($LASTEXITCODE -eq 0 -and $finalValidate -match "All containers exist")) {
+                    if (-not ($LASTEXITCODE -eq 0 -and $finalValidate -match "All containers present")) {
                         Write-Host "    ❌ Container validation failed" -ForegroundColor Red
                         az resource update --ids $cosmosResourceId --set properties.disableLocalAuth=true --api-version 2023-11-15 --output none 2>&1 | Out-Null
                         throw "Container validation failed"
