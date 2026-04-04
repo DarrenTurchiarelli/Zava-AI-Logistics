@@ -715,7 +715,7 @@ class ParcelTrackingDB:
         """
         try:
             # Call Azure AI Driver Agent for delivery execution intelligence
-            from agents.base import driver_agent
+            from src.infrastructure.agents import driver_agent
 
             container = self.database.get_container_client(self.parcels_container)
 

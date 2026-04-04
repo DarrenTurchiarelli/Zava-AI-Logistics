@@ -8,25 +8,42 @@ Zava is a last-mile delivery platform powered by **8 Azure AI Foundry agents** w
 
 **Tech Stack:**
 - Python 3.11+
-- Flask 3.0+ (web framework)
-- Azure Cosmos DB (NoSQL database)
+- Flask 3.0+ (web framework with Blueprint architecture)
+- Azure Cosmos DB (NoSQL database with Repository pattern)
 - Azure AI Foundry (persistent agents)
 - Azure Maps (route optimization)
 - Azure Speech Services (voice features)
 - Azure Vision (OCR/image analysis)
 
-## Setup Commands
+**Architecture:**
+- **Clean Architecture** - 5 distinct layers (interfaces, application, domain, infrastructure, config)
+- **Domain-Driven Design** - Business logic in domain services
+- **CQRS Pattern** - Separate read/write models
+- **Repository Pattern (modern Python packaging)
+pip install -e ".[dev]"
+# Or just production dependencies
+pip install -e .
 
-### Initial Setup
-```bash
-# Install dependencies
+# Legacy requirements.txt also supported
 pip install -r requirements.txt
 
 # Configure environment
 cp .env.example .env  # Then edit with your Azure credentials
 
 # Initialize database
-python parcel_tracking_db.py
+python -m src.infrastructure.database.cosmos_client
+# Or use the legacy script
+python archive/legacy_modules/parcel_tracking_db.py
+
+# Generate demo data
+python utils/generators/generate_fresh_test_data.py
+python utils/generators/generate_dispatcher_demo_data.py
+python utils/generators/generate_demo_manifests.py
+
+# Run tests
+pytest tests/ -vt
+# Or use the legacy script
+python archive/legacy_modules/parcel_tracking_db.py
 
 # Generate demo data
 python utils/generators/generate_fresh_test_data.py
@@ -74,14 +91,14 @@ py app.py
 
 | Agent | Env Var | File | Tools | Status |
 |-------|---------|------|-------|--------|
-| Customer Service | `CUSTOMER_SERVICE_AGENT_ID` | agents/base.py:662 | track_parcel, search_parcels | ✅ Active |
-| Fraud Detection | `FRAUD_RISK_AGENT_ID` | agents/fraud.py:35 | None | ✅ Active |
-| Identity Verification | `IDENTITY_AGENT_ID` | agents/base.py:770 | None | ✅ Active |
-| Dispatcher | `DISPATCHER_AGENT_ID` | agents/base.py:588 | None | ✅ Active |
-| Parcel Intake | `PARCEL_INTAKE_AGENT_ID` | agents/base.py:333 | None | ✅ Active |
-| Sorting Facility | `SORTING_FACILITY_AGENT_ID` | agents/base.py:427 | None | ✅ Active |
-| Delivery Coordination | `DELIVERY_COORDINATION_AGENT_ID` | agents/base.py:473 | None | ✅ Active |
-| Optimization | `OPTIMIZATION_AGENT_ID` | agents/base.py:521 | None | ✅ Active |
+| Customer Service | `CUSTOMER_SERVICE_AGENT_ID` | src/infrastructure/agents/core/base.py | track_parcel, search_parcels | ✅ Active |
+| Fraud Detection | `FRAUD_RISK_AGENT_ID` | src/infrastructure/agents/core/fraud.py | None | ✅ Active |
+| Identity Verification | `IDENTITY_AGENT_ID` | src/infrastructure/agents/core/base.py | None | ✅ Active |
+| Dispatcher | `DISPATCHER_AGENT_ID` | src/infrastructure/agents/core/manifest.py | None | ✅ Active |
+| Parcel Intake | `PARCEL_INTAKE_AGENT_ID` | src/infrastructure/agents/core/base.py | None | ✅ Active |
+| Sorting Facility | `SORTING_FACILITY_AGENT_ID` | src/infrastructure/agents/core/base.py | None | ✅ Active |
+| Delivery Coordination | `DELIVERY_COORDINATION_AGENT_ID` | src/infrastructure/agents/core/base.py | None | ✅ Active |
+| Optimization | `OPTIMIZATION_AGENT_ID` | src/infrastructure/agents/core/base.py | None | ✅ Active |
 
 ### 1. Customer Service Agent 🎧
 **Purpose:** Real-time customer inquiries and parcel tracking
@@ -100,13 +117,14 @@ py app.py
 - No manual configuration needed
 
 **Prompt Locations:**
-- Base instructions: Azure AI Foundry portal or register_agent_tools.py:67-100
-- Runtime prompt: agents/base.py:662-730
+- Base instructions: Azure AI Foundry portal or scripts/register_agent_tools_openai.py
+- Runtime implementation: src/infrastructure/agents/core/base.py
+- System prompts: src/infrastructure/agents/skills/customer-service/system-prompt.md
 - ⚠️ **IMPORTANT**: Photos (lodgement_photos/delivery_photos) auto-display to customers. Agent must acknowledge them naturally, never say "check internal systems" when photos exist.
 
 **Code Example:**
 ```python
-from agents.base import customer_service_agent
+from src.infrastructure.agents import customer_service_agent
 
 result = await customer_service_agent({
     'details': 'Where is my parcel LP123456?',
@@ -115,7 +133,7 @@ result = await customer_service_agent({
 ```
 
 **Known Issues:**
-- ✅ Fixed v1.2.3: Lodgement photos now included in agent tool response (agent_tools.py:66-75)
+- ✅ Fixed v1.2.3: Lodgement photos now included in agent tool response (src/infrastructure/agents/tools/cosmos_tools.py)
 
 ### 2. Fraud Detection Agent 🛡️
 **Purpose:** Security threat analysis and scam detection
@@ -130,7 +148,9 @@ result = await customer_service_agent({
 
 **Code Example:**
 ```python
-from agents.fraud import fraud_risk_agent
+from src.infrastructure.agents import fraud_risk_agent
+# Or use the domain service for business logic
+from src.domain.services import FraudService
 
 result = await fraud_risk_agent({
     'message_content': 'Suspicious SMS text',
@@ -154,7 +174,7 @@ result = await fraud_risk_agent({
 
 **Code Example:**
 ```python
-from agents.base import identity_agent
+from src.infrastructure.agents import identity_agent
 
 result = await identity_agent({
     'customer_name': 'John Smith',
@@ -191,7 +211,9 @@ result = await identity_agent({
 
 **Code Example:**
 ```python
-from agents.base import parcel_intake_agent
+from src.infrastructure.agents import parcel_intake_agent
+# Or use the domain service for validation
+from src.domain.services import ParcelService
 
 result = await parcel_intake_agent({
     'tracking_number': 'DT123456',
@@ -321,8 +343,8 @@ python generate_sample_parcels.py
 4. Click "Process with AI Agent"
 5. Observe automated decisions with explanations
 
-**Detailed Guide:** See [Guides/APPROVAL_DEMO_GUIDE.md](Guides/APPROVAL_DEMO_GUIDE.md) for complete walkthrough  
-**Quick Reference:** See [Guides/APPROVAL_DEMO_QUICK_REFERENCE.md](Guides/APPROVAL_DEMO_QUICK_REFERENCE.md) for demo script
+**Detailed Guide:** See [docs/APPROVAL_DEMO_GUIDE.md](docs/APPROVAL_DEMO_GUIDE.md) for complete walkthrough
+**Quick Reference:** See [docs/APPROVAL_DEMO_QUICK_REFERENCE.md](docs/APPROVAL_DEMO_QUICK_REFERENCE.md) for demo script
 
 **Key Demo Points:**
 - Speed: Processes 11 requests in seconds
@@ -349,12 +371,12 @@ python utils/generators/generate_bulk_realistic_data.py --count 5000
   - `DT202512170037` - Sarah Johnson (Perth WA) - Delivered with photo proof
   - Full event histories, photos, sender data
   - **NOTE**: These 2 parcels are also auto-created during deployment (with 100 additional realistic parcels)
-  
+
 - 📦 **Thousands of realistic parcels** distributed across:
   - All 8 Australian states (NSW, VIC, QLD, WA, SA, TAS, ACT, NT)
   - Proportional to population (32% NSW, 26% VIC, 20% QLD, etc.)
   - Major cities (Sydney, Melbourne, Brisbane, Perth, Adelaide, etc.)
-  
+
 - 📊 **Complete data for testing:**
   - Driver manifests (57 drivers with assigned parcels)
   - Approval system (parcels at various risk levels)
@@ -394,26 +416,35 @@ The deployment script (`deploy_to_azure.ps1`) will prompt you to generate bulk d
 
 ### Run Application Tests
 ```bash
-# Test database connection
-python parcel_tracking_db.py
+# Run modern test suite
+pytest tests/ -v
+
+# Test database connection (legacy)
+python archive/legacy_modules/parcel_tracking_db.py
+
+# Test database connection (new)
+python -m src.infrastructure.database.cosmos_client
 
 # Test Azure Maps integration
-python services/maps.py
+python -m src.infrastructure.external_services.azure_maps
 
 # Test agent workflow
-python Scripts/W01_Sequential_Workflow_Human_Approval.py
+python scripts/W01_Sequential_Workflow_Human_Approval.py
 ```
 
 ### Manual Testing
 ```bash
 # Test Customer Service Agent with tools
-python register_agent_tools.py
+python scripts/register_agent_tools_openai.py
 
 # Generate test parcels
-python Scripts/check_demo_parcel.py
+python scripts/check_demo_parcel.py
 
 # Test driver manifest generation
 python utils/generators/generate_demo_manifests.py
+
+# Run test suite
+pytest tests/ -v
 ```
 
 ### View Logs
@@ -437,10 +468,10 @@ az webapp log tail --name <webapp-name> --resource-group RG-Zava-Logistics
 - Prefix internal functions with underscore: `_helper_function()`
 
 ### Agent Prompts (✨ NEW: Centralized Management)
-**All agent system prompts are now managed in the `Agent-Skills/` folder:**
+**All agent system prompts are now managed in the `src/infrastructure/agents/skills/` folder:**
 
 ```
-Agent-Skills/
+src/infrastructure/agents/skills/
   customer-service/
     system-prompt.md  # Base agent behavior and instructions
     SKILLS.md         # Capabilities documentation
@@ -450,16 +481,20 @@ Agent-Skills/
   ... (other agents)
 ```
 
+**Validation Status**: ✅ **All 9 agents validated** (April 3, 2026)
+- Run `python scripts/validate_agent_skills.py` to re-validate
+- See [AGENT_SKILLS_VALIDATION_REPORT.md](docs/AGENT_SKILLS_VALIDATION_REPORT.md) for details
+
 **Loading Prompts in Code:**
 ```python
-from agents.prompt_loader import get_agent_prompt, get_agent_skills
+from src.infrastructure.agents.core.prompt_loader import get_agent_prompt, get_agent_skills
 
 # Load system prompt for an agent
 prompt = get_agent_prompt("customer-service")
 skills = get_agent_skills("customer-service")
 
 # List all available agents
-from agents.prompt_loader import list_available_agents
+from src.infrastructure.agents.core.prompt_loader import list_available_agents
 agents = list_available_agents()
 ```
 
@@ -469,6 +504,14 @@ agents = list_available_agents()
 - ✅ Easy to update agent instructions without code changes
 - ✅ Version control for agent prompts
 - ✅ Automatic validation on import
+- ✅ **Deployed to Azure AI Foundry during deployment** (via `create_foundry_agents_openai.py`)
+
+**Deployment Integration:**
+- Deployment script (`deploy_to_azure.ps1`) automatically loads prompts from skills folder
+- Creates agents in Azure AI Foundry with correct instructions
+- Registers tools with Customer Service Agent
+- Validates tool registration succeeded
+- All managed identity authentication configured
 
 ### Agent Functions
 ```python
@@ -490,8 +533,18 @@ async def agent_name(request_data: Dict[str, Any]) -> Dict[str, Any]:
 
 ### Database Operations
 ```python
+# Old way (direct database access - deprecated)
+from archive.legacy_modules.parcel_tracking_db import ParcelTrackingDB
 async with ParcelTrackingDB() as db:
     result = await db.operation()
+
+# New way (repository pattern - recommended)
+from src.infrastructure.database import get_cosmos_client
+from src.infrastructure.database.repositories import ParcelRepository
+
+async with await get_cosmos_client() as client:
+    repository = ParcelRepository(client.database)
+    parcel = await repository.get_by_tracking_number("DT123456")
 ```
 
 ### Naming Conventions
@@ -554,7 +607,7 @@ The deployment script automatically:
    - **Immediately re-secures Cosmos DB (managed identity only)**
 10. ✅ Tests endpoint connectivity
 
-**Security Note**: 
+**Security Note**:
 - Cosmos DB local auth is temporarily enabled **only** during demo data generation (30 seconds), then immediately disabled
 - API key authentication is temporarily enabled **only** during agent creation (30 seconds), then immediately disabled
 - All runtime operations use managed identity exclusively - no keys are stored in environment variables or configuration
@@ -583,10 +636,10 @@ The deployment is fully automated - no manual steps required for a working demo!
 **Solution 1 - Standard Fix (Try First):**
 ```powershell
 # 1. Diagnose the issue
-.\Scripts\diagnose_cosmos_auth.ps1
+.\scripts\diagnose_cosmos_auth.ps1
 
 # 2. Fix authentication issues
-.\Scripts\fix_cosmos_auth.ps1
+.\scripts\fix_cosmos_auth.ps1
 ```
 
 **Solution 2 - Aggressive Fix (If Standard Fix Doesn't Work):**
@@ -595,7 +648,7 @@ The deployment is fully automated - no manual steps required for a working demo!
 # - Removes ALL key-based auth environment variables
 # - Completely stops and restarts the app
 # - Waits 90 seconds for RBAC propagation
-.\Scripts\force_fix_auth.ps1
+.\scripts\force_fix_auth.ps1
 ```
 
 **Manual Solution (Last Resort):**
@@ -656,10 +709,10 @@ Start-Sleep -Seconds 45
 **Solution (Automated):**
 ```powershell
 # 1. Diagnose which containers are missing
-python Scripts/diagnose_containers.py
+python scripts/diagnose_containers.py
 
 # 2. Fix missing containers (creates all 10 required containers)
-.\Scripts\fix_azure_containers.ps1
+.\scripts\fix_azure_containers.ps1
 
 # 3. Restart app
 az webapp restart --name <webapp-name> --resource-group RG-Zava-Frontend-dev
@@ -790,23 +843,54 @@ Located: `workflows/fraud_to_customer_service.py`
 **Trigger:**
 ```python
 from workflows.fraud_to_customer_service import fraud_detection_to_customer_service_workflow
+# Or use the new application layer
+from src.application.commands import ReportFraudCommand
+from src.infrastructure.database.repositories import ApprovalRepository
 
+# Old way (direct workflow)
 result = await fraud_detection_to_customer_service_workflow(
     message_content="Suspicious delivery request",
     customer_name="John Smith",
     customer_email="john@example.com",
     customer_phone="+61400000000"
 )
+
+# New way (CQRS pattern)
+command = ReportFraudCommand(repository)
+await command.execute(message_content="Suspicious delivery request", customer_name="John Smith")
 ```
 
 ## Updating Agents
+
+### Pre-Deployment Validation ✨ NEW
+
+**Always validate agent skills before deployment:**
+```bash
+# Validate all agent prompts load correctly
+python scripts/validate_agent_skills.py
+
+# Expected output:
+# ✅ SUCCESS: All 9 agents validated successfully
+#
+# Deployment Status:
+#   ✓ All system-prompt.md files exist and are loadable
+#   ✓ Scripts can import from src.infrastructure.agents.core.prompt_loader
+#   ✓ Agent prompts will be registered with Azure AI Foundry on deployment
+```
+
+**What this validates:**
+- ✅ All 9 agent skill folders exist
+- ✅ All `system-prompt.md` files are present and valid
+- ✅ Import paths work correctly
+- ✅ Prompts contain sufficient content (>100 chars)
+- ✅ No file system errors
 
 ### Update Agent Instructions
 
 **✨ NEW: Edit Markdown Files (Recommended)**
 ```bash
 # Edit the system prompt file directly
-# File: Agent-Skills/{agent-name}/system-prompt.md
+# File: src/infrastructure/agents/skills/{agent-name}/system-prompt.md
 
 # Changes take effect immediately on next agent call
 # No code changes or redeployment needed!
@@ -815,9 +899,15 @@ result = await fraud_detection_to_customer_service_workflow(
 **Example: Update Customer Service Agent**
 ```bash
 # 1. Edit the prompt file
-code Agent-Skills/customer-service/system-prompt.md
+code src/infrastructure/agents/skills/customer-service/system-prompt.md
 
-# 2. Changes apply immediately (prompts are loaded dynamically)
+# 2. Validate changes
+python scripts/validate_agent_skills.py
+
+# 3. For Azure deployment, re-register the agent
+python scripts/create_foundry_agents_openai.py
+
+# 4. Changes apply immediately (prompts are loaded dynamically)
 # Test the updated agent
 python test_agent.py customer-service
 ```
@@ -826,14 +916,14 @@ python test_agent.py customer-service
 
 **Method 1: Local Testing (Immediate Effect)**
 ```bash
-# Edit Agent-Skills/{agent-name}/system-prompt.md
+# Edit src/infrastructure/agents/skills/{agent-name}/system-prompt.md
 # Restart your application to pick up changes
 ```
 
 **Method 2: Register with Azure AI Foundry (Persistent)**
 ```bash
 # After editing system-prompt.md files, register with Azure
-python register_agent_tools.py
+python scripts/register_agent_tools_openai.py
 ```
 
 **Method 3: Update in Azure Portal**
@@ -844,12 +934,15 @@ python register_agent_tools.py
 
 ### Add New Agent Tools
 ```bash
-# 1. Define tool in agent_tools.py
+# 1. Define tool in src/infrastructure/agents/tools/cosmos_tools.py
 async def new_tool(param: str) -> str:
-    # Implementation
+    """Tool description"""
+    # Implementation using repository pattern
+    from src.infrastructure.database.repositories import ParcelRepository
+    # ... implementation
     pass
 
-# 2. Add to AGENT_TOOLS list
+# 2. Add to AGENT_TOOLS list in the same file
 AGENT_TOOLS = [
     existing_tools,
     {
@@ -863,33 +956,69 @@ AGENT_TOOLS = [
 ]
 
 # 3. Register with agent
-python register_agent_tools.py
+python scripts/register_agent_tools_openai.py
 ```
 
 ## Key Files Reference
 
+### New Enterprise Structure (v2.0+)
+
 | File | Purpose |
 |------|---------|
-| `agents/base.py` | Core agent implementations (8 agents) |
-| `agents/fraud.py` | Fraud detection agent |
-| `agent_tools.py` | Cosmos DB function tools for agents |
-| `register_agent_tools.py` | Register tools with Azure AI agents |
-| `parcel_tracking_db.py` | Cosmos DB operations |
-| `app.py` | Flask web application (main entry) |
-| `main.py` | CLI interface |
+| `src/infrastructure/agents/core/base.py` | Core agent implementations (most agents) |
+| `src/infrastructure/agents/core/fraud.py` | Fraud detection agent |
+| `src/infrastructure/agents/core/manifest.py` | Dispatcher/manifest agent |
+| `src/infrastructure/agents/tools/cosmos_tools.py` | Cosmos DB function tools for agents |
+| `src/infrastructure/agents/skills/` | Agent system prompts and capabilities |
+| `src/domain/models/` | Business entities (Parcel, Manifest, Driver, etc.) |
+| `src/domain/services/` | Business logic services |
+| `src/infrastructure/database/cosmos_client.py` | Cosmos DB client |
+| `src/infrastructure/database/repositories/` | Data access layer (Repository pattern) |
+| `src/interfaces/web/app.py` | Flask application factory |
+| `src/interfaces/web/routes/` | Web route blueprints (7 modules) |
+| `app.py` | Thin wrapper (26 lines) - entry point |
+| `main.py` | CLI interface (uses archived modules) |
+| `scripts/register_agent_tools_openai.py` | Register tools with Azure AI agents |
+| `scripts/create_foundry_agents_openai.py` | Create agents in Azure AI Foundry |
 | `deploy_to_azure.ps1` | Azure deployment automation |
 | `workflows/fraud_to_customer_service.py` | Multi-agent workflow |
 
-## Documentation
+### Legacy Files (Archived)
 
+| File | New Location |
+|------|-------------|
+| `agents/base.py` | `src/infrastructure/agents/core/base.py` |
+| `agents/fraud.py` | `src/infrastructure/agents/core/fraud.py` |
+| `agent_tools.py` | `src/infrastructure/agents/tools/cosmos_tools.py` |
+| `parcel_tracking_db.py` | `src/infrastructure/database/cosmos_client.py` |
+| `logistics_*.py` (12 files) | `archive/legacy_modules/` (business logic → `src/domain/services/`) |
+| `app.py` (5,403 lines) | `archive/app.py.old` (routes → `src/interfaces/web/routes/`) |
+
+### Core Documentation
 - `readme.md` - User-focused overview
 - `AGENTS.md` - This file (developer/agent focused)
-- `Guides/DEMO_GUIDE.md` - Demo walkthrough
-- `Guides/APPROVAL_DEMO_GUIDE.md` - Approval agent mode demo (detailed)
-- `Guides/APPROVAL_DEMO_QUICK_REFERENCE.md` - Approval demo quick reference card
-- `Guides/AZURE_DEPLOYMENT.md` - Deployment details
-- `Guides/DISPATCHER_AGENT_GUIDE.md` - Dispatcher integration
-- `Guides/AGENT_COMMUNICATION_OPPORTUNITIES.md` - Workflow opportunities
+- `README_NEW_STRUCTURE.md` - Quick start guide for new structure
+- `RESTRUCTURE_COMPLETE.md` - Complete restructuring report
+
+### Architecture & Development
+- `docs/ARCHITECTURE.md` - System architecture (Clean Architecture + DDD)
+- `docs/DEVELOPMENT.md` - Developer setup and workflow guide
+- `docs/TESTING.md` - Testing strategy and best practices
+- `docs/README.md` - Documentation index
+
+### User Guides
+- `docs/DEMO_GUIDE.md` - Demo walkthrough
+- `docs/APPROVAL_DEMO_GUIDE.md` - Approval agent mode demo (detailed)
+- `docs/APPROVAL_DEMO_QUICK_REFERENCE.md` - Approval demo quick reference card
+- `docs/AZURE_DEPLOYMENT.md` - Deployment details
+- `docs/DISPATCHER_AGENT_GUIDE.md` - Dispatcher integration
+- `docs/AGENT_COMMUNICATION_OPPORTUNITIES.md` - Workflow opportunities
+
+### Migration Guides
+- `RESTRUCTURE_PLAN.md` - Original restructuring plan
+- `ROUTE_MIGRATION_SUMMARY.md` - Where all 53 routes went
+- `BLUEPRINT_IMPLEMENTATION_GUIDE.md` - Blueprint development patterns
+- `PHASE_1_2_REFACTORING_SUMMARY.md` - Services & agents migration details
 
 ## Security Considerations
 
@@ -932,6 +1061,13 @@ python register_agent_tools.py
 
 ## Version History
 
+- **v2.0.0** (2026-04-03): Enterprise restructuring - Clean Architecture + DDD implementation
+  - Split 5,403-line monolithic app.py into 7 focused blueprints
+  - Created domain models, services, and repositories
+  - Implemented CQRS pattern with commands and queries
+  - Reorganized agents into proper infrastructure layer
+  - Added comprehensive test suite (40 test cases)
+  - Created 15+ documentation files
 - **v1.2.4** (2026-02-12): Fixed Azure deployment login issues with automatic user initialization
 - **v1.2.3** (2026-01-13): Fixed lodgement photo display in Customer Service Agent
 - **v1.2.0** (2025-12-18): Added 8 active AI agents with performance dashboard
@@ -940,6 +1076,7 @@ python register_agent_tools.py
 
 ---
 
-**Last Updated:** February 12, 2026  
-**Agent Framework:** Azure AI Foundry (Microsoft Agent Framework)  
+**Last Updated:** April 3, 2026 (v2.0.0 - Enterprise Restructuring Complete)
+**Agent Framework:** Azure AI Foundry (Microsoft Agent Framework)
+**Architecture:** Clean Architecture + Domain-Driven Design
 **Maintained By:** Darren Turchiarelli (Microsoft Australia)

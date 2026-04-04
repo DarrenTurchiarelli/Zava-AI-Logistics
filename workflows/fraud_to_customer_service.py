@@ -16,10 +16,10 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from agents.base import customer_service_agent, identity_agent
+from src.infrastructure.agents import customer_service_agent, identity_agent
 
 # Import agents
-from agents.fraud import analyze_with_fraud_agent, fraud_risk_agent
+from src.infrastructure.agents import analyze_with_fraud_agent, fraud_risk_agent
 
 
 @dataclass

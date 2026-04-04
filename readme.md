@@ -46,17 +46,23 @@ See [AGENTS.md](AGENTS.md) for technical details. Agent prompts in `Agent-Skills
 ## 🛠️ Setup
 
 ```powershell
-# Install
+# Install dependencies
 pip install -r requirements.txt
 
-# Configure
+# Configure environment
 cp .env.example .env  # Edit with Azure credentials
 
-# Initialize
-python parcel_tracking_db.py
+# Initialize database
+python Scripts/initialize_all_containers.py
 
-# Run
+# Generate demo data
+python utils/generators/generate_fresh_test_data.py
+
+# Run application (legacy)
 py app.py
+
+# Or use new architecture
+python -c "from src.interfaces.web.app import create_app; app = create_app(); app.run(debug=True)"
 ```
 
 **Environment (.env):**
@@ -65,7 +71,9 @@ AZURE_AI_PROJECT_ENDPOINT="your-endpoint"
 AZURE_AI_MODEL_DEPLOYMENT_NAME="gpt-4o"
 COSMOS_DB_ENDPOINT="your-endpoint"
 COSMOS_DB_DATABASE_NAME="logisticstracking"
+COSMOS_CONNECTION_STRING="your-connection-string"  # For local dev
 AZURE_MAPS_SUBSCRIPTION_KEY="your-key"
+# + All 8 agent IDs (see AGENTS.md)
 ```
 
 ---
@@ -82,34 +90,107 @@ AZURE_MAPS_SUBSCRIPTION_KEY="your-key"
 
 Deploys: Cosmos DB, AI Hub, OpenAI, Maps, Speech, Vision, 8 agents, RBAC, demo data.
 
+**Automated Deployment (GitHub Actions):**
+```
+1. Setup: Follow .github/GITHUB_ACTIONS_SETUP.md
+2. Go to: Actions → Deploy Infrastructure & Application
+3. Click: Run workflow → Use defaults
+4. Wait: 15-20 minutes
+```
+
+**See:** [`.github/README.md`](.github/README.md) for complete CI/CD workflow documentation.
+
 ---
 
 ## 🔧 Troubleshooting
 
 **Access Denied:**
 ```powershell
+# Wait 5 minutes for RBAC propagation, then:
 az webapp restart --name <name> --resource-group RG-Zava-Frontend-dev
+
+# Or use automated fix:
+.\Scripts\force_fix_auth.ps1
 ```
 
 **Database Connection:**
 ```bash
-python parcel_tracking_db.py  # Test connectivity
+# Test connectivity
+python parcel_tracking_db.py
+
+# Diagnose containers
+python Scripts/diagnose_containers.py
+
+# Fix missing containers
+.\Scripts\fix_azure_containers.ps1
 ```
 
 **Agent Issues:**
 ```bash
-az login  # Verify credentials
+# Verify login
+az login
+
+# Validate agent tools
+python Scripts/validate_agent_tools.py
+
+# Register tools
+python Scripts/register_agent_tools_openai.py
+```
+
+**Testing:**
+```bash
+# Run all tests
+pytest tests/
+
+# Run specific test level
+pytest tests/unit/       # Fast unit tests
+pytest tests/integration/ # Integration tests
+pytest tests/e2e/        # End-to-end tests
+
+# Coverage report
+pytest --cov=src --cov-report=html tests/
 ```
 
 ---
 
 ## 📚 Documentation
 
-- [AGENTS.md](AGENTS.md) - Technical agent documentation
-- [Guides/DEPLOYMENT.md](Guides/DEPLOYMENT.md) - Deployment guide
-- [Agent-Skills/README.md](Agent-Skills/README.md) - System prompts
+### Guides
+- **[AGENTS.md](AGENTS.md)** - AI agent technical documentation
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture overview
+- **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** - Developer guide
+- **[docs/TESTING.md](docs/TESTING.md)** - Testing strategy and guide
+- **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Deployment guide
 
-Telemetry: https://ai.azure.com → Tracing / Monitoring
+### Detailed Guides
+- [Guides/DEMO_GUIDE.md](Guides/DEMO_GUIDE.md) - Full feature walkthrough
+- [Guides/APPROVAL_DEMO_GUIDE.md](Guides/APPROVAL_DEMO_GUIDE.md) - AI approval workflow
+- [Guides/DISPATCHER_AGENT_GUIDE.md](Guides/DISPATCHER_AGENT_GUIDE.md) - Dispatcher integration
+- [Guides/USER_AUTH_GUIDE.md](Guides/USER_AUTH_GUIDE.md) - Authentication system
+
+### Project Structure
+
+```
+src/                    # New Clean Architecture implementation
+├── interfaces/        # Web routes, API endpoints
+├── application/       # Commands, Queries (CQRS)
+├── domain/           # Models, Services, Business Logic
+├── infrastructure/   # Database, AI Agents, External Services
+└── shared/           # Utilities, Logging
+
+tests/                 # Comprehensive test suite
+├── unit/             # Component tests
+├── integration/      # Workflow tests
+└── e2e/              # Full application tests
+
+agents/               # AI agent implementations
+Agent-Skills/         # Agent system prompts
+config/              # Configuration files
+utils/               # Utility scripts
+workflows/           # Multi-agent workflows
+```
+
+**Telemetry:** https://ai.azure.com → Tracing / Monitoring
 
 ---
 

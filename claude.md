@@ -82,6 +82,10 @@ Don't build for imaginary scenarios. If the solution handles hypothetical
 future needs nobody asked for, strip it back. Simple and correct beats
 elaborate and speculative.
 
+### Production Grade
+Do not use deprecated services, products, modules or libraries. Use the latest
+stable release where possible. If a a preview service is fine as long as it's noted.
+
 ---
 
 ## 4. Context Management

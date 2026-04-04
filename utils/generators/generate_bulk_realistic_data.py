@@ -452,7 +452,7 @@ async def main():
         # Verify demo parcels exist
         print(f"\n  🎯 Demo Parcel Verification:")
         for demo_spec in DEMO_PARCELS:
-            parcel = await db.search_parcels_by_tracking(demo_spec['tracking_number'])
+            parcel = await db.get_parcel_by_tracking_number(demo_spec['tracking_number'])
             if parcel:
                 print(f"    ✓ {demo_spec['tracking_number']:20} - {demo_spec['recipient_name']}")
             else:
@@ -470,7 +470,8 @@ async def main():
         print("  • 'Who sent parcel RG857954?'")
         print("  • 'Find parcels for Dr. Emma Wilson'")
         print("  • 'Show me delivery statistics for Western Australia'")
-        print()    finally:
+        print()
+    finally:
         # Clean up database connection
         await db.__aexit__(None, None, None)
 if __name__ == "__main__":

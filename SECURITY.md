@@ -18,7 +18,7 @@ We provide security updates for the following versions:
 
 ### Contact
 
-- **Email:** <security@dtlogistics.com.au>
+- **Email:** <security@zavalogistics.com.au>
 - **Response Time:** Within 48 hours
 - **Severity Assessment:** Within 5 business days
 

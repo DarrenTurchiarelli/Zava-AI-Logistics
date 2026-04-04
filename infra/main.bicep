@@ -141,7 +141,7 @@ module backend 'modules/backend.bicep' = {
 // Cosmos DB Data Contributor for App Service (deployed to Backend RG)
 module cosmosRoleAssignment 'modules/rbac/cosmosDbDataContributor.bicep' = {
   scope: backendRg
-  name: 'cosmos-appservice-rbac'
+  name: 'cosmos-appservice-rbac-${uniqueSuffix}'
   params: {
     appServicePrincipalId: frontend.outputs.appServicePrincipalId
     cosmosAccountName: backend.outputs.cosmosDbAccountName
@@ -151,7 +151,7 @@ module cosmosRoleAssignment 'modules/rbac/cosmosDbDataContributor.bicep' = {
 // Cognitive Services OpenAI User for App Service (deployed to Middleware RG)
 module openAIAppServiceRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
   scope: middlewareRg
-  name: 'openai-appservice-rbac'
+  name: 'openai-appservice-rbac-${uniqueSuffix}'
   params: {
     principalId: frontend.outputs.appServicePrincipalId
     cognitiveServiceName: middleware.outputs.openAIServiceName
@@ -162,7 +162,7 @@ module openAIAppServiceRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
 // Cognitive Services OpenAI User for AI Hub (deployed to Middleware RG)
 module openAIHubRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
   scope: middlewareRg
-  name: 'openai-hub-rbac'
+  name: 'openai-hub-rbac-${uniqueSuffix}'
   params: {
     principalId: middleware.outputs.aiHubPrincipalId
     cognitiveServiceName: middleware.outputs.openAIServiceName
@@ -173,7 +173,7 @@ module openAIHubRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
 // Cognitive Services OpenAI User for AI Project (deployed to Middleware RG)
 module openAIProjectRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
   scope: middlewareRg
-  name: 'openai-project-rbac'
+  name: 'openai-project-rbac-${uniqueSuffix}'
   params: {
     principalId: middleware.outputs.aiProjectPrincipalId
     cognitiveServiceName: middleware.outputs.openAIServiceName
@@ -184,7 +184,7 @@ module openAIProjectRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
 // Cognitive Services User for App Service to Speech Service (deployed to Shared RG)
 module speechAppServiceRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
   scope: sharedRg
-  name: 'speech-appservice-rbac'
+  name: 'speech-appservice-rbac-${uniqueSuffix}'
   params: {
     principalId: frontend.outputs.appServicePrincipalId
     cognitiveServiceName: sharedServices.outputs.speechServiceName
@@ -195,7 +195,7 @@ module speechAppServiceRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
 // Cognitive Services User for App Service to Vision Service (deployed to Shared RG)
 module visionAppServiceRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
   scope: sharedRg
-  name: 'vision-appservice-rbac'
+  name: 'vision-appservice-rbac-${uniqueSuffix}'
   params: {
     principalId: frontend.outputs.appServicePrincipalId
     cognitiveServiceName: sharedServices.outputs.visionServiceName
@@ -210,7 +210,7 @@ module visionAppServiceRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
 // Update App Service config with endpoints from all resource groups (deployed to Frontend RG)
 module appServiceConfig 'modules/appServiceConfig.bicep' = {
   scope: frontendRg
-  name: 'appservice-config'
+  name: 'appservice-config-${uniqueSuffix}'
   params: {
     appServiceName: frontend.outputs.appServiceName
     cosmosDbEndpoint: backend.outputs.cosmosDbEndpoint

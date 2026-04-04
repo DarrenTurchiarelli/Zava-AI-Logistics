@@ -9,11 +9,12 @@ import sys
 from pathlib import Path
 from dotenv import load_dotenv
 from openai import AzureOpenAI
+from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from agent_tools import AGENT_TOOLS
-from agents.prompt_loader import get_agent_prompt
+from src.infrastructure.agents.tools.cosmos_tools import AGENT_TOOLS
+from src.infrastructure.agents.core.prompt_loader import get_agent_prompt
 from config.company import COMPANY_EMAIL, COMPANY_NAME, COMPANY_PHONE
 
 # Fix Windows console encoding
@@ -26,11 +27,9 @@ if sys.platform == 'win32':
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
-load_dotenv()
+load_dotenv(override=True)
 
-# Azure OpenAI configuration
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
-AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")  # Set during deployment
 CUSTOMER_SERVICE_AGENT_ID = os.getenv("CUSTOMER_SERVICE_AGENT_ID")
 
 print("=" * 70)
@@ -48,21 +47,16 @@ if not CUSTOMER_SERVICE_AGENT_ID:
     print("   Run create_foundry_agents_openai.py first")
     sys.exit(1)
 
-if not AZURE_OPENAI_API_KEY:
-    print("❌ AZURE_OPENAI_API_KEY not set")
-    print("   This script requires API key during deployment")
-    print("   The key is temporarily enabled, then disabled after registration")
-    sys.exit(1)
-
 print(f"📡 Connecting to Azure OpenAI")
 print(f"   Endpoint: {AZURE_OPENAI_ENDPOINT}")
 print(f"   Agent ID: {CUSTOMER_SERVICE_AGENT_ID}")
 print()
 
-# Create OpenAI client with API key
+credential = DefaultAzureCredential()
+token_provider = get_bearer_token_provider(credential, "https://cognitiveservices.azure.com/.default")
 client = AzureOpenAI(
     azure_endpoint=AZURE_OPENAI_ENDPOINT,
-    api_key=AZURE_OPENAI_API_KEY,
+    azure_ad_token_provider=token_provider,
     api_version="2024-05-01-preview"
 )
 
@@ -116,15 +110,14 @@ try:
     
     # Update agent with tools
     updated_agent = client.beta.assistants.update(
-        assistant_id=CUSTOMER_SERVICE_AGENT_ID,
+        CUSTOMER_SERVICE_AGENT_ID,
         tools=AGENT_TOOLS,
         instructions=enhanced_instructions
     )
     
     print(f"✅ Successfully registered tools!")
     print(f"   Agent: {updated_agent.name}")
-    print(f"   Tools: {len(updated_agent.tools)}")
-    print()
+    print(f"   Tools: {len(updated_agent.tools) if updated_agent.tools else 0}")
     
     print("📝 Registered Tools:")
     for i, tool in enumerate(AGENT_TOOLS, 1):

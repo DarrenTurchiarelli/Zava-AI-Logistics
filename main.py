@@ -1,11 +1,23 @@
-# main.py
-# Main entry point for the modular logistics operations center
+"""
+Zava Logistics CLI Application
+Entry point for command-line interface
+
+⚠️  NOTICE: This CLI uses legacy modules currently archived in archive/legacy_modules/.
+   For production use, consider migrating to the new modular structure in src/.
+"""
 
 import asyncio
+import sys
+from pathlib import Path
+
+# Add archive path temporarily for legacy module access
+archive_path = Path(__file__).parent / "archive" / "legacy_modules"
+sys.path.insert(0, str(archive_path))
+
 from logistics_common import setup_warning_suppression
 from logistics_menu import display_menu, check_environment, print_header
 
-# Import all feature modules
+# Import all feature modules from archived legacy code
 from logistics_core import (
     register_parcel_manually, register_sample_parcels, view_all_parcels,
     track_parcel, scan_parcel_at_location_demo, generate_test_data,

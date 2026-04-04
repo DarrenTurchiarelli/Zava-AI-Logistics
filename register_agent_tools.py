@@ -6,18 +6,18 @@ This script adds function calling capabilities to the agent for real-time data a
 import asyncio
 import os
 
-from azure.ai.projects import AIProjectClient
-from azure.identity import DefaultAzureCredential, ManagedIdentityCredential
+from openai import AzureOpenAI
+from azure.identity import DefaultAzureCredential, ManagedIdentityCredential, get_bearer_token_provider
 from dotenv import load_dotenv
 
 from agent_tools import AGENT_TOOLS
-from agents.prompt_loader import get_agent_prompt
+from src.infrastructure.agents import get_agent_prompt
 from config.company import COMPANY_EMAIL, COMPANY_NAME, COMPANY_PHONE
 
 load_dotenv()
 
-# Azure AI Project Configuration
-AZURE_AI_PROJECT_ENDPOINT = os.getenv("AZURE_AI_PROJECT_ENDPOINT")
+# Azure OpenAI Configuration
+AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 CUSTOMER_SERVICE_AGENT_ID = os.getenv("CUSTOMER_SERVICE_AGENT_ID")
 
 
@@ -28,29 +28,33 @@ async def register_tools():
     print("🔧 Registering Cosmos DB Tools with AI Agent")
     print("=" * 60)
 
-    if not AZURE_AI_PROJECT_ENDPOINT or not CUSTOMER_SERVICE_AGENT_ID:
+    if not AZURE_OPENAI_ENDPOINT or not CUSTOMER_SERVICE_AGENT_ID:
         print("❌ Missing environment variables:")
-        print(f"   AZURE_AI_PROJECT_ENDPOINT: {'✓' if AZURE_AI_PROJECT_ENDPOINT else '✗'}")
+        print(f"   AZURE_OPENAI_ENDPOINT: {'✓' if AZURE_OPENAI_ENDPOINT else '✗'}")
         print(f"   CUSTOMER_SERVICE_AGENT_ID: {'✓' if CUSTOMER_SERVICE_AGENT_ID else '✗'}")
         return
 
     try:
-        # Initialize Azure AI client
-        # Use Managed Identity when explicitly enabled (Azure deployment)
+        # Initialize Azure OpenAI client with token credential (no API key)
         if os.getenv("USE_MANAGED_IDENTITY", "false").lower() == "true":
             credential = ManagedIdentityCredential()
         else:
             credential = DefaultAzureCredential(exclude_developer_cli_credential=True)
 
-        client = AIProjectClient(endpoint=AZURE_AI_PROJECT_ENDPOINT, credential=credential)
+        token_provider = get_bearer_token_provider(credential, "https://cognitiveservices.azure.com/.default")
+        client = AzureOpenAI(
+            azure_endpoint=AZURE_OPENAI_ENDPOINT,
+            azure_ad_token_provider=token_provider,
+            api_version="2024-05-01-preview"
+        )
 
-        print(f"\n📡 Connected to Azure AI Project")
-        print(f"   Endpoint: {AZURE_AI_PROJECT_ENDPOINT}")
+        print(f"\n📡 Connected to Azure OpenAI")
+        print(f"   Endpoint: {AZURE_OPENAI_ENDPOINT}")
         print(f"   Agent ID: {CUSTOMER_SERVICE_AGENT_ID}")
 
         # Get current agent configuration
         print(f"\n📋 Retrieving current agent configuration...")
-        agent = client.agents.get_agent(CUSTOMER_SERVICE_AGENT_ID)
+        agent = client.beta.assistants.retrieve(CUSTOMER_SERVICE_AGENT_ID)
 
         print(f"   Agent Name: {agent.name}")
         print(f"   Model: {agent.model}")
@@ -97,8 +101,8 @@ async def register_tools():
 """
 
         # Update the agent with new tools
-        updated_agent = client.agents.update_agent(
-            agent_id=CUSTOMER_SERVICE_AGENT_ID,
+        updated_agent = client.beta.assistants.update(
+            CUSTOMER_SERVICE_AGENT_ID,
             tools=AGENT_TOOLS,
             instructions=enhanced_instructions,
         )

@@ -1,142 +1,98 @@
 """
-Diagnose Cosmos DB container setup
-Checks which containers exist and which are missing
+Diagnose Cosmos DB container status — read-only, no writes.
+Checks which of the 10 required containers exist and reports missing ones.
+Exit code 0 = all containers present, 1 = missing containers or connection error.
 """
 
+import asyncio
 import os
 import sys
 from pathlib import Path
 
-# Add project root to Python path
 root_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(root_dir))
 
-import asyncio
 from azure.cosmos.aio import CosmosClient
-from azure.identity.aio import DefaultAzureCredential, ManagedIdentityCredential
-from dotenv import load_dotenv
+from azure.identity.aio import DefaultAzureCredential
 
-# Load environment variables
-load_dotenv()
+REQUIRED_CONTAINERS = [
+    "parcels",
+    "TrackingEvents",
+    "DeliveryAttempts",
+    "feedback",
+    "company_info",
+    "suspicious_messages",
+    "address_history",
+    "users",
+    "Manifests",
+    "address_notes",
+]
 
 
-async def diagnose_containers():
-    """Check which containers exist in the database"""
-    print("=" * 80)
-    print("Cosmos DB Container Diagnostic")
-    print("=" * 80)
-    
-    # Get connection details
+async def diagnose():
     connection_string = os.getenv("COSMOS_CONNECTION_STRING")
     endpoint = os.getenv("COSMOS_DB_ENDPOINT")
     database_name = os.getenv("COSMOS_DB_DATABASE_NAME", "logisticstracking")
-    use_managed_identity = os.getenv("USE_MANAGED_IDENTITY", "false").lower() == "true"
-    
-    print(f"Database: {database_name}")
-    print(f"Endpoint: {endpoint}")
-    print(f"Auth method: {'Managed Identity' if use_managed_identity else 'Connection String/Azure AD'}\n")
-    
-    # Initialize client
-    client = None
+
     credential = None
-    
+
     try:
         if connection_string:
-            # Parse connection string
-            parts = connection_string.split(";")
-            endpoint = parts[0].replace("AccountEndpoint=", "")
-            key = parts[1].replace("AccountKey=", "")
-            print("Using connection string authentication\n")
+            parts = dict(p.split("=", 1) for p in connection_string.split(";") if "=" in p)
+            endpoint = parts.get("AccountEndpoint", endpoint)
+            key = parts.get("AccountKey")
             client = CosmosClient(endpoint, key)
-        elif use_managed_identity:
-            print("Using managed identity authentication\n")
-            credential = ManagedIdentityCredential()
-            client = CosmosClient(endpoint, credential)
+            print(f"Auth: connection string")
         elif endpoint:
-            print("Using Azure AD (DefaultAzureCredential) authentication\n")
             credential = DefaultAzureCredential()
             client = CosmosClient(endpoint, credential)
+            print(f"Auth: Azure AD (DefaultAzureCredential)")
         else:
-            print("❌ ERROR: No Cosmos DB connection details found")
-            print("   Set COSMOS_CONNECTION_STRING or COSMOS_DB_ENDPOINT")
-            return False
-        
-        # Get database
+            print("ERROR: No Cosmos DB connection details found")
+            print("  Set COSMOS_CONNECTION_STRING or COSMOS_DB_ENDPOINT")
+            sys.exit(1)
+
+        print(f"Endpoint : {endpoint}")
+        print(f"Database : {database_name}")
+        print()
+
         try:
             database = client.get_database_client(database_name)
-            # Test database access
-            await database.read()
-            print(f"✓ Database '{database_name}' exists and is accessible\n")
+            existing = {c["id"] async for c in database.list_containers()}
         except Exception as e:
-            print(f"❌ ERROR: Cannot access database '{database_name}'")
-            print(f"   {str(e)}\n")
-            return False
-        
-        # Expected containers
-        expected_containers = [
-            ("parcels", "/store_location", "Parcel records"),
-            ("TrackingEvents", "/barcode", "Tracking event history"),
-            ("DeliveryAttempts", "/barcode", "Delivery attempt records"),
-            ("feedback", "/tracking_number", "Customer feedback"),
-            ("company_info", "/info_type", "Company configuration"),
-            ("suspicious_messages", "/report_date", "Fraud detection logs"),
-            ("address_history", "/address_normalized", "Address history"),
-            ("users", "/username", "User accounts"),
-            ("Manifests", "/manifest_id", "Driver manifests"),
-            ("address_notes", "/address_normalized", "Delivery notes"),
-        ]
-        
-        # Check each container
-        print("Checking containers...")
-        print("-" * 80)
-        
-        existing_count = 0
-        missing_containers = []
-        
-        for container_id, partition_key, description in expected_containers:
-            try:
-                container = database.get_container_client(container_id)
-                await container.read()
-                print(f"  ✓ {container_id:25} (PK: {partition_key:25}) - {description}")
-                existing_count += 1
-            except Exception:
-                print(f"  ✗ {container_id:25} (PK: {partition_key:25}) - MISSING")
-                missing_containers.append((container_id, partition_key, description))
-        
-        print("-" * 80)
-        print(f"Status: {existing_count}/{len(expected_containers)} containers exist\n")
-        
-        if missing_containers:
-            print("=" * 80)
-            print("MISSING CONTAINERS")
-            print("=" * 80)
-            for container_id, partition_key, description in missing_containers:
-                print(f"  • {container_id:25} (PK: {partition_key})")
-            print("\n💡 Run this command to create missing containers:")
-            print("   python Scripts/initialize_all_containers.py")
-            print("=" * 80)
-            return False
-        else:
-            print("=" * 80)
-            print("✅ All containers exist and are accessible!")
-            print("=" * 80)
-            return True
-        
-    except Exception as e:
-        print(f"\n❌ ERROR: {e}")
-        print("\n💡 Troubleshooting steps:")
-        print("   1. Check COSMOS_DB_ENDPOINT is set correctly")
-        print("   2. Verify RBAC permissions (Cosmos DB Built-in Data Contributor)")
-        print("   3. For local dev: Run 'az login' and try again")
-        print("   4. For Azure: Verify managed identity is enabled")
-        return False
-    finally:
-        if client:
+            print(f"ERROR: Cannot connect to database '{database_name}': {e}")
             await client.close()
+            sys.exit(1)
+
+        print(f"{'Container':<28} Status")
+        print("-" * 42)
+
+        missing = []
+        for name in REQUIRED_CONTAINERS:
+            if name in existing:
+                print(f"  {name:<26} ✓ exists")
+            else:
+                print(f"  {name:<26} ✗ MISSING")
+                missing.append(name)
+
+        extra = existing - set(REQUIRED_CONTAINERS)
+        for name in sorted(extra):
+            print(f"  {name:<26} (extra)")
+
+        print()
+        if missing:
+            print(f"MISSING {len(missing)}/{len(REQUIRED_CONTAINERS)} containers: {', '.join(missing)}")
+            await client.close()
+            sys.exit(1)
+        else:
+            print(f"All containers present ({len(REQUIRED_CONTAINERS)}/{len(REQUIRED_CONTAINERS)})")
+            await client.close()
+            sys.exit(0)
+
+    finally:
         if credential:
             await credential.close()
 
 
 if __name__ == "__main__":
-    success = asyncio.run(diagnose_containers())
-    sys.exit(0 if success else 1)
+    asyncio.run(diagnose())
