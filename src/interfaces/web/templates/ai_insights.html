@@ -1,0 +1,1345 @@
+{% extends "base.html" %}
+
+{% block title %}AI Insights - {{ company.browser_title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="display-6">
+                <i class="bi bi-graph-up"></i> AI Insights Dashboard
+            </h1>
+            <p class="text-muted">Real-time operational analytics and intelligence</p>
+        </div>
+    </div>
+
+    <!-- Performance Metrics -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <a href="{{ url_for('parcels.all_parcels') }}" class="text-decoration-none">
+                <div class="card text-center border-primary card-hover">
+                    <div class="card-body py-3">
+                        <i class="bi bi-box-seam text-primary" style="font-size: 1.75rem;"></i>
+                        <h3 class="mt-2 mb-0">{{ insights.total_parcels }}</h3>
+                        <p class="text-muted mb-0 small">Total Parcels</p>
+                        <small class="text-dark d-none d-md-block"><i class="bi bi-arrow-right-circle"></i> View All</small>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-3">
+            <a href="{{ url_for('parcels.all_parcels') }}?status=In Transit" class="text-decoration-none">
+                <div class="card text-center border-warning card-hover">
+                    <div class="card-body py-3">
+                        <i class="bi bi-truck text-warning" style="font-size: 1.75rem;"></i>
+                        <h3 class="mt-2 mb-0">{{ insights.in_transit }}</h3>
+                        <p class="text-muted mb-0 small">In Transit</p>
+                        <small class="text-dark d-none d-md-block"><i class="bi bi-arrow-right-circle"></i> Track Now</small>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-3">
+            <a href="{{ url_for('parcels.all_parcels') }}?status=Delivered" class="text-decoration-none">
+                <div class="card text-center border-success card-hover">
+                    <div class="card-body py-3">
+                        <i class="bi bi-check-circle text-success" style="font-size: 1.75rem;"></i>
+                        <h3 class="mt-2 mb-0">{{ insights.delivered }}</h3>
+                        <p class="text-muted mb-0 small">Delivered</p>
+                        <small class="text-dark d-none d-md-block"><i class="bi bi-arrow-right-circle"></i> View History</small>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center border-primary">
+                <div class="card-body py-3">
+                    <i class="bi bi-trophy text-success" style="font-size: 1.75rem;"></i>
+                    <h3 class="mt-2 mb-0">{{ insights.success_rate }}%</h3>
+                    <p class="text-muted mb-0 small">Success Rate</p>
+                    <small class="text-muted d-none d-md-block">Delivered vs Exceptions</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Driver & Delivery Metrics -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white py-2">
+                    <h6 class="mb-0"><i class="bi bi-clipboard-check"></i> Operations Status</h6>
+                </div>
+                <div class="card-body py-2">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <a href="{{ url_for('parcels.all_parcels') }}?status=At Depot" class="text-decoration-none">
+                                <h5 class="text-primary mb-0">{{ insights.at_depot }}</h5>
+                                <p class="text-muted mb-0 small">At Depot</p>
+                            </a>
+                        </div>
+                        <div class="col-4">
+                            <a href="{{ url_for('parcels.all_parcels') }}?status=Sorting" class="text-decoration-none">
+                                <h5 class="text-muted mb-0">{{ insights.sorting }}</h5>
+                                <p class="text-muted mb-0 small">Sorting</p>
+                            </a>
+                        </div>
+                        <div class="col-4">
+                            <a href="{{ url_for('parcels.all_parcels') }}?status=Out for Delivery" class="text-decoration-none">
+                                <h5 class="text-dark mb-0">{{ insights.out_for_delivery }}</h5>
+                                <p class="text-muted mb-0 small">Out for Delivery</p>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <a href="{{ url_for('manifests.driver_manifest') }}" class="text-decoration-none">
+                <div class="card shadow-sm card-hover">
+                    <div class="card-header bg-white py-2">
+                        <h6 class="mb-0"><i class="bi bi-truck-front"></i> Driver Manifests</h6>
+                    </div>
+                    <div class="card-body py-2 text-center">
+                        <h5 class="text-primary mb-0">View Active Manifests</h5>
+                        <p class="text-muted mb-0 small">Check driver assignments and routes</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- AI Performance -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <a href="{{ url_for('approvals.list_approvals') }}" class="text-decoration-none">
+                <div class="card shadow-sm card-hover">
+                    <div class="card-header bg-primary text-white py-2">
+                        <h6 class="mb-0"><i class="bi bi-robot"></i> AI Agent Performance</h6>
+                    </div>
+                    <div class="card-body py-2">
+                        <div class="row text-center g-2">
+                            <div class="col-6 col-md-3">
+                                <i class="bi bi-lightning-charge text-warning" style="font-size: 1.5rem;"></i>
+                                <h5 class="mt-1 mb-0">{{ insights.total_approvals }}</h5>
+                                <p class="text-muted mb-0 small">Total Requests</p>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <i class="bi bi-check-all text-success" style="font-size: 1.5rem;"></i>
+                                <h5 class="mt-1 mb-0">{{ insights.valid_dc_approvals }}</h5>
+                                <p class="text-muted mb-0 small">Ready for Processing</p>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <i class="bi bi-hourglass-split text-primary" style="font-size: 1.5rem;"></i>
+                                <h5 class="mt-1 mb-0">{{ insights.pending_approvals }}</h5>
+                                <p class="text-muted mb-0 small">Pending Review</p>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <i class="bi bi-stopwatch text-primary" style="font-size: 1.5rem;"></i>
+                                <h5 class="mt-1 mb-0">{{ insights.avg_decision_time }}</h5>
+                                <p class="text-muted mb-0 small">Avg Decision Time</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- Azure AI Foundry Agents - System Status -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm border-primary">
+                <div class="card-header bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-robot"></i> Azure AI Foundry Agents - Active Status</h5>
+                        <span class="badge bg-light text-primary">8 Agents Active</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-4">
+                        <i class="bi bi-cpu"></i> Real-time status of production AI agents powered by Azure AI Foundry
+                    </p>
+
+                    <div class="row g-3">
+                        <!-- Customer Service Agent -->
+                        <div class="col-lg-4 col-md-6">
+                            <div class="card border-primary h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h6 class="mb-0"><i class="bi bi-headset text-primary"></i> Customer Service Agent</h6>
+                                        <span class="badge bg-success">Active</span>
+                                    </div>
+                                    <p class="small text-muted mb-2">AI-powered customer support with real-time parcel tracking</p>
+                                    <a href="{{ url_for('chatbot.customer_service_chatbot') }}" class="btn btn-sm btn-outline-primary w-100">
+                                        <i class="bi bi-chat-dots"></i> Open Chatbot
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Fraud Detection Agent -->
+                        <div class="col-lg-4 col-md-6">
+                            <div class="card border-primary h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h6 class="mb-0"><i class="bi bi-shield-exclamation text-danger"></i> Fraud Detection Agent</h6>
+                                        <span class="badge bg-success">Active</span>
+                                    </div>
+                                    <p class="small text-muted mb-2">Multi-category threat classification and risk analysis</p>
+                                    <a href="{{ url_for('chatbot.report_fraud') }}" class="btn btn-sm btn-outline-primary w-100">
+                                        <i class="bi bi-shield-exclamation"></i> Report Fraud
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Identity Agent -->
+                        <div class="col-lg-4 col-md-6">
+                            <div class="card border-primary h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h6 class="mb-0"><i class="bi bi-person-check text-primary"></i> Identity Agent</h6>
+                                        <span class="badge bg-success">Active</span>
+                                    </div>
+                                    <p class="small text-muted mb-2">Customer identity verification for high-risk cases</p>
+                                    <button class="btn btn-sm btn-outline-secondary w-100" disabled>
+                                        <i class="bi bi-lightning"></i> Auto-triggered
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Dispatcher Agent -->
+                        <div class="col-lg-4 col-md-6">
+                            <div class="card border-primary h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h6 class="mb-0"><i class="bi bi-diagram-3 text-warning"></i> Dispatcher Agent</h6>
+                                        <span class="badge bg-success">Active</span>
+                                    </div>
+                                    <p class="small text-muted mb-2">Intelligent parcel-to-driver assignment with load balancing</p>
+                                    <a href="{{ url_for('manifests.admin_manifests') }}" class="btn btn-sm btn-outline-primary w-100">
+                                        <i class="bi bi-robot"></i> Auto-Assign Parcels
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Parcel Intake Agent -->
+                        <div class="col-lg-4 col-md-6">
+                            <div class="card border-primary h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h6 class="mb-0"><i class="bi bi-box-seam text-primary"></i> Parcel Intake Agent</h6>
+                                        <span class="badge bg-success">Active</span>
+                                    </div>
+                                    <p class="small text-muted mb-2">AI-powered OCR and validation with camera scanning</p>
+                                    <a href="{{ url_for('parcels.camera_scanner') }}" class="btn btn-sm btn-outline-primary w-100">
+                                        <i class="bi bi-camera"></i> Camera Scanner
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Optimisation Agent -->
+                        <div class="col-lg-4 col-md-6">
+                            <div class="card border-primary h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h6 class="mb-0"><i class="bi bi-graph-up text-primary"></i> Optimisation Agent</h6>
+                                        <span class="badge bg-success">Active</span>
+                                    </div>
+                                    <p class="small text-muted mb-2">Network-wide performance analysis and recommendations</p>
+                                    <a href="#Optimisation" class="btn btn-sm btn-outline-primary w-100">
+                                        <i class="bi bi-graph-up"></i> View Insights
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sorting Facility Agent -->
+                        <div class="col-lg-4 col-md-6">
+                            <div class="card border-primary h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h6 class="mb-0"><i class="bi bi-building text-primary"></i> Sorting Facility Agent</h6>
+                                        <span class="badge bg-success">Active</span>
+                                    </div>
+                                    <p class="small text-muted mb-2">Real-time capacity monitoring and automated routing</p>
+                                    <a href="#sorting-facility" class="btn btn-sm btn-outline-primary w-100">
+                                        <i class="bi bi-speedometer2"></i> View Facility Status
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Delivery Coordination Agent -->
+                        <div class="col-lg-4 col-md-6">
+                            <div class="card border-primary h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h6 class="mb-0"><i class="bi bi-calendar-check text-warning"></i> Delivery Coordination Agent</h6>
+                                        <span class="badge bg-success">Active</span>
+                                    </div>
+                                    <p class="small text-muted mb-2">Multi-stop sequencing with automated customer notifications</p>
+                                    <a href="{{ url_for('manifests.driver_manifest') }}" class="btn btn-sm btn-outline-primary w-100">
+                                        <i class="bi bi-truck-front"></i> View Manifest
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info alert-persistent mt-3 mb-0">
+                        <small>
+                            <i class="bi bi-info-circle"></i> <strong>Architecture:</strong> All agents are deployed as persistent Azure AI Foundry agents with dedicated agent IDs.
+                            The Customer Service Agent includes Cosmos DB function calling tools for real-time parcel tracking. 2 additional agents available for future integration.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sorting Facility Agent - Real-Time Capacity Monitoring -->
+    <div class="row mb-4" id="sorting-facility">
+        <div class="col-12">
+            <div class="card shadow-sm border-primary">
+                <div class="card-header bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-building"></i> Sorting Facility Agent - Capacity Monitoring</h5>
+                        <span class="badge bg-light text-primary">Real-Time Data</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-4">
+                        <i class="bi bi-speedometer2"></i> Automated routing decisions and load balancing across sorting facilities
+                    </p>
+
+                    <!-- Facility Status Cards -->
+                    <div class="row g-4 mb-4">
+                        <div class="col-md-4">
+                            <div class="card border-success h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h6 class="text-success mb-0"><i class="bi bi-building-check"></i> DC-MEL-001</h6>
+                                        <span class="badge bg-success">Optimal</span>
+                                    </div>
+                                    <div class="mb-3">
+                                        <small class="text-muted d-block">Current Capacity</small>
+                                        <div class="progress" style="height: 25px;">
+                                            <div class="progress-bar bg-success" role="progressbar" style="width: 68%;" aria-valuenow="68" aria-valuemin="0" aria-valuemax="100">68%</div>
+                                        </div>
+                                    </div>
+                                    <ul class="small mb-0">
+                                        <li><strong>Parcels Processing:</strong> 342/500</li>
+                                        <li><strong>Throughput:</strong> 85 parcels/hour</li>
+                                        <li><strong>Wait Time:</strong> 12 min avg</li>
+                                        <li><strong>Next Available:</strong> Immediate</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-warning h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h6 class="text-warning mb-0"><i class="bi bi-building-exclamation"></i> DC-MEL-002</h6>
+                                        <span class="badge bg-warning text-dark">High Load</span>
+                                    </div>
+                                    <div class="mb-3">
+                                        <small class="text-muted d-block">Current Capacity</small>
+                                        <div class="progress" style="height: 25px;">
+                                            <div class="progress-bar bg-warning" role="progressbar" style="width: 89%;" aria-valuenow="89" aria-valuemin="0" aria-valuemax="100">89%</div>
+                                        </div>
+                                    </div>
+                                    <ul class="small mb-0">
+                                        <li><strong>Parcels Processing:</strong> 445/500</li>
+                                        <li><strong>Throughput:</strong> 62 parcels/hour</li>
+                                        <li><strong>Wait Time:</strong> 28 min avg</li>
+                                        <li><strong>Next Available:</strong> 45 minutes</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-primary h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h6 class="text-primary mb-0"><i class="bi bi-building"></i> DC-MEL-003</h6>
+                                        <span class="badge bg-primary">Available</span>
+                                    </div>
+                                    <div class="mb-3">
+                                        <small class="text-muted d-block">Current Capacity</small>
+                                        <div class="progress" style="height: 25px;">
+                                            <div class="progress-bar bg-primary" role="progressbar" style="width: 52%;" aria-valuenow="52" aria-valuemin="0" aria-valuemax="100">52%</div>
+                                        </div>
+                                    </div>
+                                    <ul class="small mb-0">
+                                        <li><strong>Parcels Processing:</strong> 260/500</li>
+                                        <li><strong>Throughput:</strong> 95 parcels/hour</li>
+                                        <li><strong>Wait Time:</strong> 8 min avg</li>
+                                        <li><strong>Next Available:</strong> Immediate</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI-Powered Routing Recommendations -->
+                    <div class="row g-4 mb-4">
+                        <div class="col-md-6">
+                            <div class="card bg-light h-100">
+                                <div class="card-body">
+                                    <h6 class="text-primary"><i class="bi bi-robot"></i> AI Routing Recommendations</h6>
+                                    <div class="recommendation-item p-2 mb-2" style="cursor: pointer; border-left: 3px solid #0dcaf0;" data-bs-toggle="modal" data-bs-target="#routingBalanceModal">
+                                        <strong>Load Balancing:</strong> Redirect next 25 parcels to DC-MEL-003 (reduce DC-MEL-002 wait by 15 min)
+                                        <small class="text-muted d-block"><i class="bi bi-clock"></i> Impact: High • Confidence: 92%</small>
+                                    </div>
+                                    <div class="recommendation-item p-2 mb-2" style="cursor: pointer; border-left: 3px solid #198754;" data-bs-toggle="modal" data-bs-target="#priorityRoutingModal">
+                                        <strong>Priority Routing:</strong> 12 express parcels arriving - route to DC-MEL-001 for fastest processing
+                                        <small class="text-muted d-block"><i class="bi bi-clock"></i> Impact: Medium • Confidence: 88%</small>
+                                    </div>
+                                    <div class="recommendation-item p-2" style="cursor: pointer; border-left: 3px solid #ffc107;" data-bs-toggle="modal" data-bs-target="#throughputOptModal">
+                                        <strong>Throughput:</strong> DC-MEL-002 slowing - recommend shift change in 30 min to maintain flow
+                                        <small class="text-muted d-block"><i class="bi bi-clock"></i> Impact: Medium • Confidence: 76%</small>
+                                    </div>
+                                    <small class="text-muted mt-2 d-block">
+                                        <i class="bi bi-robot"></i> AI-powered routing • <i class="bi bi-hand-index"></i> Click for details
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-light h-100">
+                                <div class="card-body">
+                                    <h6 class="text-primary"><i class="bi bi-bar-chart"></i> Network Performance</h6>
+                                    <div class="mb-3">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <small><strong>Overall Network Capacity:</strong></small>
+                                            <small class="text-dark">70% (1,047/1,500)</small>
+                                        </div>
+                                        <div class="progress" style="height: 20px;">
+                                            <div class="progress-bar bg-primary" role="progressbar" style="width: 70%;" aria-valuenow="70" aria-valuemin="0" aria-valuemax="100">70%</div>
+                                        </div>
+                                    </div>
+                                    <hr>
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <small class="text-muted d-block">Avg Processing Time</small>
+                                            <strong class="text-success">16 min</strong>
+                                            <small class="text-success d-block"><i class="bi bi-arrow-down"></i> 12% vs yesterday</small>
+                                        </div>
+                                        <div class="col-6">
+                                            <small class="text-muted d-block">Parcels Routed Today</small>
+                                            <strong class="text-success">2,847</strong>
+                                            <small class="text-success d-block"><i class="bi bi-arrow-up"></i> 8% vs yesterday</small>
+                                        </div>
+                                    </div>
+                                    <hr>
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <small class="text-muted d-block">AI Interventions</small>
+                                            <strong class="text-dark">47 today</strong>
+                                        </div>
+                                        <div class="col-6">
+                                            <small class="text-muted d-block">Efficiency Gain</small>
+                                            <strong class="text-success">+18%</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Active Alerts -->
+                    <div class="alert alert-warning alert-persistent mb-0">
+                        <h6 class="alert-heading"><i class="bi bi-exclamation-triangle-fill"></i> Active Facility Alerts</h6>
+                        <ul class="mb-0">
+                            <li><strong>DC-MEL-002:</strong> Approaching capacity threshold - AI routing diverted 18 parcels in last hour</li>
+                            <li><strong>Express Shipments:</strong> 12 priority parcels arriving in next 30 min - DC-MEL-001 pre-allocated</li>
+                            <li><strong>Peak Detection:</strong> Friday volume spike predicted - recommend staffing increase at DC-MEL-002</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delivery Coordination Agent - Customer Communication -->
+    <div class="row mb-4" id="delivery-coordination">
+        <div class="col-12">
+            <div class="card shadow-sm border-primary">
+                <div class="card-header bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-calendar-check"></i> Delivery Coordination Agent - Customer Communication</h5>
+                        <span class="badge bg-light text-primary">Real-Time Notifications</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-4">
+                        <i class="bi bi-chat-dots"></i> AI-powered customer notifications and delivery sequencing Optimisation
+                    </p>
+
+                    <!-- Communication Stats -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-6 col-md-3">
+                            <div class="card border-success h-100">
+                                <div class="card-body text-center py-3">
+                                    <i class="bi bi-envelope-check text-success" style="font-size: 1.75rem;"></i>
+                                    <h3 class="mt-2 text-success">142</h3>
+                                    <p class="small text-muted mb-0">Notifications Sent Today</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card border-primary h-100">
+                                <div class="card-body text-center py-3">
+                                    <i class="bi bi-phone-vibrate text-muted" style="font-size: 1.75rem;"></i>
+                                    <h3 class="mt-2 text-muted">89%</h3>
+                                    <p class="small text-muted mb-0">SMS Delivery Rate</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card border-primary h-100">
+                                <div class="card-body text-center py-3">
+                                    <i class="bi bi-clock-history text-primary" style="font-size: 1.75rem;"></i>
+                                    <h3 class="mt-2 text-primary">8 min</h3>
+                                    <p class="small text-muted mb-0">Avg Notification Lead Time</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card border-success h-100">
+                                <div class="card-body text-center py-3">
+                                    <i class="bi bi-people text-success" style="font-size: 1.75rem;"></i>
+                                    <h3 class="mt-2 text-success">94%</h3>
+                                    <p class="small text-muted mb-0">Customer Satisfaction</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- How It Works -->
+                    <div class="row g-4 mb-4">
+                        <div class="col-md-6">
+                            <div class="card bg-light h-100">
+                                <div class="card-body">
+                                    <h6 class="text-primary"><i class="bi bi-gear"></i> How It Works</h6>
+                                    <ol class="small mb-0">
+                                        <li class="mb-2"><strong>Driver Triggers:</strong> Press "Notify Customer" button when 1-3 stops away from delivery address</li>
+                                        <li class="mb-2"><strong>AI Routing:</strong> Agent determines optimal communication channel (SMS or Email) based on customer preferences</li>
+                                        <li class="mb-2"><strong>Instant Delivery:</strong> Customer receives notification with driver ETA and tracking link</li>
+                                        <li><strong>Preparation Time:</strong> Customer has advance notice to be ready for delivery</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-light h-100">
+                                <div class="card-body">
+                                    <h6 class="text-primary"><i class="bi bi-graph-up-arrow"></i> Impact & Benefits</h6>
+                                    <ul class="small mb-0">
+                                        <li class="mb-2"><strong>Reduced Failed Deliveries:</strong> 23% decrease in "customer unavailable" exceptions</li>
+                                        <li class="mb-2"><strong>Improved Efficiency:</strong> Drivers spend less time waiting or making return trips</li>
+                                        <li class="mb-2"><strong>Customer Satisfaction:</strong> 94% of customers appreciate advance notice</li>
+                                        <li class="mb-2"><strong>Cost Savings:</strong> $1,200/month reduction in redelivery costs</li>
+                                        <li><strong>Time Optimisation:</strong> Average 15 minutes saved per delivery route</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Active Notifications -->
+                    <div class="alert alert-warning alert-persistent mb-0">
+                        <h6 class="alert-heading"><i class="bi bi-bell-fill"></i> Recent Notifications (Last Hour)</h6>
+                        <ul class="mb-0">
+                            <li><strong>13:42:</strong> SMS sent to customer at 25 Collins St - Delivery ETA 10 minutes (Driver: John Smith)</li>
+                            <li><strong>13:38:</strong> Email sent to customer at 142 Burke St - Parcel arriving within 15 minutes</li>
+                            <li><strong>13:35:</strong> SMS sent to customer at 88 Lonsdale St - Driver approaching your location</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Optimisation Agent - AI-Powered Recommendations -->
+    <div class="row mb-4" id="Optimisation">
+        <div class="col-12">
+            <div class="card shadow-sm border-primary">
+                <div class="card-header bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-graph-up"></i> Optimisation Agent - AI Recommendations</h5>
+                        <span class="badge bg-light text-primary">Powered by Azure AI Foundry</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-4">
+                        <i class="bi bi-cpu"></i> Network-wide performance analysis and actionable recommendations powered by AI
+                    </p>
+
+                    <!-- Cost Reduction Insights -->
+                    <div class="row g-4 mb-4">
+                        <div class="col-md-4">
+                            <div class="card border-primary h-100">
+                                <div class="card-body">
+                                    <h6 class="card-title text-dark">
+                                        <i class="bi bi-cash-coin"></i> Cost Reduction Opportunities
+                                    </h6>
+                                    <div class="mt-3">
+                                        <!-- Route Optimisation -->
+                                        <div class="recommendation-item" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#routeOptModal">
+                                            <div class="d-flex justify-content-between mb-2 align-items-center">
+                                                <small><i class="bi bi-info-circle text-primary"></i> Route Optimisation</small>
+                                                <span class="badge bg-success">$2,400/mo</span>
+                                            </div>
+                                            <div class="progress mb-3" style="height: 8px;">
+                                                <div class="progress-bar bg-success" style="width: 85%"></div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Depot Consolidation -->
+                                        <div class="recommendation-item" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#depotConsolModal">
+                                            <div class="d-flex justify-content-between mb-2 align-items-center">
+                                                <small><i class="bi bi-info-circle text-primary"></i> Depot Consolidation</small>
+                                                <span class="badge bg-primary">$1,800/mo</span>
+                                            </div>
+                                            <div class="progress mb-3" style="height: 8px;">
+                                                <div class="progress-bar bg-primary" style="width: 65%"></div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Exception Reduction -->
+                                        <div class="recommendation-item" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#exceptionModal">
+                                            <div class="d-flex justify-content-between mb-2 align-items-center">
+                                                <small><i class="bi bi-info-circle text-primary"></i> Exception Reduction</small>
+                                                <span class="badge bg-warning">$950/mo</span>
+                                            </div>
+                                            <div class="progress" style="height: 8px;">
+                                                <div class="progress-bar bg-warning" style="width: 45%"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <hr>
+                                    <div class="text-center">
+                                        <strong class="text-success">Potential Savings: $5,150/mo</strong>
+                                        <br>
+                                        <small class="text-muted"><i class="bi bi-hand-index"></i> Click items for details</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="card border-primary h-100">
+                                <div class="card-body">
+                                    <h6 class="card-title text-dark">
+                                        <i class="bi bi-bullseye"></i> Resource Allocation
+                                    </h6>
+                                    <div class="mt-3">
+                                        <div class="alert alert-light border mb-2 py-2">
+                                            <small class="text-muted d-block">Driver Efficiency</small>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <strong>{{ ((insights.out_for_delivery / (insights.out_for_delivery + insights.at_depot)) * 100)|round(1) if (insights.out_for_delivery + insights.at_depot) > 0 else 0 }}%</strong>
+                                                <span class="badge bg-success">Optimal</span>
+                                            </div>
+                                        </div>
+
+                                        <div class="alert alert-light border mb-2 py-2">
+                                            <small class="text-muted d-block">Depot Utilization</small>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <strong>{{ ((insights.at_depot / insights.total_parcels) * 100)|round(1) if insights.total_parcels > 0 else 0 }}%</strong>
+                                                <span class="badge bg-info">Good</span>
+                                            </div>
+                                        </div>
+
+                                        <div class="alert alert-light border mb-0 py-2">
+                                            <small class="text-muted d-block">Sorting Throughput</small>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <strong>{{ ((insights.sorting / insights.total_parcels) * 100)|round(1) if insights.total_parcels > 0 else 0 }}%</strong>
+                                                <span class="badge bg-warning">Monitor</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <hr>
+                                    <small class="text-muted">
+                                        <i class="bi bi-info-circle"></i> AI-Optimised resource distribution
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="card border-warning h-100">
+                                <div class="card-body">
+                                    <h6 class="card-title text-dark">
+                                        <i class="bi bi-graph-up-arrow"></i> Predictive Analytics
+                                    </h6>
+                                    <div class="mt-3">
+                                        <!-- Volume Prediction -->
+                                        <div class="mb-3 recommendation-item" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#volumePredictModal">
+                                            <div class="d-flex justify-content-between mb-1 align-items-center">
+                                                <small class="text-muted"><i class="bi bi-info-circle text-primary"></i> Next Week Volume</small>
+                                                <strong class="text-success">+{{ ((insights.total_parcels * 1.15)|round(0)|int - insights.total_parcels) }}</strong>
+                                            </div>
+                                            <small class="text-success">
+                                                <i class="bi bi-arrow-up"></i> 15% increase predicted
+                                            </small>
+                                        </div>
+
+                                        <!-- Peak Day Prediction -->
+                                        <div class="mb-3 recommendation-item" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#peakDayModal">
+                                            <div class="d-flex justify-content-between mb-1 align-items-center">
+                                                <small class="text-muted"><i class="bi bi-info-circle text-primary"></i> Peak Demand Day</small>
+                                                <strong class="text-dark">Friday</strong>
+                                            </div>
+                                            <small class="text-muted">
+                                                <i class="bi bi-calendar-event"></i> Prepare extra capacity
+                                            </small>
+                                        </div>
+
+                                        <!-- Exception Risk -->
+                                        <div class="recommendation-item" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#exceptionRiskModal">
+                                            <div class="d-flex justify-content-between mb-1 align-items-center">
+                                                <small class="text-muted"><i class="bi bi-info-circle text-primary"></i> Exception Risk</small>
+                                                <strong class="text-success">Low ({{ (100 - insights.success_rate)|round(1) }}%)</strong>
+                                            </div>
+                                            <small class="text-success">
+                                                <i class="bi bi-shield-check"></i> Below industry average
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <hr>
+                                    <small class="text-muted">
+                                        <i class="bi bi-robot"></i> AI-powered forecasting<br>
+                                        <i class="bi bi-hand-index"></i> Click items for details
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Recommendations -->
+                    <div class="alert alert-warning alert-persistent mb-0">
+                        <h6 class="alert-heading"><i class="bi bi-lightbulb-fill"></i> Top AI Recommendations</h6>
+                        <ul class="mb-0">
+                            <li><strong>Immediate:</strong> Reassign 3 parcels from DC-MEL-001 to DC-MEL-002 to balance workload (est. 2hr delivery improvement)</li>
+                            <li><strong>This Week:</strong> Schedule additional driver for Friday peak (predicted 15% volume increase)</li>
+                            <li><strong>Optimisation:</strong> Consolidate overlapping routes in postal codes 3000-3010 (save $450/week in fuel costs)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    </div>
+
+    <!-- System Status -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body py-3">
+                    <div class="row align-items-center">
+                        <div class="col-auto d-none d-md-block">
+                            <h6 class="mb-0 text-muted">
+                                <i class="bi bi-hdd-network"></i> System Health:
+                            </h6>
+                        </div>
+                        <div class="col">
+                            <div class="row text-center g-2">
+                                <div class="col-6 col-md-3">
+                                    <i class="bi bi-check-circle-fill text-success"></i>
+                                    <strong class="ms-1">Cosmos DB</strong>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <i class="bi bi-check-circle-fill text-success"></i>
+                                    <strong class="ms-1">AI Agents</strong>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <i class="bi bi-check-circle-fill text-success"></i>
+                                    <strong class="ms-1">Fraud Detection</strong>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <i class="bi bi-check-circle-fill text-success"></i>
+                                    <strong class="ms-1">API Status</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<style>
+    .card-hover {
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+
+    .card-hover:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+
+    .card-hover:hover .card-body {
+        background-color: rgba(0, 123, 255, 0.02);
+    }
+
+    a.text-decoration-none:hover h3,
+    a.text-decoration-none:hover small {
+        transition: all 0.2s ease;
+    }
+
+    a.text-decoration-none:hover small {
+        font-weight: 600;
+    }
+
+    .recommendation-item:hover {
+        background-color: rgba(0, 123, 255, 0.05);
+        border-radius: 4px;
+        padding: 2px 4px;
+        margin: -2px -4px;
+    }
+</style>
+
+<!-- Modals for Detailed AI Recommendations -->
+
+<!-- Route Optimisation Modal -->
+<div class="modal fade" id="routeOptModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-truck"></i> Route Optimisation - AI Analysis</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-permanent alert-info">
+                    <strong><i class="bi bi-robot"></i> AI Confidence:</strong> 85% (High) | <strong>Estimated Savings:</strong> $2,400/month
+                </div>
+
+                <h6 class="text-primary"><i class="bi bi-clipboard-data"></i> Data Analysis</h6>
+                <p>The Optimisation Agent Analysed {{ insights.total_parcels }} parcels across {{ insights.out_for_delivery }} active routes and identified:</p>
+                <ul>
+                    <li>12 overlapping routes in postal codes 3000-3010 (Melbourne CBD)</li>
+                    <li>Average 18 stops per route with 23% return-to-depot inefficiency</li>
+                    <li>Peak hours: 10 AM - 2 PM account for 68% of deliveries</li>
+                    <li>Current fuel cost: ~$8,200/month based on {{ insights.out_for_delivery }} active routes</li>
+                </ul>
+
+                <h6 class="text-primary mt-3"><i class="bi bi-lightbulb"></i> AI Recommendation</h6>
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <p><strong>Consolidate Melbourne CBD routes:</strong></p>
+                        <ul class="mb-0">
+                            <li>Merge DRV001 and DRV003 routes (both covering 3000-3006)</li>
+                            <li>Reassign 8 parcels to reduce overlap by 45%</li>
+                            <li>Estimated fuel savings: $2,100/month</li>
+                            <li>Time savings: 4.2 hours/week per driver</li>
+                            <li>Additional savings from reduced vehicle maintenance: $300/month</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <h6 class="text-primary mt-3"><i class="bi bi-graph-up"></i> Expected Impact</h6>
+                <div class="row">
+                    <div class="col-6">
+                        <div class="text-center p-3 border rounded">
+                            <small class="text-muted d-block">Delivery Time</small>
+                            <strong class="text-success">-18%</strong>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="text-center p-3 border rounded">
+                            <small class="text-muted d-block">CO₂ Reduction</small>
+                            <strong class="text-success">240 kg/mo</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <h6 class="text-warning mt-3"><i class="bi bi-exclamation-triangle"></i> Human Review Required</h6>
+                <ul>
+                    <li>Verify driver availability and preferences</li>
+                    <li>Check customer delivery windows for affected parcels</li>
+                    <li>Confirm vehicle capacity for consolidated routes</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning">Request More Data</button>
+                <button type="button" class="btn btn-primary">Approve & Implement</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Depot Consolidation Modal -->
+<div class="modal fade" id="depotConsolModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title text-dark"><i class="bi bi-building"></i> Depot Consolidation - AI Analysis</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <strong><i class="bi bi-robot"></i> AI Confidence:</strong> 65% (Medium) | <strong>Estimated Savings:</strong> $1,800/month
+                </div>
+
+                <h6 class="text-primary"><i class="bi bi-clipboard-data"></i> Data Analysis</h6>
+                <p>Analysis of current depot utilization shows:</p>
+                <ul>
+                    <li>DC-MEL-001: {{ insights.at_depot }} parcels (58% capacity utilization)</li>
+                    <li>DC-MEL-002: Est. 45 parcels (32% capacity utilization)</li>
+                    <li>Geographic overlap in 15km radius</li>
+                    <li>Combined operational cost: $4,200/month</li>
+                </ul>
+
+                <h6 class="text-primary mt-3"><i class="bi bi-lightbulb"></i> AI Recommendation</h6>
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <p><strong>Consolidate low-utilization depots:</strong></p>
+                        <ul class="mb-0">
+                            <li>Merge DC-MEL-002 operations into DC-MEL-001</li>
+                            <li>Reduce duplicate staff/equipment costs</li>
+                            <li>Lease savings: $1,500/month</li>
+                            <li>Operational efficiency: $300/month</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <h6 class="text-warning mt-3"><i class="bi bi-exclamation-triangle"></i> Human Review Required</h6>
+                <ul>
+                    <li>Assess lease termination costs and timing</li>
+                    <li>Plan staff reassignment or restructuring</li>
+                    <li>Verify DC-MEL-001 capacity can handle combined volume</li>
+                    <li>Consider seasonal demand fluctuations</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning">Schedule Consultation</button>
+                <button type="button" class="btn btn-info">Add to Planning Queue</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Exception Reduction Modal -->
+<div class="modal fade" id="exceptionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="bi bi-shield-exclamation"></i> Exception Reduction - AI Analysis</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <strong><i class="bi bi-robot"></i> AI Confidence:</strong> 45% (Medium-Low) | <strong>Estimated Savings:</strong> $950/month
+                </div>
+
+                <h6 class="text-primary"><i class="bi bi-clipboard-data"></i> Exception Analysis</h6>
+                <p>Current exception rate: {{ (100 - insights.success_rate)|round(1) }}% (Industry avg: 8-12%)</p>
+                <ul>
+                    <li>Failed deliveries: ~{{ ((insights.total_parcels * 0.05)|round(0)|int) }} parcels/month</li>
+                    <li>Cost per reattempt: $19 (driver time + fuel)</li>
+                    <li>Top causes: Customer unavailable (45%), Incorrect address (30%)</li>
+                </ul>
+
+                <h6 class="text-primary mt-3"><i class="bi bi-lightbulb"></i> AI Recommendations</h6>
+                <div class="card bg-light mb-2">
+                    <div class="card-body">
+                        <p class="mb-2"><strong>1. Implement delivery time notifications:</strong></p>
+                        <ul class="mb-0 small">
+                            <li>SMS alerts 30 minutes before delivery</li>
+                            <li>Estimated impact: 60% reduction in "customer unavailable"</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <p class="mb-2"><strong>2. Enhanced address validation (Parcel Intake Agent):</strong></p>
+                        <ul class="mb-0 small">
+                            <li>AI-powered address correction at registration</li>
+                            <li>Estimated impact: 50% reduction in address errors</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <h6 class="text-warning mt-3"><i class="bi bi-exclamation-triangle"></i> Human Review Required</h6>
+                <ul>
+                    <li>Lower confidence due to external dependencies (customer behavior)</li>
+                    <li>Requires SMS notification system implementation cost assessment</li>
+                    <li>Need to validate customer preference for notifications</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-info">Run Pilot Program</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Volume Prediction Modal -->
+<div class="modal fade" id="volumePredictModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-graph-up-arrow"></i> Volume Forecast - AI Analysis</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <strong><i class="bi bi-robot"></i> AI Confidence:</strong> 78% (High) | <strong>Predicted Increase:</strong> +{{ ((insights.total_parcels * 1.15)|round(0)|int - insights.total_parcels) }} parcels
+                </div>
+
+                <h6 class="text-primary"><i class="bi bi-clipboard-data"></i> Historical Pattern Analysis</h6>
+                <ul>
+                    <li>Last 4 weeks average: {{ insights.total_parcels }} parcels/week</li>
+                    <li>Year-over-year growth: 12% for this period</li>
+                    <li>Recent trend: +3% week-over-week for last 3 weeks</li>
+                    <li>Seasonal factor: Pre-holiday shopping surge (Dec 18-25)</li>
+                </ul>
+
+                <h6 class="text-primary mt-3"><i class="bi bi-lightbulb"></i> AI Recommendation</h6>
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <p><strong>Capacity Planning for Next Week:</strong></p>
+                        <ul class="mb-0">
+                            <li>Add 1 temporary driver for Friday peak (estimated 25 extra parcels)</li>
+                            <li>Extend sorting facility hours by 2 hours on Thursday</li>
+                            <li>Pre-position stock at DC-MEL-001 for faster processing</li>
+                            <li>Estimated additional cost: $450 vs. $1,200 for overtime/expedited delivery</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <h6 class="text-primary mt-3"><i class="bi bi-database"></i> Model Inputs</h6>
+                <ul class="small">
+                    <li>Historical data: 12 months of parcel volumes</li>
+                    <li>External factors: Public holidays, weather forecasts</li>
+                    <li>Economic indicators: Consumer confidence index</li>
+                    <li>Web traffic patterns: E-commerce site activity</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary">Approve Capacity Plan</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Peak Day Modal -->
+<div class="modal fade" id="peakDayModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title text-dark"><i class="bi bi-calendar-event"></i> Peak Demand Forecast - AI Analysis</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <strong><i class="bi bi-robot"></i> AI Confidence:</strong> 82% (High) | <strong>Predicted Peak:</strong> Friday
+                </div>
+
+                <h6 class="text-primary"><i class="bi bi-clipboard-data"></i> Weekly Pattern Analysis</h6>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <p><strong>Historical Friday Volumes:</strong></p>
+                        <ul>
+                            <li>Average: 135% of Monday baseline</li>
+                            <li>Last 4 Fridays: +32%, +28%, +35%, +31%</li>
+                            <li>Contributing factor: Weekend delivery preparation</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card border-warning">
+                            <div class="card-body text-center">
+                                <small class="text-muted d-block">Expected Friday Volume</small>
+                                <h3 class="text-warning mb-0">{{ (insights.total_parcels * 1.35)|round(0)|int }}</h3>
+                                <small class="text-muted">+35% above baseline</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h6 class="text-primary"><i class="bi bi-lightbulb"></i> Preparation Recommendations</h6>
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <ul class="mb-0">
+                            <li>Schedule additional sorting staff for Thursday evening</li>
+                            <li>Confirm Friday driver availability (consider standby driver)</li>
+                            <li>Pre-sort high-priority parcels Wednesday/Thursday</li>
+                            <li>Enable overflow capacity at DC-MEL-001</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-info">Create Staffing Plan</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Exception Risk Modal -->
+<div class="modal fade" id="exceptionRiskModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-shield-check"></i> Exception Risk Analysis</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-success">
+                    <strong><i class="bi bi-robot"></i> AI Assessment:</strong> Low Risk {{ (100 - insights.success_rate)|round(1) }}% (Industry: 8-12%)
+                </div>
+
+                <h6 class="text-primary"><i class="bi bi-clipboard-data"></i> Risk Factors Analysis</h6>
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Current Performance:</strong></p>
+                        <ul>
+                            <li>Success rate: {{ insights.success_rate }}%</li>
+                            <li>Failed deliveries: {{ ((insights.total_parcels * (100 - insights.success_rate) / 100)|round(0)|int) }}</li>
+                            <li>Below industry average ✓</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Contributing Factors:</strong></p>
+                        <ul>
+                            <li>Address validation: Active</li>
+                            <li>Fraud detection: Active</li>
+                            <li>Driver training: Up to date</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <h6 class="text-primary mt-3"><i class="bi bi-lightbulb"></i> Maintenance Recommendations</h6>
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <p><strong>Continue current best practices:</strong></p>
+                        <ul class="mb-0">
+                            <li>Maintain AI agent integrations (Fraud, Identity, Parcel Intake)</li>
+                            <li>Monitor weekly for early warning signs</li>
+                            <li>Review failed deliveries monthly for emerging patterns</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-success" data-bs-dismiss="modal">Acknowledged</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sorting Facility Agent Modals -->
+
+<!-- Load Balancing Routing Modal -->
+<div class="modal fade" id="routingBalanceModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title text-dark"><i class="bi bi-diagram-3"></i> Load Balancing - AI Analysis</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <strong><i class="bi bi-robot"></i> AI Confidence:</strong> 92% (Very High) | <strong>Impact:</strong> High Priority
+                </div>
+
+                <h6 class="text-primary"><i class="bi bi-clipboard-data"></i> Current Situation Analysis</h6>
+                <p>The Sorting Facility Agent detected capacity imbalance across Melbourne facilities:</p>
+                <ul>
+                    <li><strong>DC-MEL-002:</strong> 89% capacity (445/500 parcels) - wait time: 28 minutes</li>
+                    <li><strong>DC-MEL-003:</strong> 52% capacity (260/500 parcels) - wait time: 8 minutes</li>
+                    <li>25 parcels currently routed to DC-MEL-002 can be redirected to DC-MEL-003</li>
+                    <li>Destination postal codes compatible with both facilities</li>
+                </ul>
+
+                <h6 class="text-primary mt-3"><i class="bi bi-lightbulb"></i> AI Recommendation</h6>
+                <div class="card border-primary">
+                    <div class="card-body">
+                        <p><strong>Action:</strong> Redirect next 25 incoming parcels from DC-MEL-002 to DC-MEL-003</p>
+                        <p class="mb-0"><strong>Expected Results:</strong></p>
+                        <ul class="mb-0">
+                            <li>DC-MEL-002 wait time reduced from 28 to 13 minutes (-15 min)</li>
+                            <li>DC-MEL-003 capacity increases to 57% (still optimal)</li>
+                            <li>Overall network throughput improved by 12%</li>
+                            <li>No impact on delivery times (same service area)</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <h6 class="text-primary mt-3"><i class="bi bi-check2-square"></i> Human Review Checklist</h6>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="checkLoadBalance1">
+                    <label class="form-check-label" for="checkLoadBalance1">
+                        Verify both facilities have capacity for redirect
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="checkLoadBalance2">
+                    <label class="form-check-label" for="checkLoadBalance2">
+                        Confirm service area compatibility
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="checkLoadBalance3">
+                    <label class="form-check-label" for="checkLoadBalance3">
+                        Check for special handling requirements
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning">Request More Data</button>
+                <button type="button" class="btn btn-success">Approve & Execute</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Priority Routing Modal -->
+<div class="modal fade" id="priorityRoutingModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-star-fill"></i> Priority Routing - AI Analysis</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-success">
+                    <strong><i class="bi bi-robot"></i> AI Confidence:</strong> 88% (High) | <strong>Impact:</strong> Medium Priority
+                </div>
+
+                <h6 class="text-primary"><i class="bi bi-clipboard-data"></i> Express Shipment Analysis</h6>
+                <p>The Sorting Facility Agent identified incoming express parcels requiring priority handling:</p>
+                <ul>
+                    <li><strong>Express Parcels:</strong> 12 items arriving in next 30 minutes</li>
+                    <li><strong>Service Level:</strong> Next-day delivery commitment (by 10 AM tomorrow)</li>
+                    <li><strong>Current Time:</strong> 3:45 PM (4h 15m until facility closing)</li>
+                    <li><strong>DC-MEL-001:</strong> 68% capacity, fastest throughput (85 parcels/hour)</li>
+                </ul>
+
+                <h6 class="text-primary mt-3"><i class="bi bi-lightbulb"></i> AI Recommendation</h6>
+                <div class="card border-success">
+                    <div class="card-body">
+                        <p><strong>Action:</strong> Route all 12 express parcels to DC-MEL-001 for immediate processing</p>
+                        <p class="mb-0"><strong>Expected Results:</strong></p>
+                        <ul class="mb-0">
+                            <li>All parcels processed within 15 minutes (guaranteed)</li>
+                            <li>Loaded onto evening dispatch truck by 4:30 PM</li>
+                            <li>100% on-time delivery probability for tomorrow morning</li>
+                            <li>DC-MEL-001 capacity increases to 71% (still optimal)</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <h6 class="text-primary mt-3"><i class="bi bi-check2-square"></i> Human Review Checklist</h6>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="checkPriority1">
+                    <label class="form-check-label" for="checkPriority1">
+                        Verify express service level agreements
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="checkPriority2">
+                    <label class="form-check-label" for="checkPriority2">
+                        Confirm DC-MEL-001 has evening dispatch capacity
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="checkPriority3">
+                    <label class="form-check-label" for="checkPriority3">
+                        Check for hazmat or special handling items
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning">Request More Data</button>
+                <button type="button" class="btn btn-success">Approve & Execute</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Throughput Optimisation Modal -->
+<div class="modal fade" id="throughputOptModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="bi bi-speedometer"></i> Throughput Optimisation - AI Analysis</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <strong><i class="bi bi-robot"></i> AI Confidence:</strong> 76% (Medium) | <strong>Impact:</strong> Medium Priority
+                </div>
+
+                <h6 class="text-primary"><i class="bi bi-clipboard-data"></i> Performance Degradation Analysis</h6>
+                <p>The Sorting Facility Agent detected throughput decline at DC-MEL-002:</p>
+                <ul>
+                    <li><strong>Current throughput:</strong> 62 parcels/hour (down from 78 parcels/hour)</li>
+                    <li><strong>Pattern:</strong> 21% decline over last 90 minutes</li>
+                    <li><strong>Historical data:</strong> Similar pattern occurs daily around shift fatigue time</li>
+                    <li><strong>Staff on duty:</strong> Same team since 8 AM (7h 45m shift)</li>
+                </ul>
+
+                <h6 class="text-primary mt-3"><i class="bi bi-lightbulb"></i> AI Recommendation</h6>
+                <div class="card border-warning">
+                    <div class="card-body">
+                        <p><strong>Action:</strong> Schedule shift rotation at DC-MEL-002 in next 30 minutes</p>
+                        <p class="mb-0"><strong>Expected Results:</strong></p>
+                        <ul class="mb-0">
+                            <li>Throughput returns to optimal 75-80 parcels/hour</li>
+                            <li>Backlog of 55 parcels cleared within 45 minutes</li>
+                            <li>Maintain service levels through evening peak</li>
+                            <li>Prevent need for overtime staffing ($450 cost avoidance)</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <h6 class="text-primary mt-3"><i class="bi bi-check2-square"></i> Human Review Checklist</h6>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="checkThroughput1">
+                    <label class="form-check-label" for="checkThroughput1">
+                        Verify replacement staff availability
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="checkThroughput2">
+                    <label class="form-check-label" for="checkThroughput2">
+                        Confirm shift rotation doesn't violate union agreements
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="checkThroughput3">
+                    <label class="form-check-label" for="checkThroughput3">
+                        Review current staffing levels across all facilities
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning">Request More Data</button>
+                <button type="button" class="btn btn-success">Approve & Execute</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

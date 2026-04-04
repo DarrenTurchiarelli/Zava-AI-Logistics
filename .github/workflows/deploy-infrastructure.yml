@@ -1,0 +1,235 @@
+name: Deploy Infrastructure & Application (PowerShell)
+
+# Hybrid Approach: GitHub Actions triggers the existing PowerShell deployment script
+# This workflow authenticates with Azure, then runs deploy_to_azure.ps1
+# Benefits: Version control, audit trail, consistent environment, while keeping PowerShell logic
+
+on:
+  workflow_dispatch:
+    inputs:
+      resource_group:
+        description: 'Resource Group Name (leave empty for default RG-Zava-*)'
+        required: false
+        type: string
+      location:
+        description: 'Azure Region'
+        required: false
+        default: 'australiaeast'
+        type: choice
+        options:
+          - australiaeast
+          - australiasoutheast
+          - eastus
+          - westus2
+          - eastus2
+          - westeurope
+      sku:
+        description: 'App Service SKU'
+        required: false
+        default: 'B2'
+        type: choice
+        options:
+          - B1
+          - B2
+          - B3
+          - S1
+          - S2
+          - S3
+          - P1V2
+          - P2V2
+
+permissions:
+  id-token: write      # Required for Azure OIDC authentication
+  contents: read       # Required to checkout code
+
+jobs:
+  deploy-infrastructure:
+    name: Deploy Complete Azure Infrastructure
+    runs-on: windows-latest
+    
+    # Deployment typically takes 15-20 minutes, timeout after 60
+    timeout-minutes: 60
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Setup Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+      
+      - name: 📦 Install Python Dependencies
+        run: |
+          Write-Host "📦 Installing Python dependencies..." -ForegroundColor Cyan
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          Write-Host "✓ Dependencies installed" -ForegroundColor Green
+        shell: pwsh
+      
+      - name: 🔐 Azure Login (OIDC - Keyless Authentication)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          enable-AzPSSession: true
+      
+      - name: ✅ Verify Azure Authentication
+        run: |
+          Write-Host ""
+          Write-Host "======================================================================" -ForegroundColor Cyan
+          Write-Host " VERIFYING AZURE AUTHENTICATION" -ForegroundColor Cyan
+          Write-Host "======================================================================" -ForegroundColor Cyan
+          Write-Host ""
+          
+          $account = az account show | ConvertFrom-Json
+          Write-Host "  ✓ Authenticated as: $($account.user.name)" -ForegroundColor Green
+          Write-Host "  ✓ Subscription: $($account.name)" -ForegroundColor Green
+          Write-Host "  ✓ Subscription ID: $($account.id)" -ForegroundColor Green
+          Write-Host "  ✓ Tenant ID: $($account.tenantId)" -ForegroundColor Green
+          Write-Host ""
+        shell: pwsh
+      
+      - name: 🚀 Run PowerShell Deployment Script
+        run: |
+          Write-Host ""
+          Write-Host "======================================================================" -ForegroundColor Cyan
+          Write-Host " STARTING AUTOMATED DEPLOYMENT VIA GITHUB ACTIONS" -ForegroundColor Cyan
+          Write-Host "======================================================================" -ForegroundColor Cyan
+          Write-Host ""
+          Write-Host "This workflow runs the complete deploy_to_azure.ps1 script:" -ForegroundColor Gray
+          Write-Host "  • Infrastructure deployment (Bicep)" -ForegroundColor Gray
+          Write-Host "  • RBAC role assignments" -ForegroundColor Gray
+          Write-Host "  • Azure OpenAI agent creation" -ForegroundColor Gray
+          Write-Host "  • Application code deployment" -ForegroundColor Gray
+          Write-Host "  • Demo data generation (2500 parcels)" -ForegroundColor Gray
+          Write-Host ""
+          
+          # Build parameter splat for deployment script
+          $deployParams = @{}
+          
+          if ("${{ inputs.resource_group }}" -ne "") {
+            $deployParams['ResourceGroup'] = "${{ inputs.resource_group }}"
+            Write-Host "  📋 Resource Group: ${{ inputs.resource_group }}" -ForegroundColor Yellow
+          } else {
+            Write-Host "  📋 Resource Group: Default (RG-Zava-*)" -ForegroundColor Gray
+          }
+          
+          if ("${{ inputs.location }}" -ne "" -and "${{ inputs.location }}" -ne "australiaeast") {
+            $deployParams['Location'] = "${{ inputs.location }}"
+            Write-Host "  🌍 Location: ${{ inputs.location }}" -ForegroundColor Yellow
+          } else {
+            Write-Host "  🌍 Location: australiaeast (default)" -ForegroundColor Gray
+          }
+          
+          if ("${{ inputs.sku }}" -ne "" -and "${{ inputs.sku }}" -ne "B2") {
+            $deployParams['Sku'] = "${{ inputs.sku }}"
+            Write-Host "  💰 SKU: ${{ inputs.sku }}" -ForegroundColor Yellow
+          } else {
+            Write-Host "  💰 SKU: B2 (default)" -ForegroundColor Gray
+          }
+          
+          Write-Host ""
+          Write-Host "⏱  Estimated time: 15-20 minutes" -ForegroundColor Cyan
+          Write-Host ""
+          
+          # Execute deployment with parameters
+          if ($deployParams.Count -gt 0) {
+            .\deploy_to_azure.ps1 @deployParams
+          } else {
+            .\deploy_to_azure.ps1
+          }
+          
+          # Check exit code
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host ""
+            Write-Host "❌ Deployment script failed with exit code: $LASTEXITCODE" -ForegroundColor Red
+            exit $LASTEXITCODE
+          }
+        shell: pwsh
+      
+      - name: 📊 Upload Deployment Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-config-${{ github.run_number }}
+          path: |
+            .azure-deployment.json
+            deploy_to_azure.log
+          retention-days: 30
+          if-no-files-found: warn
+      
+      - name: 📝 Generate Deployment Summary
+        if: success()
+        run: |
+          Write-Host ""
+          Write-Host "======================================================================" -ForegroundColor Green
+          Write-Host " ✓ DEPLOYMENT COMPLETED SUCCESSFULLY VIA GITHUB ACTIONS" -ForegroundColor Green
+          Write-Host "======================================================================" -ForegroundColor Green
+          Write-Host ""
+          
+          if (Test-Path .azure-deployment.json) {
+            $deployment = Get-Content .azure-deployment.json | ConvertFrom-Json
+            
+            Write-Host "🌐 Application URL:" -ForegroundColor Cyan
+            Write-Host "   https://$($deployment.AppServiceName).azurewebsites.net" -ForegroundColor White
+            Write-Host ""
+            
+            Write-Host "🔑 Default Login Credentials:" -ForegroundColor Yellow
+            Write-Host "   Username: admin" -ForegroundColor White
+            Write-Host "   Password: admin123" -ForegroundColor White
+            Write-Host ""
+            
+            Write-Host "📦 Demo Data:" -ForegroundColor Yellow
+            Write-Host "   ✓ 2500 realistic parcels across all Australian states" -ForegroundColor Green
+            Write-Host "   ✓ Driver manifests with delivery parcels" -ForegroundColor Green
+            Write-Host "   ✓ Voice & Text Example demo parcels (RG857954, DT202512170037)" -ForegroundColor Green
+            Write-Host "   ✓ Approval demo requests for testing" -ForegroundColor Green
+            Write-Host ""
+            
+            Write-Host "🤖 AI Agents:" -ForegroundColor Yellow
+            Write-Host "   ✓ 9 Azure OpenAI agents created and registered" -ForegroundColor Green
+            Write-Host "   ✓ Customer Service Agent with Cosmos DB tools" -ForegroundColor Green
+            Write-Host ""
+            
+            Write-Host "🔒 Security:" -ForegroundColor Yellow
+            Write-Host "   ✓ Managed identity authentication (no secrets in env vars)" -ForegroundColor Green
+            Write-Host "   ✓ RBAC permissions configured via Bicep" -ForegroundColor Green
+            Write-Host ""
+            
+            Write-Host "📋 Resource Groups:" -ForegroundColor Cyan
+            Write-Host "   Frontend:   $($deployment.FrontendResourceGroup)" -ForegroundColor White
+            Write-Host "   Middleware: $($deployment.MiddlewareResourceGroup)" -ForegroundColor White
+            Write-Host "   Backend:    $($deployment.BackendResourceGroup)" -ForegroundColor White
+            Write-Host "   Shared:     $($deployment.SharedResourceGroup)" -ForegroundColor White
+            Write-Host ""
+          } else {
+            Write-Host "⚠ Deployment config not found - check logs for details" -ForegroundColor Yellow
+          }
+          
+          Write-Host "🎉 Deployment workflow completed!" -ForegroundColor Green
+          Write-Host ""
+        shell: pwsh
+      
+      - name: ❌ Deployment Failure Summary
+        if: failure()
+        run: |
+          Write-Host ""
+          Write-Host "======================================================================" -ForegroundColor Red
+          Write-Host " ❌ DEPLOYMENT FAILED" -ForegroundColor Red
+          Write-Host "======================================================================" -ForegroundColor Red
+          Write-Host ""
+          Write-Host "Check the workflow logs above for detailed error messages." -ForegroundColor Yellow
+          Write-Host ""
+          Write-Host "Common issues:" -ForegroundColor Yellow
+          Write-Host "  • Azure authentication failure (check OIDC setup)" -ForegroundColor Gray
+          Write-Host "  • Insufficient Azure permissions" -ForegroundColor Gray
+          Write-Host "  • Resource naming conflicts" -ForegroundColor Gray
+          Write-Host "  • RBAC propagation delays (retry may succeed)" -ForegroundColor Gray
+          Write-Host ""
+          Write-Host "Download artifacts for detailed logs:" -ForegroundColor Cyan
+          Write-Host "  Actions → This workflow run → Artifacts" -ForegroundColor Gray
+          Write-Host ""
+        shell: pwsh

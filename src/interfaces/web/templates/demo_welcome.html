@@ -1,0 +1,489 @@
+{% extends "base.html" %}
+
+{% block title %}Experience AI - {{ company.browser_title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Hero Section -->
+    <div class="hero-gradient text-white py-5 mb-4">
+        <div class="row">
+            <div class="col-12 text-center hero-content">
+                <h1 class="display-3 fw-bold mb-3">Zava</h1>
+                <p class="display-6 fw-light mb-4">Experience AI.</p>
+                <p class="lead mb-0">Imagine the Possibilities</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Agent Demo Tiles -->
+    <div class="row g-4 mb-5">
+
+        <!-- Customer Service Agent -->
+        <div class="col-lg-6 col-xl-4">
+            <div class="card h-100 shadow-sm hover-shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-chat-dots"></i> Customer Service Agent</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        AI-powered customer support with real-time parcel tracking and natural language understanding.
+                    </p>
+                    <h6 class="fw-bold">Try it yourself:</h6>
+                    <ol class="small">
+                        <li>Click <strong>Open Chat Assistant</strong> button below</li>
+                        <li>Ask: "Show parcels in transit for driver001"</li>
+                        <li>Or: "Track parcel DT202512090001"</li>
+                    </ol>
+                    <div class="alert alert-light border alert-permanent mt-3">
+                        <strong>What to observe:</strong> Natural conversation, real-time data lookup, helpful responses
+                    </div>
+                    <div class="alert alert-secondary alert-permanent py-3 mt-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div style="font-size: 0.85rem;">
+                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong>
+                                <a href="{{ url_for('auth.demo_login', username='support', next=url_for('chatbot.customer_service_chatbot')) }}" class="text-dark fw-bold text-decoration-none">
+                                    <u>support</u>
+                                </a>
+                            </div>
+                            <a href="{{ url_for('auth.demo_login', username='support', next=url_for('chatbot.customer_service_chatbot')) }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
+                                <i class="bi bi-chat-dots"></i> Open Chat Assistant
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fraud Detection Agent -->
+        <div class="col-lg-6 col-xl-4">
+            <div class="card h-100 shadow-sm hover-shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-shield-check"></i> Fraud Detection Agent</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Intelligent threat detection Analysing messages for phishing, scams, and delivery fraud.
+                    </p>
+                    <h6 class="fw-bold">Try it yourself:</h6>
+                    <ol class="small">
+                        <li>Click <strong>Report Fraud</strong> button below</li>
+                        <li>Paste a suspicious SMS or email message</li>
+                        <li>Watch AI analyze risk score and threat patterns</li>
+                    </ol>
+                    <div class="alert alert-light border alert-permanent mt-3">
+                        <strong>What to observe:</strong> Real-time risk scoring, threat patterns, security recommendations
+                    </div>
+                    <div class="alert alert-secondary alert-permanent py-3 mt-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div style="font-size: 0.85rem;">
+                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong>
+                                <a href="{{ url_for('auth.demo_login', username='admin', next=url_for('chatbot.report_fraud')) }}" class="text-dark fw-bold text-decoration-none">
+                                    <u>admin</u>
+                                </a>
+                            </div>
+                            <a href="{{ url_for('auth.demo_login', username='admin', next=url_for('chatbot.report_fraud')) }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
+                                <i class="bi bi-shield-exclamation"></i> Report Fraud
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Parcel Intake Agent -->
+        <div class="col-lg-6 col-xl-4">
+            <div class="card h-100 shadow-sm hover-shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-inbox"></i> Parcel Intake Agent</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Automated parcel registration with AI-powered address validation and service type recommendations.
+                    </p>
+                    <h6 class="fw-bold">Try it yourself:</h6>
+                    <ol class="small">
+                        <li>Click <strong>Camera Scanner</strong> button below</li>
+                        <li>Scan a label or upload an image</li>
+                        <li>Watch AI extract data and validate addresses</li>
+                    </ol>
+                    <div class="alert alert-light border alert-permanent mt-3">
+                        <strong>What to observe:</strong> OCR barcode scanning, automatic data extraction, AI-powered validation
+                    </div>
+                    <div class="alert alert-secondary alert-permanent py-3 mt-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div style="font-size: 0.85rem;">
+                                <i class="bi bi-unlock"></i> <strong>Try it:</strong> No login required
+                            </div>
+                            <a href="{{ url_for('parcels.camera_scanner') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
+                                <i class="bi bi-camera"></i> Camera Scanner
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sorting Facility Agent -->
+        <div class="col-lg-6 col-xl-4">
+            <div class="card h-100 shadow-sm hover-shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-diagram-3"></i> Sorting Facility Agent</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Real-time capacity monitoring and intelligent routing decisions for distribution centers.
+                    </p>
+                    <h6 class="fw-bold">Try it yourself:</h6>
+                    <ol class="small">
+                        <li>Click <strong>AI Insights</strong> button below</li>
+                        <li>Scroll to "Sorting Facility Decisions" section</li>
+                        <li>View real-time capacity and routing analytics</li>
+                    </ol>
+                    <div class="alert alert-light border alert-permanent mt-3">
+                        <strong>What to observe:</strong> Facility capacity metrics, automated routing decisions, load balancing
+                    </div>
+                    <div class="alert alert-secondary alert-permanent py-3 mt-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div style="font-size: 0.85rem;">
+                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong>
+                                <a href="{{ url_for('auth.demo_login', username='admin') }}" class="text-dark fw-bold text-decoration-none">
+                                    <u>admin</u>
+                                </a>
+                            </div>
+                            <a href="{{ url_for('auth.demo_login', username='admin') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
+                                <i class="bi bi-graph-up"></i> AI Insights
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Delivery Coordination Agent -->
+        <div class="col-lg-6 col-xl-4">
+            <div class="card h-100 shadow-sm hover-shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-truck"></i> Delivery Coordination Agent</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Intelligent delivery sequencing with customer notifications and route Optimisation.
+                    </p>
+                    <h6 class="fw-bold">Try it yourself:</h6>
+                    <ol class="small">
+                        <li>Login as driver and view manifest</li>
+                        <li>Select a route type (Fastest/Shortest/Safest)</li>
+                        <li>Watch AI calculate optimal delivery sequence with Azure Maps</li>
+                    </ol>
+                    <div class="alert alert-light border alert-permanent mt-3">
+                        <strong>What to observe:</strong> Azure Maps route optimization, delivery sequencing, real-time ETA calculations
+                    </div>
+                    <div class="alert alert-secondary alert-permanent py-3 mt-2">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap">
+                            <div style="font-size: 0.85rem;" class="mb-2 mb-sm-0">
+                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong>
+                                <a href="{{ url_for('auth.demo_login', username='driver001') }}" class="text-dark fw-bold text-decoration-none"><u>driver001</u></a> |
+                                <a href="{{ url_for('auth.demo_login', username='driver002') }}" class="text-dark fw-bold text-decoration-none"><u>driver002</u></a> |
+                                <a href="{{ url_for('auth.demo_login', username='driver003') }}" class="text-dark fw-bold text-decoration-none"><u>driver003</u></a>
+                            </div>
+                            <a href="{{ url_for('auth.demo_login', username='driver001') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
+                                <i class="bi bi-map"></i> Driver Manifest
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dispatcher Agent -->
+        <div class="col-lg-6 col-xl-4">
+            <div class="card h-100 shadow-sm hover-shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-person-badge"></i> Dispatcher Agent</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Automated manifest creation and driver assignment with load balancing Optimisation.
+                    </p>
+                    <h6 class="fw-bold">Try it yourself:</h6>
+                    <ol class="small">
+                        <li>Login as admin or depot_mgr</li>
+                        <li>Navigate to <strong>Drivers > Manage Manifests</strong> from top menu</li>
+                        <li>View active driver assignments and load distribution</li>
+                    </ol>
+                    <div class="alert alert-light border alert-permanent mt-3">
+                        <strong>What to observe:</strong> Automated manifest generation, intelligent driver allocation, workload balancing
+                    </div>
+                    <div class="alert alert-secondary alert-permanent py-3 mt-2">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap">
+                            <div style="font-size: 0.85rem;" class="mb-2 mb-sm-0">
+                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong>
+                                <a href="{{ url_for('auth.demo_login', username='admin', next=url_for('manifests.admin_manifests')) }}" class="text-dark fw-bold text-decoration-none"><u>admin</u></a> |
+                                <a href="{{ url_for('auth.demo_login', username='depot_mgr', next=url_for('manifests.admin_manifests')) }}" class="text-dark fw-bold text-decoration-none"><u>depot_mgr</u></a>
+                            </div>
+                            <a href="{{ url_for('auth.demo_login', username='admin', next=url_for('manifests.admin_manifests')) }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
+                                <i class="bi bi-clipboard-check"></i> View Manifests
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Optimisation Agent -->
+        <div class="col-lg-6 col-xl-4">
+            <div class="card h-100 shadow-sm hover-shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-lightning"></i> Optimisation Agent</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Network-wide cost reduction and predictive analytics for operational efficiency.
+                    </p>
+                    <h6 class="fw-bold">Try it yourself:</h6>
+                    <ol class="small">
+                        <li>Click <strong>Optimisation</strong> button below (requires admin login)</li>
+                        <li>View "Optimisation Recommendations" section</li>
+                        <li>Review network-wide efficiency metrics and cost insights</li>
+                    </ol>
+                    <div class="alert alert-light border alert-permanent mt-3">
+                        <strong>What to observe:</strong> Network optimization recommendations, cost reduction insights, predictive analytics
+                    </div>
+                    <div class="alert alert-secondary alert-permanent py-3 mt-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div style="font-size: 0.85rem;">
+                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong>
+                                <a href="{{ url_for('auth.demo_login', username='admin') }}" class="text-dark fw-bold text-decoration-none">
+                                    <u>admin</u>
+                                </a>
+                            </div>
+                            <a href="{{ url_for('auth.demo_login', username='admin') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
+                                <i class="bi bi-speedometer2"></i> Optimisation
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Driver Agent -->
+        <div class="col-lg-6 col-xl-4">
+            <div class="card h-100 shadow-sm hover-shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-geo-alt"></i> Driver Agent</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Real-time navigation assistance with delivery proof capture and status updates.
+                    </p>
+                    <h6 class="fw-bold">Try it yourself:</h6>
+                    <ol class="small">
+                        <li>Login as driver and view manifest</li>
+                        <li>Click "Mark as Delivered" on any parcel</li>
+                        <li>Capture photo proof of delivery (or use camera)</li>
+                        <li>Add delivery notes and confirm completion</li>
+                    </ol>
+                    <div class="alert alert-light border alert-permanent mt-3">
+                        <strong>What to observe:</strong> Photo capture, real-time status updates, driver notes, customer notifications
+                    </div>
+                    <div class="alert alert-secondary alert-permanent py-3 mt-2">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap">
+                            <div style="font-size: 0.85rem;" class="mb-2 mb-sm-0">
+                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong>
+                                <a href="{{ url_for('auth.demo_login', username='driver001') }}" class="text-dark fw-bold text-decoration-none"><u>driver001</u></a> |
+                                <a href="{{ url_for('auth.demo_login', username='driver002') }}" class="text-dark fw-bold text-decoration-none"><u>driver002</u></a> |
+                                <a href="{{ url_for('auth.demo_login', username='driver003') }}" class="text-dark fw-bold text-decoration-none"><u>driver003</u></a>
+                            </div>
+                            <a href="{{ url_for('auth.demo_login', username='driver001') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
+                                <i class="bi bi-pin-map"></i> Driver Interface
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Identity Agent -->
+        <div class="col-lg-6 col-xl-4">
+            <div class="card h-100 shadow-sm hover-shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-person-check"></i> Identity Agent</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Secure authentication and authorization with role-based access control.
+                    </p>
+                    <h6 class="fw-bold">Try it yourself:</h6>
+                    <ol class="small">
+                        <li>Click different user roles below to instantly switch</li>
+                        <li>Observe how navigation menu changes per role</li>
+                        <li>Try accessing admin features as driver (blocked)</li>
+                    </ol>
+                    <div class="alert alert-light border alert-permanent mt-3">
+                        <strong>What to observe:</strong> Role-based access control, personalized navigation, security restrictions
+                    </div>
+                    <div class="alert alert-secondary alert-permanent py-3 mt-2">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap">
+                            <div style="font-size: 0.85rem;" class="mb-2 mb-sm-0">
+                                <i class="bi bi-person-badge"></i> <strong>Try it:</strong>
+                                <a href="{{ url_for('auth.demo_login', username='admin') }}" class="text-dark fw-bold text-decoration-none"><u>admin</u></a> |
+                                <a href="{{ url_for('auth.demo_login', username='support') }}" class="text-dark fw-bold text-decoration-none"><u>support</u></a> |
+                                <a href="{{ url_for('auth.demo_login', username='driver001') }}" class="text-dark fw-bold text-decoration-none"><u>driver001</u></a>
+                            </div>
+                            <a href="{{ url_for('auth.demo_login', username='admin') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6;">
+                                <i class="bi bi-box-arrow-right"></i> Test Login
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Tech Stack Section -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header" style="background-color: #6c757d; color: white;">
+                    <h5 class="mb-0"><i class="bi bi-stack"></i> Technology Stack</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <h6 class="text-primary fw-bold">AI & ML</h6>
+                            <ul class="small list-unstyled">
+                                <li><i class="bi bi-check-circle text-success"></i> Azure AI Foundry</li>
+                                <li><i class="bi bi-check-circle text-success"></i> 9 Persistent Agents</li>
+                                <li><i class="bi bi-check-circle text-success"></i> GPT-4 Turbo</li>
+                                <li><i class="bi bi-check-circle text-success"></i> Azure OpenAI</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <h6 class="text-primary fw-bold">Data & Storage</h6>
+                            <ul class="small list-unstyled">
+                                <li><i class="bi bi-check-circle text-success"></i> Azure Cosmos DB</li>
+                                <li><i class="bi bi-check-circle text-success"></i> NoSQL Database</li>
+                                <li><i class="bi bi-check-circle text-success"></i> Real-time Sync</li>
+                                <li><i class="bi bi-check-circle text-success"></i> Multi-region</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <h6 class="text-primary fw-bold">Services</h6>
+                            <ul class="small list-unstyled">
+                                <li><i class="bi bi-check-circle text-success"></i> Azure Maps API</li>
+                                <li><i class="bi bi-check-circle text-success"></i> Azure Speech</li>
+                                <li><i class="bi bi-check-circle text-success"></i> Azure App Service</li>
+                                <li><i class="bi bi-check-circle text-success"></i> Managed Identity</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <h6 class="text-primary fw-bold">Application</h6>
+                            <ul class="small list-unstyled">
+                                <li><i class="bi bi-check-circle text-success"></i> Python Flask</li>
+                                <li><i class="bi bi-check-circle text-success"></i> Bootstrap 5</li>
+                                <li><i class="bi bi-check-circle text-success"></i> Async Architecture</li>
+                                <li><i class="bi bi-check-circle text-success"></i> RESTful APIs</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Start Guide -->
+    <div class="row mb-5">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-rocket"></i> Quick Start Guide</h5>
+                </div>
+                <div class="card-body">
+                    <h6 class="fw-bold">Recommended Demo Flow:</h6>
+                    <ol>
+                        <li><strong>Start with Customer Service:</strong> Click the chat widget and ask about a parcel</li>
+                        <li><strong>Test Fraud Detection:</strong> Analyse a suspicious delivery message</li>
+                        <li><strong>Register a Parcel:</strong> See AI validate addresses in real-time</li>
+                        <li><strong>View AI Insights:</strong> Explore Optimisation metrics and agent decisions</li>
+                        <li><strong>Check Driver Manifest:</strong> See route Optimisation and delivery sequencing</li>
+                    </ol>
+
+                    <div class="alert alert-primary alert-permanent mt-4">
+                        <strong><i class="bi bi-info-circle"></i> Getting Started:</strong><br>
+                        Select a persona from the login dropdown to experience different user roles and capabilities across the platform.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CTA Button -->
+    <div class="row mb-5">
+        <div class="col-12 text-center">
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-primary btn-lg px-5 py-3">
+                <i class="bi bi-play-circle"></i> Start Exploring the Platform
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Modern Gradient Hero Section */
+.hero-gradient {
+    background: {{ company.brand_gradient }};
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(235, 37, 37, 0.2);
+}
+
+.hero-gradient::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background:
+        radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.08) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.hero-gradient::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -10%;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.hero-content {
+    position: relative;
+    z-index: 1;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.hover-shadow {
+    transition: all 0.3s ease;
+}
+
+.hover-shadow:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15) !important;
+}
+
+.card {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.card-header {
+    border-bottom: 2px solid rgba(255,255,255,0.2);
+}
+</style>
+{% endblock %}

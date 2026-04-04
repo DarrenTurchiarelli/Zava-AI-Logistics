@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Track Parcel - {{ company.browser_title }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="bi bi-search"></i> Track Parcel</h4>
+                </div>
+                <div class="card-body">
+                    <form method="GET" action="{{ url_for('parcels.track_parcel_page') }}" class="mb-4">
+                        <div class="input-group input-group-lg">
+                            <input type="text" class="form-control" name="tracking_number"
+                                   placeholder="Enter tracking number..."
+                                   value="{{ tracking_number or '' }}" required>
+                            <button class="btn btn-lg" type="submit" style="background-color: #f8f9fa; color: #198754; border: 1px solid #dee2e6;">
+                                <i class="bi bi-search" style="color: #198754;"></i> Track
+                            </button>
+                        </div>
+                    </form>
+
+                    {% if tracking_number %}
+                        {% if parcel %}
+                        <!-- Parcel Found -->
+                        <div class="alert alert-success">
+                            <i class="bi bi-check-circle"></i> Parcel found!
+                        </div>
+
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="bi bi-box-seam"></i> {{ parcel.tracking_number }}
+                                </h5>
+
+                                <hr>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <h6 class="text-muted">Status</h6>
+                                        <span class="badge bg-info fs-6">{{ parcel.status }}</span>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <h6 class="text-muted">Service Type</h6>
+                                        <p class="mb-0">{{ parcel.service_type|title }}</p>
+                                    </div>
+                                </div>
+
+                                <hr>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <h6 class="text-muted"><i class="bi bi-person"></i> Sender</h6>
+                                        <p class="mb-0"><strong>{{ parcel.sender_name }}</strong></p>
+                                        <p class="mb-0 small">{{ parcel.sender_address }}</p>
+                                        <p class="mb-0 small">{{ parcel.sender_phone }}</p>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <h6 class="text-muted"><i class="bi bi-geo-alt"></i> Recipient</h6>
+                                        <p class="mb-0"><strong>{{ parcel.recipient_name }}</strong></p>
+                                        <p class="mb-0 small">{{ parcel.recipient_address }}</p>
+                                        <p class="mb-0 small">{{ parcel.recipient_phone }}</p>
+                                    </div>
+                                </div>
+
+                                <hr>
+
+                                <div class="row">
+                                    <div class="col-4 col-md-4 mb-2">
+                                        <h6 class="text-muted">Weight</h6>
+                                        <p class="mb-0">{{ parcel.weight }} kg</p>
+                                    </div>
+                                    <div class="col-4 col-md-4 mb-2">
+                                        <h6 class="text-muted">Dimensions</h6>
+                                        <p class="mb-0">{{ parcel.dimensions or 'N/A' }}</p>
+                                    </div>
+                                    <div class="col-4 col-md-4 mb-2">
+                                        <h6 class="text-muted">Value</h6>
+                                        <p class="mb-0">${{ parcel.declared_value }}</p>
+                                    </div>
+                                </div>
+
+                                {% if parcel.special_instructions %}
+                                <hr>
+                                <div class="alert alert-permanent alert-info mb-0">
+                                    <i class="bi bi-info-circle"></i> <strong>Special Instructions:</strong><br>
+                                    {{ parcel.special_instructions }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-3">
+                            <a href="{{ url_for('parcels.register_parcel') }}" class="btn btn-lg" style="background-color: #f8f9fa; color: #198754; border: 1px solid #dee2e6;">
+                                <i class="bi bi-plus-circle" style="color: #198754;"></i> Lodge Another Parcel
+                            </a>
+                            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline-secondary btn-lg">
+                                <i class="bi bi-house"></i> Back to Dashboard
+                            </a>
+                        </div>
+                        {% else %}
+                        <!-- Parcel Not Found -->
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            Parcel not found with tracking number: <strong>{{ tracking_number }}</strong>
+                        </div>
+                        <p class="text-muted">
+                            Please check the tracking number and try again. If you continue to have issues,
+                            please contact customer service.
+                        </p>
+                        {% endif %}
+                    {% else %}
+                    <!-- No search yet -->
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-box-seam" style="font-size: 4rem;"></i>
+                        <p class="mt-3">Enter a tracking number to search for your parcel</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

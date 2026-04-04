@@ -7,6 +7,9 @@ echo "Starting Zava Web Application..."
 echo "Installing Python dependencies..."
 pip install -r requirements.txt
 
-# Start Gunicorn server
+# Set PYTHONPATH to include src/ directory for new architecture
+export PYTHONPATH="${PYTHONPATH}:/home/site/wwwroot:/home/site/wwwroot/src"
+
+# Start Gunicorn server with application factory
 echo "Starting Gunicorn server..."
-gunicorn --bind=0.0.0.0:8000 --timeout 600 --workers=4 --threads=2 --worker-class=gthread app:app
+gunicorn --bind=0.0.0.0 --timeout 600 app:app

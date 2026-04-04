@@ -1,0 +1,636 @@
+{% extends "base.html" %}
+
+{% block title %}Camera Scanner - {{ company.browser_title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Camera Scanner - Mobile-first responsive styles */
+    .scanner-container {
+        max-width: 1200px;
+    }
+
+    .scanner-header {
+        background: linear-gradient(135deg, var(--dt-primary, #007FFF), #0066CC);
+    }
+
+    /* Camera viewport - adapts to screen */
+    .camera-viewport {
+        position: relative;
+        width: 100%;
+        background: #000;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        aspect-ratio: 4/3;
+    }
+
+    .camera-viewport video,
+    .camera-viewport canvas {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    /* Floating capture button overlay on mobile */
+    .capture-overlay {
+        display: none;
+        position: absolute;
+        bottom: 1rem;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10;
+    }
+
+    .capture-btn-floating {
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        background: #fff;
+        border: 4px solid #007FFF;
+        color: #007FFF;
+        font-size: 1.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+        transition: transform 0.15s ease;
+    }
+
+    .capture-btn-floating:active {
+        transform: scale(0.9);
+    }
+
+    .capture-btn-floating:disabled {
+        opacity: 0.4;
+        border-color: #999;
+        color: #999;
+    }
+
+    /* Control bar - horizontal on all screens */
+    .camera-controls {
+        display: flex;
+        gap: 0.5rem;
+        justify-content: center;
+        flex-wrap: nowrap;
+    }
+
+    .camera-controls .btn {
+        flex: 1 1 0;
+        max-width: 200px;
+        white-space: nowrap;
+        font-size: 0.9rem;
+        padding: 0.6rem 0.75rem;
+    }
+
+    /* Info tip - collapsible on mobile */
+    .scanner-tip {
+        font-size: 0.85rem;
+        line-height: 1.4;
+    }
+
+    .scanner-tip-toggle {
+        cursor: pointer;
+        user-select: none;
+    }
+
+    /* Extracted data section */
+    .extracted-fields .form-label {
+        font-size: 0.8rem;
+        margin-bottom: 0.25rem;
+        font-weight: 600;
+        color: #555;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .extracted-fields .form-control,
+    .extracted-fields textarea.form-control {
+        font-size: 0.95rem;
+    }
+
+    .extracted-fields .mb-3 {
+        margin-bottom: 0.75rem !important;
+    }
+
+    /* Mobile-specific (< 768px) */
+    @media (max-width: 767.98px) {
+        .scanner-container {
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+        }
+
+        .scanner-container .mt-4 {
+            margin-top: 0.75rem !important;
+        }
+
+        /* Full-bleed camera on mobile */
+        .camera-viewport {
+            border-radius: 0;
+            margin-left: -0.5rem;
+            margin-right: -0.5rem;
+            width: calc(100% + 1rem);
+            aspect-ratio: 3/4; /* Portrait orientation for mobile */
+            max-height: 55vh;
+        }
+
+        /* Show floating capture button on mobile when camera is active */
+        .camera-active .capture-overlay {
+            display: block;
+        }
+
+        /* Compact controls on mobile */
+        .camera-controls .btn {
+            font-size: 0.8rem;
+            padding: 0.5rem 0.5rem;
+        }
+
+        .camera-controls .btn .btn-label {
+            display: none; /* Hide text labels, show only icons on small screens */
+        }
+
+        /* Compact info tip on mobile */
+        .scanner-tip-full {
+            display: none;
+        }
+
+        .scanner-tip-short {
+            display: inline;
+        }
+
+        /* Compact header */
+        .scanner-header h4 {
+            font-size: 1.1rem;
+        }
+
+        .scanner-header .small {
+            font-size: 0.75rem;
+        }
+
+        /* Stack extracted data neatly */
+        .extracted-fields .row .col-4,
+        .extracted-fields .row .col-3,
+        .extracted-fields .row .col-5 {
+            flex: 1 1 0;
+            min-width: 0;
+        }
+    }
+
+    /* Tablets and up */
+    @media (min-width: 768px) {
+        .capture-overlay {
+            display: none !important; /* Always use button bar on desktop */
+        }
+
+        .scanner-tip-short {
+            display: none;
+        }
+
+        .scanner-tip-full {
+            display: inline;
+        }
+
+        .camera-viewport {
+            aspect-ratio: 16/10;
+        }
+    }
+
+    /* Processing overlay */
+    .processing-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.7);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 20;
+        border-radius: 0.5rem;
+    }
+
+    .processing-overlay .spinner-border {
+        width: 3rem;
+        height: 3rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container scanner-container mt-2 mt-md-4">
+    <!-- Compact Header -->
+    <div class="card shadow-lg border-0 overflow-hidden">
+        <div class="card-header scanner-header text-white py-2 py-md-3">
+            <h4 class="mb-0">
+                <i class="bi bi-camera"></i> AI Camera Scanner
+            </h4>
+            <p class="mb-0 small opacity-75">Scan barcodes and handwritten addresses with Azure AI Vision</p>
+        </div>
+
+        <div class="card-body p-2 p-md-4">
+            <!-- Collapsible Tip -->
+            <div class="alert alert-permanent alert-info mb-2 mb-md-3 py-2 scanner-tip">
+                <span class="scanner-tip-short">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Point camera at a parcel label.</strong> AI extracts handwritten sender details.
+                    <a data-bs-toggle="collapse" href="#scannerTipDetails" class="scanner-tip-toggle text-primary">More info</a>
+                </span>
+                <span class="scanner-tip-full">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Smart Address Detection:</strong> Point the camera at an Zava envelope or parcel label.
+                    The AI uses <strong>intelligent filtering</strong> to ignore printed text (branding, disclaimers, form labels)
+                    and extract only the <strong>handwritten sender details</strong>: name, street address, suburb, state, and postcode.
+                    <br>
+                    <i class="bi bi-lightbulb"></i> <em>Tip: For best results, ensure the address area is well-lit and in focus.</em>
+                </span>
+                <div class="collapse mt-1" id="scannerTipDetails">
+                    The AI uses <strong>intelligent filtering</strong> to ignore printed text and extract only <strong>handwritten sender details</strong>: name, street address, suburb, state, and postcode.
+                    Ensure the address area is well-lit and in focus.
+                </div>
+            </div>
+
+            <!-- Camera Controls Bar -->
+            <div class="camera-controls mb-2">
+                <button id="toggleCamera" class="btn" style="background-color: #f8f9fa; color: #198754; border: 1px solid #dee2e6;">
+                    <i class="bi bi-camera-video"></i> <span class="btn-label">Start Camera</span>
+                </button>
+                <button id="captureImage" class="btn" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;" disabled>
+                    <i class="bi bi-camera-fill" style="color: #007FFF;"></i> <span class="btn-label">Capture</span>
+                </button>
+            </div>
+
+            <!-- Camera Feed & Results -->
+            <div class="row g-2 g-md-3">
+                <!-- Camera Viewport -->
+                <div class="col-12 col-md-6">
+                    <div id="cameraWrapper" class="camera-viewport">
+                        <video id="cameraFeed" autoplay playsinline style="display: none;"></video>
+                        <canvas id="capturedCanvas" style="display: none;"></canvas>
+
+                        <!-- Floating capture button for mobile -->
+                        <div class="capture-overlay">
+                            <button id="captureImageFloat" class="capture-btn-floating" disabled>
+                                <i class="bi bi-camera-fill"></i>
+                            </button>
+                        </div>
+
+                        <!-- Processing overlay -->
+                        <div id="processingOverlay" class="processing-overlay" style="display: none;">
+                            <div class="spinner-border text-light" role="status">
+                                <span class="visually-hidden">Processing...</span>
+                            </div>
+                            <p class="mt-2 text-light small">Analysing with Azure AI...</p>
+                        </div>
+
+                        <!-- Placeholder -->
+                        <div id="cameraPlaceholder" class="d-flex flex-column align-items-center justify-content-center h-100 text-white">
+                            <i class="bi bi-camera" style="font-size: 3.5rem; opacity: 0.3;"></i>
+                            <p class="mt-2 mb-0 small opacity-50">Tap "Start Camera" to begin</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Extracted Data -->
+                <div class="col-12 col-md-6">
+                    <div class="card h-100 border">
+                        <div class="card-header bg-primary text-white py-2">
+                            <h6 class="mb-0"><i class="bi bi-file-text"></i> Extracted Information</h6>
+                        </div>
+                        <div class="card-body p-2 p-md-3 extracted-fields">
+                            <div id="processingIndicator" style="display: none;" class="text-center p-3">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Processing...</span>
+                                </div>
+                                <p class="mt-2 small">Analysing image with Azure AI...</p>
+                            </div>
+
+                            <div id="extractedData" style="display: none;">
+                                <div class="mb-3">
+                                    <label class="form-label">Detected Text</label>
+                                    <div id="detectedText" class="border p-2 bg-light rounded" style="min-height: 60px; max-height: 120px; overflow-y: auto; white-space: pre-wrap; font-size: 0.85rem;"></div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Barcode</label>
+                                    <input type="text" id="extractedBarcode" class="form-control form-control-sm" readonly>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Address</label>
+                                    <textarea id="extractedAddress" class="form-control form-control-sm" rows="2" readonly></textarea>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Recipient Name</label>
+                                    <input type="text" id="extractedName" class="form-control form-control-sm" readonly>
+                                </div>
+
+                                <div class="row g-2">
+                                    <div class="col-5">
+                                        <div class="mb-3">
+                                            <label class="form-label">Suburb</label>
+                                            <input type="text" id="extractedSuburb" class="form-control form-control-sm" readonly>
+                                        </div>
+                                    </div>
+                                    <div class="col-3">
+                                        <div class="mb-3">
+                                            <label class="form-label">State</label>
+                                            <input type="text" id="extractedState" class="form-control form-control-sm" readonly>
+                                        </div>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="mb-3">
+                                            <label class="form-label">Postcode</label>
+                                            <input type="text" id="extractedPostcode" class="form-control form-control-sm" readonly>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div id="detectionStatus" class="alert alert-success py-2 mb-2 small" style="display: none;">
+                                    <i class="bi bi-check-circle"></i> <span id="detectionStatusText"></span>
+                                </div>
+
+                                <div class="d-grid">
+                                    <a href="{{ url_for('parcels.register_parcel') }}" id="useDataButton" class="btn" style="display: none; background-color: #f8f9fa; color: #198754; border: 1px solid #dee2e6;">
+                                        <i class="bi bi-box-seam" style="color: #198754;"></i> Use Data to Register Parcel
+                                    </a>
+                                </div>
+                            </div>
+
+                            <div id="noDataMessage" class="text-muted text-center p-3">
+                                <i class="bi bi-image" style="font-size: 2.5rem; opacity: 0.3;"></i>
+                                <p class="mt-2 mb-0 small">Capture an image to extract data</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let videoStream = null;
+let video = null;
+let canvas = null;
+let ctx = null;
+
+// Initialize elements after DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    video = document.getElementById('cameraFeed');
+    canvas = document.getElementById('capturedCanvas');
+    if (canvas) {
+        ctx = canvas.getContext('2d');
+    }
+
+    // Sync floating capture button with main capture button
+    const captureFloat = document.getElementById('captureImageFloat');
+    if (captureFloat) {
+        captureFloat.addEventListener('click', () => {
+            document.getElementById('captureImage').click();
+        });
+    }
+});
+
+// Fallback initialization
+function ensureElements() {
+    if (!video) video = document.getElementById('cameraFeed');
+    if (!canvas) canvas = document.getElementById('capturedCanvas');
+    if (canvas && !ctx) ctx = canvas.getContext('2d');
+    return video && canvas && ctx;
+}
+
+let cameraRunning = false;
+
+// Update floating button state to match main capture button
+function syncFloatingButton() {
+    const captureBtn = document.getElementById('captureImage');
+    const captureFloat = document.getElementById('captureImageFloat');
+    if (captureFloat && captureBtn) {
+        captureFloat.disabled = captureBtn.disabled;
+    }
+}
+
+// Toggle camera-active class for mobile floating button visibility
+function setCameraActive(active) {
+    const wrapper = document.getElementById('cameraWrapper');
+    if (wrapper) {
+        if (active) {
+            wrapper.classList.add('camera-active');
+        } else {
+            wrapper.classList.remove('camera-active');
+        }
+    }
+}
+
+// Update toggle button appearance
+function updateToggleButton() {
+    const btn = document.getElementById('toggleCamera');
+    if (!btn) return;
+    const icon = btn.querySelector('i');
+    const label = btn.querySelector('.btn-label');
+    if (cameraRunning) {
+        btn.style.color = '#dc3545';
+        if (icon) { icon.className = 'bi bi-stop-circle'; }
+        if (label) { label.textContent = 'Stop'; }
+    } else {
+        btn.style.color = '#198754';
+        if (icon) { icon.className = 'bi bi-camera-video'; }
+        if (label) { label.textContent = 'Start Camera'; }
+    }
+}
+
+// Start camera
+async function startCamera() {
+    if (!ensureElements()) {
+        alert('Error: Camera elements not found. Please refresh the page.');
+        return;
+    }
+
+    try {
+        const constraints = {
+            video: {
+                facingMode: { ideal: 'environment' },
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            }
+        };
+
+        videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = videoStream;
+        video.style.display = 'block';
+        canvas.style.display = 'none';
+
+        const placeholder = document.getElementById('cameraPlaceholder');
+        if (placeholder) placeholder.style.display = 'none';
+
+        cameraRunning = true;
+        document.getElementById('captureImage').disabled = false;
+        updateToggleButton();
+        syncFloatingButton();
+        setCameraActive(true);
+    } catch (error) {
+        alert('Error accessing camera: ' + error.message);
+    }
+}
+
+// Stop camera
+function stopCamera() {
+    if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
+    }
+
+    if (video) video.style.display = 'none';
+    if (canvas) canvas.style.display = 'none';
+
+    const placeholder = document.getElementById('cameraPlaceholder');
+    if (placeholder) placeholder.style.display = 'block';
+
+    cameraRunning = false;
+    document.getElementById('captureImage').disabled = true;
+    updateToggleButton();
+    syncFloatingButton();
+    setCameraActive(false);
+}
+
+// Toggle Camera button
+document.getElementById('toggleCamera').addEventListener('click', async () => {
+    if (cameraRunning) {
+        stopCamera();
+    } else {
+        await startCamera();
+    }
+});
+
+// Capture Image
+document.getElementById('captureImage').addEventListener('click', async () => {
+    if (!ensureElements()) {
+        alert('Error: Camera elements not found. Please refresh the page.');
+        return;
+    }
+
+    // Draw current video frame to canvas
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // Hide video, show canvas
+    video.style.display = 'none';
+    canvas.style.display = 'block';
+    setCameraActive(false); // Hide floating button while showing captured image
+
+    // Show processing indicators
+    const processingIndicator = document.getElementById('processingIndicator');
+    const processingOverlay = document.getElementById('processingOverlay');
+    const extractedData = document.getElementById('extractedData');
+    const noDataMessage = document.getElementById('noDataMessage');
+
+    if (processingIndicator) processingIndicator.style.display = 'block';
+    if (processingOverlay) processingOverlay.style.display = 'flex';
+    if (extractedData) extractedData.style.display = 'none';
+    if (noDataMessage) noDataMessage.style.display = 'none';
+
+    // Convert to blob and send to server
+    canvas.toBlob(async (blob) => {
+        if (!blob) {
+            alert('Error: Could not capture image from canvas.');
+            if (processingIndicator) processingIndicator.style.display = 'none';
+            if (noDataMessage) noDataMessage.style.display = 'block';
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('image', blob, 'capture.jpg');
+
+        // Store the captured image in sessionStorage for the registration form
+        const reader = new FileReader();
+        reader.onloadend = function() {
+            const base64data = reader.result;
+            sessionStorage.setItem('capturedPhotoBase64', base64data);
+            console.log('📸 Photo stored in sessionStorage for registration');
+        };
+        reader.readAsDataURL(blob);
+
+        try {
+            const response = await fetch('/api/analyze-image', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            // Check for API error
+            if (result.error) {
+                throw new Error(result.error);
+            }
+
+            // Hide processing indicators
+            if (processingIndicator) processingIndicator.style.display = 'none';
+            if (processingOverlay) processingOverlay.style.display = 'none';
+            if (extractedData) extractedData.style.display = 'block';
+
+            // Scroll to results on mobile
+            if (window.innerWidth < 768) {
+                setTimeout(() => {
+                    extractedData.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 200);
+            }
+
+            // Display results with null checks
+            const detectedText = document.getElementById('detectedText');
+            const extractedBarcode = document.getElementById('extractedBarcode');
+            const extractedAddress = document.getElementById('extractedAddress');
+            const extractedName = document.getElementById('extractedName');
+            const extractedSuburb = document.getElementById('extractedSuburb');
+            const extractedState = document.getElementById('extractedState');
+            const extractedPostcode = document.getElementById('extractedPostcode');
+
+            if (detectedText) detectedText.textContent = result.full_text || 'No text detected';
+            if (extractedBarcode) extractedBarcode.value = result.barcode || '';
+            if (extractedAddress) extractedAddress.value = result.address || '';
+            if (extractedName) extractedName.value = result.recipient_name || '';
+            if (extractedSuburb) extractedSuburb.value = result.suburb || '';
+            if (extractedState) extractedState.value = result.state || '';
+            if (extractedPostcode) extractedPostcode.value = result.postcode || '';
+
+            // Show detection status
+            const detectionStatusEl = document.getElementById('detectionStatus');
+            const detectionStatusTextEl = document.getElementById('detectionStatusText');
+            if (detectionStatusEl && detectionStatusTextEl && result.address_region_detected) {
+                const totalLines = result.text_lines ? result.text_lines.length : 0;
+                const filteredLines = result.filtered_lines ? result.filtered_lines.length : 0;
+                const noiseFiltered = totalLines - filteredLines;
+
+                detectionStatusEl.style.display = 'block';
+                detectionStatusTextEl.textContent =
+                    'Smart address detection filtered out ' + noiseFiltered +
+                    ' noise items (printed labels, branding, etc.)';
+            } else if (detectionStatusEl) {
+                detectionStatusEl.style.display = 'none';
+            }
+
+            // Store data in sessionStorage for pre-filling registration form
+            const useDataButton = document.getElementById('useDataButton');
+            if (result.barcode || result.address || result.postcode) {
+                sessionStorage.setItem('scannedData', JSON.stringify(result));
+                if (useDataButton) useDataButton.style.display = 'block';
+            }
+
+        } catch (error) {
+            console.error('Error analysing image:', error);
+            alert('Error Analysing image: ' + (error.message || 'Unknown error'));
+            if (processingIndicator) processingIndicator.style.display = 'none';
+            if (processingOverlay) processingOverlay.style.display = 'none';
+            if (noDataMessage) noDataMessage.style.display = 'block';
+
+            const detectionStatusEl = document.getElementById('detectionStatus');
+            if (detectionStatusEl) detectionStatusEl.style.display = 'none';
+        }
+    }, 'image/jpeg', 0.95);
+});
+
+
+</script>
+{% endblock %}

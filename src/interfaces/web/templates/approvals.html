@@ -1,0 +1,774 @@
+{% extends "base.html" %}
+
+{% block title %}Approvals - {{ company.browser_title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="display-6">
+                <i class="bi bi-clipboard-check"></i> Pending Approvals
+            </h1>
+            <p class="text-muted">Review and process workflow approvals</p>
+        </div>
+        <div class="col-auto">
+            <button type="button" class="btn btn-primary" id="toggleAgentMode">
+                <i class="bi bi-robot"></i> Enable Agent Mode
+            </button>
+        </div>
+    </div>
+
+    <!-- Distribution Center Filter (Always Visible) -->
+    <div class="card border-primary mb-4">
+        <div class="card-header bg-light">
+            <h6 class="mb-0"><i class="bi bi-funnel"></i> Filter by Distribution Center</h6>
+        </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label">
+                    <i class="bi bi-building"></i> Select Distribution Centers to Filter
+                    <span class="badge bg-secondary" id="selectedDCCount">0 selected</span>
+                </label>
+                <div class="dropdown">
+                    <button class="btn btn-outline-primary dropdown-toggle w-100 text-start" type="button" id="dcDropdownButton" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-geo-alt"></i> Select Distribution Centers
+                    </button>
+                    <ul class="dropdown-menu w-100 p-3" id="dcDropdownMenu" style="max-height: 400px; overflow-y: auto;" aria-labelledby="dcDropdownButton" onclick="event.stopPropagation()">
+                        <li class="mb-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary me-2" id="selectAllDC">Select All</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="clearAllDC">Clear All</button>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <!-- DC Checkboxes will be populated by JavaScript -->
+                    </ul>
+                </div>
+                <div id="selectedDCList" class="mt-2 small text-muted">No distribution centers selected</div>
+            </div>
+            <p class="text-muted small mb-0">
+                <i class="bi bi-info-circle"></i> Select distribution centers to filter the approval list. Agent mode requires at least one DC selected.
+            </p>
+        </div>
+    </div>
+
+    <!-- Agent Mode Panel -->
+    <div id="agentModePanel" class="card border-primary mb-4" style="display: none;">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="bi bi-cpu"></i> AI Agent Auto-Approval Mode</h5>
+        </div>
+        <div class="card-body">
+            <p class="mb-3">Configure AI agents to automatically approve or reject pending requests based on predefined criteria.</p>
+            
+            <!-- Distribution Center Selection -->
+            <div class="alert alert-permanent alert-info mb-3">
+                <i class="bi bi-info-circle"></i> 
+                <strong>Agent Scope:</strong> The agent will only process approvals from the distribution centers selected in the filter above.
+            </div>
+            
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <h6>Auto-Approval Criteria:</h6>
+                    <ul class="small">
+                        <li>Value under threshold</li>
+                        <li>Verified sender/recipient</li>
+                        <li>Standard delivery location</li>
+                        <li>No fraud risk indicators</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6>Auto-Rejection Criteria:</h6>
+                    <ul class="small">
+                        <li>High fraud risk score (&gt;70%)</li>
+                        <li>Blacklisted address</li>
+                        <li>Duplicate request</li>
+                        <li>Missing required documentation</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 align-items-center">
+                <button type="button" class="btn btn-success" id="runAgentApproval">
+                    <i class="bi bi-play-circle"></i> Run Auto-Approval Agent
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="configureAgent">
+                    <i class="bi bi-gear"></i> Configure Criteria
+                </button>
+                <div class="ms-auto">
+                    <span id="agentStatus" class="badge bg-secondary">Ready</span>
+                </div>
+            </div>
+
+            <div id="agentResults" class="mt-3" style="display: none;">
+                <div class="alert alert-permanent alert-info">
+                    <strong><i class="bi bi-info-circle"></i> Agent Processing Results:</strong>
+                    <div id="agentResultsContent" class="mt-2"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if approvals %}
+    <div class="row" id="approvalsContainer">
+        {% for approval in approvals %}
+        <div class="col-lg-6 mb-4 approval-card" data-dc="{{ approval.parcel_dc or 'Unknown' }}">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong><i class="bi bi-clock-history"></i> Approval Request</strong>
+                            <br>
+                            <small><i class="bi bi-upc-scan"></i> {{ approval.tracking_number or approval.parcel_id or 'N/A' }}</small>
+                        </div>
+                        <span class="badge bg-light text-dark">Pending</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-3 text-muted">
+                        ID: <code>{{ approval.id }}</code>
+                    </h6>
+                    
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <strong>Tracking Number:</strong><br>
+                            <code>{{ approval.tracking_number or approval.parcel_id }}</code>
+                        </div>
+                        <div class="col-6">
+                            <strong>Type:</strong><br>
+                            {{ approval.approval_type or 'N/A' }}
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <strong><i class="bi bi-building"></i> Distribution Center:</strong><br>
+                            <span class="badge bg-primary">{{ approval.parcel_dc or 'Unknown' }}</span>
+                        </div>
+                        <div class="col-6">
+                            <strong><i class="bi bi-truck"></i> Status:</strong><br>
+                            <span class="badge bg-info">{{ approval.parcel_status or 'unknown' }}</span>
+                        </div>
+                    </div>
+                    
+                    {% if approval.parcel_location %}
+                    <div class="mb-3">
+                        <strong><i class="bi bi-geo-alt"></i> Current Location:</strong><br>
+                        <small class="text-muted">{{ approval.parcel_location }}</small>
+                    </div>
+                    {% endif %}
+                    
+                    {% if approval.fraud_risk is defined %}
+                    <div class="mb-3">
+                        <strong><i class="bi bi-shield-exclamation" 
+                                  data-bs-toggle="tooltip" 
+                                  data-bs-placement="right" 
+                                  data-bs-html="true"
+                                  title="<strong>Fraud Risk Analysis</strong><br>{{ approval.fraud_details|replace('|', '<br>')|safe if approval.fraud_details else 'No detailed analysis available' }}"></i> Fraud Risk:</strong>
+                        <span class="badge {% if approval.fraud_risk > 70 %}bg-danger{% elif approval.fraud_risk > 30 %}bg-warning text-dark{% else %}bg-success{% endif %}"
+                              data-bs-toggle="tooltip" 
+                              data-bs-placement="right"
+                              data-bs-html="true" 
+                              title="<strong>Risk Score: {{ approval.fraud_risk }}%</strong><br>{{ approval.fraud_details|replace('|', '<br>')|safe if approval.fraud_details else 'Standard fraud risk assessment' }}">
+                            {{ approval.fraud_risk }}%
+                        </span>
+                    </div>
+                    
+                    {% if approval.address_notes and approval.address_notes|length > 0 %}
+                    <div class="alert alert-warning mb-3 alert-persistent" role="alert">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <strong><i class="bi bi-exclamation-triangle-fill"></i> Address Risk Notes:</strong>
+                                <ul class="mb-0 mt-2 small">
+                                    {% for note in approval.address_notes %}
+                                    <li>{{ note }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            <button type="button" 
+                                    class="btn btn-sm btn-primary ms-2 flex-shrink-0" 
+                                    onclick="escalateToAuthorities('{{ approval.id }}', '{{ approval.tracking_number }}', '{{ approval.fraud_risk }}'); event.stopPropagation();"
+                                    title="Escalate to law enforcement or customs authorities">
+                                <i class="bi bi-megaphone-fill"></i> Escalate
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endif %}
+
+                    {% if approval.reason %}
+                    <div class="alert alert-info mb-3">
+                        <strong>Reason:</strong><br>
+                        {{ approval.reason }}
+                    </div>
+                    {% endif %}
+
+                    <form method="POST" action="{{ url_for('approvals.process_approval', approval_id=approval.id) }}" class="mt-3">
+                        <div class="mb-3">
+                            <label for="notes_{{ approval.id }}" class="form-label">Decision Notes (optional)</label>
+                            <textarea class="form-control" id="notes_{{ approval.id }}" name="notes" rows="2" 
+                                      placeholder="Add notes about your decision..."></textarea>
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" name="decision" value="approve" class="btn flex-fill" style="background-color: #f8f9fa; color: #198754; border: 1px solid #dee2e6;">
+                                <i class="bi bi-check-circle" style="color: #198754;"></i> Approve
+                            </button>
+                            <button type="submit" name="decision" value="reject" class="btn flex-fill" style="background-color: #f8f9fa; color: #dc3545; border: 1px solid #dee2e6;">
+                                <i class="bi bi-x-circle" style="color: #dc3545;"></i> Reject
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer text-muted small">
+                    Requested: {{ approval.requested_at or 'N/A' }}
+                    {% if approval.requester_id %}
+                    by {{ approval.requester_id }}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-check-circle text-success" style="font-size: 4rem;"></i>
+            <h4 class="mt-3">No Pending Approvals</h4>
+            <p class="text-muted">All approval requests have been processed</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Configuration Modal -->
+<div class="modal fade" id="configModal" tabindex="-1" aria-labelledby="configModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="configModalLabel">
+                    <i class="bi bi-gear"></i> Configure Agent Criteria
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="agentConfigForm">
+                    <h6 class="fw-bold mb-3">Auto-Approval Settings</h6>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="fraudThresholdLow" class="form-label">
+                                Low Fraud Risk Threshold (%)
+                                <i class="bi bi-info-circle text-muted" title="Approve if fraud risk is below this value"></i>
+                            </label>
+                            <input type="number" class="form-control" id="fraudThresholdLow" value="30" min="0" max="100">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="valueThreshold" class="form-label">
+                                Maximum Value for Auto-Approval ($)
+                                <i class="bi bi-info-circle text-muted" title="Approve if parcel value is below this amount"></i>
+                            </label>
+                            <input type="number" class="form-control" id="valueThreshold" value="500" min="0" step="10">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Auto-Approve When:</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="approveVerified" checked>
+                            <label class="form-check-label" for="approveVerified">
+                                Sender/recipient is verified
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="approveDelivered" checked>
+                            <label class="form-check-label" for="approveDelivered">
+                                Status is 'delivered' for delivery confirmations
+                            </label>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <h6 class="fw-bold mb-3">Auto-Rejection Settings</h6>
+                    
+                    <div class="mb-3">
+                        <label for="fraudThresholdHigh" class="form-label">
+                            High Fraud Risk Threshold (%)
+                            <i class="bi bi-info-circle text-muted" title="Reject if fraud risk is above this value"></i>
+                        </label>
+                        <input type="number" class="form-control" id="fraudThresholdHigh" value="70" min="0" max="100">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Auto-Reject When:</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="rejectBlacklist" checked>
+                            <label class="form-check-label" for="rejectBlacklist">
+                                Blacklisted address detected
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="rejectDuplicate" checked>
+                            <label class="form-check-label" for="rejectDuplicate">
+                                Duplicate request detected
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="rejectMissingDocs">
+                            <label class="form-check-label" for="rejectMissingDocs">
+                                Missing required documentation
+                            </label>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i> 
+                        <strong>Note:</strong> Approvals that don't match any criteria will be skipped and require manual review.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveConfigBtn">
+                    <i class="bi bi-save"></i> Save Configuration
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Escalate to authorities function
+function escalateToAuthorities(approvalId, trackingNumber, riskScore) {
+    if (confirm(`⚠️ ESCALATE TO AUTHORITIES\n\nTracking: ${trackingNumber}\nRisk Score: ${riskScore}%\n\nThis will notify law enforcement and customs authorities.\n\nProceed with escalation?`)) {
+        fetch('/api/escalate-to-authorities', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                approval_id: approvalId,
+                tracking_number: trackingNumber,
+                risk_score: riskScore,
+                escalated_by: '{{ session.username or "operator" }}'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('✅ Successfully escalated to authorities\n\nReference: ' + data.reference_id);
+                // Optionally reload the page
+                location.reload();
+            } else {
+                alert('❌ Escalation failed: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            alert('❌ Error: ' + error.message);
+        });
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Bootstrap tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    const toggleBtn = document.getElementById('toggleAgentMode');
+    const agentPanel = document.getElementById('agentModePanel');
+    const runAgentBtn = document.getElementById('runAgentApproval');
+    const configureBtn = document.getElementById('configureAgent');
+    const agentStatus = document.getElementById('agentStatus');
+    const agentResults = document.getElementById('agentResults');
+    const agentResultsContent = document.getElementById('agentResultsContent');
+    
+    let agentModeEnabled = false;
+    
+    // Define 40 hypothetical distribution centers
+    const distributionCenters = [
+        { id: 'DC-SYD-001', name: 'Sydney Metro Hub', state: 'NSW' },
+        { id: 'DC-SYD-002', name: 'Sydney West Distribution', state: 'NSW' },
+        { id: 'DC-SYD-003', name: 'Sydney North Depot', state: 'NSW' },
+        { id: 'DC-MEL-001', name: 'Melbourne Central Hub', state: 'VIC' },
+        { id: 'DC-MEL-002', name: 'Melbourne East Depot', state: 'VIC' },
+        { id: 'DC-MEL-003', name: 'Melbourne West Warehouse', state: 'VIC' },
+        { id: 'DC-BNE-001', name: 'Brisbane Metro Hub', state: 'QLD' },
+        { id: 'DC-BNE-002', name: 'Brisbane South Distribution', state: 'QLD' },
+        { id: 'DC-BNE-003', name: 'Brisbane North Depot', state: 'QLD' },
+        { id: 'DC-PER-001', name: 'Perth Central Hub', state: 'WA' },
+        { id: 'DC-PER-002', name: 'Perth North Depot', state: 'WA' },
+        { id: 'DC-ADL-001', name: 'Adelaide Metro Hub', state: 'SA' },
+        { id: 'DC-ADL-002', name: 'Adelaide South Distribution', state: 'SA' },
+        { id: 'DC-CAN-001', name: 'Canberra Central Hub', state: 'ACT' },
+        { id: 'DC-HOB-001', name: 'Hobart Distribution Center', state: 'TAS' },
+        { id: 'DC-DAR-001', name: 'Darwin Central Hub', state: 'NT' },
+        { id: 'DC-NEW-001', name: 'Newcastle Regional Hub', state: 'NSW' },
+        { id: 'DC-WOL-001', name: 'Wollongong Depot', state: 'NSW' },
+        { id: 'DC-GEE-001', name: 'Geelong Distribution', state: 'VIC' },
+        { id: 'DC-BAL-001', name: 'Ballarat Depot', state: 'VIC' },
+        { id: 'DC-GLD-001', name: 'Gold Coast Hub', state: 'QLD' },
+        { id: 'DC-TWD-001', name: 'Townsville Regional', state: 'QLD' },
+        { id: 'DC-CAI-001', name: 'Cairns Distribution', state: 'QLD' },
+        { id: 'DC-TOW-001', name: 'Toowoomba Depot', state: 'QLD' },
+        { id: 'DC-LAU-001', name: 'Launceston Hub', state: 'TAS' },
+        { id: 'DC-BEN-001', name: 'Bendigo Regional', state: 'VIC' },
+        { id: 'DC-ALB-001', name: 'Albury-Wodonga Hub', state: 'NSW' },
+        { id: 'DC-WAG-001', name: 'Wagga Wagga Depot', state: 'NSW' },
+        { id: 'DC-TRA-001', name: 'Traralgon Distribution', state: 'VIC' },
+        { id: 'DC-SHP-001', name: 'Shepparton Depot', state: 'VIC' },
+        { id: 'DC-BUN-001', name: 'Bunbury Regional Hub', state: 'WA' },
+        { id: 'DC-GER-001', name: 'Geraldton Distribution', state: 'WA' },
+        { id: 'DC-KAL-001', name: 'Kalgoorlie Depot', state: 'WA' },
+        { id: 'DC-MOU-001', name: 'Mount Gambier Hub', state: 'SA' },
+        { id: 'DC-WHY-001', name: 'Whyalla Distribution', state: 'SA' },
+        { id: 'DC-POR-001', name: 'Port Augusta Depot', state: 'SA' },
+        { id: 'DC-DUB-001', name: 'Dubbo Regional Hub', state: 'NSW' },
+        { id: 'DC-TAM-001', name: 'Tamworth Distribution', state: 'NSW' },
+        { id: 'DC-ARM-001', name: 'Armidale Depot', state: 'NSW' },
+        { id: 'DC-ROC-001', name: 'Rockhampton Hub', state: 'QLD' }
+    ];
+    
+    // Populate distribution center checkboxes
+    const dcDropdownMenu = document.getElementById('dcDropdownMenu');
+    distributionCenters.forEach(dc => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+            <div class="form-check">
+                <input class="form-check-input dc-checkbox" type="checkbox" value="${dc.id}" id="dc_${dc.id}">
+                <label class="form-check-label small" for="dc_${dc.id}">
+                    <strong>${dc.id}</strong> - ${dc.name} (${dc.state})
+                </label>
+            </div>
+        `;
+        dcDropdownMenu.appendChild(li);
+    });
+    
+    // Update selected DC count and list
+    function updateSelectedDCs() {
+        const checkboxes = document.querySelectorAll('.dc-checkbox:checked');
+        const count = checkboxes.length;
+        const selectedDCCount = document.getElementById('selectedDCCount');
+        const selectedDCList = document.getElementById('selectedDCList');
+        
+        selectedDCCount.textContent = `${count} selected`;
+        
+        if (count === 0) {
+            selectedDCList.innerHTML = '<span class="text-muted"><i class="bi bi-info-circle"></i> No filter applied - Showing all distribution centers</span>';
+            runAgentBtn.disabled = true;
+            // Show all approval cards when no filter
+            filterApprovalsByDC([]);
+        } else {
+            const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+            selectedDCList.innerHTML = `<span class="text-success"><i class="bi bi-check-circle"></i> Filtered to: ${selectedIds.join(', ')}</span>`;
+            runAgentBtn.disabled = false;
+            // Filter approval cards to show only selected DCs
+            filterApprovalsByDC(selectedIds);
+        }
+        
+        // Save to localStorage
+        const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+        localStorage.setItem('selectedDCs', JSON.stringify(selectedIds));
+    }
+    
+    // Filter approval cards based on selected DCs
+    function filterApprovalsByDC(selectedDCs) {
+        const approvalCards = document.querySelectorAll('.approval-card');
+        let visibleCount = 0;
+        
+        approvalCards.forEach(card => {
+            const cardDC = card.getAttribute('data-dc');
+            
+            if (selectedDCs.length === 0) {
+                // No filter selected - show all approvals
+                card.style.display = 'block';
+                visibleCount++;
+            } else if (selectedDCs.includes(cardDC)) {
+                // DC matches selection - show
+                card.style.display = 'block';
+                visibleCount++;
+            } else {
+                // DC doesn't match - hide
+                card.style.display = 'none';
+            }
+        });
+        
+        // Update the heading to show filtered count
+        updateFilteredCount(visibleCount, approvalCards.length);
+    }
+    
+    // Update filtered count display
+    function updateFilteredCount(visible, total) {
+        let countBadge = document.getElementById('filteredCountBadge');
+        if (!countBadge) {
+            // Create badge if it doesn't exist
+            const heading = document.querySelector('h1.display-6');
+            if (heading) {
+                countBadge = document.createElement('span');
+                countBadge.id = 'filteredCountBadge';
+                countBadge.className = 'badge bg-info ms-2 fs-6';
+                countBadge.style.fontSize = '0.75rem';
+                countBadge.style.fontWeight = '400';
+                heading.appendChild(countBadge);
+            }
+        }
+        
+        if (countBadge) {
+            if (visible === 0) {
+                countBadge.style.display = 'none';
+            } else {
+                countBadge.style.display = 'inline';
+                if (visible < total) {
+                    countBadge.textContent = `Showing ${visible} of ${total}`;
+                    countBadge.className = 'badge bg-info ms-2 fs-6';
+                } else {
+                    countBadge.textContent = `${total}`;
+                    countBadge.className = 'badge bg-info ms-2 fs-6';
+                }
+                countBadge.style.fontSize = '0.75rem';
+                countBadge.style.fontWeight = '400';
+            }
+        }
+    }
+    
+    // Load saved DCs from localStorage
+    function loadSelectedDCs() {
+        const saved = localStorage.getItem('selectedDCs');
+        if (saved) {
+            const selectedIds = JSON.parse(saved);
+            selectedIds.forEach(id => {
+                const checkbox = document.getElementById(`dc_${id}`);
+                if (checkbox) checkbox.checked = true;
+            });
+        }
+        updateSelectedDCs();
+    }
+    
+    // Select/Clear all buttons
+    document.getElementById('selectAllDC').addEventListener('click', function() {
+        document.querySelectorAll('.dc-checkbox').forEach(cb => cb.checked = true);
+        updateSelectedDCs();
+    });
+    
+    document.getElementById('clearAllDC').addEventListener('click', function() {
+        document.querySelectorAll('.dc-checkbox').forEach(cb => cb.checked = false);
+        updateSelectedDCs();
+    });
+    
+    // Listen to checkbox changes
+    dcDropdownMenu.addEventListener('change', function(e) {
+        if (e.target.classList.contains('dc-checkbox')) {
+            updateSelectedDCs();
+        }
+    });
+    
+    // Handle dropdown z-index when opening/closing
+    const dcDropdown = document.querySelector('.dropdown');
+    const dcDropdownButton = document.getElementById('dcDropdownButton');
+    const filterCard = document.querySelector('.card.border-primary');
+    
+    dcDropdownButton.addEventListener('show.bs.dropdown', function () {
+        // Increase z-index when dropdown opens
+        if (filterCard) {
+            filterCard.style.zIndex = '1060';
+        }
+        if (dcDropdown) {
+            dcDropdown.style.zIndex = '1065';
+        }
+    });
+    
+    dcDropdownButton.addEventListener('hide.bs.dropdown', function () {
+        // Reset z-index when dropdown closes
+        setTimeout(() => {
+            if (filterCard) {
+                filterCard.style.zIndex = '1050';
+            }
+            if (dcDropdown) {
+                dcDropdown.style.zIndex = '';
+            }
+        }, 300); // Delay to allow animation to complete
+    });
+    
+    // Load saved selections on page load
+    loadSelectedDCs();
+
+    // Toggle agent mode panel
+    toggleBtn.addEventListener('click', function() {
+        agentModeEnabled = !agentModeEnabled;
+        
+        if (agentModeEnabled) {
+            agentPanel.style.display = 'block';
+            toggleBtn.innerHTML = '<i class="bi bi-robot"></i> Disable Agent Mode';
+            toggleBtn.classList.remove('btn-primary');
+            toggleBtn.classList.add('btn-outline-primary');
+        } else {
+            agentPanel.style.display = 'none';
+            toggleBtn.innerHTML = '<i class="bi bi-robot"></i> Enable Agent Mode';
+            toggleBtn.classList.remove('btn-outline-primary');
+            toggleBtn.classList.add('btn-primary');
+            agentResults.style.display = 'none';
+        }
+    });
+
+    // Run auto-approval agent
+    runAgentBtn.addEventListener('click', async function() {
+        // Get selected distribution centers
+        const selectedDCs = Array.from(document.querySelectorAll('.dc-checkbox:checked')).map(cb => cb.value);
+        
+        if (selectedDCs.length === 0) {
+            alert('Please select at least one distribution center before running the agent.');
+            return;
+        }
+        
+        agentStatus.className = 'badge bg-warning';
+        agentStatus.textContent = 'Processing...';
+        runAgentBtn.disabled = true;
+        
+        // Get configuration from localStorage
+        const savedConfig = localStorage.getItem('agentConfig');
+        const config = savedConfig ? JSON.parse(savedConfig) : {};
+        
+        try {
+            const response = await fetch('/api/run-approval-agent', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    config: config,
+                    distributionCenters: selectedDCs
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                agentStatus.className = 'badge bg-success';
+                agentStatus.textContent = 'Completed';
+                
+                const dcSkippedText = result.skipped_dc > 0 
+                    ? `<li><strong>Skipped (wrong DC):</strong> ${result.skipped_dc} requests (not from selected distribution centers)</li>` 
+                    : '';
+                
+                agentResultsContent.innerHTML = `
+                    <ul class="mb-0">
+                        <li><strong>Approved:</strong> ${result.approved || 0} requests</li>
+                        <li><strong>Rejected:</strong> ${result.rejected || 0} requests</li>
+                        <li><strong>Skipped:</strong> ${result.skipped || 0} requests (manual review required)</li>
+                        ${dcSkippedText}
+                    </ul>
+                `;
+                agentResults.style.display = 'block';
+                
+                // Reload page after 3 seconds to show updated approvals
+                setTimeout(() => {
+                    window.location.reload();
+                }, 3000);
+            } else {
+                agentStatus.className = 'badge bg-danger';
+                agentStatus.textContent = 'Error';
+                agentResultsContent.innerHTML = `<p class="text-danger mb-0">Error: ${result.error || 'Unknown error'}</p>`;
+                agentResults.style.display = 'block';
+            }
+        } catch (error) {
+            agentStatus.className = 'badge bg-danger';
+            agentStatus.textContent = 'Error';
+            agentResultsContent.innerHTML = `<p class="text-danger mb-0">Failed to connect to agent service</p>`;
+            agentResults.style.display = 'block';
+        } finally {
+            runAgentBtn.disabled = false;
+            
+            // Reset status after 5 seconds
+            setTimeout(() => {
+                agentStatus.className = 'badge bg-secondary';
+                agentStatus.textContent = 'Ready';
+            }, 5000);
+        }
+    });
+
+    // Configure agent criteria (placeholder for future implementation)
+    configureBtn.addEventListener('click', function() {
+        // Load saved configuration from localStorage
+        loadConfiguration();
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('configModal'));
+        modal.show();
+    });
+
+    // Save configuration button
+    document.getElementById('saveConfigBtn').addEventListener('click', function() {
+        const config = {
+            fraudThresholdLow: document.getElementById('fraudThresholdLow').value,
+            valueThreshold: document.getElementById('valueThreshold').value,
+            fraudThresholdHigh: document.getElementById('fraudThresholdHigh').value,
+            approveVerified: document.getElementById('approveVerified').checked,
+            approveDelivered: document.getElementById('approveDelivered').checked,
+            rejectBlacklist: document.getElementById('rejectBlacklist').checked,
+            rejectDuplicate: document.getElementById('rejectDuplicate').checked,
+            rejectMissingDocs: document.getElementById('rejectMissingDocs').checked
+        };
+        
+        // Save to localStorage
+        localStorage.setItem('agentConfig', JSON.stringify(config));
+        
+        // Close modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('configModal'));
+        modal.hide();
+        
+        // Show success message
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+        alertDiv.style.zIndex = '9999';
+        alertDiv.innerHTML = `
+            <i class="bi bi-check-circle"></i> Configuration saved successfully!
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(alertDiv);
+        
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 3000);
+    });
+
+    function loadConfiguration() {
+        const savedConfig = localStorage.getItem('agentConfig');
+        if (savedConfig) {
+            const config = JSON.parse(savedConfig);
+            document.getElementById('fraudThresholdLow').value = config.fraudThresholdLow || 30;
+            document.getElementById('valueThreshold').value = config.valueThreshold || 500;
+            document.getElementById('fraudThresholdHigh').value = config.fraudThresholdHigh || 70;
+            document.getElementById('approveVerified').checked = config.approveVerified !== false;
+            document.getElementById('approveDelivered').checked = config.approveDelivered !== false;
+            document.getElementById('rejectBlacklist').checked = config.rejectBlacklist !== false;
+            document.getElementById('rejectDuplicate').checked = config.rejectDuplicate !== false;
+            document.getElementById('rejectMissingDocs').checked = config.rejectMissingDocs || false;
+        }
+    }
+    
+    // Prevent any automatic dismissal of persistent alerts
+    document.querySelectorAll('.alert-persistent').forEach(alert => {
+        alert.addEventListener('close.bs.alert', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        });
+    });
+});
+</script>
+
+<style>
+/* Ensure address risk notes alerts are always visible and not dismissible */
+.alert-persistent {
+    position: relative !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.alert-persistent .btn-close {
+    display: none !important;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,404 @@
+{% extends "base.html" %}
+
+{% block title %}Register Parcel - {{ company.browser_title }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="bi bi-plus-circle"></i> Register New Parcel</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('parcels.register_parcel') }}" enctype="multipart/form-data">
+                        <!-- Sender Information -->
+                        <h5 class="mb-3"><i class="bi bi-person"></i> Sender Information</h5>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label for="sender_name" class="form-label">Name *</label>
+                                <input type="text" class="form-control" id="sender_name" name="sender_name" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="sender_phone" class="form-label">Phone *</label>
+                                <input type="tel" class="form-control" id="sender_phone" name="sender_phone" required>
+                            </div>
+                            <div class="col-12">
+                                <label for="sender_address" class="form-label">Address *
+                                    <span id="sender_address_status" class="ms-2"></span>
+                                </label>
+                                <textarea class="form-control" id="sender_address" name="sender_address" rows="2" required></textarea>
+                                <small class="text-muted">Address will be validated using Azure Maps</small>
+                            </div>
+                        </div>
+
+                        <!-- Recipient Information -->
+                        <h5 class="mb-3"><i class="bi bi-geo-alt"></i> Recipient Information</h5>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label for="recipient_name" class="form-label">Name *</label>
+                                <input type="text" class="form-control" id="recipient_name" name="recipient_name" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="recipient_phone" class="form-label">Phone *</label>
+                                <input type="tel" class="form-control" id="recipient_phone" name="recipient_phone" required>
+                            </div>
+                            <div class="col-12">
+                                <label for="recipient_address" class="form-label">Address *
+                                    <span id="recipient_address_status" class="ms-2"></span>
+                                </label>
+                                <textarea class="form-control" id="recipient_address" name="recipient_address" rows="2" required></textarea>
+                                <small class="text-muted">Address will be validated using Azure Maps</small>
+                            </div>
+                        </div>
+
+                        <!-- Parcel Details -->
+                        <h5 class="mb-3"><i class="bi bi-box-seam"></i> Parcel Details</h5>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label for="service_type" class="form-label">Service Type *</label>
+                                <select class="form-select" id="service_type" name="service_type" required>
+                                    <option value="">Select service...</option>
+                                    <option value="standard">Standard</option>
+                                    <option value="express">Express</option>
+                                    <option value="overnight">Overnight</option>
+                                    <option value="registered">Registered</option>
+                                </select>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label for="weight" class="form-label">Weight (kg) *</label>
+                                <input type="number" step="0.1" class="form-control" id="weight" name="weight" required>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label for="declared_value" class="form-label">Value ($)</label>
+                                <input type="number" step="0.01" class="form-control" id="declared_value" name="declared_value" value="0">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="dimensions" class="form-label">Dimensions</label>
+                                <input type="text" class="form-control" id="dimensions" name="dimensions" placeholder="e.g., 30x20x10cm">
+                            </div>
+                            <div class="col-12">
+                                <label for="special_instructions" class="form-label">Special Instructions</label>
+                                <textarea class="form-control" id="special_instructions" name="special_instructions" rows="2"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Hidden file input for photo data from camera scanner -->
+                        <input type="file" id="lodgement_photo" name="lodgement_photo" accept="image/*" style="display: none;">
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-lg" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
+                                <i class="bi bi-check-circle" style="color: #007FFF;"></i> Register Parcel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Form validation and scanned data handling
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+
+    // Form validation before submit
+    form.addEventListener('submit', async function(e) {
+        const senderAddress = document.getElementById('sender_address').value.trim();
+        const recipientAddress = document.getElementById('recipient_address').value.trim();
+
+        // If addresses haven't been validated yet, validate them now
+        if (senderAddress && !document.getElementById('sender_address_status').innerHTML.includes('Valid Address')) {
+            e.preventDefault();
+            alert('Please wait while we validate the sender address...');
+            await validateAddress('sender_address', 'sender_address_status');
+            return false;
+        }
+
+        if (recipientAddress && !document.getElementById('recipient_address_status').innerHTML.includes('Valid Address')) {
+            e.preventDefault();
+            alert('Please wait while we validate the recipient address...');
+            await validateAddress('recipient_address', 'recipient_address_status');
+            return false;
+        }
+    });
+
+    // Check if there's scanned data from camera scanner
+    const scannedData = sessionStorage.getItem('scannedData');
+
+    if (scannedData) {
+        try {
+            const data = JSON.parse(scannedData);
+
+            // Show notification that data is being pre-filled
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-secondary alert-dismissible fade show';
+            alert.innerHTML = `
+                <i class="bi bi-check-circle"></i>
+                <strong>Data from camera scanner loaded!</strong> Please verify and complete the remaining fields.
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.querySelector('.card-body').insertBefore(alert, document.querySelector('form'));
+
+            // Pre-fill recipient name if detected
+            if (data.recipient_name) {
+                document.getElementById('recipient_name').value = data.recipient_name;
+            }
+
+            // Pre-fill recipient address if detected
+            if (data.address) {
+                document.getElementById('recipient_address').value = data.address;
+                // Trigger validation after populating
+                validateAddress('recipient_address', 'recipient_address_status');
+            }
+
+            // If barcode was detected, you might use it for special handling
+            if (data.barcode) {
+                // Could be used to auto-fill special instructions or reference number
+                const specialInstructions = document.getElementById('special_instructions');
+                if (specialInstructions.value === '') {
+                    specialInstructions.value = `Scanned Barcode: ${data.barcode}`;
+                }
+            }
+
+            // Parse additional fields from detected text if available
+            if (data.full_text) {
+                // Try to extract phone numbers (Australian format)
+                const phoneMatch = data.full_text.match(/(?:\+61|0)\s?[2-478]\s?\d{4}\s?\d{4}/);
+                if (phoneMatch && !document.getElementById('recipient_phone').value) {
+                    document.getElementById('recipient_phone').value = phoneMatch[0].replace(/\s/g, '');
+                }
+            }
+
+            // Clear the session storage after using the data
+            sessionStorage.removeItem('scannedData');
+
+        } catch (error) {
+            console.error('Error loading scanned data:', error);
+        }
+    }
+
+    // Check if there's a captured photo from the camera scanner
+    const capturedPhoto = sessionStorage.getItem('capturedPhotoBase64');
+    if (capturedPhoto) {
+        console.log('📸 Found captured photo from camera scanner');
+
+        // Convert base64 to blob and store in file input
+        fetch(capturedPhoto)
+            .then(res => res.blob())
+            .then(blob => {
+                const file = new File([blob], 'lodgement.jpg', { type: 'image/jpeg' });
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                document.getElementById('lodgement_photo').files = dataTransfer.files;
+                console.log('✅ Photo ready for upload with form submission');
+
+                // Show a badge indicating photo is attached
+                const photoBadge = document.createElement('div');
+                photoBadge.className = 'alert alert-success alert-dismissible fade show mt-2';
+                photoBadge.innerHTML = `
+                    <i class="bi bi-camera-fill"></i>
+                    <strong>Lodgement photo attached</strong> from camera scanner
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                document.querySelector('.card-body').insertBefore(photoBadge, document.querySelector('form'));
+            });
+
+        // Clear from sessionStorage after loading
+        sessionStorage.removeItem('capturedPhotoBase64');
+    }
+});
+
+// Address validation using Azure Maps
+let validationTimeout;
+
+async function validateAddress(addressField, statusElementId) {
+    const address = document.getElementById(addressField).value.trim();
+    const statusElement = document.getElementById(statusElementId);
+
+    if (!address || address.length < 10) {
+        statusElement.innerHTML = '';
+        return;
+    }
+
+    // Show validating status
+    statusElement.innerHTML = '<span class="badge bg-secondary"><i class="bi bi-hourglass-split"></i> Validating...</span>';
+
+    try {
+        const response = await fetch('/api/validate-address', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ address: address })
+        });
+
+        const data = await response.json();
+
+        if (data.valid) {
+            statusElement.innerHTML = '<span class="badge bg-success"><i class="bi bi-check-circle-fill"></i> Valid Address</span>';
+
+            // Auto-update with formatted address if available (no confirmation needed)
+            if (data.formatted_address && data.formatted_address !== address) {
+                document.getElementById(addressField).value = data.formatted_address;
+            }
+        } else {
+            statusElement.innerHTML = '<span class="badge bg-warning"><i class="bi bi-exclamation-triangle-fill"></i> Could not validate</span>';
+            if (data.message) {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'alert alert-danger alert-sm mt-2 mb-0';
+                errorDiv.innerHTML = `<i class="bi bi-exclamation-triangle"></i> ${data.message}`;
+                statusElement.appendChild(errorDiv);
+            }
+        }
+    } catch (error) {
+        console.error('Address validation error:', error);
+        statusElement.innerHTML = '<span class="badge bg-secondary"><i class="bi bi-info-circle"></i> Validation unavailable</span>';
+    }
+}
+
+// Address autocomplete
+let autocompleteTimeout;
+let currentFocusedField = null;
+
+async function getAddressSuggestions(fieldId, query) {
+    if (!query || query.length < 3) {
+        hideAutocomplete(fieldId);
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/autocomplete-address', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ query: query })
+        });
+
+        const data = await response.json();
+
+        if (data.suggestions && data.suggestions.length > 0) {
+            showAutocomplete(fieldId, data.suggestions);
+        } else {
+            hideAutocomplete(fieldId);
+        }
+    } catch (error) {
+        console.error('Autocomplete error:', error);
+        hideAutocomplete(fieldId);
+    }
+}
+
+function showAutocomplete(fieldId, suggestions) {
+    // Remove any existing dropdown
+    hideAutocomplete(fieldId);
+
+    const field = document.getElementById(fieldId);
+    const dropdown = document.createElement('div');
+    dropdown.id = fieldId + '_autocomplete';
+    dropdown.className = 'autocomplete-dropdown';
+    dropdown.style.cssText = `
+        position: absolute;
+        background: white;
+        border: 1px solid #dee2e6;
+        border-top: none;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 1000;
+        width: 100%;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        top: 100%;
+        left: 0;
+        margin-top: -1px;
+    `;
+
+    suggestions.forEach(suggestion => {
+        const item = document.createElement('div');
+        item.className = 'autocomplete-item';
+        item.style.cssText = `
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+        `;
+        item.textContent = suggestion.address;
+
+        item.addEventListener('mouseenter', function() {
+            this.style.backgroundColor = '#f8f9fa';
+        });
+
+        item.addEventListener('mouseleave', function() {
+            this.style.backgroundColor = 'white';
+        });
+
+        item.addEventListener('click', function() {
+            field.value = suggestion.address;
+            hideAutocomplete(fieldId);
+
+            // Trigger validation after selection
+            const statusId = fieldId + '_status';
+            validateAddress(fieldId, statusId);
+        });
+
+        dropdown.appendChild(item);
+    });
+
+    // Set parent to relative positioning and append dropdown
+    field.parentElement.style.position = 'relative';
+    field.parentElement.appendChild(dropdown);
+}
+
+function hideAutocomplete(fieldId) {
+    const dropdown = document.getElementById(fieldId + '_autocomplete');
+    if (dropdown) {
+        dropdown.remove();
+    }
+}
+
+// Add autocomplete listeners
+document.getElementById('sender_address').addEventListener('input', function(e) {
+    clearTimeout(autocompleteTimeout);
+    currentFocusedField = 'sender_address';
+
+    autocompleteTimeout = setTimeout(() => {
+        getAddressSuggestions('sender_address', e.target.value);
+    }, 300);
+});
+
+document.getElementById('recipient_address').addEventListener('input', function(e) {
+    clearTimeout(autocompleteTimeout);
+    currentFocusedField = 'recipient_address';
+
+    autocompleteTimeout = setTimeout(() => {
+        getAddressSuggestions('recipient_address', e.target.value);
+    }, 300);
+});
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('textarea')) {
+        hideAutocomplete('sender_address');
+        hideAutocomplete('recipient_address');
+    }
+});
+
+// Add debounced validation listeners
+document.getElementById('sender_address').addEventListener('input', function() {
+    clearTimeout(validationTimeout);
+    validationTimeout = setTimeout(() => {
+        validateAddress('sender_address', 'sender_address_status');
+    }, 1500);
+});
+
+document.getElementById('recipient_address').addEventListener('input', function() {
+    clearTimeout(validationTimeout);
+    validationTimeout = setTimeout(() => {
+        validateAddress('recipient_address', 'recipient_address_status');
+    }, 1500);
+});
+
+</script>
+{% endblock %}

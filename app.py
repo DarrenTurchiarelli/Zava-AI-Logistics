@@ -33,14 +33,15 @@ from pathlib import Path
 
 from werkzeug.utils import secure_filename
 
+# Import centralized utilities
+from utils.async_helpers import run_async
+from utils.logging_config import setup_logging, log_with_context
+
+# Setup application logging
+logger = setup_logging("zava.app")
+
 # Debug mode - set to False for production performance
 DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
-
-
-def debug_print(*args, **kwargs):
-    """Print only if DEBUG_MODE is enabled"""
-    if DEBUG_MODE:
-        print(*args, **kwargs)
 
 
 # Optional OCR support
@@ -323,8 +324,7 @@ async def ensure_users_initialized():
                 if "already exists" in str(e).lower() or "conflict" in str(e).lower():
                     print("[INIT] Users container already exists")
                 else:
-                    print(f"[WARN] Container creation warning: {e}")
-
+                        logger.warning("Container creation warning", extra={"error": str(e)})
             user_mgr = UserManager(db)
 
             # Define default users
@@ -389,27 +389,22 @@ async def ensure_users_initialized():
                             email=user_data.get("email"),
                             driver_id=user_data.get("driver_id"),
                         )
-                        print(f"[INIT] Created user: {user_data['username']}")
+                        logger.info("Created user", extra={"username": user_data['username']})
                         users_created += 1
                 except Exception as e:
-                    print(f"[WARN] Error creating user {user_data['username']}: {e}")
+                    logger.warning("Error creating user", extra={"username": user_data['username'], "error": str(e)})
 
             if users_created > 0:
-                print(f"[INIT] Initialized {users_created} default users")
+                logger.info(f"Initialized {users_created} default users")
             else:
-                print("[INIT] All default users already exist")
+                logger.info("All default users already exist")
 
             with USERS_INIT_LOCK:
                 USERS_INITIALIZED = True
             return True
 
     except Exception as e:
-        print(f"[ERROR] User initialization failed: {e}")
-        import traceback
-
-        traceback.print_exc()
-        return False
-        # Don't fail the app if user init fails - users can be auto-created on login
+        logger.error("User initialization failed", extra={"error": str(e)}, exc_info=True)
         return False
 
 
@@ -418,18 +413,18 @@ def init_users_on_startup():
     try:
         run_async(ensure_users_initialized())
     except Exception as e:
-        print(f"⚠️ Background user initialization failed: {e}")
-        print("   Users will be auto-created on first login attempt")
+        logger.warning("Background user initialization failed", extra={"error": str(e)})
+        logger.info("Users will be auto-created on first login attempt")
 
 
 # Trigger initialization when app module is loaded (for Gunicorn/production)
 # This runs automatically when Gunicorn imports the app module
 try:
     init_users_on_startup()
-    print("✅ App startup initialization completed")
+    logger.info("App startup initialization completed")
 except Exception as startup_error:
-    print(f"⚠️ Startup initialization skipped: {startup_error}")
-    print("   Users will be auto-created on first login")
+    logger.warning("Startup initialization skipped", extra={"error": str(startup_error)})
+    logger.info("Users will be auto-created on first login")
 
 
 # Make company info available to all templates
@@ -437,29 +432,6 @@ except Exception as startup_error:
 def inject_company_info():
     """Inject company information into all templates"""
     return {"company": get_company_info()}
-
-
-# Helper function to run async functions in Flask
-def run_async(coro):
-    """
-    Optimized async runner for Flask routes
-    
-    Uses asyncio.run() which is more efficient than creating/destroying loops.
-    Note: asyncio.run() automatically handles cleanup and is the recommended approach
-    for running async code from synchronous contexts in Python 3.7+.
-    """
-    try:
-        return asyncio.run(coro)
-    except RuntimeError as e:
-        if "cannot schedule new futures after shutdown" in str(e) or "no running event loop" in str(e):
-            # Fallback: create new loop only if absolutely necessary
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                return loop.run_until_complete(coro)
-            finally:
-                loop.close()
-        raise
 
 
 # File processing utilities for fraud detection
@@ -803,16 +775,16 @@ def login():
 
                     try:
                         # Call Azure AI Identity Agent for courier verification
-                        print(f"   [AI] Attempting Identity Agent verification for {user.get('username')}")
+                        logger.info("Attempting Identity Agent verification", extra={"username": user.get('username')})
                         identity_result = await identity_agent(verification_request)
                         if identity_result.get("success"):
-                            print(f"   [AI] ✓ Identity Agent verified courier")
+                            logger.info("Identity Agent verified courier", extra={"username": user.get('username')})
                             user["ai_verified"] = True
                         else:
-                            print(f"   [AI] ⚠ Identity Agent verification unsuccessful")
+                            logger.warning("Identity Agent verification unsuccessful", extra={"username": user.get('username')})
                             user["ai_verified"] = False
                     except Exception as ai_error:
-                        print(f"   [WARN] AI Identity Agent unavailable: {ai_error}")
+                        logger.warning("AI Identity Agent unavailable", extra={"username": user.get('username'), "error": str(ai_error)})
                         import traceback
 
                         traceback.print_exc()
@@ -1037,7 +1009,7 @@ def dashboard():
 @app.route("/api/validate-address", methods=["POST"])
 def validate_address():
     """Validate address using Azure Maps (Public access)"""
-    from services.maps import BingMapsRouter
+    from services.maps_service import get_maps_service
 
     data = request.get_json()
     address = data.get("address", "").strip()
@@ -1046,8 +1018,8 @@ def validate_address():
         return jsonify({"valid": False, "error": "No address provided"}), 400
 
     try:
-        router = BingMapsRouter()
-        result = router.geocode_address_strict(address)
+        maps = get_maps_service()
+        result = maps.geocode_address_strict(address)
 
         if result and result["valid"]:
             return jsonify(

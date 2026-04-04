@@ -64,7 +64,7 @@ Write-Host "✓ Subscription: $($account.name)" -ForegroundColor Green
 Write-Host ""
 
 # Register Required Resource Providers
-Write-Host "[1.5/7] Registering required Azure resource providers..." -ForegroundColor Yellow
+Write-Host "[2/7] Registering required Azure resource providers..." -ForegroundColor Yellow
 $requiredProviders = @(
     "Microsoft.DocumentDB",              # Cosmos DB
     "Microsoft.CognitiveServices",       # Azure AI, Speech, Vision
@@ -158,55 +158,181 @@ if (-not $SkipInfrastructure -and -not $CodeOnly) {
         exit 1
     }
 
-    # Deploy Bicep template at subscription scope
-    $deploymentName = "zava-deployment-$(Get-Date -Format 'yyyyMMddHHmmss')"
-    
-    # Generate new unique suffix to avoid soft-delete conflicts
-    $newSuffix = -join ((97..122) | Get-Random -Count 6 | ForEach-Object {[char]$_})
-    Write-Host "  🔑 Using new unique suffix: $newSuffix (avoids soft-delete conflicts)" -ForegroundColor Cyan
+    # --- Step 3 retry loop ---
+    # On failure the user is prompted to Retry (new attempt), Load outputs from
+    # a previous succeeded deployment and continue, or Quit.
+    $deploymentName   = $null
+    $newSuffix        = $null
+    $bicepOutputJson  = $null
+    $deployAttempt    = 0
 
-    Write-Host "  🚀 Starting subscription-level Bicep deployment: $deploymentName" -ForegroundColor Cyan
+    while ($null -eq $bicepOutputJson) {
+        $deployAttempt++
+        $deploymentName = "zava-deployment-$(Get-Date -Format 'yyyyMMddHHmmss')"
+        $newSuffix      = -join ((97..122) | Get-Random -Count 6 | ForEach-Object {[char]$_})
 
-    # Deploy at subscription scope (creates resource groups and resources)
-    # Don't query outputs immediately - check deployment succeeded first
-    az deployment sub create `
-        --name $deploymentName `
-        --location $Location `
-        --template-file $bicepTemplate `
-        --parameters location=$Location environment=$Environment appServiceSku=$Sku uniqueSuffix=$newSuffix `
-        --output none
+        Write-Host "  🔑 Using unique suffix: $newSuffix (avoids soft-delete conflicts)" -ForegroundColor Cyan
+        Write-Host "  🚀 Attempt $deployAttempt — Bicep deployment: $deploymentName" -ForegroundColor Cyan
 
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "  ✗ Infrastructure deployment failed" -ForegroundColor Red
-        Write-Host "  Run 'az deployment sub show --name $deploymentName' for details" -ForegroundColor Yellow
-        exit 1
-    }
-
-    Write-Host "  ✓ Infrastructure deployment succeeded" -ForegroundColor Green
-    Write-Host "  Retrieving deployment outputs..." -ForegroundColor Cyan
-
-    # Get deployment outputs after successful deployment
-    $bicepOutput = az deployment sub show `
-        --name $deploymentName `
-        --query properties.outputs `
-        --output json
-
-    # Parse JSON output
-    try {
-        $bicepOutputJson = $bicepOutput | ConvertFrom-Json
-    } catch {
-        Write-Host "  ✗ Failed to parse deployment output" -ForegroundColor Red
-        Write-Host "  Output was: $bicepOutput" -ForegroundColor Yellow
-        Write-Host ""
-        Write-Host "  Attempting to retrieve deployment outputs manually..." -ForegroundColor Yellow
-
-        $bicepOutputJson = az deployment sub show `
+        # Capture stderr so the real failure reason is always visible.
+        # Note: az CLI can return exit code 1 even on success when Bicep emits
+        # warnings to stderr (e.g. outputs-should-not-contain-secrets). We
+        # therefore verify the actual Azure state via 'az deployment sub show'
+        # rather than trusting $LASTEXITCODE alone.
+        $deployError = $($deployOutput = az deployment sub create `
             --name $deploymentName `
-            --query properties.outputs `
-            --output json | ConvertFrom-Json
+            --location $Location `
+            --template-file $bicepTemplate `
+            --parameters location=$Location environment=$Environment appServiceSku=$Sku uniqueSuffix=$newSuffix `
+            --output none) 2>&1
+        $deployExitCode = $LASTEXITCODE
+
+        # Surface any output (warnings/errors) immediately
+        if ($deployError) {
+            $deployError | Where-Object { $_ -notmatch '^WARNING:' } | ForEach-Object {
+                Write-Host "  ⚠  $_" -ForegroundColor Yellow
+            }
+        }
+
+        # Regardless of exit code, check what Azure actually recorded
+        $azState = az deployment sub show `
+            --name $deploymentName `
+            --query "properties.provisioningState" --output tsv 2>$null
+
+        if ($azState -eq 'Succeeded') {
+            # Azure confirms success — exit code was a false negative (Bicep warnings on stderr)
+            Write-Host "  ✓ Infrastructure deployment succeeded" -ForegroundColor Green
+            Write-Host "  Retrieving deployment outputs..." -ForegroundColor Cyan
+
+            $bicepOutput = az deployment sub show `
+                --name $deploymentName `
+                --query properties.outputs `
+                --output json
+
+            try {
+                $bicepOutputJson = $bicepOutput | ConvertFrom-Json
+            } catch {
+                Write-Host "  ✗ Failed to parse deployment output — retrying output fetch..." -ForegroundColor Yellow
+                $bicepOutputJson = az deployment sub show `
+                    --name $deploymentName `
+                    --query properties.outputs `
+                    --output json | ConvertFrom-Json
+            }
+
+        } else {
+            # Failure — pause and offer options before looping
+            Write-Host "" 
+            Write-Host "  ✗ Infrastructure deployment failed (attempt $deployAttempt)" -ForegroundColor Red
+            Write-Host ""
+
+            Write-Host ""
+            Write-Host "  ✗ Infrastructure deployment failed (attempt $deployAttempt)" -ForegroundColor Red
+            Write-Host "  Azure state: $azState" -ForegroundColor Yellow
+
+            # Pull Azure-side error detail when the deployment was registered
+            if ($azState -eq 'Failed') {
+                $azError = az deployment sub show `
+                    --name $deploymentName `
+                    --query "properties.error" --output json 2>$null
+                if ($azError -and $azError -ne 'null') {
+                    Write-Host "  Azure error detail:" -ForegroundColor Red
+                    ($azError | ConvertFrom-Json | ConvertTo-Json -Depth 5).Split("`n") |
+                        ForEach-Object { Write-Host "    $_" -ForegroundColor Red }
+                }
+            } elseif (-not $azState) {
+                Write-Host "  (Deployment was never registered — failure was client-side or network)" -ForegroundColor Yellow
+                Write-Host "  Check the output above for Bicep compilation or parameter errors." -ForegroundColor Yellow
+            }
+            Write-Host ""
+            Write-Host "  ┌─ Choose an option ──────────────────────────────────────────┐" -ForegroundColor Cyan
+            Write-Host "  │  R  Retry   — new deployment with a fresh suffix            │" -ForegroundColor White
+            Write-Host "  │  L  Load    — load outputs from last succeeded deployment   │" -ForegroundColor White
+            Write-Host "  │  Q  Quit    — stop the deployment                           │" -ForegroundColor White
+            Write-Host "  └─────────────────────────────────────────────────────────────┘" -ForegroundColor Cyan
+            Write-Host ""
+
+            $choice = Read-Host "  Enter choice [R/L/Q]"
+
+            switch ($choice.Trim().ToUpper()) {
+                'R' {
+                    Write-Host "  ↻ Retrying deployment..." -ForegroundColor Cyan
+                    Write-Host ""
+                    # loop continues — new name and suffix generated at top
+                }
+                'L' {
+                    Write-Host "  🔍 Searching for last succeeded zava deployment..." -ForegroundColor Cyan
+                    $lastGood = az deployment sub list `
+                        --query "[?starts_with(name,'zava-deployment') && properties.provisioningState=='Succeeded'] | sort_by(@, &properties.timestamp) | [-1].name" `
+                        --output tsv 2>$null
+
+                    if ($lastGood) {
+                        Write-Host "  ✓ Found: $lastGood — loading outputs..." -ForegroundColor Green
+                        $bicepOutputJson = az deployment sub show `
+                            --name $lastGood `
+                            --query properties.outputs `
+                            --output json | ConvertFrom-Json
+                        $deploymentName = $lastGood
+                        if (-not $bicepOutputJson) {
+                            Write-Host "  ✗ Could not load outputs from $lastGood" -ForegroundColor Red
+                            Write-Host "  Try R to retry or Q to quit." -ForegroundColor Yellow
+                            $bicepOutputJson = $null  # stay in loop
+                        }
+                    } else {
+                        Write-Host "  ✗ No previous succeeded deployment found." -ForegroundColor Red
+                        Write-Host "  Try R to retry or Q to quit." -ForegroundColor Yellow
+                        # stay in loop
+                    }
+                }
+                default {
+                    Write-Host "  Deployment cancelled." -ForegroundColor Red
+                    exit 1
+                }
+            }
+        }
     }
 
     Write-Host "  ✓ Infrastructure deployed successfully!" -ForegroundColor Green
+
+    # --- Sync .env with fresh Bicep outputs ---
+    # This ensures subsequent manual script runs always use the correct endpoints,
+    # rather than stale system env vars or outdated .env values.
+    Write-Host ""
+    Write-Host "  📝 Updating .env with deployment outputs..." -ForegroundColor Cyan
+
+    function Update-EnvFile {
+        param (
+            [string]$Key,
+            [string]$Value,
+            [string]$FilePath = ".env"
+        )
+        if (-not $Value) { return }
+        if (Test-Path $FilePath) {
+            $content = Get-Content $FilePath -Raw
+            if ($content -match "(?m)^$Key\s*=") {
+                # Replace existing key
+                $content = $content -replace "(?m)^$Key\s*=.*", "$Key=$Value"
+            } else {
+                # Append new key
+                $content = $content.TrimEnd() + "`r`n$Key=$Value`r`n"
+            }
+            [System.IO.File]::WriteAllText((Resolve-Path $FilePath).Path, $content)
+        } else {
+            Add-Content $FilePath "$Key=$Value"
+        }
+    }
+
+    $openAIEndpoint    = $bicepOutputJson.middleware.value.openAIServiceEndpoint
+    $aiProjectEndpoint = $bicepOutputJson.middleware.value.aiProjectEndpoint
+    $cosmosEndpoint    = $bicepOutputJson.backend.value.cosmosDbEndpoint
+
+    Update-EnvFile "AZURE_OPENAI_ENDPOINT"      $openAIEndpoint
+    Update-EnvFile "AZURE_AI_PROJECT_ENDPOINT"  $aiProjectEndpoint
+    Update-EnvFile "COSMOS_DB_ENDPOINT"         $cosmosEndpoint
+
+    if ($openAIEndpoint)    { Write-Host "  ✓ AZURE_OPENAI_ENDPOINT     = $openAIEndpoint" -ForegroundColor Green }
+    if ($aiProjectEndpoint) { Write-Host "  ✓ AZURE_AI_PROJECT_ENDPOINT = $aiProjectEndpoint" -ForegroundColor Green }
+    if ($cosmosEndpoint)    { Write-Host "  ✓ COSMOS_DB_ENDPOINT        = $cosmosEndpoint" -ForegroundColor Green }
+    Write-Host "  ✓ .env updated — subsequent script runs will use these values" -ForegroundColor Green
     Write-Host ""
     Write-Host "  📋 Deployment Details:" -ForegroundColor Cyan
     Write-Host "     Frontend Resource Group: $frontendRgName" -ForegroundColor White
@@ -237,7 +363,7 @@ if (-not $SkipInfrastructure -and -not $CodeOnly) {
 
     # Wait for RBAC permissions to propagate
     Write-Host ""
-    Write-Host "[3.5/7] Waiting for cross-resource group RBAC permissions to propagate..." -ForegroundColor Yellow
+    Write-Host "[3/7] Waiting for cross-resource group RBAC permissions to propagate..." -ForegroundColor Yellow
     Write-Host "  ℹ  Bicep template assigned the following roles across resource groups:" -ForegroundColor Cyan
     Write-Host "     • App Service → Cosmos DB Built-in Data Contributor (Backend RG)" -ForegroundColor Gray
     Write-Host "     • App Service → Cognitive Services OpenAI User (Middleware RG)" -ForegroundColor Gray
@@ -292,10 +418,10 @@ Write-Host "  ✓ Web App Status: $($webApp.state)" -ForegroundColor Green
 Write-Host "  ✓ Default Hostname: $($webApp.defaultHostName)" -ForegroundColor Green
 Write-Host ""
 
-# [4.5/7] Create Azure AI Foundry Agents
-Write-Host "=" * 70 -ForegroundColor Cyan
-Write-Host "[4.5/7] Creating Azure AI Foundry Agents..." -ForegroundColor Cyan
-Write-Host "=" * 70 -ForegroundColor Cyan
+# [4/7] Create Azure AI Foundry Agents
+Write-Host ("=" * 70) -ForegroundColor Cyan
+Write-Host "[4/7] Creating Azure AI Foundry Agents..." -ForegroundColor Cyan
+Write-Host ("=" * 70) -ForegroundColor Cyan
 Write-Host "  📦 This will create 8 AI agents in your Azure AI project" -ForegroundColor Gray
 Write-Host "  ⏱ This may take 2-3 minutes..." -ForegroundColor Gray
 Write-Host ""
@@ -304,137 +430,137 @@ Write-Host ""
 $agentSettings = @{}
 
 # Create agents using Python script
-try {
-    # Check if Python is available
-    if (Get-Command python -ErrorAction SilentlyContinue) {
-        # Get OpenAI service name and subscription ID (from Middleware RG)
-        $openAIServiceName = $bicepOutputJson.middleware.value.openAIServiceName
-        $subscriptionId = $account.id
-        $resourceId = "/subscriptions/$subscriptionId/resourceGroups/$middlewareRgName/providers/Microsoft.CognitiveServices/accounts/$openAIServiceName"
-        
-        Write-Host "  ⚙ Temporarily enabling API key authentication for agent creation..." -ForegroundColor Yellow
-        $enableResult = az resource update `
-            --ids $resourceId `
-            --set properties.disableLocalAuth=false `
-            --api-version 2023-05-01 `
-            --output json 2>&1
-        
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "  ⚠️  Failed to enable API key auth: $enableResult" -ForegroundColor Yellow
-            Write-Host "  Continuing anyway (may already be enabled)..." -ForegroundColor Gray
-        } else {
-            Write-Host "  ✓ API key auth enabled" -ForegroundColor Green
-        }
-        
-        Write-Host "  ⏱ Waiting 30 seconds for change to propagate..." -ForegroundColor Gray
-        Start-Sleep -Seconds 30
-        
-        Write-Host "  🔑 Getting temporary API key..." -ForegroundColor Yellow
-        $openAIApiKey = az cognitiveservices account keys list --name $openAIServiceName --resource-group $middlewareRgName --query key1 -o tsv
-        
-        Write-Host "  🤖 Creating AI agents..." -ForegroundColor Yellow
-        Write-Host "     OpenAI Service: $openAIServiceName" -ForegroundColor Gray
-        Write-Host "     Endpoint: $($bicepOutputJson.middleware.value.openAIServiceEndpoint)" -ForegroundColor Gray
+if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
+    Write-Host "  ⚠ Python not found - skipping agent creation" -ForegroundColor Yellow
+    Write-Host "    Run manually: python scripts/create_foundry_agents_openai.py" -ForegroundColor Gray
+} else {
+    # Resolve resource ID once - reused across all retry attempts
+    $openAIServiceName = $bicepOutputJson.middleware.value.openAIServiceName
+    $subscriptionId    = $account.id
+    $resourceId        = "/subscriptions/$subscriptionId/resourceGroups/$middlewareRgName/providers/Microsoft.CognitiveServices/accounts/$openAIServiceName"
+
+    # Helper: prompt R / S / Q and return the choice
+    function Invoke-RetryPrompt {
+        param([string]$Context)
         Write-Host ""
-        
-        # Set environment variables and run Python script directly (no subprocess)
-        $env:AZURE_OPENAI_ENDPOINT = $bicepOutputJson.middleware.value.openAIServiceEndpoint
-        $env:AZURE_OPENAI_API_KEY = $openAIApiKey
-        $env:AZURE_AI_MODEL_DEPLOYMENT_NAME = "gpt-4o"
-        $env:PYTHONIOENCODING = "utf-8"  # Fix Windows Unicode encoding issues
-        
-        # Run agent creation script directly and capture output
-        python Scripts/create_foundry_agents_openai.py 2>&1 | Tee-Object -Variable agentOutput | Out-Host
+        Write-Host "  ┌─ $Context ──────────────────────────────────┐" -ForegroundColor Cyan
+        Write-Host "  │  R  Retry  — try again                                      │" -ForegroundColor White
+        Write-Host "  │  S  Skip   — continue deployment without this step          │" -ForegroundColor White
+        Write-Host "  │  Q  Quit   — stop the deployment now                        │" -ForegroundColor White
+        Write-Host "  └─────────────────────────────────────────────────────────────┘" -ForegroundColor Cyan
+        return (Read-Host "  Enter choice [R/S/Q]").Trim().ToUpper()
+    }
+
+    # Use openai.AzureOpenAI + DefaultAzureCredential (picks up 'az login' locally, Managed Identity in Azure)
+    # No API key enable/disable needed
+    $env:AZURE_OPENAI_ENDPOINT            = $bicepOutputJson.middleware.value.openAIServiceEndpoint
+    $env:AZURE_AI_MODEL_DEPLOYMENT_NAME   = "gpt-4o"
+    $env:PYTHONIOENCODING                 = "utf-8"
+
+    # Grant the current developer 'Cognitive Services OpenAI Contributor' on the OpenAI resource
+    # Required for assistants/write (creating agents) — Bicep only grants this to the App Service MI
+    $currentUserObjectId = az ad signed-in-user show --query id -o tsv 2>$null
+    if ($currentUserObjectId) {
+        Write-Host "  🔑 Granting Cognitive Services OpenAI Contributor to current user..." -ForegroundColor Yellow
+        az role assignment create `
+            --assignee-object-id $currentUserObjectId `
+            --assignee-principal-type User `
+            --role "a001fd3d-188f-4b5d-821b-7da978bf7442" `
+            --scope $resourceId `
+            --output none 2>&1 | Out-Null
+        Write-Host "  ⏱ Waiting 20 seconds for role assignment to propagate..." -ForegroundColor Gray
+        Start-Sleep -Seconds 20
+        Write-Host "  ✓ Role assigned — proceeding with agent creation" -ForegroundColor Green
+    } else {
+        Write-Host "  ⚠ Could not determine signed-in user — agent creation may fail with 401" -ForegroundColor Yellow
+        Write-Host "    Ensure you have 'Cognitive Services OpenAI Contributor' on the OpenAI resource" -ForegroundColor Gray
+    }
+
+    # ── Agent creation retry loop ────────────────────────────────────────────
+    $agentsDone   = $false
+    $agentAttempt = 0
+
+    while (-not $agentsDone) {
+        $agentAttempt++
+        Write-Host ""
+        Write-Host "  🤖 Creating AI agents (attempt $agentAttempt)..." -ForegroundColor Yellow
+        Write-Host "     AI Project Endpoint: $($bicepOutputJson.middleware.value.aiProjectEndpoint)" -ForegroundColor Gray
+        Write-Host "     OpenAI Endpoint    : $($bicepOutputJson.middleware.value.openAIServiceEndpoint)" -ForegroundColor Gray
+        Write-Host ""
+
+        python scripts/create_foundry_agents_openai.py 2>&1 | Tee-Object -Variable agentOutput | Out-Host
         $agentExitCode = $LASTEXITCODE
-        
-        # Check if agent creation was successful
-        if ($agentExitCode -eq 0 -and $agentOutput) {
-            # Extract JSON from output (should be at the end)
-            $jsonMatch = [regex]::Match($agentOutput, '\{[^}]*"[A-Z_]+AGENT_ID"[^}]*\}')
-            
-            if ($jsonMatch.Success) {
-                # Parse agent IDs from JSON
-                $agentIds = $jsonMatch.Value | ConvertFrom-Json
-                
+
+        $jsonMatch = if ($agentExitCode -eq 0 -and $agentOutput) {
+            [regex]::Match(($agentOutput | Out-String), '\{[^{}]*"[A-Z_]+AGENT_ID"[^{}]*\}')
+        } else { $null }
+
+        if ($agentExitCode -eq 0 -and $jsonMatch -and $jsonMatch.Success) {
+            # ── Parse and persist agent IDs ──────────────────────────────────
+            $parsedAgentIds = $jsonMatch.Value | ConvertFrom-Json
+            Write-Host ""
+            Write-Host "  ✓ All agents created" -ForegroundColor Green
+            Write-Host "  📋 Agent IDs:" -ForegroundColor Cyan
+            $parsedAgentIds.PSObject.Properties | ForEach-Object {
+                Write-Host "     $($_.Name) = $($_.Value)" -ForegroundColor Gray
+                $agentSettings[$_.Name] = $_.Value
+                Set-Item -Path "env:$($_.Name)" -Value $_.Value
+                Update-EnvFile $_.Name $_.Value
+            }
+            Write-Host ""
+            Write-Host "  ✓ Agent IDs persisted to .env" -ForegroundColor Green
+
+            # ── Tool registration retry loop ──────────────────────────────────
+            $toolsDone   = $false
+            $toolAttempt = 0
+
+            while (-not $toolsDone) {
+                $toolAttempt++
                 Write-Host ""
-                Write-Host "  ✓ Successfully created all agents" -ForegroundColor Green
+                Write-Host "  🔧 Registering Cosmos DB tools (attempt $toolAttempt)..." -ForegroundColor Cyan
+                Write-Host "     Customer Service Agent: $($agentSettings['CUSTOMER_SERVICE_AGENT_ID'])" -ForegroundColor Gray
                 Write-Host ""
-                Write-Host "  📋 Agent IDs:" -ForegroundColor Cyan
-                
-                # Store agent IDs in both $agentSettings and environment variables
-                $agentIds.PSObject.Properties | ForEach-Object {
-                    Write-Host "     $($_.Name) = $($_.Value)" -ForegroundColor Gray
-                    $agentSettings[$_.Name] = $_.Value
-                    # Set as environment variable for tool registration script
-                    Set-Item -Path "env:$($_.Name)" -Value $_.Value
-                }
-                
-                Write-Host ""
-                Write-Host "  ✓ Agent IDs captured and ready for tool registration" -ForegroundColor Green
-                
-                # Register tools with Customer Service Agent (API key auth still enabled)
-                Write-Host ""
-                Write-Host "  🔧 Registering Cosmos DB tools with Customer Service Agent..." -ForegroundColor Cyan
-                Write-Host "     Agent ID: $($agentSettings['CUSTOMER_SERVICE_AGENT_ID'])" -ForegroundColor Gray
-                Write-Host ""
-                
-                # Environment variables already set (API key, endpoint, agent IDs)
-                python Scripts/register_agent_tools_openai.py 2>&1 | Tee-Object -Variable toolOutput | Out-Host
+
+                python scripts/register_agent_tools_openai.py 2>&1 | Out-Host
                 $toolExitCode = $LASTEXITCODE
-                
+
                 if ($toolExitCode -eq 0) {
                     Write-Host ""
-                    Write-Host "  ✓ Successfully registered agent tools" -ForegroundColor Green
-                    
-                    # Validate tool registration
-                    Write-Host ""
-                    Write-Host "  ✅ Validating tool registration..." -ForegroundColor Cyan
-                    python Scripts/validate_agent_tools.py 2>&1 | Out-Host
-                    $validateExitCode = $LASTEXITCODE
-                    
-                    if ($validateExitCode -eq 0) {
-                        Write-Host "  ✓ Tool registration validated successfully" -ForegroundColor Green
-                    } else {
-                        Write-Host "  ⚠ Tool validation failed - agent may not work correctly" -ForegroundColor Yellow
-                    }
+                    Write-Host "  ✓ Tools registered — validating..." -ForegroundColor Green
+                    python scripts/validate_agent_tools.py 2>&1 | Out-Host
+                    $toolsDone = $true
                 } else {
                     Write-Host ""
-                    Write-Host "  ⚠ Tool registration failed (exit code: $toolExitCode)" -ForegroundColor Yellow
-                    Write-Host "  Agent will not be able to access Cosmos DB" -ForegroundColor Yellow
+                    Write-Host "  ✗ Tool registration failed (exit code: $toolExitCode, attempt $toolAttempt)" -ForegroundColor Red
+                    $toolChoice = Invoke-RetryPrompt "Tool registration failed — choose an option"
+                    switch ($toolChoice) {
+                        'R' { Write-Host "  ↻ Retrying tool registration..." -ForegroundColor Cyan }
+                        'S' { Write-Host "  ⚠ Skipping tool registration." -ForegroundColor Yellow; $toolsDone = $true }
+                        default { exit 1 }
+                    }
                 }
-                
+            }
+
+            $agentsDone = $true  # agent creation + tool registration both resolved
+
+        } else {
+            # Agent creation failed or JSON not found in output
+            if ($agentExitCode -ne 0) {
+                Write-Host ""
+                Write-Host "  ✗ Agent creation script failed (exit code: $agentExitCode, attempt $agentAttempt)" -ForegroundColor Red
             } else {
                 Write-Host ""
-                Write-Host "  ⚠ Agent creation completed but couldn't parse JSON output" -ForegroundColor Yellow
-                Write-Host "  Output: $($agentOutput.Substring(0, [Math]::Min(200, $agentOutput.Length)))" -ForegroundColor Gray
+                Write-Host "  ✗ Agent creation ran but no agent IDs found in output (attempt $agentAttempt)" -ForegroundColor Red
             }
-        } else {
-            Write-Host ""
-            Write-Host "  ⚠ Agent creation failed (exit code: $agentExitCode)" -ForegroundColor Yellow
-            Write-Host "  ⚠ Continuing deployment without agents" -ForegroundColor Yellow
-            Write-Host ""
-            Write-Host "  You can create agents manually after deployment" -ForegroundColor Gray
-            Write-Host "    Run: python Scripts/create_foundry_agents_openai.py" -ForegroundColor Gray
+
+            $agentChoice = Invoke-RetryPrompt "Agent creation failed — choose an option"
+            switch ($agentChoice) {
+                'R' { Write-Host "  ↻ Retrying agent creation..." -ForegroundColor Cyan }
+                'S' { Write-Host "  ⚠ Skipping agent creation." -ForegroundColor Yellow; $agentsDone = $true }
+                default { exit 1 }
+            }
         }
-        
-        # NOW disable API key authentication (after tool registration)
-        Write-Host ""
-        Write-Host "  🔒 Disabling API key authentication (switching to managed identity)..." -ForegroundColor Yellow
-        az resource update `
-            --ids $resourceId `
-            --set properties.disableLocalAuth=true `
-            --api-version 2023-05-01 `
-            --output none 2>&1 | Out-Null
-        
-        Write-Host "  ✓ Azure OpenAI now uses managed identity only" -ForegroundColor Green
-    } else {
-        Write-Host "  ⚠ Python not found - skipping agent creation" -ForegroundColor Yellow
-        Write-Host "  You can create agents manually after deployment" -ForegroundColor Gray
-        Write-Host "    Run: python Scripts/create_foundry_agents.py" -ForegroundColor Gray
     }
-} catch {
-    Write-Host "  ⚠ Agent creation error: $($_.Exception.Message)" -ForegroundColor Yellow
-    Write-Host "  Continuing deployment without agents" -ForegroundColor Gray
 }
 
 Write-Host ""
@@ -485,39 +611,23 @@ if (Test-Path ".env") {
             Write-Host "  🔧 Verifying agent tools are registered..." -ForegroundColor Cyan
             Write-Host "     Agent ID: $($agentIds['CUSTOMER_SERVICE_AGENT_ID'])" -ForegroundColor Gray
             
-            # Temporarily enable API key auth for validation and registration
-            Write-Host ""
-            Write-Host "  ⚙ Temporarily enabling API key authentication..." -ForegroundColor Yellow
-            $resourceId = az cognitiveservices account show --name $openAIServiceName --resource-group $middlewareRgName --query id -o tsv
-            
-            # Use REST API for reliable enable
-            $body = @{properties=@{disableLocalAuth=$false}} | ConvertTo-Json -Compress
-            az rest --method PATCH --uri "$resourceId`?api-version=2023-05-01" --headers "Content-Type=application/json" --body $body --output none
-            
-            Write-Host "  ⏱ Waiting 15 seconds for propagation..." -ForegroundColor Yellow
-            Start-Sleep -Seconds 15
-            
-            # Get API key
-            Write-Host "  🔑 Retrieving API key..." -ForegroundColor Yellow
-            $openAIApiKey = az cognitiveservices account keys list --name $openAIServiceName --resource-group $middlewareRgName --query key1 -o tsv
-            
+            # Use openai.AzureOpenAI + DefaultAzureCredential — no API key enable/disable needed
             # Set environment variables for all agent IDs
             $env:AZURE_OPENAI_ENDPOINT = $bicepOutputJson.middleware.value.openAIServiceEndpoint
-            $env:AZURE_OPENAI_API_KEY = $openAIApiKey
             foreach ($key in $agentIds.Keys) {
                 Set-Item -Path "env:$key" -Value $agentIds[$key]
             }
             
             Write-Host ""
             # First validate if tools are already registered
-            python Scripts/validate_agent_tools.py 2>&1 | Out-Host
+            python scripts/validate_agent_tools.py 2>&1 | Out-Host
             $validateExitCode = $LASTEXITCODE
             
             if ($validateExitCode -ne 0) {
                 # Tools not registered or validation failed - register them
                 Write-Host ""
                 Write-Host "  🔧 Registering Cosmos DB tools..." -ForegroundColor Cyan
-                python Scripts/register_agent_tools_openai.py 2>&1 | Out-Host
+                python scripts/register_agent_tools_openai.py 2>&1 | Out-Host
                 $toolExitCode = $LASTEXITCODE
                 
                 if ($toolExitCode -eq 0) {
@@ -526,7 +636,7 @@ if (Test-Path ".env") {
                     
                     # Validate again
                     Write-Host ""
-                    python Scripts/validate_agent_tools.py 2>&1 | Out-Host
+                    python scripts/validate_agent_tools.py 2>&1 | Out-Host
                 } else {
                     Write-Host ""
                     Write-Host "  ⚠ Tool registration failed (exit code: $toolExitCode)" -ForegroundColor Yellow
@@ -535,17 +645,10 @@ if (Test-Path ".env") {
                 Write-Host ""
                 Write-Host "  ✓ Agent tools already registered and validated" -ForegroundColor Green
             }
-            
-            # Disable API key auth
-            Write-Host ""
-            Write-Host "  🔒 Disabling API key authentication..." -ForegroundColor Yellow
-            $body = @{properties=@{disableLocalAuth=$true}} | ConvertTo-Json -Compress
-            az rest --method PATCH --uri "$resourceId`?api-version=2023-05-01" --headers "Content-Type=application/json" --body $body --output none
-            Write-Host "  ✓ API key authentication disabled" -ForegroundColor Green
         }
     } else {
         Write-Host "  ⚠ No agent IDs found - agents may not work" -ForegroundColor Yellow
-        Write-Host "    Run manually: python Scripts/create_foundry_agents_openai.py" -ForegroundColor Gray
+        Write-Host "    Run manually: python scripts/create_foundry_agents_openai.py" -ForegroundColor Gray
     }
 
     # Add depot addresses
@@ -633,7 +736,7 @@ if ($additionalSettings.Count -gt 0) {
 } else {
     Write-Host "  ⚠ No configuration settings to apply" -ForegroundColor Yellow
     Write-Host "  Agents should have been created automatically during deployment" -ForegroundColor Gray
-    Write-Host "  If agents are missing, run: python Scripts/create_foundry_agents.py" -ForegroundColor Gray
+    Write-Host "  If agents are missing, run: python scripts/create_foundry_agents.py" -ForegroundColor Gray
 }
 
 # Set startup command for Flask/Gunicorn (CRITICAL for Linux App Service)
@@ -645,6 +748,7 @@ az webapp config set `
     --output none
 
 Write-Host "  ✓ Startup command: gunicorn --bind=0.0.0.0 --timeout 600 app:app" -ForegroundColor Green
+Write-Host "  ℹ  Using application factory pattern from new architecture" -ForegroundColor Gray
 Write-Host ""
 
 # =============================================================================
@@ -667,7 +771,7 @@ $excludePatterns = @(
     "node_modules", ".venv", "venv", "env",
     "*.zip", "deploy*.zip",
     ".vs", "*.suo", "*.user",
-    "tests", "*test*.py", "Scripts/test*.py"
+    "tests", "*test*.py", "scripts/test*.py"
 )
 
 # Get all files excluding patterns
@@ -919,7 +1023,7 @@ if (-not $cosmosCheck) {
             Write-Host "    ✓ Using Cosmos DB: $cosmosEndpoint" -ForegroundColor Green
             
             # Run container initialization with correct environment
-            $containerOutput = python Scripts/initialize_cosmos_containers.py 2>&1
+            $containerOutput = python scripts/initialize_all_containers.py 2>&1
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "  ✓ All 10 containers initialized successfully" -ForegroundColor Green
             } else {
@@ -928,7 +1032,7 @@ if (-not $cosmosCheck) {
                     Write-Host "  ✓ Containers already exist (OK)" -ForegroundColor Green
                 } else {
                     Write-Host "  ⚠ Container initialization may have failed" -ForegroundColor Yellow
-                    Write-Host "    Run manually: python Scripts/initialize_cosmos_containers.py" -ForegroundColor Gray
+                    Write-Host "    Run manually: python scripts/initialize_all_containers.py" -ForegroundColor Gray
                     Write-Host "    Error output: $containerOutput" -ForegroundColor Gray
                 }
             }
@@ -948,17 +1052,13 @@ if (-not $cosmosCheck) {
                 Write-Host "    ✓ Cosmos DB re-secured (managed identity only)" -ForegroundColor Green
             }
             
-            # Wait for auth change to propagate
-            Write-Host "    ⏳ Waiting 120 seconds for auth propagation..." -ForegroundColor Gray
-            Start-Sleep -Seconds 120
-            
         } else {
             Write-Host "  ⚠ Python not found - skipping container initialization" -ForegroundColor Yellow
-            Write-Host "    Run manually: python Scripts/initialize_cosmos_containers.py" -ForegroundColor Gray
+            Write-Host "    Run manually: python scripts/initialize_all_containers.py" -ForegroundColor Gray
         }
     } catch {
         Write-Host "  ⚠ Could not initialize containers: $($_.Exception.Message)" -ForegroundColor Yellow
-        Write-Host "    Run manually: python Scripts/initialize_cosmos_containers.py" -ForegroundColor Gray
+        Write-Host "    Run manually: python scripts/initialize_all_containers.py" -ForegroundColor Gray
     }
     
     # Step 2: Initialize default users (containers must be created first)
@@ -1092,14 +1192,14 @@ try {
             
             # Step 3a: Initialize all database containers FIRST (CRITICAL DEPENDENCY)
             Write-Host "    📦 Initializing all 10 database containers..." -ForegroundColor Cyan
-            $containerOutput = python Scripts/initialize_all_containers.py 2>&1
+            $containerOutput = python scripts/initialize_all_containers.py 2>&1
             
             if ($LASTEXITCODE -eq 0 -and $containerOutput -match "SUCCESS") {
                 Write-Host "    ✓ All database containers created successfully" -ForegroundColor Green
                 
                 # Step 3a.1: VALIDATE containers exist (critical validation)
                 Write-Host "    🔍 Validating all containers exist..." -ForegroundColor Cyan
-                $validateOutput = python Scripts/diagnose_containers.py 2>&1
+                $validateOutput = python scripts/diagnose_containers.py 2>&1
                 
                 if ($LASTEXITCODE -eq 0 -and $validateOutput -match "All containers exist") {
                     Write-Host "    ✓ Container validation passed - all 10 containers confirmed" -ForegroundColor Green
@@ -1114,10 +1214,10 @@ try {
                     
                     # Retry container creation AND validation
                     Write-Host "    🔄 Retrying container initialization..." -ForegroundColor Cyan
-                    $retryOutput = python Scripts/initialize_all_containers.py 2>&1
+                    $retryOutput = python scripts/initialize_all_containers.py 2>&1
                     
                     Write-Host "    🔍 Re-validating container count..." -ForegroundColor Cyan
-                    $retryValidate = python Scripts/diagnose_containers.py 2>&1
+                    $retryValidate = python scripts/diagnose_containers.py 2>&1
                     
                     if ($LASTEXITCODE -eq 0 -and $retryValidate -match "All containers exist") {
                         Write-Host "    ✓ Container validation passed on retry" -ForegroundColor Green
@@ -1165,14 +1265,14 @@ try {
                 
                 # Retry with fresh connection
                 Write-Host "    🔄 Retrying container initialization (attempt 2/3)..." -ForegroundColor Cyan
-                $retryOutput = python Scripts/initialize_all_containers.py 2>&1
+                $retryOutput = python scripts/initialize_all_containers.py 2>&1
                 
                 if ($LASTEXITCODE -eq 0 -and $retryOutput -match "SUCCESS") {
                     Write-Host "    ✓ Container creation succeeded on retry" -ForegroundColor Green
                     
                     # Validate after successful retry
                     Write-Host "    🔍 Validating container count..." -ForegroundColor Cyan
-                    $validateOutput = python Scripts/diagnose_containers.py 2>&1
+                    $validateOutput = python scripts/diagnose_containers.py 2>&1
                     
                     if ($LASTEXITCODE -eq 0 -and $validateOutput -match "All containers exist") {
                         Write-Host "    ✓ Container validation passed - all 10 containers confirmed" -ForegroundColor Green
@@ -1182,8 +1282,8 @@ try {
                         
                         # Final retry
                         Write-Host "    🔄 Final retry of container initialization (attempt 3/3)..." -ForegroundColor Cyan
-                        $finalRetry = python Scripts/initialize_all_containers.py 2>&1
-                        $finalValidate = python Scripts/diagnose_containers.py 2>&1
+                        $finalRetry = python scripts/initialize_all_containers.py 2>&1
+                        $finalValidate = python scripts/diagnose_containers.py 2>&1
                         
                         if (-not ($LASTEXITCODE -eq 0 -and $finalValidate -match "All containers exist")) {
                             Write-Host "    ❌ Container validation failed after 3 attempts" -ForegroundColor Red
@@ -1203,7 +1303,7 @@ try {
                     Start-Sleep -Seconds 30
                     
                     Write-Host "    🔄 Final retry of container initialization (attempt 3/3)..." -ForegroundColor Cyan
-                    $finalRetry = python Scripts/initialize_all_containers.py 2>&1
+                    $finalRetry = python scripts/initialize_all_containers.py 2>&1
                     
                     if (-not ($LASTEXITCODE -eq 0 -and $finalRetry -match "SUCCESS")) {
                         Write-Host "    ❌ Container initialization failed after 3 attempts" -ForegroundColor Red
@@ -1216,7 +1316,7 @@ try {
                     }
                     
                     # Validate final success
-                    $finalValidate = python Scripts/diagnose_containers.py 2>&1
+                    $finalValidate = python scripts/diagnose_containers.py 2>&1
                     if (-not ($LASTEXITCODE -eq 0 -and $finalValidate -match "All containers exist")) {
                         Write-Host "    ❌ Container validation failed" -ForegroundColor Red
                         az resource update --ids $cosmosResourceId --set properties.disableLocalAuth=true --api-version 2023-11-15 --output none 2>&1 | Out-Null
@@ -1260,12 +1360,14 @@ try {
                 Write-Host "    ⚠ Demo manifest generation had issues" -ForegroundColor Yellow
             }
 
-            # Generate Voice & Text Example demo parcels + small realistic dataset
+            # Generate Voice & Text Example demo parcels + bulk realistic dataset (2500)
             Write-Host "    • Creating Voice & Text Example demo parcels (RG857954, DT202512170037)..." -ForegroundColor Gray
-            Write-Host "      (Also creating 100 realistic parcels for demonstration)" -ForegroundColor Gray
-            $bulkDemoOutput = python utils/generators/generate_bulk_realistic_data.py --count 100 2>&1
+            Write-Host "      (Also generating 2500 realistic parcels for comprehensive demo)" -ForegroundColor Gray
+            Write-Host "      ⏳ This may take 5-10 minutes..." -ForegroundColor Gray
+            $bulkDemoOutput = python utils/generators/generate_bulk_realistic_data.py --count 2500 2>&1
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "    ✓ Voice & Text Example demo parcels created" -ForegroundColor Green
+                Write-Host "    ✓ 2500 realistic parcels generated across all Australian states" -ForegroundColor Green
                 Write-Host "      ✓ Try: 'Track parcel RG857954' or 'Find parcels for Dr. Emma Wilson'" -ForegroundColor Cyan
             } else {
                 Write-Host "    ⚠ Demo parcel generation had issues" -ForegroundColor Yellow
@@ -1448,163 +1550,12 @@ if ($agentSettings.Count -gt 0) {
     Write-Host "  ✓ Azure AI agents created and configured" -ForegroundColor Green
 }
 Write-Host ""
+Write-Host "  ✓ 2500 realistic parcels generated across all Australian states" -ForegroundColor Green
+Write-Host ""
 
 # Optional: Generate bulk realistic data
-Write-Host "📦 Optional: Bulk Realistic Data Generation" -ForegroundColor Cyan
-Write-Host "Generate thousands of realistic parcels for comprehensive testing?" -ForegroundColor Yellow
-Write-Host "This creates:" -ForegroundColor Gray
-Write-Host "  • Specific demo parcels for Voice & Text Examples (RG857954, DT202512170037, etc.)" -ForegroundColor Gray
-Write-Host "  • Thousands of parcels across all Australian states" -ForegroundColor Gray
-Write-Host "  • Full event histories and photo proofs" -ForegroundColor Gray
-Write-Host "  • Driver assignments for manifest testing" -ForegroundColor Gray
-Write-Host "  • Data for approval system and statistics queries" -ForegroundColor Gray
-Write-Host ""
-$generateBulkData = Read-Host "Generate bulk data? (y/N)"
-
-if ($generateBulkData -eq 'y' -or $generateBulkData -eq 'Y') {
-    Write-Host ""
-    $parcelCount = Read-Host "How many parcels to generate? (default: 2000)"
-    if ([string]::IsNullOrWhiteSpace($parcelCount)) {
-        $parcelCount = "2000"
-    }
-    
-    Write-Host ""
-    Write-Host "🚀 Generating $parcelCount realistic parcels..." -ForegroundColor Cyan
-    Write-Host "   (This may take 5-10 minutes depending on count)" -ForegroundColor Gray
-    Write-Host ""
-    
-    # Temporarily enable Cosmos DB local auth again for bulk generation
-    try {
-        Write-Host "  🔓 Temporarily enabling Cosmos DB local auth..." -ForegroundColor Cyan
-        $subscriptionId = $account.id
-        $cosmosAccountName = $bicepOutputJson.backend.value.cosmosDbAccountName
-        $cosmosResourceId = "/subscriptions/$subscriptionId/resourceGroups/$backendRgName/providers/Microsoft.DocumentDB/databaseAccounts/$cosmosAccountName"
-        
-        az resource update `
-            --ids $cosmosResourceId `
-            --set properties.disableLocalAuth=false `
-            --api-version 2023-11-15 `
-            --output none 2>&1 | Out-Null
-        
-        Write-Host "  ⏱  Waiting 180 seconds for auth propagation..." -ForegroundColor Gray
-        Write-Host "     (Data plane needs more time than control plane)" -ForegroundColor Gray
-        Start-Sleep -Seconds 180
-        
-        # Verify local auth is enabled (control plane check)
-        Write-Host "  🔍 Verifying local auth is enabled (control plane)..." -ForegroundColor Cyan
-        $authStatus = az cosmosdb show --name $cosmosAccountName --resource-group $backendRgName --query "disableLocalAuth" -o tsv
-        if ($authStatus -eq "false") {
-            Write-Host "  ✓ Local auth confirmed enabled (control plane)" -ForegroundColor Green
-        } else {
-            Write-Host "  ⚠️  Local auth not yet enabled - waiting additional 60 seconds..." -ForegroundColor Yellow
-            Start-Sleep -Seconds 60
-        }
-        
-        # Get connection string BEFORE testing
-        Write-Host "  🔑 Retrieving connection string..." -ForegroundColor Cyan
-        $connectionString = az cosmosdb keys list `
-            --name $cosmosAccountName `
-            --resource-group $backendRgName `
-            --type connection-strings `
-            --query "connectionStrings[0].connectionString" `
-            -o tsv
-        
-        # Test data plane connectivity (most important check)
-        Write-Host "  🔍 Testing data plane connectivity with connection string..." -ForegroundColor Cyan
-        $testSuccess = $false
-        $retryCount = 0
-        $maxRetries = 3
-        
-        while (-not $testSuccess -and $retryCount -lt $maxRetries) {
-            $retryCount++
-            
-            # Quick Python test that actually tries to connect to data plane
-            $env:COSMOS_CONNECTION_STRING = $connectionString
-            $testScript = @"
-import os, sys
-sys.path.insert(0, '.')
-try:
-    from parcel_tracking_db import ParcelTrackingDB
-    import asyncio
-    async def test():
-        async with ParcelTrackingDB() as db:
-            container = db.database.get_container_client('parcels')
-            query = 'SELECT TOP 1 c.id FROM c'
-            items = []
-            async for item in container.query_items(query=query):
-                items.append(item)
-                break
-            return True
-    asyncio.run(test())
-    print('SUCCESS')
-except Exception as e:
-    print(f'FAILED: {str(e)}')
-    sys.exit(1)
-"@
-            
-            $testOutput = python -c $testScript 2>&1
-            
-            if ($LASTEXITCODE -eq 0 -and $testOutput -match "SUCCESS") {
-                $testSuccess = $true
-                Write-Host "  ✓ Data plane connectivity confirmed" -ForegroundColor Green
-            } else {
-                if ($retryCount -lt $maxRetries) {
-                    Write-Host "  ⚠️  Data plane not ready (attempt $retryCount/$maxRetries) - waiting 30 seconds..." -ForegroundColor Yellow
-                    Write-Host "     Error: $($testOutput -join ' ')" -ForegroundColor Gray
-                    Start-Sleep -Seconds 30
-                } else {
-                    Write-Host "  ❌ Data plane still not ready after $maxRetries attempts" -ForegroundColor Red
-                    Write-Host "     Last error: $($testOutput -join ' ')" -ForegroundColor Gray
-                    Write-Host "     WARNING: Continuing anyway - bulk generation may use retry logic" -ForegroundColor Yellow
-                }
-            }
-        }
-        
-        if ($connectionString) {
-            $env:COSMOS_CONNECTION_STRING = $connectionString
-            $env:PYTHONIOENCODING = "utf-8"  # Fix Windows Unicode encoding issues
-            
-            # Run bulk data generator
-            $bulkOutput = python utils/generators/generate_bulk_realistic_data.py --count $parcelCount 2>&1
-            Write-Host $bulkOutput
-            
-            if ($LASTEXITCODE -eq 0) {
-                Write-Host "  ✓ Bulk data generation completed!" -ForegroundColor Green
-            } else {
-                Write-Host "  ⚠ Bulk data generation had issues (check output above)" -ForegroundColor Yellow
-            }
-            
-            # Clear connection string
-            Remove-Item Env:\COSMOS_CONNECTION_STRING -ErrorAction SilentlyContinue
-        } else {
-            Write-Host "  ⚠ Could not retrieve connection string - skipping bulk generation" -ForegroundColor Yellow
-        }
-        
-        # Re-secure Cosmos DB
-        Write-Host "  🔒 Re-securing Cosmos DB..." -ForegroundColor Cyan
-        az resource update `
-            --ids $cosmosResourceId `
-            --set properties.disableLocalAuth=true `
-            --api-version 2023-11-15 `
-            --output none 2>&1 | Out-Null
-        
-        Write-Host "  ✓ Cosmos DB re-secured" -ForegroundColor Green
-        
-        # Restart App Service again to refresh credentials
-        Write-Host "  🔄 Restarting App Service..." -ForegroundColor Cyan
-        az webapp restart --name $WebAppName --resource-group $frontendRgName --output none 2>&1 | Out-Null
-        Write-Host "  ✓ App Service restarted" -ForegroundColor Green
-        
-    } catch {
-        Write-Host "  ⚠ Bulk data generation failed: $($_.Exception.Message)" -ForegroundColor Yellow
-    }
-    Write-Host ""
-} else {
-    Write-Host "  ⊘ Skipped bulk data generation" -ForegroundColor Gray
-    Write-Host "  You can run it later with:" -ForegroundColor Gray
-    Write-Host "    python utils/generators/generate_bulk_realistic_data.py --count 2000" -ForegroundColor White
-    Write-Host ""
-}
+# REMOVED: Bulk generation now happens automatically during deployment (2500 parcels)
+#          within the same Cosmos DB local auth session to save time
 
 Write-Host "Security & Permissions:" -ForegroundColor Yellow
 Write-Host "  ✓ App Service using managed identity (no connection strings)" -ForegroundColor Green
@@ -1707,3 +1658,4 @@ Write-Host "====================================================================
 # Copy URL to clipboard
 $url | Set-Clipboard
 Write-Host "✓ URL copied to clipboard!" -ForegroundColor Green
+
