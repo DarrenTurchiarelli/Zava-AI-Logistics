@@ -639,9 +639,11 @@ def render_map(manifest_id: str):
         # ── Server-side route geometry (restored from legacy implementation) ──
         # Client-side fetching from inside an iframe is unreliable. For small
         # routes without pre-stored geometry, fetch road geometry server-side.
+        print(f"[render_map] manifest={manifest_id} pin_coords={len(pin_coords)} pre_stored={len(stored_route_points)} route_type={selected_route_type}")
         if not stored_route_points and len(pin_coords) <= 25:
             import requests as _requests
             query_str = ":".join([f"{c[1]},{c[0]}" for c in pin_coords])
+            print(f"[render_map] Fetching Atlas route: {len(pin_coords)} waypoints, type={atlas_route_type}")
             try:
                 resp = _requests.get(
                     "https://atlas.microsoft.com/route/directions/json",
@@ -655,20 +657,32 @@ def render_map(manifest_id: str):
                     },
                     timeout=10,
                 )
+                print(f"[render_map] Atlas route HTTP {resp.status_code}")
                 if resp.ok:
                     rdata = resp.json()
+                    num_legs = len(rdata.get("routes", [{}])[0].get("legs", [])) if rdata.get("routes") else 0
+                    print(f"[render_map] Atlas returned {num_legs} legs")
                     if rdata.get("routes") and rdata["routes"][0]:
                         pts = []
                         for leg in rdata["routes"][0].get("legs", []):
                             for pt in leg.get("points", []):
                                 pts.append([pt["longitude"], pt["latitude"]])
+                        print(f"[render_map] Collected {len(pts)} geometry points")
                         if pts:
                             stored_route_points = pts
-            except Exception:
-                pass  # fall through to straight-line fallback
+                else:
+                    print(f"[render_map] Atlas error body: {resp.text[:300]}")
+            except Exception as ex:
+                print(f"[render_map] Atlas fetch exception: {ex}")
+
+        elif stored_route_points:
+            print(f"[render_map] Using pre-stored {len(stored_route_points)} geometry points")
+        else:
+            print(f"[render_map] Skipping Atlas fetch: {len(pin_coords)} pins > 25")
 
         if not stored_route_points:
             # Last resort: straight lines between waypoints
+            print(f"[render_map] Fallback: straight lines between {len(pin_coords)} waypoints")
             stored_route_points = list(pin_coords)
 
         # ── Build template variables ──────────────────────────────────────────
