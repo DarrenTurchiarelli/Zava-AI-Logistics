@@ -7,7 +7,7 @@ voice interactions, SSE streaming, and fraud report submission.
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, Response, stream_with_context
 from datetime import datetime, timezone
 import re
-from typing import Dict, Any
+from typing import Any, Dict, Optional
 
 from src.interfaces.web.middleware import login_required
 from parcel_tracking_db import ParcelTrackingDB
@@ -18,7 +18,6 @@ from src.infrastructure.agents import analyze_with_fraud_agent
 chatbot_bp = Blueprint('chatbot', __name__)
 
 
-# Helper: Call customer service agent
 async def call_customer_service_agent(
     query: str,
     tracking_number: str = None,
@@ -128,18 +127,23 @@ def chatbot_query():
     try:
         result = run_async(process())
 
-        # Check if agent call failed
         if isinstance(result, dict) and not result.get("success", True):
-            error_msg = result.get("error", "Unknown error occurred")
+            error_msg = result.get("error", "Unknown agent error")
+            print(f"❌ Customer service agent error: {error_msg}")
             return jsonify({
-                "response": "I'm sorry, I'm having trouble connecting right now. Please try again in a moment.",
+                "response": "I was unable to retrieve that information from our database at this time. Please try again or contact support directly.",
                 "error": error_msg,
-            }), 200
+                "agent_error": True,
+            }), 503
 
-        # Extract response text from nested Azure AI agent formats
         response_text = _extract_response_text(result)
+        if not response_text or response_text == "No response from assistant":
+            return jsonify({
+                "response": "I was unable to retrieve a response from the agent. Please try again.",
+                "agent_error": True,
+            }), 503
 
-        # Check if response mentions photos and attach photo data
+        # Attach photo data when agent response references them
         delivery_photos, lodgement_photos = _extract_photos_if_mentioned(response_text, query, tracking_number)
 
         response_data = {"response": response_text}
@@ -152,7 +156,9 @@ def chatbot_query():
 
         return jsonify(response_data), 200
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"❌ chatbot_query exception: {e}")
+        import traceback; traceback.print_exc()
+        return jsonify({"error": str(e), "agent_error": True}), 500
 
 
 @chatbot_bp.route("/api/chatbot/voice", methods=["POST"])
@@ -293,16 +299,22 @@ def public_chatbot():
         result = run_async(process())
 
         if isinstance(result, dict) and not result.get("success", True):
+            error_msg = result.get("error", "Unknown agent error")
+            print(f"❌ Public chatbot agent error: {error_msg}")
             return jsonify({
-                "response": "I'm sorry, I'm having trouble connecting right now. Please try again in a moment.",
-                "error": result.get("error", "Unknown error"),
-            }), 200
+                "response": "I was unable to retrieve that information right now. Please try again in a moment.",
+                "error": error_msg,
+                "agent_error": True,
+            }), 503
 
-        # Extract and clean response text
         response_text = _extract_response_text(result)
-        response_text = _clean_structured_markers(response_text)
+        if not response_text or response_text == "No response from assistant":
+            return jsonify({
+                "response": "I was unable to retrieve a response. Please try again.",
+                "agent_error": True,
+            }), 503
 
-        # Check for delivery photos
+        response_text = _clean_structured_markers(response_text)
         delivery_photos, _ = _extract_photos_if_mentioned(response_text, query, tracking_number)
 
         response_data = {"response": response_text}
@@ -313,10 +325,13 @@ def public_chatbot():
 
         return jsonify(response_data), 200
     except Exception as e:
+        print(f"❌ public_chatbot exception: {e}")
+        import traceback; traceback.print_exc()
         return jsonify({
-            "response": "I'm sorry, something went wrong on our end. Please try again in a moment.",
+            "response": "I was unable to retrieve that information right now. Please try again.",
             "error": str(e),
-        }), 200
+            "agent_error": True,
+        }), 503
 
 
 @chatbot_bp.route("/api/public/chatbot/voice", methods=["POST"])

@@ -142,13 +142,18 @@ async def call_azure_agent(
 
         # Import tool handlers if available
         try:
-            from agent_tools import TOOL_FUNCTIONS
-
+            from src.infrastructure.agents.tools.cosmos_tools import TOOL_FUNCTIONS
             has_tools = True
             print(f"✅ Agent tools loaded: {list(TOOL_FUNCTIONS.keys())}")
         except ImportError:
-            has_tools = False
-            print("⚠️ Agent tools not available")
+            try:
+                from agent_tools import TOOL_FUNCTIONS  # legacy root-level fallback
+                has_tools = True
+                print(f"✅ Agent tools loaded (fallback): {list(TOOL_FUNCTIONS.keys())}")
+            except ImportError:
+                has_tools = False
+                TOOL_FUNCTIONS = {}
+                print("⚠️ Agent tools not available")
 
         # Create or reuse thread
         if thread_id:
@@ -223,8 +228,15 @@ async def call_azure_agent(
                 print(f"✅ Run completed successfully!")
                 break
             elif run.status in ["failed", "cancelled", "expired"]:
-                print(f"❌ Run ended with status: {run.status}")
-                break
+                error_detail = getattr(run, 'last_error', None)
+                error_msg = str(error_detail) if error_detail else f"Run ended with status: {run.status}"
+                print(f"❌ {error_msg}")
+                return {
+                    "success": False,
+                    "agent_id": agent_id,
+                    "error": error_msg,
+                    "response": None,
+                }
 
             iteration += 1
             time.sleep(1)
@@ -640,60 +652,47 @@ Provide updated ETAs and optimization recommendations.
 
 async def customer_service_agent(customer_request: Dict[str, Any], thread_id: Optional[str] = None) -> Dict[str, Any]:
     """
-    Call Customer Service Agent for exception handling and communications
+    Call Customer Service Agent for exception handling and communications.
+    The agent queries Cosmos DB in real-time via registered function tools.
 
     Args:
         customer_request: Customer issue, delivery preferences, or inquiry
         thread_id: Optional existing thread ID to continue a conversation
 
     Returns:
-        Resolution options and customer communication
+        Dictionary with agent response and metadata
     """
-    # Load base system prompt from Agent-Skills folder
     base_prompt = get_agent_prompt("customer-service")
-    
-    # Check if this is a public chat request (from chat widget)
-    is_chat_request = bool(customer_request.get("public_mode"))
+    is_public = bool(customer_request.get("public_mode"))
+    question = customer_request.get("details", "No details provided")
 
-    if is_chat_request:
-        # Conversational mode for chat widget - combine base prompt with context
+    if is_public:
         message = f"""{base_prompt}
 
-## Current Customer Request
+## Customer's Question
 
-**Customer's Question:**
-{customer_request.get('details', 'No details provided')}
+{question}
 
-## Additional Context
+## Company Information
+- Phone: {COMPANY_PHONE}
+- Email: {COMPANY_EMAIL}
 
-- Company: {COMPANY_NAME}
-- Support Phone: {COMPANY_PHONE}
-- Support Email: {COMPANY_EMAIL}
-
-**Remember:** This is a public chat - photos cannot be displayed directly. If photos exist in tracking data, tell the customer they are on file and can be requested via customer service.
-"""
+Use your tools to look up any parcel data in real time. If a lookup fails, say you are unable to retrieve that information right now."""
     else:
-        # Structured format for internal customer service representatives
         message = f"""{base_prompt}
 
 ## Internal Customer Service Request
 
-**Customer Details:**
-- Name: {customer_request.get('customer_name', 'Unknown')}
-- Issue Type: {customer_request.get('issue_type', 'inquiry')}
-- Tracking Number: {customer_request.get('tracking_number', 'N/A')}
+**Customer:** {customer_request.get('customer_name', 'Unknown')}
+**Issue Type:** {customer_request.get('issue_type', 'inquiry')}
+**Tracking Number:** {customer_request.get('tracking_number', 'N/A')}
 
-**Request Details:**
-{customer_request.get('details', 'No details provided')}
+**Question / Details:**
+{question}
 
-{f"**Preferred Resolution:** {customer_request.get('preferred_resolution', '')}" if customer_request.get('preferred_resolution') else ""}
+**Company:** {COMPANY_NAME} | Phone: {COMPANY_PHONE} | Email: {COMPANY_EMAIL}
 
-**Company Information:**
-- Phone: {COMPANY_PHONE}
-- Email: {COMPANY_EMAIL}
-
-**Internal Note:** When tracking data includes photos, they are automatically displayed to internal staff and customers. Acknowledge them naturally in your response.
-"""
+Use your tools to look up any parcel data in real time. When tracking data includes photos, acknowledge them naturally."""
 
     return await call_azure_agent(CUSTOMER_SERVICE_AGENT_ID, message, customer_request, thread_id=thread_id)
 

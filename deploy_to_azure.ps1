@@ -67,6 +67,27 @@ Write-Host "✓ Logged in as: $($account.user.name)" -ForegroundColor Green
 Write-Host "✓ Subscription: $($account.name)" -ForegroundColor Green
 Write-Host ""
 
+# Resolve the Python executable — prefer the project venv so all pip packages are available.
+# Falls back to system Python if the venv has not been created.
+# Always resolves to an absolute path (or $null) so Test-Path guards work correctly.
+$pythonExe = if (Test-Path (Join-Path $PSScriptRoot ".venv\Scripts\python.exe")) {
+    Join-Path $PSScriptRoot ".venv\Scripts\python.exe"
+} elseif (Test-Path (Join-Path $PSScriptRoot ".venv\bin\python")) {
+    Join-Path $PSScriptRoot ".venv\bin\python"
+} elseif (Get-Command python -ErrorAction SilentlyContinue) {
+    (Get-Command python -ErrorAction SilentlyContinue).Source
+} elseif (Get-Command py -ErrorAction SilentlyContinue) {
+    (Get-Command py -ErrorAction SilentlyContinue).Source
+} else {
+    $null
+}
+if ($pythonExe) {
+    Write-Host "✓ Python: $pythonExe" -ForegroundColor Green
+} else {
+    Write-Host "⚠ Python not found — agent creation and data generation steps will be skipped" -ForegroundColor Yellow
+}
+Write-Host ""
+
 # Register Required Resource Providers
 Write-Host "[2/7] Registering required Azure resource providers..." -ForegroundColor Yellow
 $requiredProviders = @(
@@ -434,7 +455,7 @@ Write-Host ""
 $agentSettings = @{}
 
 # Create agents using Python script
-if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
+if (-not $pythonExe) {
     Write-Host "  ⚠ Python not found - skipping agent creation" -ForegroundColor Yellow
     Write-Host "    Run manually: python scripts/create_foundry_agents_openai.py" -ForegroundColor Gray
 } else {
@@ -494,7 +515,7 @@ if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
         Write-Host "     OpenAI Endpoint    : $($bicepOutputJson.middleware.value.openAIServiceEndpoint)" -ForegroundColor Gray
         Write-Host ""
 
-        python scripts/create_foundry_agents_openai.py 2>&1 | Tee-Object -Variable agentOutput | Out-Host
+        & $pythonExe scripts/create_foundry_agents_openai.py 2>&1 | Tee-Object -Variable agentOutput | Out-Host
         $agentExitCode = $LASTEXITCODE
 
         $jsonMatch = if ($agentExitCode -eq 0 -and $agentOutput) {
@@ -527,13 +548,13 @@ if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
                 Write-Host "     Customer Service Agent: $($agentSettings['CUSTOMER_SERVICE_AGENT_ID'])" -ForegroundColor Gray
                 Write-Host ""
 
-                python scripts/register_agent_tools_openai.py 2>&1 | Out-Host
+                & $pythonExe scripts/register_agent_tools_openai.py 2>&1 | Out-Host
                 $toolExitCode = $LASTEXITCODE
 
                 if ($toolExitCode -eq 0) {
                     Write-Host ""
                     Write-Host "  ✓ Tools registered — validating..." -ForegroundColor Green
-                    python scripts/validate_agent_tools.py 2>&1 | Out-Host
+                    & $pythonExe scripts/validate_agent_tools.py 2>&1 | Out-Host
                     $toolsDone = $true
                 } else {
                     Write-Host ""
@@ -626,14 +647,14 @@ if (Test-Path ".env") {
             
             Write-Host ""
             # First validate if tools are already registered
-            python scripts/validate_agent_tools.py 2>&1 | Out-Host
+            & $pythonExe scripts/validate_agent_tools.py 2>&1 | Out-Host
             $validateExitCode = $LASTEXITCODE
             
             if ($validateExitCode -ne 0) {
                 # Tools not registered or validation failed - register them
                 Write-Host ""
                 Write-Host "  🔧 Registering Cosmos DB tools..." -ForegroundColor Cyan
-                python scripts/register_agent_tools_openai.py 2>&1 | Out-Host
+                & $pythonExe scripts/register_agent_tools_openai.py 2>&1 | Out-Host
                 $toolExitCode = $LASTEXITCODE
                 
                 if ($toolExitCode -eq 0) {
@@ -642,7 +663,7 @@ if (Test-Path ".env") {
                     
                     # Validate again
                     Write-Host ""
-                    python scripts/validate_agent_tools.py 2>&1 | Out-Host
+                    & $pythonExe scripts/validate_agent_tools.py 2>&1 | Out-Host
                 } else {
                     Write-Host ""
                     Write-Host "  ⚠ Tool registration failed (exit code: $toolExitCode)" -ForegroundColor Yellow
@@ -984,7 +1005,7 @@ if (-not $cosmosCheck) {
     Write-Host "     (Creating 10 required containers with proper partition keys)" -ForegroundColor Gray
     
     try {
-        if (Get-Command python -ErrorAction SilentlyContinue) {
+        if ($pythonExe) {
             $env:PYTHONIOENCODING = "utf-8"
             
             # CRITICAL: Get Cosmos DB connection from BICEP OUTPUTS, not from .env
@@ -1029,7 +1050,7 @@ if (-not $cosmosCheck) {
             Write-Host "    ✓ Using Cosmos DB: $cosmosEndpoint" -ForegroundColor Green
             
             # Run container initialization with correct environment
-            $containerOutput = python scripts/initialize_all_containers.py 2>&1
+            $containerOutput = & $pythonExe scripts/initialize_all_containers.py 2>&1
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "  ✓ All 10 containers initialized successfully" -ForegroundColor Green
             } else {
@@ -1072,7 +1093,7 @@ if (-not $cosmosCheck) {
     
     try {
         # Check if Python is available
-        if (Get-Command python -ErrorAction SilentlyContinue) {
+        if ($pythonExe) {
             # Set encoding for Unicode output on Windows
             $env:PYTHONIOENCODING = "utf-8"
             
@@ -1086,7 +1107,7 @@ if (-not $cosmosCheck) {
             Write-Host "    Using Cosmos DB: $env:COSMOS_DB_ENDPOINT" -ForegroundColor Gray
             
             # Run setup_users.py to create default accounts
-            $setupOutput = python utils/setup/setup_users.py 2>&1
+            $setupOutput = & $pythonExe utils/setup/setup_users.py 2>&1
             if ($LASTEXITCODE -eq 0 -and $setupOutput -match "SUCCESS") {
                 Write-Host "  ✓ Default users created successfully" -ForegroundColor Green
                 Write-Host "    Login at: https://$($webApp.defaultHostName)/login" -ForegroundColor Gray
@@ -1098,7 +1119,7 @@ if (-not $cosmosCheck) {
                     Start-Sleep -Seconds 30
                     
                     # Retry once
-                    $retryOutput = python utils/setup/setup_users.py 2>&1
+                    $retryOutput = & $pythonExe utils/setup/setup_users.py 2>&1
                     if ($LASTEXITCODE -eq 0 -and $retryOutput -match "SUCCESS") {
                         Write-Host "  ✓ Default users created successfully (after retry)" -ForegroundColor Green
                     } else {
@@ -1125,7 +1146,7 @@ if (-not $cosmosCheck) {
 Write-Host "  📦 Generating demo data (parcels, manifests, dispatcher data)..." -ForegroundColor Cyan
 Write-Host "     (Requires temporary Cosmos DB local auth for data generation)" -ForegroundColor Gray
 try {
-    if (Get-Command python -ErrorAction SilentlyContinue) {
+    if ($pythonExe) {
         # Get Cosmos DB account name from Bicep output
         $cosmosAccountName = $bicepOutputJson.backend.value.cosmosDbAccountName
         $subscriptionId = $account.id
@@ -1198,14 +1219,14 @@ try {
             
             # Step 3a: Initialize all database containers FIRST (CRITICAL DEPENDENCY)
             Write-Host "    📦 Initializing all 10 database containers..." -ForegroundColor Cyan
-            $containerOutput = python scripts/initialize_all_containers.py 2>&1
+            $containerOutput = & $pythonExe scripts/initialize_all_containers.py 2>&1
             
             if ($LASTEXITCODE -eq 0 -and $containerOutput -match "SUCCESS") {
                 Write-Host "    ✓ All database containers created successfully" -ForegroundColor Green
                 
                 # Step 3a.1: VALIDATE containers exist (critical validation)
                 Write-Host "    🔍 Validating all containers exist..." -ForegroundColor Cyan
-                $validateOutput = python scripts/diagnose_containers.py 2>&1
+                $validateOutput = & $pythonExe scripts/diagnose_containers.py 2>&1
                 
                 if ($LASTEXITCODE -eq 0 -and $validateOutput -match "All containers present") {
                     Write-Host "    ✓ Container validation passed - all 10 containers confirmed" -ForegroundColor Green
@@ -1220,10 +1241,10 @@ try {
                     
                     # Retry container creation AND validation
                     Write-Host "    🔄 Retrying container initialization..." -ForegroundColor Cyan
-                    $retryOutput = python scripts/initialize_all_containers.py 2>&1
+                    $retryOutput = & $pythonExe scripts/initialize_all_containers.py 2>&1
                     
                     Write-Host "    🔍 Re-validating container count..." -ForegroundColor Cyan
-                    $retryValidate = python scripts/diagnose_containers.py 2>&1
+                    $retryValidate = & $pythonExe scripts/diagnose_containers.py 2>&1
                     
                     if ($LASTEXITCODE -eq 0 -and $retryValidate -match "All containers present") {
                         Write-Host "    ✓ Container validation passed on retry" -ForegroundColor Green
@@ -1271,14 +1292,14 @@ try {
                 
                 # Retry with fresh connection
                 Write-Host "    🔄 Retrying container initialization (attempt 2/3)..." -ForegroundColor Cyan
-                $retryOutput = python scripts/initialize_all_containers.py 2>&1
+                $retryOutput = & $pythonExe scripts/initialize_all_containers.py 2>&1
                 
                 if ($LASTEXITCODE -eq 0 -and $retryOutput -match "SUCCESS") {
                     Write-Host "    ✓ Container creation succeeded on retry" -ForegroundColor Green
                     
                     # Validate after successful retry
                     Write-Host "    🔍 Validating container count..." -ForegroundColor Cyan
-                    $validateOutput = python scripts/diagnose_containers.py 2>&1
+                    $validateOutput = & $pythonExe scripts/diagnose_containers.py 2>&1
                     
                     if ($LASTEXITCODE -eq 0 -and $validateOutput -match "All containers present") {
                         Write-Host "    ✓ Container validation passed - all 10 containers confirmed" -ForegroundColor Green
@@ -1288,8 +1309,8 @@ try {
                         
                         # Final retry
                         Write-Host "    🔄 Final retry of container initialization (attempt 3/3)..." -ForegroundColor Cyan
-                        $finalRetry = python scripts/initialize_all_containers.py 2>&1
-                        $finalValidate = python scripts/diagnose_containers.py 2>&1
+                        $finalRetry = & $pythonExe scripts/initialize_all_containers.py 2>&1
+                        $finalValidate = & $pythonExe scripts/diagnose_containers.py 2>&1
                         
                         if (-not ($LASTEXITCODE -eq 0 -and $finalValidate -match "All containers present")) {
                             Write-Host "    ❌ Container validation failed after 3 attempts" -ForegroundColor Red
@@ -1309,7 +1330,7 @@ try {
                     Start-Sleep -Seconds 30
                     
                     Write-Host "    🔄 Final retry of container initialization (attempt 3/3)..." -ForegroundColor Cyan
-                    $finalRetry = python scripts/initialize_all_containers.py 2>&1
+                    $finalRetry = & $pythonExe scripts/initialize_all_containers.py 2>&1
                     
                     if (-not ($LASTEXITCODE -eq 0 -and $finalRetry -match "SUCCESS")) {
                         Write-Host "    ❌ Container initialization failed after 3 attempts" -ForegroundColor Red
@@ -1322,7 +1343,7 @@ try {
                     }
                     
                     # Validate final success
-                    $finalValidate = python scripts/diagnose_containers.py 2>&1
+                    $finalValidate = & $pythonExe scripts/diagnose_containers.py 2>&1
                     if (-not ($LASTEXITCODE -eq 0 -and $finalValidate -match "All containers present")) {
                         Write-Host "    ❌ Container validation failed" -ForegroundColor Red
                         az resource update --ids $cosmosResourceId --set properties.disableLocalAuth=true --api-version 2023-11-15 --output none 2>&1 | Out-Null
@@ -1341,7 +1362,7 @@ try {
             
             # Generate fresh test parcels with valid DC assignments
             Write-Host "    • Creating test parcels with valid DC assignments..." -ForegroundColor Gray
-            $freshDataOutput = python utils/generators/generate_fresh_test_data.py 2>&1
+            $freshDataOutput = & $pythonExe utils/generators/generate_fresh_test_data.py 2>&1
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "    ✓ Fresh test data generated" -ForegroundColor Green
             } else {
@@ -1350,7 +1371,7 @@ try {
 
             # Generate dispatcher demo data (parcels at depot ready for assignment)
             Write-Host "    • Creating parcels ready for dispatcher assignment..." -ForegroundColor Gray
-            $dispatcherOutput = python utils/generators/generate_dispatcher_demo_data.py 2>&1
+            $dispatcherOutput = & $pythonExe utils/generators/generate_dispatcher_demo_data.py 2>&1
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "    ✓ Dispatcher demo data generated" -ForegroundColor Green
             } else {
@@ -1360,7 +1381,7 @@ try {
             # Generate bulk realistic parcels FIRST so manifests can assign them to drivers
             Write-Host "    • Generating 2500 realistic parcels across all states..." -ForegroundColor Gray
             Write-Host "      ⏳ This may take 5-10 minutes..." -ForegroundColor Gray
-            $bulkDemoOutput = python utils/generators/generate_bulk_realistic_data.py --count 2500 2>&1
+            $bulkDemoOutput = & $pythonExe utils/generators/generate_bulk_realistic_data.py --count 2500 2>&1
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "    ✓ 2500 realistic parcels generated across all Australian states" -ForegroundColor Green
             } else {
@@ -1372,7 +1393,7 @@ try {
 
             # Generate driver manifests with parcels
             Write-Host "    • Creating driver manifests with delivery parcels..." -ForegroundColor Gray
-            $manifestOutput = python utils/generators/generate_demo_manifests.py 2>&1
+            $manifestOutput = & $pythonExe utils/generators/generate_demo_manifests.py 2>&1
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "    ✓ Demo manifests generated for all drivers" -ForegroundColor Green
             } else {
@@ -1382,7 +1403,7 @@ try {
             # Generate Voice & Text Example demo parcels only (RG857954, DT202512170037)
             # Bulk parcels were already created above — this just ensures the 2 keydemo parcels exist
             Write-Host "    • Ensuring Voice & Text Example demo parcels exist (RG857954, DT202512170037)..." -ForegroundColor Gray
-            $demoParcelsOutput = python utils/generators/generate_bulk_realistic_data.py --demo-only 2>&1
+            $demoParcelsOutput = & $pythonExe utils/generators/generate_bulk_realistic_data.py --demo-only 2>&1
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "    ✓ Demo parcels verified (RG857954, DT202512170037)" -ForegroundColor Green
                 Write-Host "      ✓ Try: 'Track parcel RG857954' or 'Find parcels for Dr. Emma Wilson'" -ForegroundColor Cyan
@@ -1395,7 +1416,7 @@ try {
 
             # Create approval demo requests
             Write-Host "    • Creating approval demo requests for existing parcels..." -ForegroundColor Gray
-            $approvalOutput = python utils/generators/create_approval_requests.py 2>&1
+            $approvalOutput = & $pythonExe utils/generators/create_approval_requests.py 2>&1
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "    ✓ Approval demo requests created" -ForegroundColor Green
             } else {
@@ -1411,7 +1432,7 @@ try {
             $deliveryPhotoPng  = "static\images\delivery_sample.png"
             if ((Test-Path $deliveryPhotoPath) -or (Test-Path $deliveryPhotoPng)) {
                 Write-Host "    • Importing real delivery photo for DT202512170037..." -ForegroundColor Gray
-                $photoOutput = python utils/generators/import_delivery_photo.py 2>&1
+                $photoOutput = & $pythonExe utils/generators/import_delivery_photo.py 2>&1
                 if ($LASTEXITCODE -eq 0) {
                     Write-Host "    ✓ Real delivery photo imported for DT202512170037" -ForegroundColor Green
                 } else {
