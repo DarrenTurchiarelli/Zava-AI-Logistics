@@ -287,9 +287,11 @@ class BingMapsRouter:
                     coordinates.append(coords)
                     print(f"  ✓ {addr} -> {coords}")
                 else:
-                    print(f"  ❌ Could not geocode address: {addr}")
-                    print(f"⚠️ Falling back to mock optimization due to geocoding failure")
-                    return self._mock_optimization(addresses, start_location)
+                    print(f"  ⚠️ Could not geocode (skipping): {addr}")
+
+            if len(coordinates) < 2:
+                print(f"❌ Only {len(coordinates)} addresses geocoded (need ≥2). Falling back to mock.")
+                return self._mock_optimization(addresses, start_location)
 
             # Use Azure Maps Route Directions API
             route_url = f"{self.base_url}/route/directions/json"
@@ -905,12 +907,12 @@ class BingMapsRouter:
                 score = result.get("score", 0)
                 entity_type = result.get("type", "")
 
-                # Reject very low confidence matches
-                # Lower threshold to 0.6 to be more permissive (was 0.7)
-                if score < 0.6:
+                # Reject only extremely poor confidence matches.
+                # Demo/generated addresses may return suburb-level scores ~0.2-0.4 — still useful.
+                if score < 0.2:
                     print(f"⚠️ Very low confidence match (score={score}): {address}")
                     return None
-                elif score < 0.8:
+                elif score < 0.6:
                     print(f"⚠️ Low-medium confidence match (score={score}): {address} - accepting anyway")
 
                 # Reject if it's not a specific address type
