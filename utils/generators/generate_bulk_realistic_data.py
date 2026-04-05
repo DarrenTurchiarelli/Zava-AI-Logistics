@@ -637,12 +637,18 @@ async def main():
         print("-" * 80)
         
         demo_created = 0
+        demo_skipped = 0
         for demo_spec in DEMO_PARCELS:
+            existing = await db.get_parcel_by_tracking_number(demo_spec['tracking_number'])
+            if existing:
+                print(f"  ⏭  {demo_spec['tracking_number']} already exists — skipping")
+                demo_skipped += 1
+                continue
             barcode = await create_demo_parcel(db, demo_spec)
             if barcode:
                 demo_created += 1
-        
-        print(f"\n✓ Created {demo_created} demo parcels")
+
+        print(f"\n✓ Demo parcels: {demo_created} created, {demo_skipped} already existed")
         print()
 
         if args.demo_only:
@@ -753,6 +759,17 @@ async def main():
         else:
             print(f"  ⚠ No delivery_sample image found in static/images/ — skipping.")
             print(f"    Save static/images/delivery_sample.jpg to include a real photo.")
+
+        # Step 5: Import real lodgement photo for RG857954
+        print(f"\n  📸 Step 5: Real Lodgement Photo for RG857954")
+        print("-" * 80)
+        lodgement_image = _find_image_file(project_root, "lodgement")
+        if lodgement_image:
+            print(f"  Found image: {lodgement_image}")
+            await _import_photo("RG857954", lodgement_image, uploaded_by="sender", photo_type="lodgement")
+        else:
+            print(f"  ⚠ No lodgement_sample image found in static/images/ — skipping.")
+            print(f"    Save static/images/lodgement_sample.jpg to include a real photo.")
 
         print()
         print("=" * 80)

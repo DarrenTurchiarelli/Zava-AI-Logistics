@@ -272,6 +272,7 @@ class ParcelTrackingDB:
                 "id": "driver_manifests",
                 "partition_key": PartitionKey(path="/driver_id"),
                 "indexing_policy": {"indexingMode": "consistent", "automatic": True, "includedPaths": [{"path": "/*"}]},
+                "default_ttl": 2592000,  # 30 days — manifests accumulate daily; auto-expire old ones
             },
             {
                 "id": "address_notes",
@@ -282,10 +283,14 @@ class ParcelTrackingDB:
 
         for container_spec in containers:
             try:
+                ttl_kwargs = {}
+                if "default_ttl" in container_spec:
+                    ttl_kwargs["default_ttl"] = container_spec["default_ttl"]
                 await self.database.create_container_if_not_exists(
                     id=container_spec["id"],
                     partition_key=container_spec["partition_key"],
                     indexing_policy=container_spec["indexing_policy"],
+                    **ttl_kwargs,
                 )
                 print(f"✓ Container ready: {container_spec['id']}")
             except Exception as e:

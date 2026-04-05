@@ -1,0 +1,83 @@
+name: Daily Demo Data Generator
+
+on:
+  schedule:
+    - cron: '0 1 * * *' # 1am UTC = 11am AEST
+  workflow_dispatch:     # Allow manual trigger from GitHub Actions tab
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TODO (MANUAL SETUP REQUIRED — pick ONE of the two auth options below)
+#
+# OPTION A — Connection String (simpler, sufficient for dev/demo)
+# ──────────────────────────────────────────────────────────────
+# 1. In Azure Portal → Cosmos DB → your account → Keys
+#    Copy the PRIMARY CONNECTION STRING
+# 2. In GitHub → repo → Settings → Secrets and variables → Actions → New secret
+#    Name:  COSMOS_CONNECTION_STRING
+#    Value: <the connection string you just copied>
+# 3. Uncomment the COSMOS_CONNECTION_STRING line in the env block below.
+#    Delete the OPTION B block (or leave it commented — it won't run).
+#
+# OPTION B — Service Principal with RBAC (more secure, recommended for prod)
+# ──────────────────────────────────────────────────────────────────────────
+# 1. Create a service principal:
+#    az ad sp create-for-rbac --name "zava-gh-actions" --sdk-auth
+#    Save the JSON output — you'll need client_id, client_secret, tenant_id
+#
+# 2. Grant Cosmos DB Built-in Data Contributor role to the service principal:
+#    COSMOS_ID=$(az cosmosdb show --name <cosmos-account> \
+#      --resource-group RG-Zava-Backend-dev --query id -o tsv)
+#    SP_OBJECT_ID=$(az ad sp show --id <appId-from-step-1> --query id -o tsv)
+#    az cosmosdb sql role assignment create \
+#      --account-name <cosmos-account> \
+#      --resource-group RG-Zava-Backend-dev \
+#      --role-definition-name "Cosmos DB Built-in Data Contributor" \
+#      --scope "$COSMOS_ID" \
+#      --principal-id "$SP_OBJECT_ID"
+#
+# 3. Add three GitHub secrets:
+#    AZURE_CLIENT_ID     = <appId from step 1>
+#    AZURE_CLIENT_SECRET = <password from step 1>
+#    AZURE_TENANT_ID     = <tenant from step 1>
+#    COSMOS_DB_ENDPOINT  = https://<cosmos-account>.documents.azure.com:443/
+#    COSMOS_DB_DATABASE_NAME = logisticstracking
+#
+# 4. Uncomment the OPTION B env vars below and delete/comment the OPTION A line.
+# ─────────────────────────────────────────────────────────────────────────────
+
+env:
+  # ── OPTION A: uncomment when secret is wired up ──────────────────────────
+  # COSMOS_CONNECTION_STRING: ${{ secrets.COSMOS_CONNECTION_STRING }}
+
+  # ── OPTION B: uncomment when service principal secrets are wired up ───────
+  # AZURE_CLIENT_ID:          ${{ secrets.AZURE_CLIENT_ID }}
+  # AZURE_CLIENT_SECRET:      ${{ secrets.AZURE_CLIENT_SECRET }}
+  # AZURE_TENANT_ID:          ${{ secrets.AZURE_TENANT_ID }}
+  # COSMOS_DB_ENDPOINT:       ${{ secrets.COSMOS_DB_ENDPOINT }}
+  # COSMOS_DB_DATABASE_NAME:  logisticstracking
+
+  AZURE_AI_PROJECT_ENDPOINT: ${{ secrets.AZURE_AI_PROJECT_ENDPOINT }}
+
+jobs:
+  generate-daily-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -e .
+
+      - name: Generate daily parcels (50 new lodgements)
+        run: python utils/generators/generate_bulk_realistic_data.py --count 50
+
+      - name: Refresh driver manifests
+        run: python utils/generators/generate_demo_manifests.py

@@ -96,6 +96,7 @@ resource manifestsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/
   properties: {
     resource: {
       id: 'driver_manifests'
+      defaultTtl: 2592000 // 30 days — manifests accumulate daily; auto-expire old ones
       partitionKey: {
         paths: [
           '/driver_id'
