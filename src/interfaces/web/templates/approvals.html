@@ -442,7 +442,7 @@ function showEscalateModal(approvalId, trackingNumber, riskScore, contrabandType
             <div class="border rounded p-3 mb-2" style="border-left: 4px solid ${cfg.color} !important;">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                     <strong><i class="bi ${cfg.icon}" style="color:${cfg.color}"></i> ${name}</strong>
-                    <span class="badge" style="background:${cfg.color}">${cfg.phone}</span>
+                    <span class="badge" style="background:${cfg.color};color:#fff">${cfg.phone}</span>
                 </div>
                 <small class="text-muted">${cfg.desc}</small>
                 <div class="mt-2">
@@ -455,6 +455,7 @@ function showEscalateModal(approvalId, trackingNumber, riskScore, contrabandType
     }).join('');
 
     const priorityColor = riskScore >= 85 ? '#dc3545' : riskScore >= 70 ? '#fd7e14' : '#ffc107';
+    const priorityTextColor = riskScore >= 70 ? '#fff' : '#212529';
 
     const modalHtml = `
         <div class="modal fade" id="escalateModal" tabindex="-1" aria-labelledby="escalateModalLabel" aria-hidden="true">
@@ -481,7 +482,7 @@ function showEscalateModal(approvalId, trackingNumber, riskScore, contrabandType
                                 </div>
                                 <div class="col-sm-6">
                                     <small class="text-muted d-block">Risk Score</small>
-                                    <span class="badge fs-6" style="background:${priorityColor}">${riskScore}%</span>
+                                    <span class="badge fs-6" style="background:${priorityColor};color:${priorityTextColor}">${riskScore}%</span>
                                 </div>
                                 <div class="col-sm-6">
                                     <small class="text-muted d-block">Parcel Status</small>
