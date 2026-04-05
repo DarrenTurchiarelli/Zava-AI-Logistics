@@ -109,7 +109,9 @@
     {% if approvals %}
     <div class="row" id="approvalsContainer">
         {% for approval in approvals %}
-        <div class="col-lg-6 mb-4 approval-card" data-dc="{{ approval.parcel_dc or 'Unknown' }}">
+        <div class="col-lg-6 mb-4 approval-card"
+             data-dc="{{ approval.parcel_dc or 'Unknown' }}"
+             data-flagged="{{ 'true' if approval.contraband_type else 'false' }}">
             <div class="card shadow-sm">
                 <div class="card-header bg-primary text-white">
                     <div class="d-flex justify-content-between align-items-center">
@@ -679,9 +681,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         approvalCards.forEach(card => {
             const cardDC = card.getAttribute('data-dc');
+            const isFlagged = card.getAttribute('data-flagged') === 'true';
             
-            if (selectedDCs.length === 0) {
-                // No filter selected - show all approvals
+            if (selectedDCs.length === 0 || isFlagged) {
+                // No filter OR flagged contraband item — always visible
                 card.style.display = 'block';
                 visibleCount++;
             } else if (selectedDCs.includes(cardDC)) {
@@ -693,6 +696,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 card.style.display = 'none';
             }
         });
+        
+        // Safety net: if filter would hide everything, show all
+        if (visibleCount === 0 && approvalCards.length > 0) {
+            approvalCards.forEach(card => { card.style.display = 'block'; });
+            visibleCount = approvalCards.length;
+        }
         
         // Update the heading to show filtered count
         updateFilteredCount(visibleCount, approvalCards.length);
