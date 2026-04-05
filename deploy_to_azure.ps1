@@ -18,6 +18,28 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 $deploymentConfigFile = ".azure-deployment.json"
 $bicepTemplate = "infra/main.bicep"
 
+# Update-EnvFile must be defined at the top (before any conditional blocks)
+# so it is available everywhere — including -CodeOnly and -SkipInfrastructure paths.
+function Update-EnvFile {
+    param (
+        [string]$Key,
+        [string]$Value,
+        [string]$FilePath = ".env"
+    )
+    if (-not $Value) { return }
+    if (Test-Path $FilePath) {
+        $content = Get-Content $FilePath -Raw
+        if ($content -match "(?m)^$Key\s*=") {
+            $content = $content -replace "(?m)^$Key\s*=.*", "$Key=$Value"
+        } else {
+            $content = $content.TrimEnd() + "`r`n$Key=$Value`r`n"
+        }
+        [System.IO.File]::WriteAllText((Resolve-Path $FilePath).Path, $content)
+    } else {
+        Add-Content $FilePath "$Key=$Value"
+    }
+}
+
 # Resource group names (will be created by Bicep)
 $frontendRgName = "RG-Zava-Frontend-$Environment"
 $middlewareRgName = "RG-Zava-Middleware-$Environment"
@@ -324,27 +346,7 @@ if (-not $SkipInfrastructure -and -not $CodeOnly) {
     Write-Host ""
     Write-Host "  📝 Updating .env with deployment outputs..." -ForegroundColor Cyan
 
-    function Update-EnvFile {
-        param (
-            [string]$Key,
-            [string]$Value,
-            [string]$FilePath = ".env"
-        )
-        if (-not $Value) { return }
-        if (Test-Path $FilePath) {
-            $content = Get-Content $FilePath -Raw
-            if ($content -match "(?m)^$Key\s*=") {
-                # Replace existing key
-                $content = $content -replace "(?m)^$Key\s*=.*", "$Key=$Value"
-            } else {
-                # Append new key
-                $content = $content.TrimEnd() + "`r`n$Key=$Value`r`n"
-            }
-            [System.IO.File]::WriteAllText((Resolve-Path $FilePath).Path, $content)
-        } else {
-            Add-Content $FilePath "$Key=$Value"
-        }
-    }
+    # Update-EnvFile is defined at the top of the script — available everywhere.
 
     $openAIEndpoint    = $bicepOutputJson.middleware.value.openAIServiceEndpoint
     $aiProjectEndpoint = $bicepOutputJson.middleware.value.aiProjectEndpoint
@@ -444,15 +446,23 @@ Write-Host "  ✓ Default Hostname: $($webApp.defaultHostName)" -ForegroundColor
 Write-Host ""
 
 # [4/7] Create Azure AI Foundry Agents
+# Skipped on -CodeOnly: agent IDs are already in App Service settings and .env.
+# Re-creating agents would generate new IDs that would then mismatch the .env,
+# breaking all tracking queries until a full redeploy is performed.
+$agentSettings = @{}
+if ($CodeOnly) {
+    Write-Host ("=" * 70) -ForegroundColor Cyan
+    Write-Host "[4/7] Skipping agent creation (-CodeOnly flag)" -ForegroundColor Yellow
+    Write-Host ("=" * 70) -ForegroundColor Cyan
+    Write-Host "  ℹ  Existing agent IDs in App Service settings will be used" -ForegroundColor DarkGray
+    Write-Host ""
+} else {
 Write-Host ("=" * 70) -ForegroundColor Cyan
 Write-Host "[4/7] Creating Azure AI Foundry Agents..." -ForegroundColor Cyan
 Write-Host ("=" * 70) -ForegroundColor Cyan
 Write-Host "  📦 This will create 8 AI agents in your Azure AI project" -ForegroundColor Gray
 Write-Host "  ⏱ This may take 2-3 minutes..." -ForegroundColor Gray
 Write-Host ""
-
-# Prepare array for agent settings (will be added to app settings later)
-$agentSettings = @{}
 
 # Create agents using Python script
 if (-not $pythonExe) {
@@ -589,6 +599,8 @@ if (-not $pythonExe) {
         }
     }
 }
+
+} # end -not $CodeOnly agent creation block
 
 Write-Host ""
 
