@@ -1,25 +1,48 @@
 """
 Azure AI Agent Tools for Cosmos DB Integration
-Provides tools for agents to query Cosmos DB directly for real-time data
+Provides tools for agents to query Cosmos DB directly for real-time data.
+
+IMPORTANT: These functions are SYNCHRONOUS — they are executed inside a
+ThreadPoolExecutor by base.py and must not be async.  Using the sync
+Cosmos SDK avoids all event-loop/aiohttp credential issues that arise
+when async code runs inside a throwaway event loop on a worker thread.
 """
 
 import json
 import os
-from typing import Any, Dict, List
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
 
+from azure.cosmos import CosmosClient, exceptions as cosmos_exceptions
 from azure.identity import AzureCliCredential, ManagedIdentityCredential
 from dotenv import load_dotenv
-
-# Import existing ParcelTrackingDB for consistent access
-from parcel_tracking_db import ParcelTrackingDB
 
 load_dotenv()
 
 
-async def track_parcel_tool(tracking_number: str) -> str:
+def _get_cosmos_container(container_name: str):
+    """Return a sync ContainerClient.  Creates a fresh credential every call
+    so there is no shared state between tool invocations."""
+    load_dotenv(override=True)
+    endpoint = os.getenv("COSMOS_DB_ENDPOINT")
+    database_name = os.getenv("COSMOS_DB_DATABASE_NAME", "logisticstracking")
+
+    if not endpoint:
+        raise ValueError("COSMOS_DB_ENDPOINT not set")
+
+    if os.getenv("USE_MANAGED_IDENTITY", "false").lower() == "true":
+        credential = ManagedIdentityCredential()
+    else:
+        credential = AzureCliCredential(process_timeout=60)
+
+    client = CosmosClient(endpoint, credential)
+    db = client.get_database_client(database_name)
+    return db.get_container_client(container_name)
+
+
+def track_parcel_tool(tracking_number: str) -> str:
     """
     Tool for AI agents to track a parcel in real-time from Cosmos DB.
-    Uses existing ParcelTrackingDB for consistent access.
 
     Args:
         tracking_number: The parcel tracking number to look up
@@ -30,93 +53,109 @@ async def track_parcel_tool(tracking_number: str) -> str:
     print(f"🔧 Agent Tool: track_parcel_tool called with tracking_number={tracking_number}")
 
     try:
-        # Ensure environment variables are loaded in this thread context
-        load_dotenv(override=True)
+        container = _get_cosmos_container("parcels")
 
-        # Use existing ParcelTrackingDB for consistent access
-        async with ParcelTrackingDB() as db:
-            # Search by tracking_number, barcode, or id (method now searches all)
-            parcel = await db.get_parcel_by_tracking_number(tracking_number)
+        parcels = list(container.query_items(
+            query="""SELECT * FROM c
+                     WHERE c.tracking_number = @id1
+                     OR c.barcode = @id2
+                     OR c.id = @id3""",
+            parameters=[
+                {"name": "@id1", "value": tracking_number},
+                {"name": "@id2", "value": tracking_number},
+                {"name": "@id3", "value": tracking_number},
+            ],
+            enable_cross_partition_query=True,
+        ))
 
-            if not parcel:
-                print(f"   ❌ Parcel not found with identifier: {tracking_number}")
-                return json.dumps(
-                    {
-                        "found": False,
-                        "message": f"No parcel found with identifier {tracking_number}",
-                        "tracking_number": tracking_number,
-                    }
-                )
+        if not parcels:
+            print(f"   ❌ Parcel not found with identifier: {tracking_number}")
+            return json.dumps({
+                "found": False,
+                "message": f"No parcel found with identifier {tracking_number}",
+                "tracking_number": tracking_number,
+            })
 
-            # Get tracking events (method searches by barcode, tracking_number, or id)
-            events = await db.get_parcel_tracking_history(tracking_number)
+        parcel = parcels[0]
 
-            # Build response
-            result = {
-                "found": True,
-                "tracking_number": parcel.get("tracking_number"),
-                "barcode": parcel.get("barcode"),
-                "status": parcel.get("current_status") or parcel.get("status"),
-                "current_location": parcel.get("current_location"),
-                "destination": parcel.get("destination") or f"{parcel.get('destination_city', '')} {parcel.get('destination_state', '')}".strip() or None,
-                "estimated_delivery": parcel.get("estimated_delivery"),
-                "service_type": parcel.get("service_type"),
-                "created_at": parcel.get("created_at") or parcel.get("registration_timestamp"),
-                "sender_name": parcel.get("sender_name") or (parcel.get("sender", {}) or {}).get("name"),
-                "sender_address": parcel.get("sender_address") or (parcel.get("sender", {}) or {}).get("address"),
-                "recipient_name": parcel.get("recipient_name") or (parcel.get("recipient", {}) or {}).get("name"),
-                "recipient_address": parcel.get("recipient_address") or (parcel.get("recipient", {}) or {}).get("address"),
-                "recipient_postcode": parcel.get("destination_postcode") or parcel.get("recipient_postcode") or (parcel.get("recipient", {}) or {}).get("postcode"),
-                "delivery_photos": [
-                    {
-                        "uploaded_by": photo.get("uploaded_by"),
-                        "timestamp": photo.get("timestamp"),
-                        "photo_size_kb": len(photo.get("photo_data", "")) // 1024 if photo.get("photo_data") else 0,
-                        "photo_data": photo.get("photo_data", ""),  # Include base64 image data
-                    }
-                    for photo in parcel.get("delivery_photos", [])
-                ],
-                "lodgement_photos": [
-                    {
-                        "uploaded_by": photo.get("uploaded_by"),
-                        "timestamp": photo.get("timestamp"),
-                        "photo_size_kb": len(photo.get("photo_data", "")) // 1024 if photo.get("photo_data") else 0,
-                        "photo_data": photo.get("photo_data", ""),  # Include base64 image data
-                    }
-                    for photo in parcel.get("lodgement_photos", [])
-                ],
-                "recent_events": [
-                    {
-                        "timestamp": e.get("timestamp"),
-                        "status": e.get("status"),
-                        "location": e.get("location"),
-                        "description": e.get("description"),
-                    }
-                    for e in (events[:5] if events else [])
-                ],
-                "total_events": len(events) if events else 0,
-            }
+        # Get tracking events
+        ev_container = _get_cosmos_container("tracking_events")
+        events = list(ev_container.query_items(
+            query="""SELECT * FROM c
+                     WHERE c.barcode = @id1
+                     OR c.tracking_number = @id2
+                     OR c.id = @id3
+                     ORDER BY c.timestamp DESC""",
+            parameters=[
+                {"name": "@id1", "value": parcel.get("barcode", tracking_number)},
+                {"name": "@id2", "value": tracking_number},
+                {"name": "@id3", "value": tracking_number},
+            ],
+            enable_cross_partition_query=True,
+        ))
 
-            print(
-                f"   ✅ Found parcel - Sender: {result['sender_name']}, Recipient: {result['recipient_name']}, Status: {result['status']}"
-            )
-            return json.dumps(result, indent=2)
+        # Build response
+        result = {
+            "found": True,
+            "tracking_number": parcel.get("tracking_number"),
+            "barcode": parcel.get("barcode"),
+            "status": parcel.get("current_status") or parcel.get("status"),
+            "current_location": parcel.get("current_location"),
+            "destination": parcel.get("destination") or f"{parcel.get('destination_city', '')} {parcel.get('destination_state', '')}".strip() or None,
+            "estimated_delivery": parcel.get("estimated_delivery"),
+            "service_type": parcel.get("service_type"),
+            "created_at": parcel.get("created_at") or parcel.get("registration_timestamp"),
+            "sender_name": parcel.get("sender_name") or (parcel.get("sender", {}) or {}).get("name"),
+            "sender_address": parcel.get("sender_address") or (parcel.get("sender", {}) or {}).get("address"),
+            "recipient_name": parcel.get("recipient_name") or (parcel.get("recipient", {}) or {}).get("name"),
+            "recipient_address": parcel.get("recipient_address") or (parcel.get("recipient", {}) or {}).get("address"),
+            "recipient_postcode": parcel.get("destination_postcode") or parcel.get("recipient_postcode") or (parcel.get("recipient", {}) or {}).get("postcode"),
+            "delivery_photos": [
+                {
+                    "uploaded_by": photo.get("uploaded_by"),
+                    "timestamp": photo.get("timestamp"),
+                    "photo_size_kb": len(photo.get("photo_data", "")) // 1024 if photo.get("photo_data") else 0,
+                    "photo_data": photo.get("photo_data", ""),
+                }
+                for photo in parcel.get("delivery_photos", [])
+            ],
+            "lodgement_photos": [
+                {
+                    "uploaded_by": photo.get("uploaded_by"),
+                    "timestamp": photo.get("timestamp"),
+                    "photo_size_kb": len(photo.get("photo_data", "")) // 1024 if photo.get("photo_data") else 0,
+                    "photo_data": photo.get("photo_data", ""),
+                }
+                for photo in parcel.get("lodgement_photos", [])
+            ],
+            "recent_events": [
+                {
+                    "timestamp": e.get("timestamp"),
+                    "status": e.get("status"),
+                    "location": e.get("location"),
+                    "description": e.get("description"),
+                }
+                for e in (events[:5] if events else [])
+            ],
+            "total_events": len(events) if events else 0,
+        }
+
+        print(f"   ✅ Found parcel - Sender: {result['sender_name']}, Recipient: {result['recipient_name']}, Status: {result['status']}")
+        return json.dumps(result, indent=2)
 
     except Exception as e:
-        error_result = {
+        import traceback
+        traceback.print_exc()
+        return json.dumps({
             "found": False,
             "lookup_error": True,
             "error": str(e),
             "tracking_number": tracking_number,
             "message": "A system error occurred while looking up this parcel. Please try again.",
-        }
-        print(f"   ❌ Agent Tool Error: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return json.dumps(error_result)
+        })
 
 
-async def search_parcels_by_recipient_tool(
+def search_parcels_by_recipient_tool(
     recipient_name: str = None, postcode: str = None, address: str = None, days_back: int = None
 ) -> str:
     """
@@ -136,41 +175,42 @@ async def search_parcels_by_recipient_tool(
     )
 
     try:
-        # Ensure environment variables are loaded
-        load_dotenv(override=True)
+        container = _get_cosmos_container("parcels")
+        query_parts = []
+        parameters = []
 
-        # Use existing ParcelTrackingDB for consistent access
-        async with ParcelTrackingDB() as db:
-            # Use the new search method
-            parcels = await db.search_parcels_by_recipient(
-                recipient_name=recipient_name, postcode=postcode, address=address, days_back=days_back
-            )
+        if recipient_name:
+            query_parts.append("CONTAINS(LOWER(c.recipient_name), @recipient_name)")
+            parameters.append({"name": "@recipient_name", "value": recipient_name.lower()})
+        if postcode:
+            query_parts.append("(c.destination_postcode = @postcode OR c.recipient_postcode = @postcode OR CONTAINS(c.recipient_address, @postcode))")
+            parameters.append({"name": "@postcode", "value": postcode})
+        if address:
+            query_parts.append("CONTAINS(LOWER(c.recipient_address), @address)")
+            parameters.append({"name": "@address", "value": address.lower()})
+        if days_back:
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=days_back)).isoformat()
+            query_parts.append("c.created_at >= @cutoff_date")
+            parameters.append({"name": "@cutoff_date", "value": cutoff})
 
-            result = {
-                "found": len(parcels) > 0,
-                "count": len(parcels),
-                "parcels": parcels,
-                "search_criteria": {
-                    "recipient_name": recipient_name,
-                    "postcode": postcode,
-                    "address": address,
-                    "days_back": days_back,
-                },
-            }
+        if not query_parts:
+            return json.dumps({"found": False, "count": 0, "parcels": [], "error": "No search criteria provided"})
 
-            print(f"   ✅ Found {len(parcels)} parcels matching search criteria")
-            return json.dumps(result, indent=2)
+        query = f"SELECT * FROM c WHERE {' AND '.join(query_parts)} ORDER BY c.created_at DESC"
+        parcels = list(container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))[:20]
+
+        print(f"   ✅ Found {len(parcels)} parcels matching search criteria")
+        return json.dumps({"found": len(parcels) > 0, "count": len(parcels), "parcels": parcels,
+                           "search_criteria": {"recipient_name": recipient_name, "postcode": postcode,
+                                               "address": address, "days_back": days_back}}, indent=2)
 
     except Exception as e:
-        error_result = {"found": False, "error": str(e)}
-        print(f"   ❌ Agent Tool Error: {str(e)}")
         import traceback
-
         traceback.print_exc()
-        return json.dumps(error_result)
+        return json.dumps({"found": False, "error": str(e)})
 
 
-async def search_parcels_by_driver_tool(driver_id: str = None, driver_name: str = None, status: str = None) -> str:
+def search_parcels_by_driver_tool(driver_id: str = None, driver_name: str = None, status: str = None) -> str:
     """
     Tool for AI agents to search parcels assigned to a specific driver.
 
@@ -187,34 +227,37 @@ async def search_parcels_by_driver_tool(driver_id: str = None, driver_name: str 
     )
 
     try:
-        # Ensure environment variables are loaded
-        load_dotenv(override=True)
+        container = _get_cosmos_container("parcels")
+        query_parts = []
+        parameters = []
 
-        # Use existing ParcelTrackingDB for consistent access
-        async with ParcelTrackingDB() as db:
-            # Use the search_parcels_by_driver method
-            parcels = await db.search_parcels_by_driver(driver_id=driver_id, driver_name=driver_name, status=status)
+        if driver_id:
+            query_parts.append("c.assigned_driver = @driver_id")
+            parameters.append({"name": "@driver_id", "value": driver_id})
+        if driver_name:
+            query_parts.append("CONTAINS(LOWER(c.driver_name), @driver_name)")
+            parameters.append({"name": "@driver_name", "value": driver_name.lower()})
+        if status:
+            query_parts.append("c.current_status = @status")
+            parameters.append({"name": "@status", "value": status})
 
-            result = {
-                "found": len(parcels) > 0,
-                "count": len(parcels),
-                "parcels": parcels,
-                "search_criteria": {"driver_id": driver_id, "driver_name": driver_name, "status": status},
-            }
+        if not query_parts:
+            return json.dumps({"found": False, "count": 0, "parcels": [], "error": "No search criteria provided"})
 
-            print(f"   ✅ Found {len(parcels)} parcels for driver")
-            return json.dumps(result, indent=2)
+        query = f"SELECT * FROM c WHERE {' AND '.join(query_parts)} ORDER BY c.assigned_timestamp DESC"
+        parcels = list(container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))
+
+        print(f"   ✅ Found {len(parcels)} parcels for driver")
+        return json.dumps({"found": len(parcels) > 0, "count": len(parcels), "parcels": parcels,
+                           "search_criteria": {"driver_id": driver_id, "driver_name": driver_name, "status": status}}, indent=2)
 
     except Exception as e:
-        error_result = {"found": False, "error": str(e)}
-        print(f"   ❌ Agent Tool Error: {str(e)}")
         import traceback
-
         traceback.print_exc()
-        return json.dumps(error_result)
+        return json.dumps({"found": False, "error": str(e)})
 
 
-async def get_delivery_statistics_tool(state: str = None, date_from: str = None, date_to: str = None) -> str:
+def get_delivery_statistics_tool(state: str = None, date_from: str = None, date_to: str = None) -> str:
     """
     Tool for AI agents to get delivery statistics, optionally filtered by state.
 
@@ -229,49 +272,34 @@ async def get_delivery_statistics_tool(state: str = None, date_from: str = None,
     print(f"🔧 Agent Tool: get_delivery_statistics_tool called with state={state}")
 
     try:
-        # Ensure environment variables are loaded
-        load_dotenv(override=True)
+        container = _get_cosmos_container("parcels")
 
-        # Use existing ParcelTrackingDB for consistent access
-        async with ParcelTrackingDB() as db:
-            # Build query with optional state filter
-            if state:
-                # Normalize state to uppercase
-                state = state.upper()
-                query = "SELECT c.current_status, c.destination_state FROM c WHERE c.destination_state = @state"
-                parameters = [{"name": "@state", "value": state}]
-            else:
-                query = "SELECT c.current_status, c.destination_state FROM c"
-                parameters = []
+        if state:
+            state = state.upper()
+            query = "SELECT c.current_status, c.destination_state FROM c WHERE c.destination_state = @state"
+            parameters = [{"name": "@state", "value": state}]
+        else:
+            query = "SELECT c.current_status, c.destination_state FROM c"
+            parameters = []
 
-            container = db.database.get_container_client("parcels")
-            parcels = []
+        parcels = list(container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))
 
-            async for item in container.query_items(query=query, parameters=parameters):
-                parcels.append(item)
+        status_counts: Dict[str, int] = {}
+        for p in parcels:
+            s = p.get("current_status", "unknown")
+            status_counts[s] = status_counts.get(s, 0) + 1
 
-            # Calculate statistics
-            status_counts = {}
-            for parcel in parcels:
-                # Use current_status field (the actual field in database)
-                status = parcel.get("current_status", "unknown")
-                status_counts[status] = status_counts.get(status, 0) + 1
+        result: Dict[str, Any] = {"total_parcels": len(parcels), "status_breakdown": status_counts}
+        if state:
+            result["state_filter"] = state
 
-            result = {"total_parcels": len(parcels), "status_breakdown": status_counts}
-
-            if state:
-                result["state_filter"] = state
-
-            print(f"   ✅ Statistics - {len(parcels)} total parcels" + (f" in {state}" if state else ""))
-            return json.dumps(result, indent=2)
+        print(f"   ✅ Statistics - {len(parcels)} total parcels" + (f" in {state}" if state else ""))
+        return json.dumps(result, indent=2)
 
     except Exception as e:
-        error_result = {"error": str(e)}
-        print(f"   ❌ Agent Tool Error: {str(e)}")
         import traceback
-
         traceback.print_exc()
-        return json.dumps(error_result)
+        return json.dumps({"error": str(e)})
 
 
 # Tool definitions for Azure AI Agent registration

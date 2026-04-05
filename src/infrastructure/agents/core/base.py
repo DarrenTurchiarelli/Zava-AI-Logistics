@@ -190,27 +190,15 @@ async def call_azure_agent(
                         print(f"   🔨 Calling tool: {function_name}")
                         print(f"      Arguments: {function_args}")
 
-                        # Execute the tool function
+                        # Execute the tool function (sync — no event-loop dance needed)
                         if function_name in TOOL_FUNCTIONS:
                             tool_function = TOOL_FUNCTIONS[function_name]
-                            print(f"      🚀 Executing async tool in separate thread...")
-                            # Run the async function in a way that works with existing event loops
+                            print(f"      🚀 Executing tool in thread pool...")
                             import concurrent.futures
 
-                            def run_async_in_thread():
-                                # Create new event loop in this thread
-                                new_loop = asyncio.new_event_loop()
-                                asyncio.set_event_loop(new_loop)
-                                try:
-                                    result = new_loop.run_until_complete(tool_function(**function_args))
-                                    return result
-                                finally:
-                                    new_loop.close()
-
-                            # Run in thread to avoid event loop conflicts
                             with concurrent.futures.ThreadPoolExecutor() as executor:
-                                future = executor.submit(run_async_in_thread)
-                                output = future.result(timeout=30)  # 30 second timeout
+                                future = executor.submit(tool_function, **function_args)
+                                output = future.result(timeout=30)
 
                             tool_outputs.append({"tool_call_id": tool_call.id, "output": output})
                             print(f"      ✅ Tool output: {output[:200]}...")
