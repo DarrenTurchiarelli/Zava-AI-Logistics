@@ -17,6 +17,22 @@ from datetime import datetime, timezone
 
 from parcel_tracking_db import ParcelTrackingDB
 
+# 11 scenario DCs — one per contraband type, spread across the 40 physical
+# Australian distribution centres that are hardcoded in the UI.
+SCENARIO_DCS = [
+    "DC-SYD-001",  # firearms         — Sydney international gateway
+    "DC-MEL-001",  # narcotics         — Melbourne hub
+    "DC-BNE-001",  # explosives        — Brisbane hub
+    "DC-PER-001",  # pharmaceuticals   — Perth (close to Asia-Pacific shipping lanes)
+    "DC-SYD-002",  # ammunition        — Sydney West
+    "DC-ADL-001",  # suspicious dest.  — Adelaide hub
+    "DC-MEL-002",  # sanctions         — Melbourne East
+    "DC-BNE-002",  # suspicious route  — Brisbane South
+    "DC-SYD-003",  # CITES wildlife    — Sydney North (near airport)
+    "DC-HOB-001",  # biosecurity       — Hobart (port city)
+    "DC-PER-002",  # counterfeit goods — Perth North
+]
+
 
 async def create_approval_requests():
     """Create 11 approval requests for existing parcels"""
@@ -164,8 +180,8 @@ async def create_approval_requests():
             if len(parcels) < len(SCENARIOS):
                 print(f"⚠️  Only found {len(parcels)} parcels (need {len(SCENARIOS)})")
                 print("   Creating placeholder parcels at distribution centres...")
-                DC_LIST = ["DC-SYD-001", "DC-MEL-001", "DC-BNE-001", "DC-PER-001", "DC-ADL-001"]
                 for i in range(len(SCENARIOS) - len(parcels)):
+                    dc = SCENARIO_DCS[i % len(SCENARIO_DCS)]
                     p = {
                         "id": str(uuid.uuid4()),
                         "barcode": f"HOLD{datetime.now().strftime('%Y%m%d')}{i:03d}",
@@ -183,28 +199,25 @@ async def create_approval_requests():
                         "weight": round(1.5 + i * 0.7, 1),
                         "dimensions": "30x20x15",
                         "declared_value": [45, 120, 280, 3200, 1800, 950, 75, 600, 2100, 380, 160][i % 11],
-                        "store_location": DC_LIST[i % len(DC_LIST)],
-                        "origin_location": DC_LIST[i % len(DC_LIST)],
-                        "current_location": DC_LIST[i % len(DC_LIST)],
+                        "store_location": dc,
+                        "origin_location": dc,
+                        "current_location": dc,
                         "current_status": "pending",
                         "fraud_risk_score": [88, 92, 85, 76, 95, 82, 70, 88, 97, 79, 65][i % 11],
                         "registration_timestamp": datetime.now(timezone.utc).isoformat(),
                     }
                     await parcels_container.upsert_item(p)
                     parcels.append(p)
-                    print(f"   ✓ Created placeholder {p['barcode']}")
+                    print(f"   ✓ Created placeholder {p['barcode']} at {dc}")
 
-            # Force all approval parcels to pending status at their DC
-            for parcel in parcels[: len(SCENARIOS)]:
-                dc = parcel.get("store_location") or parcel.get("origin_location") or "DC-SYD-001"
-                update_needed = (
-                    parcel.get("current_status") not in ("pending", "At Depot", "Sorting")
-                    or parcel.get("current_location") != dc
-                )
-                if update_needed:
-                    parcel["current_status"] = "pending"
-                    parcel["current_location"] = dc
-                    await parcels_container.upsert_item(parcel)
+            # Reassign each of the 11 parcels to its designated DC (from SCENARIO_DCS)
+            # and force pending status so they appear in the DC filter on the Approvals page.
+            for idx, parcel in enumerate(parcels[: len(SCENARIOS)]):
+                dc = SCENARIO_DCS[idx % len(SCENARIO_DCS)]
+                parcel["current_status"] = "pending"
+                parcel["store_location"] = dc
+                parcel["current_location"] = dc
+                await parcels_container.upsert_item(parcel)
 
             print(f"✓ Using {min(len(parcels), len(SCENARIOS))} parcels\n")
 

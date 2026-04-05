@@ -43,6 +43,33 @@ load_dotenv()
 # Initialize Faker for Australian data (names/phones only — NOT addresses)
 fake = Faker('en_AU')
 
+# ── Distribution Centre mapping ───────────────────────────────────────────────
+# Maps (state, city) → primary DC ID from the 40 physical Australian DCs.
+# A parcel can originate at its state's DC and transit through hub DCs
+# (e.g. VIC→MEL hub then SYD hub before NSW delivery).
+STATE_DCS = {
+    'NSW': ['DC-SYD-001', 'DC-SYD-002', 'DC-SYD-003', 'DC-NEW-001', 'DC-WOL-001',
+            'DC-DUB-001', 'DC-TAM-001', 'DC-ARM-001', 'DC-ALB-001', 'DC-WAG-001'],
+    'VIC': ['DC-MEL-001', 'DC-MEL-002', 'DC-MEL-003', 'DC-GEE-001', 'DC-BAL-001',
+            'DC-BEN-001', 'DC-TRA-001', 'DC-SHP-001'],
+    'QLD': ['DC-BNE-001', 'DC-BNE-002', 'DC-BNE-003', 'DC-GLD-001', 'DC-TWD-001',
+            'DC-CAI-001', 'DC-TOW-001', 'DC-ROC-001'],
+    'WA':  ['DC-PER-001', 'DC-PER-002', 'DC-BUN-001', 'DC-GER-001', 'DC-KAL-001'],
+    'SA':  ['DC-ADL-001', 'DC-ADL-002', 'DC-MOU-001', 'DC-WHY-001', 'DC-POR-001'],
+    'TAS': ['DC-HOB-001', 'DC-LAU-001'],
+    'ACT': ['DC-CAN-001'],
+    'NT':  ['DC-DAR-001'],
+}
+# Inter-state hub DCs — parcels crossing state lines typically pass through one
+INTERSTATE_HUBS = ['DC-SYD-001', 'DC-MEL-001', 'DC-BNE-001', 'DC-PER-001', 'DC-ADL-001']
+
+
+def pick_dc(state: str) -> str:
+    """Pick a primary DC for a parcel based on its origin state."""
+    options = STATE_DCS.get(state, ['DC-SYD-001'])
+    return random.choice(options)
+
+
 # ── Real GNAF-verified Australian street pools ────────────────────────────────
 # Format: (min_number, max_number, street_name, suburb, postcode)
 # All streets are real and exist in the Geocoded National Address File (GNAF).
@@ -454,7 +481,7 @@ async def create_demo_parcel(db: ParcelTrackingDB, parcel_spec: Dict) -> str:
                 weight=round(random.uniform(0.5, 25.0), 2),
                 dimensions=f"{random.randint(10,50)}x{random.randint(10,50)}x{random.randint(5,30)}",
                 service_type=random.choice(['standard', 'express', 'same-day']),
-                store_location=f"DC-{state}-01"
+                store_location=pick_dc(state)
             )
             break  # success
         except ValueError as e:
@@ -562,7 +589,7 @@ async def create_realistic_parcel(db: ParcelTrackingDB, state: str, city: str, i
                 weight=round(random.uniform(0.1, 30.0), 2),
                 dimensions=f"{random.randint(10,60)}x{random.randint(10,60)}x{random.randint(5,40)}",
                 service_type=random.choice(['standard', 'express', 'express', 'same-day']),  # More express
-                store_location=f"DC-{state}-01",
+                store_location=pick_dc(state),
                 current_status=status  # Persist the chosen status immediately
             )
             break
@@ -574,6 +601,7 @@ async def create_realistic_parcel(db: ParcelTrackingDB, state: str, city: str, i
     
     # Add realistic event history (50% of parcels)
     if random.random() < 0.5:
+        origin_dc = pick_dc(state)
         base_time = datetime.now() - timedelta(days=random.randint(1, 7))
         await db.create_tracking_event(
             barcode=barcode,
@@ -581,15 +609,34 @@ async def create_realistic_parcel(db: ParcelTrackingDB, state: str, city: str, i
             location='Sender',
             description=f'Parcel Registered at {base_time.strftime("%Y-%m-%d %H:%M")}'
         )
-        
+
         # Add more events for parcels in later stages
-        if status in ['Delivered', 'Out For Delivery']:
-            event_time = base_time + timedelta(hours=6)
+        if status in ['Delivered', 'Out For Delivery', 'In Transit', 'Sorting', 'At Depot']:
+            t1 = base_time + timedelta(hours=6)
             await db.create_tracking_event(
                 barcode=barcode,
                 event_type='Sorting',
-                location=f"DC-{state}-01",
-                description=f'Arrived at Sorting Facility at {event_time.strftime("%Y-%m-%d %H:%M")}'
+                location=origin_dc,
+                description=f'Arrived at {origin_dc} Sorting Facility at {t1.strftime("%Y-%m-%d %H:%M")}'
+            )
+
+        # 30% chance of interstate transit through a hub DC
+        if status in ['Delivered', 'Out For Delivery', 'In Transit'] and random.random() < 0.3:
+            hub = random.choice([h for h in INTERSTATE_HUBS if h != origin_dc])
+            t2 = base_time + timedelta(hours=random.randint(12, 30))
+            destination_dc = pick_dc(state)
+            await db.create_tracking_event(
+                barcode=barcode,
+                event_type='In Transit',
+                location=hub,
+                description=f'In transit via {hub} interstate hub at {t2.strftime("%Y-%m-%d %H:%M")}'
+            )
+            t3 = t2 + timedelta(hours=random.randint(4, 18))
+            await db.create_tracking_event(
+                barcode=barcode,
+                event_type='Sorting',
+                location=destination_dc,
+                description=f'Arrived at destination {destination_dc} at {t3.strftime("%Y-%m-%d %H:%M")}'
             )
     
     # Add photos for delivered parcels (30% chance)

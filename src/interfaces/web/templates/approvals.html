@@ -589,60 +589,62 @@ document.addEventListener('DOMContentLoaded', function() {
     const agentResultsContent = document.getElementById('agentResultsContent');
     
     let agentModeEnabled = false;
-    
-    // Define 40 hypothetical distribution centers
+
+    // ── 40 physical Australian distribution centres ───────────────────────────
+    // These are fixed locations. The DC filter always shows all 40 so the depot
+    // manager can filter by any DC regardless of what parcels are currently loaded.
     const distributionCenters = [
-        { id: 'DC-SYD-001', name: 'Sydney Metro Hub', state: 'NSW' },
-        { id: 'DC-SYD-002', name: 'Sydney West Distribution', state: 'NSW' },
-        { id: 'DC-SYD-003', name: 'Sydney North Depot', state: 'NSW' },
-        { id: 'DC-MEL-001', name: 'Melbourne Central Hub', state: 'VIC' },
-        { id: 'DC-MEL-002', name: 'Melbourne East Depot', state: 'VIC' },
-        { id: 'DC-MEL-003', name: 'Melbourne West Warehouse', state: 'VIC' },
-        { id: 'DC-BNE-001', name: 'Brisbane Metro Hub', state: 'QLD' },
-        { id: 'DC-BNE-002', name: 'Brisbane South Distribution', state: 'QLD' },
-        { id: 'DC-BNE-003', name: 'Brisbane North Depot', state: 'QLD' },
-        { id: 'DC-PER-001', name: 'Perth Central Hub', state: 'WA' },
-        { id: 'DC-PER-002', name: 'Perth North Depot', state: 'WA' },
-        { id: 'DC-ADL-001', name: 'Adelaide Metro Hub', state: 'SA' },
-        { id: 'DC-ADL-002', name: 'Adelaide South Distribution', state: 'SA' },
-        { id: 'DC-CAN-001', name: 'Canberra Central Hub', state: 'ACT' },
-        { id: 'DC-HOB-001', name: 'Hobart Distribution Center', state: 'TAS' },
-        { id: 'DC-DAR-001', name: 'Darwin Central Hub', state: 'NT' },
-        { id: 'DC-NEW-001', name: 'Newcastle Regional Hub', state: 'NSW' },
-        { id: 'DC-WOL-001', name: 'Wollongong Depot', state: 'NSW' },
-        { id: 'DC-GEE-001', name: 'Geelong Distribution', state: 'VIC' },
-        { id: 'DC-BAL-001', name: 'Ballarat Depot', state: 'VIC' },
-        { id: 'DC-GLD-001', name: 'Gold Coast Hub', state: 'QLD' },
-        { id: 'DC-TWD-001', name: 'Townsville Regional', state: 'QLD' },
-        { id: 'DC-CAI-001', name: 'Cairns Distribution', state: 'QLD' },
-        { id: 'DC-TOW-001', name: 'Toowoomba Depot', state: 'QLD' },
-        { id: 'DC-LAU-001', name: 'Launceston Hub', state: 'TAS' },
-        { id: 'DC-BEN-001', name: 'Bendigo Regional', state: 'VIC' },
-        { id: 'DC-ALB-001', name: 'Albury-Wodonga Hub', state: 'NSW' },
-        { id: 'DC-WAG-001', name: 'Wagga Wagga Depot', state: 'NSW' },
-        { id: 'DC-TRA-001', name: 'Traralgon Distribution', state: 'VIC' },
-        { id: 'DC-SHP-001', name: 'Shepparton Depot', state: 'VIC' },
-        { id: 'DC-BUN-001', name: 'Bunbury Regional Hub', state: 'WA' },
-        { id: 'DC-GER-001', name: 'Geraldton Distribution', state: 'WA' },
-        { id: 'DC-KAL-001', name: 'Kalgoorlie Depot', state: 'WA' },
-        { id: 'DC-MOU-001', name: 'Mount Gambier Hub', state: 'SA' },
-        { id: 'DC-WHY-001', name: 'Whyalla Distribution', state: 'SA' },
-        { id: 'DC-POR-001', name: 'Port Augusta Depot', state: 'SA' },
-        { id: 'DC-DUB-001', name: 'Dubbo Regional Hub', state: 'NSW' },
-        { id: 'DC-TAM-001', name: 'Tamworth Distribution', state: 'NSW' },
-        { id: 'DC-ARM-001', name: 'Armidale Depot', state: 'NSW' },
-        { id: 'DC-ROC-001', name: 'Rockhampton Hub', state: 'QLD' }
+        { id: 'DC-SYD-001', name: 'Sydney Metro Hub',              state: 'NSW' },
+        { id: 'DC-SYD-002', name: 'Sydney West Distribution',      state: 'NSW' },
+        { id: 'DC-SYD-003', name: 'Sydney North Depot',            state: 'NSW' },
+        { id: 'DC-MEL-001', name: 'Melbourne Central Hub',         state: 'VIC' },
+        { id: 'DC-MEL-002', name: 'Melbourne East Depot',          state: 'VIC' },
+        { id: 'DC-MEL-003', name: 'Melbourne West Warehouse',      state: 'VIC' },
+        { id: 'DC-BNE-001', name: 'Brisbane Metro Hub',            state: 'QLD' },
+        { id: 'DC-BNE-002', name: 'Brisbane South Distribution',   state: 'QLD' },
+        { id: 'DC-BNE-003', name: 'Brisbane North Depot',          state: 'QLD' },
+        { id: 'DC-PER-001', name: 'Perth Central Hub',             state: 'WA'  },
+        { id: 'DC-PER-002', name: 'Perth North Depot',             state: 'WA'  },
+        { id: 'DC-ADL-001', name: 'Adelaide Metro Hub',            state: 'SA'  },
+        { id: 'DC-ADL-002', name: 'Adelaide South Distribution',   state: 'SA'  },
+        { id: 'DC-CAN-001', name: 'Canberra Central Hub',          state: 'ACT' },
+        { id: 'DC-HOB-001', name: 'Hobart Distribution Center',    state: 'TAS' },
+        { id: 'DC-DAR-001', name: 'Darwin Central Hub',            state: 'NT'  },
+        { id: 'DC-NEW-001', name: 'Newcastle Regional Hub',        state: 'NSW' },
+        { id: 'DC-WOL-001', name: 'Wollongong Depot',              state: 'NSW' },
+        { id: 'DC-GEE-001', name: 'Geelong Distribution',          state: 'VIC' },
+        { id: 'DC-BAL-001', name: 'Ballarat Depot',                state: 'VIC' },
+        { id: 'DC-GLD-001', name: 'Gold Coast Hub',                state: 'QLD' },
+        { id: 'DC-TWD-001', name: 'Townsville Regional',           state: 'QLD' },
+        { id: 'DC-CAI-001', name: 'Cairns Distribution',           state: 'QLD' },
+        { id: 'DC-TOW-001', name: 'Toowoomba Depot',               state: 'QLD' },
+        { id: 'DC-LAU-001', name: 'Launceston Hub',                state: 'TAS' },
+        { id: 'DC-BEN-001', name: 'Bendigo Regional',              state: 'VIC' },
+        { id: 'DC-ALB-001', name: 'Albury-Wodonga Hub',            state: 'NSW' },
+        { id: 'DC-WAG-001', name: 'Wagga Wagga Depot',             state: 'NSW' },
+        { id: 'DC-TRA-001', name: 'Traralgon Distribution',        state: 'VIC' },
+        { id: 'DC-SHP-001', name: 'Shepparton Depot',              state: 'VIC' },
+        { id: 'DC-BUN-001', name: 'Bunbury Regional Hub',          state: 'WA'  },
+        { id: 'DC-GER-001', name: 'Geraldton Distribution',        state: 'WA'  },
+        { id: 'DC-KAL-001', name: 'Kalgoorlie Depot',              state: 'WA'  },
+        { id: 'DC-MOU-001', name: 'Mount Gambier Hub',             state: 'SA'  },
+        { id: 'DC-WHY-001', name: 'Whyalla Distribution',          state: 'SA'  },
+        { id: 'DC-POR-001', name: 'Port Augusta Depot',            state: 'SA'  },
+        { id: 'DC-DUB-001', name: 'Dubbo Regional Hub',            state: 'NSW' },
+        { id: 'DC-TAM-001', name: 'Tamworth Distribution',         state: 'NSW' },
+        { id: 'DC-ARM-001', name: 'Armidale Depot',                state: 'NSW' },
+        { id: 'DC-ROC-001', name: 'Rockhampton Hub',               state: 'QLD' },
     ];
-    
+
     // Populate distribution center checkboxes
     const dcDropdownMenu = document.getElementById('dcDropdownMenu');
     distributionCenters.forEach(dc => {
         const li = document.createElement('li');
         li.innerHTML = `
-            <div class="form-check">
+            <div class="form-check px-3 py-1">
                 <input class="form-check-input dc-checkbox" type="checkbox" value="${dc.id}" id="dc_${dc.id}">
                 <label class="form-check-label small" for="dc_${dc.id}">
-                    <strong>${dc.id}</strong> - ${dc.name} (${dc.state})
+                    <strong>${dc.id}</strong> — ${dc.name} (${dc.state})
                 </label>
             </div>
         `;
