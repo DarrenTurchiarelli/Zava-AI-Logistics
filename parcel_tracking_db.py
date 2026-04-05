@@ -1469,7 +1469,7 @@ class ParcelTrackingDB:
             }
 
             # Store in database (using driver_id as partition key)
-            container = self.database.get_container_client("driver_manifests")
+            container = self.database.get_container_client("Manifests")
             await container.create_item(body=manifest)
 
             print(f"✅ Created manifest {manifest_id} for driver {driver_name} with {len(manifest_items)} items")
@@ -1482,7 +1482,7 @@ class ParcelTrackingDB:
     async def get_driver_manifest(self, driver_id: str, manifest_date: str = None) -> Optional[Dict[str, Any]]:
         """Get active manifest for a driver on a specific date"""
         try:
-            container = self.database.get_container_client("driver_manifests")
+            container = self.database.get_container_client("Manifests")
             manifest_date = manifest_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
             # First try to get manifest for the specific date
@@ -1519,7 +1519,7 @@ class ParcelTrackingDB:
     async def get_manifest_by_id(self, manifest_id: str) -> Optional[Dict[str, Any]]:
         """Get manifest by ID"""
         try:
-            container = self.database.get_container_client("driver_manifests")
+            container = self.database.get_container_client("Manifests")
             query = "SELECT * FROM c WHERE c.id = @manifest_id"
             parameters = [{"name": "@manifest_id", "value": manifest_id}]
 
@@ -1556,7 +1556,7 @@ class ParcelTrackingDB:
             all_routes: Dictionary containing all route options for driver selection
         """
         try:
-            container = self.database.get_container_client("driver_manifests")
+            container = self.database.get_container_client("Manifests")
 
             # Get existing manifest
             query = "SELECT * FROM c WHERE c.id = @manifest_id"
@@ -1598,22 +1598,17 @@ class ParcelTrackingDB:
             route_type: The route type to switch to ('fastest', 'shortest', 'safest')
         """
         try:
-            container = self.database.get_container_client("driver_manifests")
+            container = self.database.get_container_client("Manifests")
 
             # Get existing manifest
             query = "SELECT * FROM c WHERE c.id = @manifest_id"
             parameters = [{"name": "@manifest_id", "value": manifest_id}]
 
             async for manifest in container.query_items(query=query, parameters=parameters):
-                # Check if multi-route is enabled
-                if not manifest.get("multi_route_enabled") or not manifest.get("all_routes"):
-                    print(f"⚠️ Multi-route not available for manifest {manifest_id}")
-                    return False
+                all_routes = manifest.get("all_routes") or {}
 
-                all_routes = manifest["all_routes"]  # Changed from route_options to all_routes
-
-                if route_type not in all_routes:
-                    print(f"❌ Route type '{route_type}' not available")
+                if route_type not in all_routes or not all_routes[route_type].get("total_duration_minutes"):
+                    print(f"❌ Route type '{route_type}' not calculated yet for manifest {manifest_id}")
                     return False
 
                 selected_route = all_routes[route_type]
@@ -1644,7 +1639,7 @@ class ParcelTrackingDB:
             driver_note: Optional note from driver about this delivery/address
         """
         try:
-            container = self.database.get_container_client("driver_manifests")
+            container = self.database.get_container_client("Manifests")
 
             # Get existing manifest
             query = "SELECT * FROM c WHERE c.id = @manifest_id"
@@ -1970,7 +1965,7 @@ class ParcelTrackingDB:
     async def get_all_active_manifests(self) -> List[Dict[str, Any]]:
         """Get all active manifests for admin overview"""
         try:
-            container = self.database.get_container_client("driver_manifests")
+            container = self.database.get_container_client("Manifests")
 
             # Get only today's active manifests
             today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -1990,7 +1985,7 @@ class ParcelTrackingDB:
     async def get_manifest_for_parcel(self, barcode: str) -> Optional[Dict[str, Any]]:
         """Get the active manifest containing a specific parcel"""
         try:
-            container = self.database.get_container_client("driver_manifests")
+            container = self.database.get_container_client("Manifests")
             today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
             # Query for active manifests that contain this parcel

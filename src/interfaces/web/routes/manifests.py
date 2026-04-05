@@ -171,7 +171,7 @@ def view_manifest(manifest_id: str):
                 if not db.database:
                     await db.connect()
 
-                container = db.database.get_container_client("driver_manifests")
+                container = db.database.get_container_client("Manifests")
                 query = "SELECT * FROM c WHERE c.id = @manifest_id"
                 parameters = [{"name": "@manifest_id", "value": manifest_id}]
 
@@ -460,7 +460,7 @@ def manage_manifest(manifest_id: str):
                 if not db.database:
                     await db.connect()
                     
-                container = db.database.get_container_client("driver_manifests")
+                container = db.database.get_container_client("Manifests")
                 query = "SELECT * FROM c WHERE c.id = @manifest_id"
                 parameters = [{"name": "@manifest_id", "value": manifest_id}]
 
@@ -825,7 +825,7 @@ def calculate_additional_route(manifest_id: str, route_type: str):
                     manifest["estimated_duration_minutes"] = new_route["total_duration_minutes"]
                     manifest["estimated_distance_km"] = new_route["total_distance_km"]
 
-                    container = db.database.get_container_client("driver_manifests")
+                    container = db.database.get_container_client("Manifests")
                     await container.replace_item(item=manifest["id"], body=manifest)
 
                     return {"success": True, "message": f"{route_type.capitalize()} route calculated",
@@ -915,13 +915,20 @@ def switch_route(manifest_id: str):
         async def run():
             async with ParcelTrackingDB() as db:
                 manifest = await db.get_manifest_by_id(manifest_id)
+                if not manifest:
+                    return False, "Manifest not found"
                 if user.get("role") == UserManager.ROLE_DRIVER:
-                    if not manifest or manifest.get("driver_id") != user.get("driver_id"):
+                    if manifest.get("driver_id") != user.get("driver_id"):
                         return False, "You can only modify your own manifest"
+
+                # Check the requested route type has been calculated
+                all_routes = manifest.get("all_routes") or {}
+                if route_type not in all_routes or not all_routes[route_type].get("total_duration_minutes"):
+                    return False, f"Route '{route_type}' has not been calculated yet. Click 'Calculate Route' first."
 
                 success = await db.update_driver_route_preference(manifest_id, route_type)
                 if not success:
-                    return False, "Failed to switch route"
+                    return False, f"Failed to switch to {route_type} route"
                 updated = await db.get_manifest_by_id(manifest_id)
                 return True, updated
 
