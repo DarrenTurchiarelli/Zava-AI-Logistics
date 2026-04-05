@@ -644,8 +644,9 @@ if (Test-Path ".env") {
     if ($agentIds.Count -gt 0) {
         Write-Host "  ✓ Found/Created $($agentIds.Count) agent ID(s)" -ForegroundColor Green
         
-        # Register tools if Customer Service Agent exists and tools weren't just registered
-        if ($agentIds.ContainsKey("CUSTOMER_SERVICE_AGENT_ID") -and $agentSettings.Count -eq 0) {
+        # Register tools if Customer Service Agent exists, tools weren't just registered,
+        # and Bicep outputs are available (skipped on -CodeOnly where $bicepOutputJson is $null)
+        if ($agentIds.ContainsKey("CUSTOMER_SERVICE_AGENT_ID") -and $agentSettings.Count -eq 0 -and $bicepOutputJson) {
             Write-Host ""
             Write-Host "  🔧 Verifying agent tools are registered..." -ForegroundColor Cyan
             Write-Host "     Agent ID: $($agentIds['CUSTOMER_SERVICE_AGENT_ID'])" -ForegroundColor Gray
