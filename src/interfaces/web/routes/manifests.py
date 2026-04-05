@@ -546,7 +546,12 @@ def api_manifest_progress_stream(manifest_id: str):
 @manifests_bp.route("/map/<manifest_id>")
 @login_required
 def render_map(manifest_id: str):
-    """Render Azure Maps iframe HTML for a manifest's optimized route."""
+    """Render Azure Maps iframe HTML for a manifest's optimized route.
+
+    Pin coordinates are derived server-side (with AU country biasing).
+    Route geometry is fetched client-side from the Atlas Route API so it
+    covers ALL legs regardless of whether pre-stored data exists.
+    """
     try:
         async def get_manifest_data():
             async with ParcelTrackingDB() as db:
@@ -554,8 +559,8 @@ def render_map(manifest_id: str):
 
         manifest = run_async(get_manifest_data())
 
-        if not manifest or not manifest.get("optimized_route"):
-            return "No route data available", 404
+        if not manifest:
+            return "Manifest not found", 404
 
         from services.maps import BingMapsRouter
         router = BingMapsRouter()
@@ -564,65 +569,84 @@ def render_map(manifest_id: str):
         if not subscription_key:
             return "Azure Maps not configured", 500
 
-        addresses = manifest.get("optimized_route", [])
-        if not addresses:
-            return "No addresses to display", 404
-
-        # ── Try to use pre-stored geometry (no live API calls needed) ────────
+        # ── Selected route data (may contain pre-stored geometry) ────────────
         all_routes_data = manifest.get("all_routes", {})
         selected_route_type = manifest.get("selected_route_type", "safest")
         route_data = all_routes_data.get(selected_route_type, {})
 
-        route_coordinates = route_data.get("route_points", [])  # [lon, lat] pairs
+        # Pre-stored pin coords in Atlas [lon, lat] order — most reliable source
+        pin_coords = route_data.get("waypoint_coords", [])
 
-        # Pre-stored pin coordinates (avoid geocoding at render time)
-        pin_coords = route_data.get("waypoint_coords", [])  # [lon, lat] pairs
+        # Pre-stored road geometry — use for instant rendering when available
+        stored_route_points = route_data.get("route_points", [])
 
-        # ── Fallback: geocode + live Directions API call ──────────────────────
-        if not route_coordinates or not pin_coords:
-            coordinates = []
-            for addr in addresses:
-                coords = router.geocode_address(addr)
+        # ── Build pin coords when not pre-stored ─────────────────────────────
+        if not pin_coords:
+            # Prefer all unique delivery addresses from items (always complete).
+            # manifest.optimized_route can be a partial list due to how
+            # Azure Maps returns optimizedWaypoints for intermediate stops only.
+            item_addresses = list(dict.fromkeys(
+                item["recipient_address"]
+                for item in manifest.get("items", [])
+                if item.get("recipient_address")
+            ))
+
+            # Prepend the depot/start location so the route starts from there
+            start_location = None
+            if route_data.get("waypoints"):
+                # First entry in stored waypoints is typically the depot
+                candidate = route_data["waypoints"][0] if route_data["waypoints"] else None
+                if candidate and candidate not in item_addresses:
+                    start_location = candidate
+            if not start_location:
+                # Derive depot from config based on the first delivery address
+                if item_addresses:
+                    try:
+                        from config.depots import get_depot_manager
+                        depot_mgr = get_depot_manager()
+                        start_location = depot_mgr.get_closest_depot_to_address(item_addresses[0])
+                    except Exception:
+                        pass
+
+            geocode_addresses = ([start_location] if start_location else []) + item_addresses
+            if not geocode_addresses:
+                # Last resort: fall back to whatever is in optimized_route
+                geocode_addresses = manifest.get("optimized_route", [])
+
+            if not geocode_addresses:
+                return "No addresses to display", 404
+
+            coordinates = []  # (lat, lon) tuples
+            for addr in geocode_addresses:
+                coords = router.geocode_address(addr)  # returns (lat, lon)
                 if coords:
                     coordinates.append(coords)
 
             if not coordinates:
                 return "Failed to geocode addresses", 500
 
-            if not pin_coords:
-                pin_coords = [[lon, lat] for lat, lon in coordinates]
+            # Convert (lat, lon) → [lon, lat] for Atlas SDK
+            pin_coords = [[lon, lat] for lat, lon in coordinates]
 
-            if not route_coordinates and len(coordinates) <= 25:
-                import requests as _req
-                query_coords = ":".join([f"{lat},{lon}" for lat, lon in coordinates])
-                try:
-                    resp = _req.get(
-                        "https://atlas.microsoft.com/route/directions/json",
-                        params={
-                            "api-version": "1.0",
-                            "subscription-key": subscription_key,
-                            "query": query_coords,
-                            "traffic": "true",
-                            "travelMode": "car",
-                            "routeType": "fastest",
-                        },
-                        timeout=15,
-                    )
-                    resp.raise_for_status()
-                    rdata = resp.json()
-                    if rdata.get("routes"):
-                        for leg in rdata["routes"][0].get("legs", []):
-                            for pt in leg.get("points", []):
-                                route_coordinates.append([pt["longitude"], pt["latitude"]])
-                except Exception as e:
-                    print(f"[render_map] Route API failed: {e} — using straight lines")
+        if not pin_coords:
+            return "No geocoded coordinates available", 500
 
-            if not route_coordinates:
-                route_coordinates = [[lon, lat] for lat, lon in coordinates]
-
-        center_lon, center_lat = pin_coords[0] if pin_coords else (151.2, -33.8)
+        # ── Build template variables ──────────────────────────────────────────
         pins_js = ", ".join([f"[{c[0]}, {c[1]}]" for c in pin_coords])
-        route_coords_js = ", ".join([f"[{c[0]}, {c[1]}]" for c in route_coordinates])
+        stored_route_js = (
+            ", ".join([f"[{c[0]}, {c[1]}]" for c in stored_route_points])
+            if stored_route_points
+            else ""
+        )
+
+        # Centroid for initial camera position (JS will auto-fit via bounds)
+        center_lon = sum(c[0] for c in pin_coords) / len(pin_coords)
+        center_lat = sum(c[1] for c in pin_coords) / len(pin_coords)
+
+        # Atlas routeType mapping ("safest" not a valid Atlas param → use "shortest")
+        atlas_route_type = {"fastest": "fastest", "shortest": "shortest"}.get(
+            selected_route_type, "fastest"
+        )
 
         return f"""<!DOCTYPE html>
 <html>
@@ -631,48 +655,123 @@ def render_map(manifest_id: str):
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.css" />
     <script src="https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.js"></script>
-    <style>body {{ margin: 0; padding: 0; }} #map {{ width: 100%; height: 100vh; }}</style>
+    <style>
+        body {{ margin: 0; padding: 0; }}
+        #map {{ width: 100%; height: 100vh; }}
+        #status {{
+            position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.65); color: #fff;
+            padding: 5px 14px; border-radius: 20px; font: 12px/1.4 sans-serif;
+            z-index: 100; display: none; pointer-events: none;
+        }}
+    </style>
 </head>
 <body>
     <div id="map"></div>
+    <div id="status">Loading route\u2026</div>
     <script>
-        var centerLon = {center_lon};
-        var centerLat = {center_lat};
-        var pins = [{pins_js}];
-        var routeCoords = [{route_coords_js}];
+        var SUB_KEY    = '{subscription_key}';
+        var ROUTE_TYPE = '{atlas_route_type}';
+        var pins       = [{pins_js}];           // [[lon, lat], ...]
+        var storedRoute = [{stored_route_js}];  // pre-stored geometry or []
 
         var map = new atlas.Map('map', {{
-            center: [centerLon, centerLat],
-            zoom: 12,
+            center: [{center_lon}, {center_lat}],
+            zoom: 11,
             language: 'en-US',
             style: 'road',
-            authOptions: {{ authType: 'subscriptionKey', subscriptionKey: '{subscription_key}' }}
+            authOptions: {{ authType: 'subscriptionKey', subscriptionKey: SUB_KEY }}
         }});
 
-        map.events.add('ready', function() {{
-            var dataSource = new atlas.source.DataSource();
-            map.sources.add(dataSource);
+        map.events.add('ready', function () {{
+            var ds = new atlas.source.DataSource();
+            map.sources.add(ds);
 
-            if (routeCoords.length > 1) {{
-                dataSource.add(new atlas.data.Feature(new atlas.data.LineString(routeCoords), {{ isRoute: true }}));
-                map.layers.add(new atlas.layer.LineLayer(dataSource, null, {{
-                    filter: ['==', ['get', 'isRoute'], true],
-                    strokeColor: '#2196F3', strokeWidth: 5, lineJoin: 'round', lineCap: 'round'
-                }}));
-            }}
+            // Route line layer (drawn below pin markers)
+            map.layers.add(new atlas.layer.LineLayer(ds, 'routeLine', {{
+                filter: ['==', ['get', 'type'], 'route'],
+                strokeColor: '#2272B5',
+                strokeWidth: 5,
+                lineJoin: 'round',
+                lineCap: 'round'
+            }}));
 
-            pins.forEach(function(pin, index) {{
-                dataSource.add(new atlas.data.Feature(new atlas.data.Point(pin), {{
-                    title: 'Stop ' + (index + 1), isWaypoint: true
+            // Waypoint symbol layer
+            map.layers.add(new atlas.layer.SymbolLayer(ds, 'waypoints', {{
+                filter: ['==', ['get', 'type'], 'pin'],
+                iconOptions: {{ image: 'marker-blue', size: 0.85, anchor: 'bottom' }},
+                textOptions: {{
+                    textField: ['get', 'label'],
+                    offset: [0, -2.8],
+                    color: '#ffffff',
+                    size: 11,
+                    font: ['StandardFont-Bold']
+                }}
+            }}));
+
+            // Add all waypoint pins
+            pins.forEach(function (pin, i) {{
+                ds.add(new atlas.data.Feature(new atlas.data.Point(pin), {{
+                    type: 'pin',
+                    label: i === 0 ? '\u25a0' : String(i)  // depot = filled square, stops = numbers
                 }}));
             }});
 
-            map.layers.add(new atlas.layer.SymbolLayer(dataSource, null, {{
-                filter: ['==', ['get', 'isWaypoint'], true],
-                iconOptions: {{ image: 'marker-blue', size: 0.8 }},
-                textOptions: {{ textField: ['get', 'title'], offset: [0, -2.5], color: '#ffffff', size: 12 }}
-            }}));
+            // Fit camera to show all pins
+            if (pins.length > 1) {{
+                map.setCamera({{
+                    bounds: atlas.data.BoundingBox.fromPositions(pins),
+                    padding: 60
+                }});
+            }}
+
+            // Use pre-stored geometry for instant rendering, otherwise fetch client-side
+            if (storedRoute.length > 1) {{
+                addRouteLine(ds, storedRoute);
+            }} else if (pins.length >= 2) {{
+                document.getElementById('status').style.display = 'block';
+                fetchRoute(ds, pins);
+            }}
         }});
+
+        function addRouteLine(ds, coords) {{
+            ds.add(new atlas.data.Feature(
+                new atlas.data.LineString(coords),
+                {{ type: 'route' }}
+            ));
+            document.getElementById('status').style.display = 'none';
+        }}
+
+        function fetchRoute(ds, waypoints) {{
+            // Build query string in "lat,lon:lat,lon" format required by Azure Maps
+            var query = waypoints.map(function (p) {{ return p[1] + ',' + p[0]; }}).join(':');
+            var url = 'https://atlas.microsoft.com/route/directions/json'
+                    + '?api-version=1.0'
+                    + '&subscription-key=' + SUB_KEY
+                    + '&query=' + encodeURIComponent(query)
+                    + '&travelMode=car'
+                    + '&routeType=' + ROUTE_TYPE
+                    + '&traffic=true';
+
+            fetch(url)
+                .then(function (r) {{ return r.json(); }})
+                .then(function (data) {{
+                    var coords = [];
+                    if (data.routes && data.routes[0]) {{
+                        (data.routes[0].legs || []).forEach(function (leg) {{
+                            (leg.points || []).forEach(function (pt) {{
+                                coords.push([pt.longitude, pt.latitude]);
+                            }});
+                        }});
+                    }}
+                    // Use road geometry if we got meaningful points, else straight lines
+                    addRouteLine(ds, coords.length > 1 ? coords : waypoints);
+                }})
+                .catch(function () {{
+                    // On any error draw straight lines so all stops remain visible
+                    addRouteLine(ds, waypoints);
+                }});
+        }}
     </script>
 </body>
 </html>"""
