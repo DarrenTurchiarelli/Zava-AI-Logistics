@@ -333,16 +333,48 @@ def create_manifest():
             async with ParcelTrackingDB() as db:
                 # Look up driver's state from users database
                 driver_state = await db.get_user_state(driver_id)
-                return await db.create_driver_manifest(
-                    driver_id, driver_name, barcodes, reason=manifest_reason, driver_state=driver_state
-                )
 
-        manifest_id = run_async(create())
+                # Resolve each identifier — supports tracking_number, barcode, or id
+                resolved_barcodes = []
+                not_found = []
+                for identifier in barcodes:
+                    try:
+                        parcel = await db.get_parcel_by_tracking_number(identifier)
+                    except Exception:
+                        parcel = None
+                    if parcel:
+                        resolved_barcodes.append(parcel["barcode"])
+                    else:
+                        not_found.append(identifier)
+
+                if not resolved_barcodes:
+                    return None, not_found
+
+                manifest_id = await db.create_driver_manifest(
+                    driver_id, driver_name, resolved_barcodes, reason=manifest_reason, driver_state=driver_state
+                )
+                return manifest_id, not_found
+
+        manifest_id, not_found = run_async(create())
 
         if manifest_id:
-            flash(f"Manifest created successfully! ID: {manifest_id}", "success")
+            if not_found:
+                flash(
+                    f"Manifest created (ID: {manifest_id}) but {len(not_found)} parcel(s) not found: "
+                    f"{', '.join(not_found)}",
+                    "warning",
+                )
+            else:
+                flash(f"Manifest created successfully! ID: {manifest_id}", "success")
         else:
-            flash("Error creating manifest", "danger")
+            if not_found:
+                flash(
+                    f"No parcels found for the entered identifiers: {', '.join(not_found)}. "
+                    "Check the tracking numbers and try again.",
+                    "danger",
+                )
+            else:
+                flash("Error creating manifest", "danger")
 
         return redirect(url_for("manifests.admin_manifests"))
 
