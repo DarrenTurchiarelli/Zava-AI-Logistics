@@ -236,12 +236,7 @@
                     {% endif %}
                     {% endif %}
 
-                    {% if approval.reason %}
-                    <div class="alert alert-info alert-permanent mb-3">
-                        <strong>Reason:</strong><br>
-                        {{ approval.reason }}
-                    </div>
-                    {% endif %}
+
 
                     <form method="POST" action="{{ url_for('approvals.process_approval', approval_id=approval.id) }}" class="mt-3">
                         <div class="mb-3">
@@ -533,18 +528,56 @@ function showEscalateModal(approvalId, trackingNumber, riskScore, contrabandType
 }
 
 function simulateNotify(agencyName, btn) {
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Sending...';
-    setTimeout(() => {
-        btn.innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> Sent';
-        const fb = document.getElementById('notifyFeedback');
-        if (fb) {
-            fb.insertAdjacentHTML('beforeend',
-                `<div class="alert alert-success py-1 px-2 mb-1 small">
-                    <i class="bi bi-check-circle"></i> <strong>${agencyName}</strong> notified via Azure Communication Services
-                 </div>`);
-        }
-    }, 1200);
+    // Show ACS integration info modal — does not send a real notification
+    const existingModal = document.getElementById('acsAgencyInfoModal');
+    if (existingModal) existingModal.remove();
+
+    const modalHtml = `
+        <div class="modal fade" id="acsAgencyInfoModal" tabindex="-1" aria-labelledby="acsAgencyInfoModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header bg-info text-white">
+                        <h5 class="modal-title" id="acsAgencyInfoModalLabel">
+                            <i class="bi bi-info-circle"></i> Azure Communication Services Setup
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-info mb-3">
+                            <i class="bi bi-cloud-arrow-up"></i> <strong>Integration Point</strong>
+                        </div>
+                        <p>This is where <strong>Azure Communication Services</strong> would send a secure notification to <strong>${agencyName}</strong>:</p>
+                        <ul class="list-unstyled">
+                            <li class="mb-2"><i class="bi bi-envelope text-primary"></i> Send encrypted email alert</li>
+                            <li class="mb-2"><i class="bi bi-chat-dots text-success"></i> Send priority SMS</li>
+                            <li class="mb-2"><i class="bi bi-telephone text-info"></i> Initiate voice escalation</li>
+                        </ul>
+                        <hr>
+                        <h6><i class="bi bi-gear"></i> Setup Requirements:</h6>
+                        <ol class="small">
+                            <li>Create an Azure Communication Services resource</li>
+                            <li>Configure <code>AZURE_COMMUNICATION_CONNECTION_STRING</code></li>
+                            <li>Add verified sender domain / SMS number</li>
+                            <li>Implement the agency notification API endpoint</li>
+                        </ol>
+                        <div class="alert alert-warning mt-3 mb-0">
+                            <small><i class="bi bi-lightbulb"></i> <strong>Demo Mode:</strong> No notification has been sent. Configure Azure Communication Services to enable live agency dispatch.</small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <a href="https://learn.microsoft.com/en-us/azure/communication-services/" target="_blank" class="btn btn-primary btn-sm">
+                            <i class="bi bi-book"></i> View Documentation
+                        </a>
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const infoModal = new bootstrap.Modal(document.getElementById('acsAgencyInfoModal'));
+    infoModal.show();
+    document.getElementById('acsAgencyInfoModal').addEventListener('hidden.bs.modal', function() { this.remove(); });
 }
 
 function confirmEscalateAll(approvalId, trackingNumber, riskScore, btn) {
