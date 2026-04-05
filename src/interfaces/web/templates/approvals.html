@@ -669,9 +669,7 @@ document.addEventListener('DOMContentLoaded', function() {
             filterApprovalsByDC(selectedIds);
         }
         
-        // Save to localStorage
-        const selectedIds = Array.from(checkboxes).map(cb => cb.value);
-        localStorage.setItem('selectedDCs', JSON.stringify(selectedIds));
+        // (DC filter is intentionally not persisted across page loads)
     }
     
     // Filter approval cards based on selected DCs
@@ -734,16 +732,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Load saved DCs from localStorage
+    // Do NOT restore saved DC filter on page load — always start with all cards visible.
+    // A stale filter from a previous session would hide cards before the user sees them.
     function loadSelectedDCs() {
-        const saved = localStorage.getItem('selectedDCs');
-        if (saved) {
-            const selectedIds = JSON.parse(saved);
-            selectedIds.forEach(id => {
-                const checkbox = document.getElementById(`dc_${id}`);
-                if (checkbox) checkbox.checked = true;
-            });
-        }
+        localStorage.removeItem('selectedDCs');
         updateSelectedDCs();
     }
     
