@@ -680,31 +680,14 @@ document.addEventListener('DOMContentLoaded', function() {
     function filterApprovalsByDC(selectedDCs) {
         const approvalCards = document.querySelectorAll('.approval-card');
         let visibleCount = 0;
-        
+
         approvalCards.forEach(card => {
             const cardDC = card.getAttribute('data-dc');
-            const isFlagged = card.getAttribute('data-flagged') === 'true';
-            
-            if (selectedDCs.length === 0 || isFlagged) {
-                // No filter OR flagged contraband item — always visible
-                card.style.display = 'block';
-                visibleCount++;
-            } else if (selectedDCs.includes(cardDC)) {
-                // DC matches selection - show
-                card.style.display = 'block';
-                visibleCount++;
-            } else {
-                // DC doesn't match - hide
-                card.style.display = 'none';
-            }
+            const show = selectedDCs.length === 0 || selectedDCs.includes(cardDC);
+            card.style.display = show ? 'block' : 'none';
+            if (show) visibleCount++;
         });
-        
-        // Safety net: if filter would hide everything, show all
-        if (visibleCount === 0 && approvalCards.length > 0) {
-            approvalCards.forEach(card => { card.style.display = 'block'; });
-            visibleCount = approvalCards.length;
-        }
-        
+
         // Update the heading to show filtered count
         updateFilteredCount(visibleCount, approvalCards.length);
     }
