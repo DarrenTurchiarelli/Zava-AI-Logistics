@@ -63,22 +63,31 @@ load_dotenv()
 # Initialize Faker for generating test data with Australian locale
 fake = Faker("en_AU")
 
-# Global credential cache to avoid re-authentication in ThreadPoolExecutor
-_cached_credential = None
+# Global credential cache for AzureCliCredential only (spawns subprocess - slow to create)
+# ManagedIdentityCredential is NOT cached because async credentials are tied to their
+# creation event loop. When tools run in new threads with new event loops, a stale
+# credential fails silently causing false "not found" responses from Cosmos DB queries.
+_cached_cli_credential = None
 
 
 def get_cached_credential():
-    """Get or create a cached Azure credential to avoid timeout in threads"""
-    global _cached_credential
-    if _cached_credential is None:
-        # Use Managed Identity when explicitly enabled (Azure deployment)
-        if os.getenv("USE_MANAGED_IDENTITY", "false").lower() == "true":
-            # Running in Azure App Service - use ManagedIdentityCredential
-            _cached_credential = ManagedIdentityCredential()
-        else:
-            # Running locally - use AzureCliCredential with longer timeout for background threads
-            _cached_credential = AzureCliCredential(process_timeout=60)
-    return _cached_credential
+    """Get an Azure credential appropriate for the current execution context.
+    
+    ManagedIdentityCredential: always creates fresh (async, event-loop-bound).
+    AzureCliCredential: cached singleton (subprocess-based, loop-independent).
+    """
+    global _cached_cli_credential
+    if os.getenv("USE_MANAGED_IDENTITY", "false").lower() == "true":
+        # Always create fresh - ManagedIdentityCredential holds an aiohttp session
+        # that is bound to the event loop in which it is first used. Reusing it
+        # across threads/event loops causes silent query failures.
+        return ManagedIdentityCredential()
+    else:
+        # AzureCliCredential spawns `az` subprocess on every get_token(); caching
+        # the Python object is safe since it has no internal aiohttp session.
+        if _cached_cli_credential is None:
+            _cached_cli_credential = AzureCliCredential(process_timeout=60)
+        return _cached_cli_credential
 
 
 class ParcelTrackingDB:
@@ -461,16 +470,20 @@ class ParcelTrackingDB:
             # Search by tracking_number, barcode, or id
             items = container.query_items(
                 query="""SELECT * FROM c
-                         WHERE c.tracking_number = @identifier
-                         OR c.barcode = @identifier
-                         OR c.id = @identifier""",
-                parameters=[{"name": "@identifier", "value": tracking_number}],
+                         WHERE c.tracking_number = @id1
+                         OR c.barcode = @id2
+                         OR c.id = @id3""",
+                parameters=[
+                    {"name": "@id1", "value": tracking_number},
+                    {"name": "@id2", "value": tracking_number},
+                    {"name": "@id3", "value": tracking_number},
+                ],
             )
             parcels = [item async for item in items]
             return parcels[0] if parcels else None
         except exceptions.CosmosHttpResponseError as e:
             print(f"❌ Error retrieving parcel by tracking number: {e}")
-            return None
+            raise  # Re-raise so callers can distinguish error from not-found
 
     async def search_parcels_by_recipient(
         self, recipient_name: str = None, postcode: str = None, address: str = None, days_back: int = None

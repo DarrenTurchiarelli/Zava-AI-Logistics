@@ -4,14 +4,18 @@ API Blueprint - Utility and Service Endpoints
 Provides Azure Maps address validation/autocomplete and Azure Speech synthesis/recognition.
 All endpoints are publicly accessible for customer-facing features.
 """
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, send_file, session
 import os
 import io
 import requests
+from datetime import datetime, timezone
 from typing import Dict, Any
 
 from services.maps_service import get_maps_service
 from services.speech import get_speech_service
+from src.interfaces.web.middleware import login_required
+from parcel_tracking_db import ParcelTrackingDB
+from utils.async_helpers import run_async
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -173,3 +177,86 @@ def recognize_speech():
         "error": "Speech recognition not yet implemented",
         "supported": False
     }), 501
+
+
+@api_bp.route("/address-notes/add", methods=["POST"])
+@login_required
+def add_address_note():
+    """Add a custom address note (drivers & admins)"""
+    try:
+        data = request.get_json()
+        address = (data.get("address") or "").strip()
+        note = (data.get("note") or "").strip()
+        category = (data.get("category") or "general").strip()
+
+        if not address or not note:
+            return jsonify({"success": False, "error": "Address and note are required"}), 400
+
+        user = session.get("user", {})
+        driver_name = user.get("display_name") or user.get("username", "unknown")
+
+        category_hints = {
+            "safety": "[SAFETY] ",
+            "access": "[ACCESS] ",
+            "property": "[PROPERTY] ",
+            "carded": "[CARDED] ",
+        }
+        prefix = category_hints.get(category, "")
+        note_with_hint = (
+            f"{prefix}{note}"
+            if prefix and prefix.strip("[] ").lower() not in note.lower()
+            else note
+        )
+
+        async def do_save():
+            async with ParcelTrackingDB() as db:
+                return await db.save_address_note(address, note_with_hint, driver_name)
+
+        success = run_async(do_save())
+
+        if success:
+            return jsonify({
+                "success": True,
+                "message": "Note saved successfully",
+                "note": {
+                    "note": note_with_hint,
+                    "category": category,
+                    "driver_name": driver_name,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+            })
+        else:
+            return jsonify({"success": False, "error": "Failed to save note"}), 500
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@api_bp.route("/address-notes/dismiss", methods=["POST"])
+@login_required
+def dismiss_address_note():
+    """Dismiss an address note that is no longer accurate (drivers & admins)"""
+    try:
+        data = request.get_json()
+        address = (data.get("address") or "").strip()
+        note_id = (data.get("note_id") or "").strip()
+
+        if not address or not note_id:
+            return jsonify({"success": False, "error": "Address and note_id are required"}), 400
+
+        user = session.get("user", {})
+        dismissed_by = user.get("display_name") or user.get("username", "unknown")
+
+        async def do_dismiss():
+            async with ParcelTrackingDB() as db:
+                return await db.dismiss_address_note(address, note_id, dismissed_by)
+
+        success = run_async(do_dismiss())
+
+        if success:
+            return jsonify({"success": True, "message": "Note dismissed successfully"})
+        else:
+            return jsonify({"success": False, "error": "Note not found"}), 404
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500

@@ -380,7 +380,7 @@
                                             {{ item.priority }}
                                         </span>
                                     </td>
-                                    <td>
+                                    <td id="notesCell{{ loop.index }}">
                                         {% if item.get('address_notes') %}
                                         <button type="button" class="btn btn-sm"
                                                 data-bs-toggle="modal"
@@ -465,13 +465,11 @@
                                         <i class="bi bi-telephone-fill"></i> Call
                                     </a>
                                     {% endif %}
-                                    {% if item.get('address_notes') %}
-                                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    <span id="cardNotesContainer{{ loop.index }}">{% if item.get('address_notes') %}<button type="button" class="btn btn-sm btn-outline-secondary"
                                             data-bs-toggle="modal"
                                             data-bs-target="#notesModal{{ loop.index }}">
                                         <i class="bi bi-sticky"></i> Notes ({{ item.address_notes|length }})
-                                    </button>
-                                    {% endif %}
+                                    </button>{% endif %}</span>
                                     {% if item.status != 'delivered' %}
                                     <button type="button" class="btn btn-sm btn-outline-warning"
                                             onclick="notifyCustomer('{{ item.barcode }}', '{{ item.recipient_name }}', {{ loop.index }})">
@@ -521,10 +519,11 @@
                             <div class="modal-body">
                                 <p><strong>Address:</strong> {{ item.recipient_address }}</p>
 
+                                <div id="notesSection{{ loop.index }}">
                                 {% if item.get('address_notes') %}
                                     <hr>
-                                    <h6>Previous Driver Notes ({{ item.address_notes|length }}):</h6>
-
+                                    <h6 id="notesCountLabel{{ loop.index }}">Previous Driver Notes ({{ item.address_notes|length }}):</h6>
+                                    <div id="notesList{{ loop.index }}">
                                     {% if item.address_notes %}
                                         {% for note in item.address_notes %}
                                         <div class="card mb-2 note-card" id="note-{{ note.note_id | default(loop.index) }}">
@@ -568,9 +567,11 @@
                                     {% else %}
                                         <p class="text-muted">No active notes for this address.</p>
                                     {% endif %}
+                                    </div>
                                 {% else %}
-                                    <p class="text-muted">No notes for this address yet.</p>
+                                    <p class="text-muted" id="noNotesMsg{{ loop.index }}">No notes for this address yet.</p>
                                 {% endif %}
+                                </div>
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn" data-bs-dismiss="modal" style="background-color: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6;">Close</button>
@@ -1237,12 +1238,18 @@ function submitAddressNote(address, loopIndex) {
     .then(data => {
         if (data.success) {
             showToast('Note saved for this address', 'success');
-            // Close modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('addNoteModal' + loopIndex));
-            if (modal) modal.hide();
+
+            // Close the add-note modal
+            const addModal = bootstrap.Modal.getInstance(document.getElementById('addNoteModal' + loopIndex));
+            if (addModal) addModal.hide();
+
             // Clear the form
             document.getElementById('customNote' + loopIndex).value = '';
             document.getElementById('noteCategory' + loopIndex).value = 'general';
+
+            // ── Update DOM immediately ──────────────────────────────────
+            const note = data.note || { note: noteText, category: category, driver_name: 'You', timestamp: new Date().toISOString() };
+            _updateNotesUI(loopIndex, address, note);
         } else {
             showToast('Could not save note: ' + (data.error || 'Unknown error'), 'danger');
         }
@@ -1254,6 +1261,94 @@ function submitAddressNote(address, loopIndex) {
         btn.disabled = false;
         btn.innerHTML = originalHtml;
     });
+}
+
+function _categoryBadge(cat) {
+    const map = {
+        safety:   '<span class="badge bg-danger"><i class="bi bi-exclamation-triangle-fill"></i> Safety</span>',
+        carded:   '<span class="badge bg-warning text-dark"><i class="bi bi-envelope"></i> Carded</span>',
+        access:   '<span class="badge bg-info"><i class="bi bi-key"></i> Access</span>',
+        property: '<span class="badge bg-secondary"><i class="bi bi-house"></i> Property</span>',
+    };
+    return map[cat] || '<span class="badge bg-light text-dark border"><i class="bi bi-chat-text"></i> General</span>';
+}
+
+function _updateNotesUI(loopIndex, address, note) {
+    // ── 1. Count current notes from the table cell ──────────────────
+    const cell = document.getElementById('notesCell' + loopIndex);
+    let noteCount = 0;
+    if (cell) {
+        const existing = cell.querySelector('.btn');
+        if (existing) {
+            const m = existing.textContent.match(/(\d+)/);
+            noteCount = m ? parseInt(m[1]) : 0;
+        }
+    }
+    const newCount = noteCount + 1;
+
+    // ── 2. Update table cell ────────────────────────────────────────
+    if (cell) {
+        cell.innerHTML = `<button type="button" class="btn btn-sm"
+                data-bs-toggle="modal"
+                data-bs-target="#notesModal${loopIndex}"
+                style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
+            <i class="bi bi-sticky" style="color: #007FFF;"></i> ${newCount} note(s)
+        </button>`;
+    }
+
+    // ── 3. Update card view notes button ────────────────────────────
+    const cardContainer = document.getElementById('cardNotesContainer' + loopIndex);
+    if (cardContainer) {
+        cardContainer.innerHTML = `<button type="button" class="btn btn-sm btn-outline-secondary"
+                data-bs-toggle="modal"
+                data-bs-target="#notesModal${loopIndex}">
+            <i class="bi bi-sticky"></i> Notes (${newCount})
+        </button>`;
+    }
+
+    // ── 4. Append new note card to the notes modal ──────────────────
+    const dateStr = note.timestamp ? note.timestamp.slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const noteCardHtml = `
+        <div class="card mb-2 note-card border-primary">
+            <div class="card-body py-2 px-3">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span><i class="bi bi-person-fill"></i> <strong>${note.driver_name}</strong></span>
+                    <div class="d-flex align-items-center gap-2">
+                        ${_categoryBadge(note.category)}
+                    </div>
+                </div>
+                <p class="mb-1">${note.note}</p>
+                <small class="text-muted"><i class="bi bi-clock"></i> ${dateStr}</small>
+            </div>
+        </div>`;
+
+    const section = document.getElementById('notesSection' + loopIndex);
+    if (section) {
+        // Remove "no notes" placeholder if present
+        const noMsg = document.getElementById('noNotesMsg' + loopIndex);
+        if (noMsg) noMsg.remove();
+
+        let list = document.getElementById('notesList' + loopIndex);
+        if (!list) {
+            // First-ever note: build the section from scratch
+            section.innerHTML = `
+                <hr>
+                <h6 id="notesCountLabel${loopIndex}">Previous Driver Notes (${newCount}):</h6>
+                <div id="notesList${loopIndex}">${noteCardHtml}</div>`;
+        } else {
+            // Add to existing list and update header count
+            list.insertAdjacentHTML('beforeend', noteCardHtml);
+            const header = document.getElementById('notesCountLabel' + loopIndex);
+            if (header) header.textContent = `Previous Driver Notes (${newCount}):`;
+        }
+    }
+
+    // ── 5. Open the notes modal so the driver sees their saved note ─
+    const notesModalEl = document.getElementById('notesModal' + loopIndex);
+    if (notesModalEl) {
+        const notesModal = new bootstrap.Modal(notesModalEl);
+        notesModal.show();
+    }
 }
 
 // Photo proof of delivery functions

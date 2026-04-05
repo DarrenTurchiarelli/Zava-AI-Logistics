@@ -103,10 +103,15 @@ async def track_parcel_tool(tracking_number: str) -> str:
             return json.dumps(result, indent=2)
 
     except Exception as e:
-        error_result = {"found": False, "error": str(e), "tracking_number": tracking_number}
+        error_result = {
+            "found": False,
+            "lookup_error": True,
+            "error": str(e),
+            "tracking_number": tracking_number,
+            "message": "A system error occurred while looking up this parcel. Please try again.",
+        }
         print(f"   ❌ Agent Tool Error: {str(e)}")
         import traceback
-
         traceback.print_exc()
         return json.dumps(error_result)
 
