@@ -1,4 +1,4 @@
-"""
+﻿"""
 Validate that Customer Service Agent has tools registered and can access Cosmos DB
 """
 
@@ -12,6 +12,15 @@ from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+# Fix Windows console encoding so emoji/unicode don't crash the script
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except (AttributeError, OSError):
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 load_dotenv(override=True)
 
 # Configuration
