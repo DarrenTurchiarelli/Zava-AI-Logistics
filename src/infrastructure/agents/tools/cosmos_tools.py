@@ -115,19 +115,23 @@ def track_parcel_tool(tracking_number: str) -> str:
                     "uploaded_by": photo.get("uploaded_by"),
                     "timestamp": photo.get("timestamp"),
                     "photo_size_kb": photo.get("photo_size_kb") or (len(photo.get("photo_data", "")) // 1024),
-                    "photo_data": photo.get("photo_data", ""),
+                    # photo_data excluded — base64 content is fetched directly by the UI,
+                    # not passed through the LLM (avoids 10K–100K token tool responses)
+                    "has_photo": bool(photo.get("photo_data")),
                 }
                 for photo in parcel.get("delivery_photos", [])
             ],
+            "delivery_photos_count": len(parcel.get("delivery_photos", [])),
             "lodgement_photos": [
                 {
                     "uploaded_by": photo.get("uploaded_by"),
                     "timestamp": photo.get("timestamp"),
                     "photo_size_kb": photo.get("photo_size_kb") or (len(photo.get("photo_data", "")) // 1024),
-                    "photo_data": photo.get("photo_data", ""),
+                    "has_photo": bool(photo.get("photo_data")),
                 }
                 for photo in parcel.get("lodgement_photos", [])
             ],
+            "lodgement_photos_count": len(parcel.get("lodgement_photos", [])),
             "recent_events": [
                 {
                     "timestamp": e.get("timestamp"),
