@@ -562,7 +562,8 @@ async def create_realistic_parcel(db: ParcelTrackingDB, state: str, city: str, i
                 weight=round(random.uniform(0.1, 30.0), 2),
                 dimensions=f"{random.randint(10,60)}x{random.randint(10,60)}x{random.randint(5,40)}",
                 service_type=random.choice(['standard', 'express', 'express', 'same-day']),  # More express
-                store_location=f"DC-{state}-01"
+                store_location=f"DC-{state}-01",
+                current_status=status  # Persist the chosen status immediately
             )
             break
         except ValueError as e:
@@ -770,6 +771,19 @@ async def main():
         else:
             print(f"  ⚠ No lodgement_sample image found in static/images/ — skipping.")
             print(f"    Save static/images/lodgement_sample.jpg to include a real photo.")
+
+        # Step 6: Generate approval requests
+        print(f"\n  📋 Step 6: Generating Approval Requests")
+        print("-" * 80)
+        try:
+            if script_dir not in sys.path:
+                sys.path.insert(0, script_dir)
+            from create_approval_requests import create_approval_requests
+            approval_success = await create_approval_requests()
+            if not approval_success:
+                print("  ⚠ Approval requests creation skipped (no eligible parcels yet)")
+        except Exception as e:
+            print(f"  ⚠ Could not create approval requests: {e}")
 
         print()
         print("=" * 80)
