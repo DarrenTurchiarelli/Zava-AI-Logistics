@@ -34,61 +34,64 @@ def list_approvals():
                         approval["approval_type"] = request_type.replace("_", " ").title()
                     else:
                         approval["approval_type"] = request_type
-                    
+
+                    # Pass through contraband fields stored by the generator
+                    # (contraband_type, reason, escalate_agencies already on the document)
+
                     # Get parcel details
                     if parcel_barcode:
                         parcel = await db.get_parcel_by_barcode(parcel_barcode)
                         if parcel:
                             if not approval.get("parcel_dc"):
-                                approval["parcel_dc"] = parcel.get("origin_location", "Unknown")
-                            if not approval.get("parcel_status"):
-                                status = parcel.get("current_status", "unknown")
-                                approval["parcel_status"] = status.title() if status else "Unknown"
-                            
-                            approval["parcel_location"] = parcel.get("current_location", "Unknown")
+                                approval["parcel_dc"] = parcel.get("store_location") or parcel.get("origin_location", "Unknown")
+                            # Always show pending — these parcels are held at the DC
+                            approval["parcel_status"] = "Pending — Held at Distribution Centre"
+                            approval["parcel_location"] = (
+                                approval.get("parcel_location")
+                                or parcel.get("current_location")
+                                or approval.get("parcel_dc")
+                                or "Distribution Centre"
+                            )
                             fraud_score = parcel.get("fraud_risk_score") or 0
                             approval["fraud_risk"] = fraud_score
-                            
-                            # Generate fraud risk details
+
+                            # Fraud risk details
                             fraud_details = []
-                            if fraud_score and fraud_score > 70:
+                            if fraud_score > 70:
                                 fraud_details.append("⚠️ High Risk Score")
                                 fraud_details.append("• Suspicious delivery pattern detected")
                                 if fraud_score > 85:
-                                    fraud_details.append("• Extreme risk - requires supervisor review")
-                            elif fraud_score and fraud_score > 30:
+                                    fraud_details.append("• Extreme risk — supervisor review required")
+                            elif fraud_score > 30:
                                 fraud_details.append("⚡ Medium Risk Score")
                                 fraud_details.append("• Some indicators detected")
-                            else:  
+                            else:
                                 fraud_details.append("✓ Low Risk Score")
                                 fraud_details.append("• No significant red flags")
-                            
                             declared_value = parcel.get("declared_value") or 0
                             if declared_value > 1000:
-                                fraud_details.append(f"• High value: ${declared_value}")
-                            
+                                fraud_details.append(f"• High declared value: ${declared_value:,.0f}")
                             approval["fraud_details"] = " | ".join(fraud_details)
-                            
-                            # Generate address notes
-                            recipient_address = parcel.get("recipient_address", "")
-                            if fraud_score and fraud_score > 30:
+
+                            # Address notes pulled from DB or derived from contraband type
+                            contraband_type = approval.get("contraband_type", "")
+                            if contraband_type:
+                                # Show the contraband reason as an address note so the
+                                # Escalate button always appears on the tile
+                                approval["address_notes"] = [approval.get("reason", contraband_type)]
+                            elif fraud_score > 30:
+                                recipient_address = parcel.get("recipient_address", "")
                                 address_notes = await db.get_address_notes(recipient_address)
                                 if not address_notes:
-                                    notes = []
                                     if fraud_score > 70:
                                         risk_reasons = [
                                             "Previous parcels intercepted at this address",
-                                            "Address flagged for illegal imports - customs watch",
+                                            "Address flagged for illegal imports — customs watch",
                                             "Law enforcement watch notice active",
                                         ]
-                                        notes = random.sample(risk_reasons, min(2, len(risk_reasons)))
+                                        approval["address_notes"] = random.sample(risk_reasons, min(2, len(risk_reasons)))
                                     else:
-                                        risk_reasons = [
-                                            "New delivery address - verification required",
-                                            "Address has history of refused deliveries",
-                                        ]
-                                        notes = random.sample(risk_reasons, min(1, len(risk_reasons)))
-                                    approval["address_notes"] = notes
+                                        approval["address_notes"] = ["New delivery address — verification required"]
                                 else:
                                     approval["address_notes"] = address_notes
                             else:
@@ -103,7 +106,7 @@ def list_approvals():
         return render_template("approvals.html", approvals=[])
 
 
-@approvals_bp.route('/api/escalate-to-authorities', methods=['POST'])
+@approvals_bp.route('/api/escalate', methods=['POST'])
 @login_required
 def escalate():
     """Escalate high-risk parcel to authorities"""

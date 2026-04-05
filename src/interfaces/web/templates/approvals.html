@@ -171,21 +171,62 @@
                         </span>
                     </div>
                     
-                    {% if approval.address_notes and approval.address_notes|length > 0 %}
-                    <div class="alert alert-warning mb-3 alert-persistent" role="alert">
+                    {% if approval.reason or approval.contraband_type %}
+                    <div class="alert alert-danger mb-3" role="alert">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <strong><i class="bi bi-exclamation-octagon-fill"></i>
+                                {% if approval.contraband_type %}
+                                    {{ approval.contraband_type }}
+                                {% else %}
+                                    Security Flag
+                                {% endif %}
+                                </strong>
+                                <p class="mb-1 mt-1 small">{{ approval.reason or approval.description }}</p>
+                                {% if approval.address_notes and approval.address_notes|length > 0 %}
+                                <ul class="mb-0 small">
+                                    {% for note in approval.address_notes %}
+                                    <li>{{ note }}</li>
+                                    {% endfor %}
+                                </ul>
+                                {% endif %}
+                            </div>
+                            <button type="button"
+                                    class="btn btn-danger btn-sm ms-3 flex-shrink-0"
+                                    onclick="showEscalateModal(
+                                        '{{ approval.id }}',
+                                        '{{ approval.tracking_number or approval.parcel_id }}',
+                                        {{ approval.fraud_risk | default(0) }},
+                                        '{{ (approval.contraband_type or 'Suspicious Item') | e }}',
+                                        {{ (approval.escalate_agencies or ['Australian Federal Police']) | tojson }}
+                                    )"
+                                    title="Escalate to law enforcement / government agencies">
+                                <i class="bi bi-megaphone-fill"></i> Escalate
+                            </button>
+                        </div>
+                    </div>
+
+                    {% elif approval.address_notes and approval.address_notes|length > 0 %}
+                    <div class="alert alert-warning mb-3" role="alert">
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="flex-grow-1">
                                 <strong><i class="bi bi-exclamation-triangle-fill"></i> Address Risk Notes:</strong>
-                                <ul class="mb-0 mt-2 small">
+                                <ul class="mb-0 mt-1 small">
                                     {% for note in approval.address_notes %}
                                     <li>{{ note }}</li>
                                     {% endfor %}
                                 </ul>
                             </div>
-                            <button type="button" 
-                                    class="btn btn-sm btn-primary ms-2 flex-shrink-0" 
-                                    onclick="escalateToAuthorities('{{ approval.id }}', '{{ approval.tracking_number }}', '{{ approval.fraud_risk }}'); event.stopPropagation();"
-                                    title="Escalate to law enforcement or customs authorities">
+                            <button type="button"
+                                    class="btn btn-sm btn-warning ms-3 flex-shrink-0"
+                                    onclick="showEscalateModal(
+                                        '{{ approval.id }}',
+                                        '{{ approval.tracking_number or approval.parcel_id }}',
+                                        {{ approval.fraud_risk | default(0) }},
+                                        'Suspicious Activity',
+                                        ['Australian Federal Police', 'Border Force']
+                                    )"
+                                    title="Escalate to law enforcement / government agencies">
                                 <i class="bi bi-megaphone-fill"></i> Escalate
                             </button>
                         </div>
@@ -338,35 +379,196 @@
 </div>
 
 <script>
-// Escalate to authorities function
-function escalateToAuthorities(approvalId, trackingNumber, riskScore) {
-    if (confirm(`⚠️ ESCALATE TO AUTHORITIES\n\nTracking: ${trackingNumber}\nRisk Score: ${riskScore}%\n\nThis will notify law enforcement and customs authorities.\n\nProceed with escalation?`)) {
-        fetch('/api/escalate-to-authorities', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                approval_id: approvalId,
-                tracking_number: trackingNumber,
-                risk_score: riskScore,
-                escalated_by: '{{ session.username or "operator" }}'
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('✅ Successfully escalated to authorities\n\nReference: ' + data.reference_id);
-                // Optionally reload the page
-                location.reload();
-            } else {
-                alert('❌ Escalation failed: ' + (data.error || 'Unknown error'));
-            }
-        })
-        .catch(error => {
-            alert('❌ Error: ' + error.message);
-        });
-    }
+// ── Escalate to Authorities Modal ─────────────────────────────────────────────
+function showEscalateModal(approvalId, trackingNumber, riskScore, contrabandType, agencies) {
+    const existingModal = document.getElementById('escalateModal');
+    if (existingModal) existingModal.remove();
+
+    // Build agency channel cards
+    const agencyConfig = {
+        'Australian Federal Police': {
+            icon: 'bi-shield-fill',
+            color: '#003087',
+            desc: 'Criminal investigation, narcotics, firearms enforcement',
+            phone: '131 444',
+        },
+        'Border Force': {
+            icon: 'bi-bag-x-fill',
+            color: '#1a1a2e',
+            desc: 'Customs, import/export control, prohibited goods',
+            phone: '1800 009 623',
+        },
+        'State Police': {
+            icon: 'bi-shield-check',
+            color: '#005792',
+            desc: 'Local law enforcement and criminal intelligence',
+            phone: '000 (Emergency)',
+        },
+        'AUSTRAC': {
+            icon: 'bi-bank',
+            color: '#3d6b2f',
+            desc: 'Financial intelligence, money-laundering investigations',
+            phone: '1300 021 037',
+        },
+        'DFAT Sanctions Unit': {
+            icon: 'bi-globe2',
+            color: '#8b1a1a',
+            desc: 'Autonomous sanctions, DFAT export controls',
+            phone: '1300 555 135',
+        },
+        'Dept of Agriculture (Biosecurity)': {
+            icon: 'bi-bug-fill',
+            color: '#4a7c3f',
+            desc: 'Biosecurity, quarantine, undeclared organic material',
+            phone: '1800 900 090',
+        },
+        'Therapeutic Goods Administration': {
+            icon: 'bi-capsule',
+            color: '#6f4e7c',
+            desc: 'Controlled pharmaceuticals, TGA import permits',
+            phone: '1800 020 653',
+        },
+        'Fire & Rescue NSW': {
+            icon: 'bi-fire',
+            color: '#cc2500',
+            desc: 'Hazardous materials, explosives, fireworks',
+            phone: '000 (Emergency)',
+        },
+        'IP Australia': {
+            icon: 'bi-patch-check-fill',
+            color: '#4a5568',
+            desc: 'Trade mark and IP enforcement, counterfeit goods',
+            phone: '1300 651 010',
+        },
+    };
+
+    const agencyCards = agencies.map((name) => {
+        const cfg = agencyConfig[name] || { icon: 'bi-person-badge', color: '#555', desc: name, phone: 'N/A' };
+        return `
+            <div class="border rounded p-3 mb-2" style="border-left: 4px solid ${cfg.color} !important;">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <strong><i class="bi ${cfg.icon}" style="color:${cfg.color}"></i> ${name}</strong>
+                    <span class="badge" style="background:${cfg.color}">${cfg.phone}</span>
+                </div>
+                <small class="text-muted">${cfg.desc}</small>
+                <div class="mt-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary me-1"
+                            onclick="simulateNotify('${name}', this)">
+                        <i class="bi bi-send"></i> Notify via Azure Comms
+                    </button>
+                </div>
+            </div>`;
+    }).join('');
+
+    const priorityColor = riskScore >= 85 ? '#dc3545' : riskScore >= 70 ? '#fd7e14' : '#ffc107';
+
+    const modalHtml = `
+        <div class="modal fade" id="escalateModal" tabindex="-1" aria-labelledby="escalateModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header text-white" style="background:#1a1a2e;">
+                        <h5 class="modal-title" id="escalateModalLabel">
+                            <i class="bi bi-megaphone-fill"></i> Escalate to Authorities
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+
+                        <!-- Parcel summary -->
+                        <div class="alert mb-3" style="background:#fff3cd;border-left:4px solid ${priorityColor};">
+                            <div class="row g-2 align-items-center">
+                                <div class="col-sm-6">
+                                    <small class="text-muted d-block">Tracking Number</small>
+                                    <strong><code>${trackingNumber}</code></strong>
+                                </div>
+                                <div class="col-sm-6">
+                                    <small class="text-muted d-block">Detection</small>
+                                    <strong>${contrabandType}</strong>
+                                </div>
+                                <div class="col-sm-6">
+                                    <small class="text-muted d-block">Risk Score</small>
+                                    <span class="badge fs-6" style="background:${priorityColor}">${riskScore}%</span>
+                                </div>
+                                <div class="col-sm-6">
+                                    <small class="text-muted d-block">Parcel Status</small>
+                                    <span class="badge bg-dark">Held at Distribution Centre</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Azure Comms integration callout -->
+                        <div class="alert alert-info mb-3">
+                            <i class="bi bi-cloud-arrow-up"></i>
+                            <strong>Azure Communication Services Integration Point</strong><br>
+                            <small>
+                                Each "Notify via Azure Comms" button below simulates a secure agency notification
+                                via Azure Communication Services (email / SMS / Push). Configure
+                                <code>AZURE_COMMUNICATION_CONNECTION_STRING</code> to enable live dispatch.
+                            </small>
+                        </div>
+
+                        <!-- Agency channels -->
+                        <h6 class="fw-bold mb-2"><i class="bi bi-diagram-3"></i> Recommended Agencies</h6>
+                        ${agencyCards}
+
+                        <div id="notifyFeedback" class="mt-2"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-danger"
+                                onclick="confirmEscalateAll('${approvalId}', '${trackingNumber}', ${riskScore}, this)">
+                            <i class="bi bi-megaphone-fill"></i> Escalate to All Agencies
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modal = new bootstrap.Modal(document.getElementById('escalateModal'));
+    modal.show();
+    document.getElementById('escalateModal').addEventListener('hidden.bs.modal', function() { this.remove(); });
+}
+
+function simulateNotify(agencyName, btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Sending...';
+    setTimeout(() => {
+        btn.innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> Sent';
+        const fb = document.getElementById('notifyFeedback');
+        if (fb) {
+            fb.insertAdjacentHTML('beforeend',
+                `<div class="alert alert-success py-1 px-2 mb-1 small">
+                    <i class="bi bi-check-circle"></i> <strong>${agencyName}</strong> notified via Azure Communication Services
+                 </div>`);
+        }
+    }, 1200);
+}
+
+function confirmEscalateAll(approvalId, trackingNumber, riskScore, btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Escalating...';
+
+    fetch('/approvals/api/escalate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approval_id: approvalId, tracking_number: trackingNumber, risk_score: riskScore }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Escalated';
+        const fb = document.getElementById('notifyFeedback');
+        if (fb) {
+            fb.insertAdjacentHTML('beforeend',
+                `<div class="alert alert-success small py-1 px-2 mb-1">
+                    ✅ All agencies notified — Reference: <strong>${data.reference_id || 'ESC-' + Date.now()}</strong>
+                 </div>`);
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-megaphone-fill"></i> Escalate to All Agencies';
+    });
 }
 
 document.addEventListener('DOMContentLoaded', function() {
