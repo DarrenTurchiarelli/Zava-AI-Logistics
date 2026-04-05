@@ -367,7 +367,8 @@ class BingMapsRouter:
             # Generate map URL
             map_url = self.generate_map_url(optimized_addresses)
 
-            # Build detailed route with individual legs
+            # Extract route geometry (road-following coordinates) from response
+            route_points = []  # [lon, lat] pairs for Atlas LineString
             route_legs = []
             for leg in route.get("legs", []):
                 leg_summary = leg.get("summary", {})
@@ -378,6 +379,13 @@ class BingMapsRouter:
                         "summary": f"Leg {len(route_legs) + 1}",
                     }
                 )
+                for pt in leg.get("points", []):
+                    route_points.append([pt["longitude"], pt["latitude"]])
+
+            # Waypoint lat/lon for map pins (pre-geocoded)
+            waypoint_coords = [[lon, lat] for lat, lon in coordinates]
+
+            print(f"✓ Extracted {len(route_points)} road geometry points, {len(waypoint_coords)} pin coords")
 
             return {
                 "waypoints": optimized_addresses,
@@ -385,6 +393,8 @@ class BingMapsRouter:
                 "total_duration_minutes": round(total_duration, 1),
                 "route_url": map_url,
                 "route_legs": route_legs,
+                "route_points": route_points,
+                "waypoint_coords": waypoint_coords,
                 "optimized": True,
                 "traffic_considered": route_type == "fastest",
                 "route_type": route_type,

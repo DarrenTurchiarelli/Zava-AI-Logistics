@@ -92,6 +92,8 @@ def driver_manifest():
                             safest_route["total_distance_km"],
                             is_optimized=safest_route.get("optimized", False),
                             traffic_considered=safest_route.get("traffic_considered", False),
+                            route_type="safest",
+                            all_routes={"safest": safest_route},
                         )
 
                         # Refresh manifest
@@ -126,6 +128,16 @@ def driver_manifest():
                 manifest["route_type_display"] = "Initial Nearest-Neighbor Route"
             else:
                 manifest["route_type_display"] = manifest["selected_route_type"].capitalize() + " Route"
+
+        # Enrich manifest items with address notes from previous deliveries
+        if manifest and manifest.get("items"):
+            async def load_address_notes():
+                async with ParcelTrackingDB() as db:
+                    for item in manifest["items"]:
+                        addr = item.get("recipient_address", "")
+                        if addr:
+                            item["address_notes"] = await db.get_address_notes(addr)
+            run_async(load_address_notes())
 
         return render_template("driver_manifest.html", manifest=manifest)
 
@@ -548,62 +560,69 @@ def render_map(manifest_id: str):
         from services.maps import BingMapsRouter
         router = BingMapsRouter()
 
-        addresses = manifest.get("optimized_route", [])
-        if not addresses:
-            return "No addresses to display", 404
-
-        coordinates = []
-        for addr in addresses:
-            coords = router.geocode_address(addr)
-            if coords:
-                coordinates.append(coords)
-
-        if not coordinates:
-            return "Failed to geocode addresses", 500
-
         subscription_key = router.subscription_key
         if not subscription_key:
             return "Azure Maps not configured", 500
 
-        # Use pre-stored route geometry if available
-        route_coordinates = []
+        addresses = manifest.get("optimized_route", [])
+        if not addresses:
+            return "No addresses to display", 404
+
+        # ── Try to use pre-stored geometry (no live API calls needed) ────────
         all_routes_data = manifest.get("all_routes", {})
         selected_route_type = manifest.get("selected_route_type", "safest")
         route_data = all_routes_data.get(selected_route_type, {})
 
-        if route_data.get("route_points"):
-            route_coordinates = route_data["route_points"]
-        elif len(coordinates) <= 25:
-            import requests as _req
-            query_coords = ":".join([f"{lat},{lon}" for lat, lon in coordinates])
-            try:
-                resp = _req.get(
-                    "https://atlas.microsoft.com/route/directions/json",
-                    params={
-                        "api-version": "1.0",
-                        "subscription-key": subscription_key,
-                        "query": query_coords,
-                        "traffic": "true",
-                        "travelMode": "car",
-                        "routeType": "fastest",
-                    },
-                    timeout=10,
-                )
-                resp.raise_for_status()
-                rdata = resp.json()
-                if rdata.get("routes"):
-                    for leg in rdata["routes"][0].get("legs", []):
-                        for pt in leg.get("points", []):
-                            route_coordinates.append([pt["longitude"], pt["latitude"]])
-            except Exception:
+        route_coordinates = route_data.get("route_points", [])  # [lon, lat] pairs
+
+        # Pre-stored pin coordinates (avoid geocoding at render time)
+        pin_coords = route_data.get("waypoint_coords", [])  # [lon, lat] pairs
+
+        # ── Fallback: geocode + live Directions API call ──────────────────────
+        if not route_coordinates or not pin_coords:
+            coordinates = []
+            for addr in addresses:
+                coords = router.geocode_address(addr)
+                if coords:
+                    coordinates.append(coords)
+
+            if not coordinates:
+                return "Failed to geocode addresses", 500
+
+            if not pin_coords:
+                pin_coords = [[lon, lat] for lat, lon in coordinates]
+
+            if not route_coordinates and len(coordinates) <= 25:
+                import requests as _req
+                query_coords = ":".join([f"{lat},{lon}" for lat, lon in coordinates])
+                try:
+                    resp = _req.get(
+                        "https://atlas.microsoft.com/route/directions/json",
+                        params={
+                            "api-version": "1.0",
+                            "subscription-key": subscription_key,
+                            "query": query_coords,
+                            "traffic": "true",
+                            "travelMode": "car",
+                            "routeType": "fastest",
+                        },
+                        timeout=15,
+                    )
+                    resp.raise_for_status()
+                    rdata = resp.json()
+                    if rdata.get("routes"):
+                        for leg in rdata["routes"][0].get("legs", []):
+                            for pt in leg.get("points", []):
+                                route_coordinates.append([pt["longitude"], pt["latitude"]])
+                except Exception as e:
+                    print(f"[render_map] Route API failed: {e} — using straight lines")
+
+            if not route_coordinates:
                 route_coordinates = [[lon, lat] for lat, lon in coordinates]
 
-        if not route_coordinates:
-            route_coordinates = [[lon, lat] for lat, lon in coordinates]
-
-        center_lat, center_lon = coordinates[0]
-        pins_js = ", ".join([f"[{lon}, {lat}]" for lat, lon in coordinates])
-        route_coords_js = ", ".join([f"[{lon}, {lat}]" for lon, lat in route_coordinates])
+        center_lon, center_lat = pin_coords[0] if pin_coords else (151.2, -33.8)
+        pins_js = ", ".join([f"[{c[0]}, {c[1]}]" for c in pin_coords])
+        route_coords_js = ", ".join([f"[{c[0]}, {c[1]}]" for c in route_coordinates])
 
         return f"""<!DOCTYPE html>
 <html>
