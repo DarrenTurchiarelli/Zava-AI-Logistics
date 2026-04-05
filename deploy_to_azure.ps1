@@ -979,6 +979,11 @@ try {
     Write-Host "    Check logs with: az webapp log tail --name $WebAppName --resource-group $frontendRgName" -ForegroundColor Gray
 }
 
+# Tasks 3 & 4 require Bicep outputs — skip on code-only redeployments
+if ($CodeOnly) {
+    Write-Host "  ℹ  Skipping database init and demo data (not required for code-only deploy)" -ForegroundColor DarkGray
+} else {
+
 # Task 3: Initialize default users
 Write-Host "  👤 Initializing default user accounts..." -ForegroundColor Cyan
 Write-Host "     (This requires Cosmos DB RBAC permissions to be active)" -ForegroundColor Gray
@@ -1564,6 +1569,8 @@ try {
         Write-Host "      az resource update --ids $cosmosResourceId --set properties.disableLocalAuth=true --api-version 2023-11-15" -ForegroundColor Gray
     }
 }
+
+} # end -not $CodeOnly block
 
 Write-Host "✓ Post-deployment tasks completed" -ForegroundColor Green
 Write-Host ""
