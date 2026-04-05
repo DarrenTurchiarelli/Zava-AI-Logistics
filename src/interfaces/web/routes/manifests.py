@@ -171,7 +171,7 @@ def view_manifest(manifest_id: str):
                 if not db.database:
                     await db.connect()
 
-                container = db.database.get_container_client("Manifests")
+                container = db.database.get_container_client("driver_manifests")
                 query = "SELECT * FROM c WHERE c.id = @manifest_id"
                 parameters = [{"name": "@manifest_id", "value": manifest_id}]
 
@@ -460,7 +460,7 @@ def manage_manifest(manifest_id: str):
                 if not db.database:
                     await db.connect()
                     
-                container = db.database.get_container_client("Manifests")
+                container = db.database.get_container_client("driver_manifests")
                 query = "SELECT * FROM c WHERE c.id = @manifest_id"
                 parameters = [{"name": "@manifest_id", "value": manifest_id}]
 
@@ -825,7 +825,7 @@ def calculate_additional_route(manifest_id: str, route_type: str):
                     manifest["estimated_duration_minutes"] = new_route["total_duration_minutes"]
                     manifest["estimated_distance_km"] = new_route["total_distance_km"]
 
-                    container = db.database.get_container_client("Manifests")
+                    container = db.database.get_container_client("driver_manifests")
                     await container.replace_item(item=manifest["id"], body=manifest)
 
                     return {"success": True, "message": f"{route_type.capitalize()} route calculated",

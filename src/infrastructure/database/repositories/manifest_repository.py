@@ -52,7 +52,7 @@ class CosmosManifestRepository(IManifestRepository):
     
     def __init__(self, database_client):
         self.database = database_client
-        self.container_name = "Manifests"
+        self.container_name = "driver_manifests"
         self._container = None
     
     async def _get_container(self):

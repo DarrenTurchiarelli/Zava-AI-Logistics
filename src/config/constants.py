@@ -345,7 +345,7 @@ class CosmosContainer(str, Enum):
     PARCELS = "parcels"
     TRACKING_EVENTS = "tracking_events"
     DELIVERY_ATTEMPTS = "delivery_attempts"
-    MANIFESTS = "manifests"
+    MANIFESTS = "driver_manifests"
     USERS = "users"
     APPROVAL_REQUESTS = "approval_requests"
     FRAUD_REPORTS = "fraud_reports"

@@ -155,7 +155,7 @@ class CosmosDBClient:
             {"id": "suspicious_messages", "partition_key": PartitionKey(path="/report_date")},
             {"id": "address_history", "partition_key": PartitionKey(path="/address_normalized")},
             {"id": "users", "partition_key": PartitionKey(path="/username")},
-            {"id": "Manifests", "partition_key": PartitionKey(path="/manifest_id")},
+            {"id": "driver_manifests", "partition_key": PartitionKey(path="/driver_id")},
             {"id": "address_notes", "partition_key": PartitionKey(path="/address_normalized")},
         ]
         
