@@ -362,7 +362,7 @@ def public_chatbot_stream():
     return Response(stream_with_context(generate()), mimetype="text/event-stream")
 
 
-@chatbot_bp.route("/report-fraud", methods=["GET", "POST"])
+@chatbot_bp.route("/fraud/report", methods=["GET", "POST"])
 def report_fraud():
     """
     Report suspicious message - Publicly accessible with automated workflow
@@ -391,8 +391,16 @@ def report_fraud():
             if "fraud_file" in request.files:
                 file = request.files["fraud_file"]
                 if file and file.filename:
-                    # TODO: Implement file processing (EML, MSG, TXT)
-                    pass
+                    filename = file.filename.lower()
+                    try:
+                        if filename.endswith((".txt", ".eml", ".msg")):
+                            raw = file.read()
+                            file_text = raw.decode("utf-8", errors="replace")
+                        else:
+                            # For images and unsupported types, include filename as context
+                            file_text = f"[Uploaded file: {file.filename}]"
+                    except Exception:
+                        file_text = f"[Uploaded file: {file.filename}]"
 
             # Combine manual text and file text
             combined_message = message_content or file_text

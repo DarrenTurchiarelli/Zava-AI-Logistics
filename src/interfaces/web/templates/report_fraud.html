@@ -263,8 +263,9 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Analysing...';
             
-            // Add anchor to URL so page scrolls to results after reload
-            form.action = '/fraud/report#analysisResults';
+            // Append anchor so browser scrolls to results after reload
+            // Use the form's own action (set by url_for) to avoid hardcoding
+            form.action = form.getAttribute('action').split('#')[0] + '#analysisResults';
         });
     }
     
