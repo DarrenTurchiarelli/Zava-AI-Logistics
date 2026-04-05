@@ -38,7 +38,7 @@ async def create_approval_requests():
             # Get 15 existing parcels
             print("\n📦 Finding existing parcels...")
             query = "SELECT TOP 15 * FROM c WHERE c.current_status IN ('At Depot', 'In Transit') ORDER BY c.registration_timestamp DESC"
-            parcels = [p async for p in parcels_container.query_items(query, enable_cross_partition_query=True)]
+            parcels = [p async for p in parcels_container.query_items(query)]
             
             if len(parcels) < 11:
                 print(f"⚠️  Only found {len(parcels)} parcels (need 11)")
@@ -99,7 +99,7 @@ async def create_approval_requests():
                 
                 # Check if request already exists
                 existing_query = f"SELECT * FROM c WHERE c.parcel_barcode = '{parcel['barcode']}'"
-                existing = [r async for r in approval_container.query_items(existing_query, enable_cross_partition_query=True)]
+                existing = [r async for r in approval_container.query_items(existing_query)]
                 
                 if existing:
                     print(f"   ⏭️  {parcel['barcode'][:20]:20} - already has request")

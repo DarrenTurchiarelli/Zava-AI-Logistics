@@ -110,7 +110,9 @@ def ai_insights():
                 status = (parcel.get("current_status") or "Unknown").lower()
                 status_counts_lower[status] = status_counts_lower.get(status, 0) + 1
 
-            in_transit = status_counts_lower.get("in transit", 0)
+            # "in_transit" (underscore) comes from driver manifest assignments;
+            # "in transit" (space) comes from the bulk generator — merge both
+            in_transit = status_counts_lower.get("in transit", 0) + status_counts_lower.get("in_transit", 0)
             delivered = status_counts_lower.get("delivered", 0)
             at_depot = status_counts_lower.get("at depot", 0)
             sorting = status_counts_lower.get("sorting", 0)
