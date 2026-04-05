@@ -194,14 +194,12 @@
                                 {% endif %}
                             </div>
                             <button type="button"
-                                    class="btn btn-danger btn-sm ms-3 flex-shrink-0"
-                                    onclick="showEscalateModal(
-                                        '{{ approval.id }}',
-                                        '{{ approval.tracking_number or approval.parcel_id }}',
-                                        {{ approval.fraud_risk | default(0) }},
-                                        '{{ (approval.contraband_type or 'Suspicious Item') | e }}',
-                                        {{ (approval.escalate_agencies or ['Australian Federal Police']) | tojson }}
-                                    )"
+                                    class="btn btn-danger btn-sm ms-3 flex-shrink-0 btn-escalate"
+                                    data-approval-id="{{ approval.id }}"
+                                    data-tracking="{{ approval.tracking_number or approval.parcel_id }}"
+                                    data-risk="{{ approval.fraud_risk | default(0) }}"
+                                    data-contraband="{{ (approval.contraband_type or 'Suspicious Item') | e }}"
+                                    data-agencies='{{ (approval.escalate_agencies or ["Australian Federal Police"]) | tojson }}'
                                     title="Escalate to law enforcement / government agencies">
                                 <i class="bi bi-megaphone-fill"></i> Escalate
                             </button>
@@ -221,13 +219,12 @@
                             </div>
                             <button type="button"
                                     class="btn btn-sm btn-warning ms-3 flex-shrink-0"
-                                    onclick="showEscalateModal(
-                                        '{{ approval.id }}',
-                                        '{{ approval.tracking_number or approval.parcel_id }}',
-                                        {{ approval.fraud_risk | default(0) }},
-                                        'Suspicious Activity',
-                                        ['Australian Federal Police', 'Border Force']
-                                    )"
+                                    class="btn btn-sm btn-warning ms-3 flex-shrink-0 btn-escalate"
+                                    data-approval-id="{{ approval.id }}"
+                                    data-tracking="{{ approval.tracking_number or approval.parcel_id }}"
+                                    data-risk="{{ approval.fraud_risk | default(0) }}"
+                                    data-contraband="Suspicious Activity"
+                                    data-agencies='["Australian Federal Police", "Border Force"]'
                                     title="Escalate to law enforcement / government agencies">
                                 <i class="bi bi-megaphone-fill"></i> Escalate
                             </button>
@@ -607,6 +604,19 @@ function confirmEscalateAll(approvalId, trackingNumber, riskScore, btn) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Wire up Escalate buttons via data-* attributes (avoids tojson double-quote collision in onclick)
+    document.querySelectorAll('.btn-escalate').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            showEscalateModal(
+                btn.dataset.approvalId,
+                btn.dataset.tracking,
+                parseInt(btn.dataset.risk, 10),
+                btn.dataset.contraband,
+                JSON.parse(btn.dataset.agencies)
+            );
+        });
+    });
+
     // Initialize Bootstrap tooltips
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
