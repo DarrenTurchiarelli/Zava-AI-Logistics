@@ -665,7 +665,7 @@ async def customer_service_agent(customer_request: Dict[str, Any], thread_id: Op
     base_prompt = get_agent_prompt("customer-service")
     
     # Check if this is a public chat request (from chat widget)
-    is_chat_request = "public_mode" in customer_request.get("details", "")
+    is_chat_request = bool(customer_request.get("public_mode"))
 
     if is_chat_request:
         # Conversational mode for chat widget - combine base prompt with context

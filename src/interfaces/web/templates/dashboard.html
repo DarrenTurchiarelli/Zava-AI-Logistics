@@ -153,26 +153,27 @@
 
             <!-- System Status -->
             <div class="card shadow-sm mt-3">
-                <div class="card-header bg-white">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="bi bi-hdd-network"></i> System Status</h5>
+                    <small class="text-muted" id="dash-health-last-checked"></small>
                 </div>
                 <div class="card-body">
-                    <ul class="list-unstyled mb-0">
-                        <li class="mb-2">
-                            <i class="bi bi-check-circle-fill text-success"></i>
-                            <strong>Cosmos DB:</strong> Connected
+                    <ul class="list-unstyled mb-0" id="dash-health-list">
+                        <li class="mb-2" id="dash-health-cosmos_db">
+                            <i class="bi bi-arrow-clockwise text-secondary"></i>
+                            <strong>Cosmos DB:</strong> Checking…
                         </li>
-                        <li class="mb-2">
-                            <i class="bi bi-check-circle-fill text-success"></i>
-                            <strong>AI Agents:</strong> Active
+                        <li class="mb-2" id="dash-health-ai_agents">
+                            <i class="bi bi-arrow-clockwise text-secondary"></i>
+                            <strong>AI Agents:</strong> Checking…
                         </li>
-                        <li class="mb-2">
-                            <i class="bi bi-check-circle-fill text-success"></i>
-                            <strong>Fraud Detection:</strong> Online
+                        <li class="mb-2" id="dash-health-fraud_detection">
+                            <i class="bi bi-arrow-clockwise text-secondary"></i>
+                            <strong>Fraud Detection:</strong> Checking…
                         </li>
-                        <li>
-                            <i class="bi bi-check-circle-fill text-success"></i>
-                            <strong>API Status:</strong> Healthy
+                        <li id="dash-health-azure_maps">
+                            <i class="bi bi-arrow-clockwise text-secondary"></i>
+                            <strong>Azure Maps:</strong> Checking…
                         </li>
                     </ul>
                 </div>
@@ -184,14 +185,54 @@
 
 {% block extra_js %}
 <script>
-// Auto-refresh stats every 30 seconds
-setInterval(function() {
-    fetch('/api/stats')
-        .then(response => response.json())
-        .then(data => {
-            console.log('Stats updated:', data);
-            // Update UI if needed
-        });
-}, 30000);
+(function () {
+    const POLL_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+
+    const STATUS_TEXT = { ok: 'Operational', degraded: 'Degraded', offline: 'Offline' };
+    const ICON_CLASS  = { ok: 'bi-check-circle-fill text-success', degraded: 'bi-exclamation-circle-fill text-warning', offline: 'bi-x-circle-fill text-danger' };
+
+    const LABELS = {
+        cosmos_db:       'Cosmos DB',
+        ai_agents:       'AI Agents',
+        fraud_detection: 'Fraud Detection',
+        azure_maps:      'Azure Maps',
+    };
+
+    function renderRow(key, service) {
+        const el = document.getElementById('dash-health-' + key);
+        if (!el) return;
+        const iconCls = ICON_CLASS[service.status] || 'bi-question-circle-fill text-secondary';
+        const text = STATUS_TEXT[service.status] || 'Unknown';
+        const latency = service.latency_ms != null ? ` <small class="text-muted">(${service.latency_ms}ms)</small>` : '';
+        const title = service.error ? ` title="${service.error.replace(/"/g, '&quot;')}"` : '';
+        el.innerHTML = `<i class="bi ${iconCls}"></i><strong${title}> ${LABELS[key] || service.label}:</strong> ${text}${latency}`;
+    }
+
+    function checkHealth() {
+        fetch('/api/health')
+            .then(r => r.json())
+            .then(data => {
+                Object.entries(data.services || {}).forEach(([key, svc]) => renderRow(key, svc));
+                const ts = document.getElementById('dash-health-last-checked');
+                if (ts && data.checked_at) {
+                    const d = new Date(data.checked_at);
+                    ts.textContent = 'Last checked ' + d.toLocaleTimeString();
+                }
+            })
+            .catch(() => {});
+    }
+
+    // Run immediately on page load, then every 30 minutes
+    checkHealth();
+    setInterval(checkHealth, POLL_INTERVAL_MS);
+
+    // Stats refresh (existing behaviour, kept as-is)
+    setInterval(function () {
+        fetch('/api/stats')
+            .then(r => r.json())
+            .then(data => { /* stats updated */ })
+            .catch(() => {});
+    }, 30000);
+})();
 </script>
 {% endblock %}

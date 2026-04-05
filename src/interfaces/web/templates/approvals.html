@@ -630,7 +630,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const config = savedConfig ? JSON.parse(savedConfig) : {};
         
         try {
-            const response = await fetch('/api/run-approval-agent', {
+            const response = await fetch('{{ url_for("approvals.run_agent") }}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

@@ -752,24 +752,35 @@
                             </h6>
                         </div>
                         <div class="col">
-                            <div class="row text-center g-2">
+                            <div class="row text-center g-2" id="system-health-badges">
                                 <div class="col-6 col-md-3">
-                                    <i class="bi bi-check-circle-fill text-success"></i>
-                                    <strong class="ms-1">Cosmos DB</strong>
+                                    <span id="health-cosmos_db">
+                                        <i class="bi bi-arrow-clockwise text-secondary"></i>
+                                        <strong class="ms-1">Cosmos DB</strong>
+                                    </span>
                                 </div>
                                 <div class="col-6 col-md-3">
-                                    <i class="bi bi-check-circle-fill text-success"></i>
-                                    <strong class="ms-1">AI Agents</strong>
+                                    <span id="health-ai_agents">
+                                        <i class="bi bi-arrow-clockwise text-secondary"></i>
+                                        <strong class="ms-1">AI Agents</strong>
+                                    </span>
                                 </div>
                                 <div class="col-6 col-md-3">
-                                    <i class="bi bi-check-circle-fill text-success"></i>
-                                    <strong class="ms-1">Fraud Detection</strong>
+                                    <span id="health-fraud_detection">
+                                        <i class="bi bi-arrow-clockwise text-secondary"></i>
+                                        <strong class="ms-1">Fraud Detection</strong>
+                                    </span>
                                 </div>
                                 <div class="col-6 col-md-3">
-                                    <i class="bi bi-check-circle-fill text-success"></i>
-                                    <strong class="ms-1">API Status</strong>
+                                    <span id="health-azure_maps">
+                                        <i class="bi bi-arrow-clockwise text-secondary"></i>
+                                        <strong class="ms-1">Azure Maps</strong>
+                                    </span>
                                 </div>
                             </div>
+                        </div>
+                        <div class="col-auto d-none d-md-block">
+                            <small class="text-muted" id="health-last-checked"></small>
                         </div>
                     </div>
                 </div>
@@ -1342,4 +1353,51 @@
     </div>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const POLL_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+
+    const ICON = {
+        ok:       '<i class="bi bi-check-circle-fill text-success"></i>',
+        degraded: '<i class="bi bi-exclamation-circle-fill text-warning"></i>',
+        offline:  '<i class="bi bi-x-circle-fill text-danger"></i>',
+        loading:  '<i class="bi bi-arrow-clockwise text-secondary"></i>',
+    };
+
+    function renderBadge(serviceKey, service) {
+        const el = document.getElementById('health-' + serviceKey);
+        if (!el) return;
+        const icon = ICON[service.status] || ICON.offline;
+        const latency = service.latency_ms != null ? ` <small class="text-muted">(${service.latency_ms}ms)</small>` : '';
+        const title = service.error ? ` title="${service.error.replace(/"/g, '&quot;')}"` : '';
+        el.innerHTML = `${icon}<strong class="ms-1"${title}>${service.label}</strong>${latency}`;
+    }
+
+    function checkHealth() {
+        fetch('/api/health')
+            .then(r => r.json())
+            .then(data => {
+                Object.entries(data.services || {}).forEach(([key, svc]) => renderBadge(key, svc));
+                const ts = document.getElementById('health-last-checked');
+                if (ts && data.checked_at) {
+                    const d = new Date(data.checked_at);
+                    ts.textContent = 'Checked ' + d.toLocaleTimeString();
+                }
+            })
+            .catch(() => {
+                ['cosmos_db', 'ai_agents', 'fraud_detection', 'azure_maps'].forEach(key => {
+                    const el = document.getElementById('health-' + key);
+                    if (el) el.querySelector('i').className = 'bi bi-question-circle-fill text-secondary';
+                });
+            });
+    }
+
+    // Run immediately on page load, then every 30 minutes
+    checkHealth();
+    setInterval(checkHealth, POLL_INTERVAL_MS);
+})();
+</script>
 {% endblock %}

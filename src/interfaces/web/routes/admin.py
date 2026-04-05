@@ -6,6 +6,7 @@ and operational insights.
 """
 from flask import Blueprint, render_template, jsonify
 from datetime import datetime, timezone, timedelta
+import os
 import random
 import uuid
 
@@ -264,3 +265,104 @@ def api_stats():
         return jsonify(stats), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@admin_bp.route("/api/health")
+@login_required
+def api_health():
+    """
+    API: Live system health check for all services.
+
+    Tests each service with a real lightweight operation and returns
+    per-service status so the UI can display accurate health indicators.
+
+    Returns:
+        JSON with status ('ok' | 'degraded' | 'offline') and latency_ms per service,
+        plus an overall system status.
+    """
+    import time
+
+    results = {}
+
+    # ── 1. Cosmos DB ────────────────────────────────────────────────────────
+    t0 = time.monotonic()
+    try:
+        async def _ping_cosmos():
+            async with ParcelTrackingDB() as db:
+                # Lightweight count query – proves connectivity + auth
+                container = db.database.get_container_client(db.parcels_container)
+                items = container.query_items(
+                    query="SELECT VALUE COUNT(1) FROM c",
+                )
+                counts = [x async for x in items]
+                return counts[0] if counts else 0
+
+        run_async(_ping_cosmos())
+        results["cosmos_db"] = {"status": "ok", "label": "Cosmos DB", "latency_ms": round((time.monotonic() - t0) * 1000)}
+    except Exception as e:
+        results["cosmos_db"] = {"status": "offline", "label": "Cosmos DB", "latency_ms": None, "error": str(e)[:120]}
+
+    # ── 2. Azure OpenAI / AI Agents ─────────────────────────────────────────
+    t0 = time.monotonic()
+    try:
+        endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
+        agent_id = os.getenv("CUSTOMER_SERVICE_AGENT_ID", "")
+        if not endpoint or not agent_id:
+            raise ValueError("AZURE_OPENAI_ENDPOINT or CUSTOMER_SERVICE_AGENT_ID not configured")
+
+        from src.infrastructure.agents.core.base import AzureOpenAIAgentClient
+        client = AzureOpenAIAgentClient().get_client()
+        # Retrieve agent metadata – fast, proves auth + connectivity
+        client.beta.assistants.retrieve(agent_id)
+        results["ai_agents"] = {"status": "ok", "label": "AI Agents", "latency_ms": round((time.monotonic() - t0) * 1000)}
+    except Exception as e:
+        results["ai_agents"] = {"status": "offline", "label": "AI Agents", "latency_ms": None, "error": str(e)[:120]}
+
+    # ── 3. Fraud Detection Agent ─────────────────────────────────────────────
+    t0 = time.monotonic()
+    try:
+        fraud_id = os.getenv("FRAUD_RISK_AGENT_ID", "")
+        if not fraud_id:
+            raise ValueError("FRAUD_RISK_AGENT_ID not configured")
+
+        from src.infrastructure.agents.core.base import AzureOpenAIAgentClient
+        client = AzureOpenAIAgentClient().get_client()
+        client.beta.assistants.retrieve(fraud_id)
+        results["fraud_detection"] = {"status": "ok", "label": "Fraud Detection", "latency_ms": round((time.monotonic() - t0) * 1000)}
+    except Exception as e:
+        results["fraud_detection"] = {"status": "offline", "label": "Fraud Detection", "latency_ms": None, "error": str(e)[:120]}
+
+    # ── 4. Azure Maps ────────────────────────────────────────────────────────
+    t0 = time.monotonic()
+    try:
+        maps_key = os.getenv("AZURE_MAPS_SUBSCRIPTION_KEY", "")
+        if not maps_key:
+            raise ValueError("AZURE_MAPS_SUBSCRIPTION_KEY not configured")
+        import requests as _requests
+        r = _requests.get(
+            "https://atlas.microsoft.com/search/address/json",
+            params={"api-version": "1.0", "subscription-key": maps_key, "query": "Sydney", "limit": 1},
+            timeout=5,
+        )
+        r.raise_for_status()
+        results["azure_maps"] = {"status": "ok", "label": "Azure Maps", "latency_ms": round((time.monotonic() - t0) * 1000)}
+    except Exception as e:
+        err = str(e)[:120]
+        # If simply not configured, mark degraded rather than offline
+        status = "degraded" if "not configured" in err else "offline"
+        results["azure_maps"] = {"status": status, "label": "Azure Maps", "latency_ms": None, "error": err}
+
+    # ── Overall ──────────────────────────────────────────────────────────────
+    statuses = [s["status"] for s in results.values()]
+    if all(s == "ok" for s in statuses):
+        overall = "ok"
+    elif any(s == "offline" for s in statuses):
+        overall = "degraded"
+    else:
+        overall = "degraded"
+
+    return jsonify({
+        "overall": overall,
+        "services": results,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+    }), 200

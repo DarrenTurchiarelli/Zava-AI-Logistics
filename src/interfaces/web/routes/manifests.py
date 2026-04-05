@@ -156,17 +156,99 @@ def view_manifest(manifest_id: str):
         return redirect(url_for("manifests.admin_manifests"))
 
 
-@manifests_bp.route("/driver/manifest/<manifest_id>/complete", methods=["POST"])
+@manifests_bp.route("/driver/manifest/<manifest_id>/complete/<barcode>", methods=["POST"])
 @login_required
-def complete_delivery(manifest_id: str):
+def mark_delivery_complete(manifest_id: str, barcode: str):
     """
-    Mark parcel as delivered (placeholder for POST handler)
-    
-    Access: Driver who owns the manifest
+    Mark a delivery as complete or carded (drivers only).
+
+    Access: Driver who owns the manifest, or admin/depot manager.
     """
-    # TODO: Implement delivery completion with photo proof
-    flash("Delivery completion not yet implemented", "warning")
-    return redirect(url_for("manifests.view_manifest", manifest_id=manifest_id))
+    import base64
+
+    user = session.get("user", {})
+
+    try:
+        driver_note = request.form.get("driver_note", "").strip()
+        delivery_status = request.form.get("delivery_status", "delivered")
+        post_office = request.form.get("post_office", "").strip()
+        card_reason = request.form.get("card_reason", "No one home")
+
+        # Handle optional photo upload
+        delivery_photo_base64 = None
+        if "delivery_photo" in request.files:
+            photo_file = request.files["delivery_photo"]
+            if photo_file and photo_file.filename != "":
+                try:
+                    photo_bytes = photo_file.read()
+                    delivery_photo_base64 = base64.b64encode(photo_bytes).decode("utf-8")
+                except Exception as photo_err:
+                    flash(f"Warning: photo could not be saved ({photo_err})", "warning")
+
+        if delivery_status == "carded" and not post_office:
+            flash("Post office selection is required for carded deliveries", "danger")
+            return redirect(url_for("manifests.driver_manifest"))
+
+        async def _complete():
+            async with ParcelTrackingDB() as db:
+                manifest = await db.get_manifest_by_id(manifest_id)
+                if not manifest:
+                    return False, "Manifest not found"
+
+                # Drivers may only complete their own deliveries
+                if user.get("role") == UserManager.ROLE_DRIVER:
+                    if manifest.get("driver_id") != user.get("driver_id"):
+                        return False, "You can only complete your own deliveries"
+
+                actor = user.get("username", "driver")
+
+                delivery_address = next(
+                    (item.get("recipient_address", "Unknown")
+                     for item in manifest.get("items", [])
+                     if item.get("barcode") == barcode),
+                    "Unknown"
+                )
+
+                if delivery_status == "carded":
+                    card_note = f"Card left - {card_reason}. Collect from: {post_office}"
+                    if driver_note:
+                        card_note += f". Driver note: {driver_note}"
+                    success = await db.mark_delivery_complete(manifest_id, barcode, card_note)
+                    if success:
+                        await db.update_parcel_status(barcode, "carded", post_office, actor)
+                        if delivery_photo_base64:
+                            await db.store_delivery_photo(barcode, delivery_photo_base64, actor)
+                else:
+                    success = await db.mark_delivery_complete(
+                        manifest_id, barcode, driver_note if driver_note else None
+                    )
+                    if success:
+                        await db.update_parcel_status(barcode, "delivered", delivery_address, actor)
+                        if delivery_photo_base64:
+                            await db.store_delivery_photo(barcode, delivery_photo_base64, actor)
+
+                return success, None
+
+        success, error_msg = run_async(_complete())
+
+        if error_msg:
+            flash(error_msg, "danger")
+        elif success:
+            if delivery_status == "carded":
+                flash(
+                    f"Parcel {barcode} marked as carded – awaiting collection at "
+                    f"{post_office.split(' - ')[0]}",
+                    "success",
+                )
+            else:
+                flash(f"Delivery {barcode} marked as complete!", "success")
+        else:
+            flash("Error marking delivery complete", "danger")
+
+    except Exception as e:
+        flash(f"Error: {str(e)}", "danger")
+
+    return redirect(url_for("manifests.driver_manifest"))
 
 
 @manifests_bp.route("/admin/manifests")

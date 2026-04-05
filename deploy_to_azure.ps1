@@ -460,6 +460,8 @@ if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
     $env:AZURE_OPENAI_ENDPOINT            = $bicepOutputJson.middleware.value.openAIServiceEndpoint
     $env:AZURE_AI_MODEL_DEPLOYMENT_NAME   = "gpt-4o"
     $env:PYTHONIOENCODING                 = "utf-8"
+    # Set tenant ID so DefaultAzureCredential uses the correct tenant (prevents token tenant mismatch)
+    $env:AZURE_TENANT_ID                  = $account.tenantId
 
     # Grant the current developer 'Cognitive Services OpenAI Contributor' on the OpenAI resource
     # Required for assistants/write (creating agents) — Bicep only grants this to the App Service MI
