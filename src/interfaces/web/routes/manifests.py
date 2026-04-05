@@ -631,22 +631,53 @@ def render_map(manifest_id: str):
         if not pin_coords:
             return "No geocoded coordinates available", 500
 
+        # Atlas routeType mapping ("safest" not a valid Atlas param → use "fastest")
+        atlas_route_type = {"fastest": "fastest", "shortest": "shortest"}.get(
+            selected_route_type, "fastest"
+        )
+
+        # ── Server-side route geometry (restored from legacy implementation) ──
+        # Client-side fetching from inside an iframe is unreliable. For small
+        # routes without pre-stored geometry, fetch road geometry server-side.
+        if not stored_route_points and len(pin_coords) <= 25:
+            import requests as _requests
+            query_str = ":".join([f"{c[1]},{c[0]}" for c in pin_coords])
+            try:
+                resp = _requests.get(
+                    "https://atlas.microsoft.com/route/directions/json",
+                    params={
+                        "api-version": "1.0",
+                        "subscription-key": subscription_key,
+                        "query": query_str,
+                        "travelMode": "car",
+                        "routeType": atlas_route_type,
+                        "traffic": "false",
+                    },
+                    timeout=10,
+                )
+                if resp.ok:
+                    rdata = resp.json()
+                    if rdata.get("routes") and rdata["routes"][0]:
+                        pts = []
+                        for leg in rdata["routes"][0].get("legs", []):
+                            for pt in leg.get("points", []):
+                                pts.append([pt["longitude"], pt["latitude"]])
+                        if pts:
+                            stored_route_points = pts
+            except Exception:
+                pass  # fall through to straight-line fallback
+
+        if not stored_route_points:
+            # Last resort: straight lines between waypoints
+            stored_route_points = list(pin_coords)
+
         # ── Build template variables ──────────────────────────────────────────
         pins_js = ", ".join([f"[{c[0]}, {c[1]}]" for c in pin_coords])
-        stored_route_js = (
-            ", ".join([f"[{c[0]}, {c[1]}]" for c in stored_route_points])
-            if stored_route_points
-            else ""
-        )
+        stored_route_js = ", ".join([f"[{c[0]}, {c[1]}]" for c in stored_route_points])
 
         # Centroid for initial camera position (JS will auto-fit via bounds)
         center_lon = sum(c[0] for c in pin_coords) / len(pin_coords)
         center_lat = sum(c[1] for c in pin_coords) / len(pin_coords)
-
-        # Atlas routeType mapping ("safest" not a valid Atlas param → use "shortest")
-        atlas_route_type = {"fastest": "fastest", "shortest": "shortest"}.get(
-            selected_route_type, "fastest"
-        )
 
         return f"""<!DOCTYPE html>
 <html>
