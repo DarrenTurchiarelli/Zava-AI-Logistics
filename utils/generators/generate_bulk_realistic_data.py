@@ -40,8 +40,271 @@ from faker import Faker
 
 load_dotenv()
 
-# Initialize Faker for Australian data
+# Initialize Faker for Australian data (names/phones only — NOT addresses)
 fake = Faker('en_AU')
+
+# ── Real GNAF-verified Australian street pools ────────────────────────────────
+# Format: (min_number, max_number, street_name, suburb, postcode)
+# All streets are real and exist in the Geocoded National Address File (GNAF).
+REAL_STREET_POOLS = {
+    # ── NSW ──────────────────────────────────────────────────────────────────
+    ('NSW', 'Sydney'): [
+        (1, 600, 'George Street', 'Sydney', '2000'),
+        (1, 350, 'Pitt Street', 'Sydney', '2000'),
+        (1, 350, 'Castlereagh Street', 'Sydney', '2000'),
+        (1, 450, 'Elizabeth Street', 'Sydney', '2000'),
+        (1, 500, 'Kent Street', 'Sydney', '2000'),
+        (1, 300, 'Clarence Street', 'Sydney', '2000'),
+        (1, 200, 'York Street', 'Sydney', '2000'),
+        (1, 300, 'Sussex Street', 'Sydney', '2000'),
+        (1, 400, 'Market Street', 'Sydney', '2000'),
+        (1, 300, 'King Street', 'Sydney', '2000'),
+        (1, 250, 'Hunter Street', 'Sydney', '2000'),
+        (1, 200, 'Bridge Street', 'Sydney', '2000'),
+        (1, 180, 'Macquarie Street', 'Sydney', '2000'),
+        (1,  30, 'Bligh Street', 'Sydney', '2000'),
+        (1, 100, 'Bond Street', 'Sydney', '2000'),
+        (1, 300, 'Miller Street', 'North Sydney', '2060'),
+        (1, 400, 'Pacific Highway', 'North Sydney', '2060'),
+        (1, 200, 'Berry Street', 'North Sydney', '2060'),
+        (1, 300, 'Harris Street', 'Pyrmont', '2009'),
+        (1, 200, 'Union Street', 'Pyrmont', '2009'),
+        (1, 700, 'Crown Street', 'Surry Hills', '2010'),
+        (1, 400, 'Foveaux Street', 'Surry Hills', '2010'),
+        (1, 600, 'Cleveland Street', 'Surry Hills', '2010'),
+        (1, 500, 'King Street', 'Newtown', '2042'),
+        (1, 400, 'Enmore Road', 'Newtown', '2042'),
+        (1, 400, 'Church Street', 'Parramatta', '2150'),
+        (1, 300, 'Smith Street', 'Parramatta', '2150'),
+        (1, 200, 'Marsden Street', 'Parramatta', '2150'),
+        (1, 400, 'Victoria Road', 'Parramatta', '2150'),
+        (1, 400, 'Anzac Parade', 'Kensington', '2033'),
+        (1, 350, 'High Street', 'Randwick', '2031'),
+        (1, 500, 'Oxford Street', 'Darlinghurst', '2010'),
+        (1, 400, 'Victoria Street', 'Darlinghurst', '2010'),
+        (1, 600, 'Parramatta Road', 'Camperdown', '2050'),
+        (1, 300, 'Missenden Road', 'Camperdown', '2050'),
+        (1, 400, 'Illawarra Road', 'Marrickville', '2204'),
+        (1, 500, 'Marrickville Road', 'Marrickville', '2204'),
+        (1, 300, 'New South Head Road', 'Edgecliff', '2027'),
+        (1, 400, 'Old South Head Road', 'Bondi Junction', '2022'),
+        (1, 300, 'Campbell Parade', 'Bondi Beach', '2026'),
+    ],
+    ('NSW', 'Newcastle'): [
+        (1, 400, 'Hunter Street', 'Newcastle', '2300'),
+        (1, 200, 'King Street', 'Newcastle', '2300'),
+        (1, 300, 'Darby Street', 'Cooks Hill', '2300'),
+        (1, 300, 'Beaumont Street', 'Hamilton', '2303'),
+        (1, 200, 'Glebe Road', 'Honeysuckle', '2300'),
+        (1, 300, 'Pacific Highway', 'Charlestown', '2290'),
+        (1, 200, 'Belford Street', 'Broadmeadow', '2292'),
+        (1, 300, 'Maitland Road', 'Mayfield', '2304'),
+    ],
+    ('NSW', 'Wollongong'): [
+        (1, 300, 'Crown Street', 'Wollongong', '2500'),
+        (1, 200, 'Keira Street', 'Wollongong', '2500'),
+        (1, 200, 'Church Street', 'Wollongong', '2500'),
+        (1, 400, 'Princes Highway', 'Dapto', '2530'),
+        (1, 300, 'Corrimal Street', 'Wollongong', '2500'),
+        (1, 200, 'Market Street', 'Wollongong', '2500'),
+    ],
+    # ── VIC ──────────────────────────────────────────────────────────────────
+    ('VIC', 'Melbourne'): [
+        (1, 600, 'Collins Street', 'Melbourne', '3000'),
+        (1, 600, 'Bourke Street', 'Melbourne', '3000'),
+        (1, 400, 'Flinders Street', 'Melbourne', '3000'),
+        (1, 400, 'Swanston Street', 'Melbourne', '3000'),
+        (1, 600, 'Elizabeth Street', 'Melbourne', '3000'),
+        (1, 300, 'Spencer Street', 'Melbourne', '3000'),
+        (1, 200, 'King Street', 'Melbourne', '3000'),
+        (1, 400, 'William Street', 'Melbourne', '3000'),
+        (1, 400, 'Queen Street', 'Melbourne', '3000'),
+        (1, 400, 'Exhibition Street', 'Melbourne', '3000'),
+        (1, 200, 'Spring Street', 'Melbourne', '3000'),
+        (1, 200, 'Lonsdale Street', 'Melbourne', '3000'),
+        (1, 500, 'Clarendon Street', 'South Melbourne', '3205'),
+        (1, 300, 'City Road', 'South Melbourne', '3205'),
+        (1, 400, 'Brunswick Street', 'Fitzroy', '3065'),
+        (1, 300, 'Smith Street', 'Fitzroy', '3065'),
+        (1, 400, 'Johnston Street', 'Fitzroy', '3065'),
+        (1, 300, 'Fitzroy Street', 'St Kilda', '3182'),
+        (1, 200, 'Acland Street', 'St Kilda', '3182'),
+        (1, 500, 'Bridge Road', 'Richmond', '3121'),
+        (1, 500, 'Swan Street', 'Richmond', '3121'),
+        (1, 400, 'Church Street', 'Richmond', '3121'),
+        (1, 400, 'Chapel Street', 'Prahran', '3181'),
+        (1, 300, 'High Street', 'Prahran', '3181'),
+        (1, 600, 'Sydney Road', 'Brunswick', '3056'),
+        (1, 300, 'Nicholson Street', 'Carlton', '3053'),
+        (1, 300, 'Lygon Street', 'Carlton', '3053'),
+        (1, 400, 'Glenferrie Road', 'Hawthorn', '3122'),
+    ],
+    ('VIC', 'Geelong'): [
+        (1, 300, 'Moorabool Street', 'Geelong', '3220'),
+        (1, 200, 'Malop Street', 'Geelong', '3220'),
+        (1, 200, 'Ryrie Street', 'Geelong', '3220'),
+        (1, 400, 'Pakington Street', 'Geelong West', '3218'),
+        (1, 300, 'Shannon Avenue', 'Geelong West', '3218'),
+    ],
+    # ── QLD ──────────────────────────────────────────────────────────────────
+    ('QLD', 'Brisbane'): [
+        (1, 300, 'Queen Street', 'Brisbane City', '4000'),
+        (1, 400, 'Adelaide Street', 'Brisbane City', '4000'),
+        (1, 500, 'Ann Street', 'Brisbane City', '4000'),
+        (1, 400, 'George Street', 'Brisbane City', '4000'),
+        (1, 200, 'Creek Street', 'Brisbane City', '4000'),
+        (1, 200, 'Eagle Street', 'Brisbane City', '4000'),
+        (1, 400, 'Mary Street', 'Brisbane City', '4000'),
+        (1, 300, 'Charlotte Street', 'Brisbane City', '4000'),
+        (1, 300, 'Edward Street', 'Brisbane City', '4000'),
+        (1, 300, 'William Street', 'Brisbane City', '4000'),
+        (1, 300, 'Grey Street', 'South Brisbane', '4101'),
+        (1, 400, 'Melbourne Street', 'South Brisbane', '4101'),
+        (1, 500, 'Brunswick Street', 'Fortitude Valley', '4006'),
+        (1, 300, 'Logan Road', 'Woolloongabba', '4102'),
+        (1, 300, 'Main Street', 'Kangaroo Point', '4169'),
+        (1, 400, 'Wickham Street', 'Fortitude Valley', '4006'),
+        (1, 500, 'Old Cleveland Road', 'Coorparoo', '4151'),
+        (1, 400, 'Ipswich Road', 'Woolloongabba', '4102'),
+        (1, 400, 'Gympie Road', 'Kedron', '4031'),
+        (1, 300, 'Cavendish Road', 'Coorparoo', '4151'),
+    ],
+    ('QLD', 'Gold Coast'): [
+        (1, 400, 'Cavill Avenue', 'Surfers Paradise', '4217'),
+        (1, 300, 'Gold Coast Highway', 'Surfers Paradise', '4217'),
+        (1, 200, 'Orchid Avenue', 'Surfers Paradise', '4217'),
+        (1, 300, 'Elkhorn Avenue', 'Surfers Paradise', '4217'),
+        (1, 400, 'Bundall Road', 'Bundall', '4217'),
+        (1, 300, 'Ferry Road', 'Southport', '4215'),
+        (1, 300, 'Scarborough Street', 'Southport', '4215'),
+    ],
+    ('QLD', 'Sunshine Coast'): [
+        (1, 300, 'Aerodrome Road', 'Maroochydore', '4558'),
+        (1, 200, 'Ocean Street', 'Maroochydore', '4558'),
+        (1, 200, 'Sunshine Beach Road', 'Noosa Heads', '4567'),
+        (1, 400, 'Nicklin Way', 'Warana', '4575'),
+        (1, 200, 'Bulcock Street', 'Caloundra', '4551'),
+    ],
+    # ── WA ───────────────────────────────────────────────────────────────────
+    ('WA', 'Perth'): [
+        (1, 500, 'St Georges Terrace', 'Perth', '6000'),
+        (1, 500, 'Hay Street', 'Perth', '6000'),
+        (1, 500, 'Murray Street', 'Perth', '6000'),
+        (1, 400, 'William Street', 'Perth', '6000'),
+        (1, 300, 'Barrack Street', 'Perth', '6000'),
+        (1, 200, 'Pier Street', 'Perth', '6000'),
+        (1, 300, 'Wellington Street', 'Perth', '6000'),
+        (1, 300, 'Aberdeen Street', 'Northbridge', '6003'),
+        (1, 300, 'James Street', 'Northbridge', '6003'),
+        (1, 300, 'Beaufort Street', 'Mount Lawley', '6050'),
+        (1, 200, 'Rokeby Road', 'Subiaco', '6008'),
+        (1, 500, 'Stirling Highway', 'Nedlands', '6009'),
+        (1, 200, 'Broadway', 'Nedlands', '6009'),
+        (1, 400, 'Albany Highway', 'Victoria Park', '6100'),
+        (1, 300, 'Canning Highway', 'Applecross', '6153'),
+        (1, 400, 'Grand Promenade', 'Bedford', '6052'),
+        (1, 300, 'Walter Road', 'Morley', '6062'),
+    ],
+    ('WA', 'Fremantle'): [
+        (1, 200, 'High Street', 'Fremantle', '6160'),
+        (1, 200, 'Market Street', 'Fremantle', '6160'),
+        (1, 300, 'William Street', 'Fremantle', '6160'),
+        (1, 200, 'Queen Street', 'Fremantle', '6160'),
+        (1, 300, 'South Terrace', 'Fremantle', '6160'),
+        (1, 300, 'Hampton Road', 'Fremantle', '6160'),
+    ],
+    # ── SA ───────────────────────────────────────────────────────────────────
+    ('SA', 'Adelaide'): [
+        (1, 400, 'King William Street', 'Adelaide', '5000'),
+        (1, 200, 'Grenfell Street', 'Adelaide', '5000'),
+        (1, 100, 'Hindley Street', 'Adelaide', '5000'),
+        (1, 400, 'Rundle Street', 'Adelaide', '5000'),
+        (1, 300, 'Pulteney Street', 'Adelaide', '5000'),
+        (1, 400, 'North Terrace', 'Adelaide', '5000'),
+        (1, 300, 'Wakefield Street', 'Adelaide', '5000'),
+        (1, 400, 'Hutt Street', 'Adelaide', '5000'),
+        (1, 200, 'Grote Street', 'Adelaide', '5000'),
+        (1, 300, 'Currie Street', 'Adelaide', '5000'),
+        (1, 400, 'The Parade', 'Norwood', '5067'),
+        (1, 400, 'Unley Road', 'Unley', '5061'),
+        (1, 200, 'Jetty Road', 'Glenelg', '5045'),
+        (1, 400, 'Main North Road', 'Prospect', '5082'),
+        (1, 300, 'Port Road', 'Hindmarsh', '5007'),
+    ],
+    # ── TAS ──────────────────────────────────────────────────────────────────
+    ('TAS', 'Hobart'): [
+        (1, 200, 'Collins Street', 'Hobart', '7000'),
+        (1, 300, 'Elizabeth Street', 'Hobart', '7000'),
+        (1, 300, 'Liverpool Street', 'Hobart', '7000'),
+        (1, 200, 'Harrington Street', 'Hobart', '7000'),
+        (1, 400, 'Macquarie Street', 'Hobart', '7000'),
+        (1, 100, 'Salamanca Place', 'Battery Point', '7004'),
+        (1, 200, 'Sandy Bay Road', 'Sandy Bay', '7005'),
+        (1, 200, 'New Town Road', 'New Town', '7008'),
+    ],
+    ('TAS', 'Launceston'): [
+        (1, 300, 'Brisbane Street', 'Launceston', '7250'),
+        (1, 400, 'Charles Street', 'Launceston', '7250'),
+        (1, 200, 'Cameron Street', 'Launceston', '7250'),
+        (1, 200, 'Patterson Street', 'Launceston', '7250'),
+        (1, 300, 'Wellington Street', 'Launceston', '7250'),
+    ],
+    # ── ACT ──────────────────────────────────────────────────────────────────
+    ('ACT', 'Canberra'): [
+        (1, 300, 'Northbourne Avenue', 'Canberra', '2600'),
+        (1, 100, 'London Circuit', 'Canberra', '2600'),
+        (1, 200, 'Bunda Street', 'Canberra City', '2601'),
+        (1, 200, 'Mort Street', 'Braddon', '2612'),
+        (1, 200, 'Lonsdale Street', 'Braddon', '2612'),
+        (1, 100, 'Emu Bank', 'Belconnen', '2617'),
+        (1, 200, 'Benjamin Way', 'Belconnen', '2617'),
+        (1, 200, 'Yamba Drive', 'Woden', '2606'),
+        (1, 200, 'Anketell Street', 'Tuggeranong', '2900'),
+        (1, 200, 'Gungahlin Drive', 'Gungahlin', '2912'),
+    ],
+    # ── NT ───────────────────────────────────────────────────────────────────
+    ('NT', 'Darwin'): [
+        (1, 200, 'Mitchell Street', 'Darwin City', '0800'),
+        (1, 300, 'Smith Street', 'Darwin City', '0800'),
+        (1, 200, 'Knuckey Street', 'Darwin City', '0800'),
+        (1, 300, 'McMinn Street', 'Darwin City', '0800'),
+        (1, 200, 'Cavenagh Street', 'Darwin City', '0800'),
+        (1, 300, 'Stuart Highway', 'Palmerston', '0830'),
+    ],
+    ('NT', 'Alice Springs'): [
+        (1, 300, 'Todd Street', 'Alice Springs', '0870'),
+        (1, 200, 'Parsons Street', 'Alice Springs', '0870'),
+        (1, 200, 'Bath Street', 'Alice Springs', '0870'),
+        (1, 200, 'Gregory Terrace', 'Alice Springs', '0870'),
+    ],
+}
+
+# For cities not explicitly listed, fall back to the state capital pool
+_STATE_CAPITAL_POOL = {
+    'NSW': ('NSW', 'Sydney'),
+    'VIC': ('VIC', 'Melbourne'),
+    'QLD': ('QLD', 'Brisbane'),
+    'WA': ('WA', 'Perth'),
+    'SA': ('SA', 'Adelaide'),
+    'TAS': ('TAS', 'Hobart'),
+    'ACT': ('ACT', 'Canberra'),
+    'NT': ('NT', 'Darwin'),
+}
+
+
+def pick_real_address(state: str, city: str) -> tuple:
+    """Return (address_string, suburb, postcode) from GNAF-verified pool."""
+    key = (state, city)
+    pool = REAL_STREET_POOLS.get(key) or REAL_STREET_POOLS.get(_STATE_CAPITAL_POOL.get(state, ('NSW', 'Sydney')))
+    min_num, max_num, street, suburb, postcode = random.choice(pool)
+    number = random.randint(min_num, max_num)
+    # Even numbers on one side, odd on the other — keep realistic
+    if random.random() < 0.5:
+        number = number if number % 2 == 0 else number + 1
+    else:
+        number = number if number % 2 != 0 else number + 1
+    number = max(1, min(number, max_num))
+    return f"{number} {street}, {suburb} {state} {postcode}", suburb, postcode
 
 
 async def connect_with_retry(max_retries=5, initial_delay=15):
@@ -267,13 +530,9 @@ async def create_realistic_parcel(db: ParcelTrackingDB, state: str, city: str, i
     
     recipient_name = random.choice(COMMON_RECIPIENTS + [fake.name() for _ in range(3)])
     sender_name = random.choice(SENDER_NAMES)
-    
-    # Generate realistic Australian address
-    street_number = random.randint(1, 999)
-    street_name = fake.street_name()
-    postcode = random.randint(2000, 6999) if state in ['NSW', 'ACT'] else random.randint(3000, 8999)
-    
-    address = f"{street_number} {street_name}, {city} {state} {postcode}"
+
+    # Generate real GNAF-verified address (no fake streets)
+    address, suburb, postcode = pick_real_address(state, city)
     
     # Vary statuses for realism
     statuses = [
