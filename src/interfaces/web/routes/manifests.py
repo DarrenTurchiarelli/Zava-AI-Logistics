@@ -103,6 +103,30 @@ def driver_manifest():
 
             manifest = run_async(create_initial_route_sync())
 
+        # ── Regenerate embed_url and route_options at render time ──────────
+        if manifest and manifest.get("route_optimized") and manifest.get("optimized_route"):
+            manifest["embed_url"] = url_for("manifests.render_map", manifest_id=manifest["id"])
+
+            all_routes = manifest.get("all_routes") or {}
+            manifest["multi_route_enabled"] = True
+            manifest["route_options"] = {}
+
+            for rtype in ["fastest", "shortest", "safest"]:
+                if rtype in all_routes:
+                    manifest["route_options"][rtype] = all_routes[rtype]
+                else:
+                    manifest["route_options"][rtype] = {
+                        "calculated": False,
+                        "total_duration_minutes": None,
+                        "total_distance_km": None,
+                    }
+
+            if not manifest.get("selected_route_type"):
+                manifest["selected_route_type"] = "safest"
+                manifest["route_type_display"] = "Initial Nearest-Neighbor Route"
+            else:
+                manifest["route_type_display"] = manifest["selected_route_type"].capitalize() + " Route"
+
         return render_template("driver_manifest.html", manifest=manifest)
 
     except Exception as e:
@@ -500,10 +524,303 @@ def api_manifest_progress_stream(manifest_id: str):
     Emits events for route optimization, delivery completions, etc.
     """
     def generate():
-        # TODO: Implement SSE streaming for manifest updates
         yield f"data: {{\"type\": \"status\", \"message\": \"Streaming not yet implemented\"}}\n\n"
     
     return Response(stream_with_context(generate()), mimetype="text/event-stream")
+
+
+# ── Azure Maps routes ───────────────────────────────────────────────────────
+
+@manifests_bp.route("/map/<manifest_id>")
+@login_required
+def render_map(manifest_id: str):
+    """Render Azure Maps iframe HTML for a manifest's optimized route."""
+    try:
+        async def get_manifest_data():
+            async with ParcelTrackingDB() as db:
+                return await db.get_manifest_by_id(manifest_id)
+
+        manifest = run_async(get_manifest_data())
+
+        if not manifest or not manifest.get("optimized_route"):
+            return "No route data available", 404
+
+        from services.maps import BingMapsRouter
+        router = BingMapsRouter()
+
+        addresses = manifest.get("optimized_route", [])
+        if not addresses:
+            return "No addresses to display", 404
+
+        coordinates = []
+        for addr in addresses:
+            coords = router.geocode_address(addr)
+            if coords:
+                coordinates.append(coords)
+
+        if not coordinates:
+            return "Failed to geocode addresses", 500
+
+        subscription_key = router.subscription_key
+        if not subscription_key:
+            return "Azure Maps not configured", 500
+
+        # Use pre-stored route geometry if available
+        route_coordinates = []
+        all_routes_data = manifest.get("all_routes", {})
+        selected_route_type = manifest.get("selected_route_type", "safest")
+        route_data = all_routes_data.get(selected_route_type, {})
+
+        if route_data.get("route_points"):
+            route_coordinates = route_data["route_points"]
+        elif len(coordinates) <= 25:
+            import requests as _req
+            query_coords = ":".join([f"{lat},{lon}" for lat, lon in coordinates])
+            try:
+                resp = _req.get(
+                    "https://atlas.microsoft.com/route/directions/json",
+                    params={
+                        "api-version": "1.0",
+                        "subscription-key": subscription_key,
+                        "query": query_coords,
+                        "traffic": "true",
+                        "travelMode": "car",
+                        "routeType": "fastest",
+                    },
+                    timeout=10,
+                )
+                resp.raise_for_status()
+                rdata = resp.json()
+                if rdata.get("routes"):
+                    for leg in rdata["routes"][0].get("legs", []):
+                        for pt in leg.get("points", []):
+                            route_coordinates.append([pt["longitude"], pt["latitude"]])
+            except Exception:
+                route_coordinates = [[lon, lat] for lat, lon in coordinates]
+
+        if not route_coordinates:
+            route_coordinates = [[lon, lat] for lat, lon in coordinates]
+
+        center_lat, center_lon = coordinates[0]
+        pins_js = ", ".join([f"[{lon}, {lat}]" for lat, lon in coordinates])
+        route_coords_js = ", ".join([f"[{lon}, {lat}]" for lon, lat in route_coordinates])
+
+        return f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.css" />
+    <script src="https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.js"></script>
+    <style>body {{ margin: 0; padding: 0; }} #map {{ width: 100%; height: 100vh; }}</style>
+</head>
+<body>
+    <div id="map"></div>
+    <script>
+        var centerLon = {center_lon};
+        var centerLat = {center_lat};
+        var pins = [{pins_js}];
+        var routeCoords = [{route_coords_js}];
+
+        var map = new atlas.Map('map', {{
+            center: [centerLon, centerLat],
+            zoom: 12,
+            language: 'en-US',
+            style: 'road',
+            authOptions: {{ authType: 'subscriptionKey', subscriptionKey: '{subscription_key}' }}
+        }});
+
+        map.events.add('ready', function() {{
+            var dataSource = new atlas.source.DataSource();
+            map.sources.add(dataSource);
+
+            if (routeCoords.length > 1) {{
+                dataSource.add(new atlas.data.Feature(new atlas.data.LineString(routeCoords), {{ isRoute: true }}));
+                map.layers.add(new atlas.layer.LineLayer(dataSource, null, {{
+                    filter: ['==', ['get', 'isRoute'], true],
+                    strokeColor: '#2196F3', strokeWidth: 5, lineJoin: 'round', lineCap: 'round'
+                }}));
+            }}
+
+            pins.forEach(function(pin, index) {{
+                dataSource.add(new atlas.data.Feature(new atlas.data.Point(pin), {{
+                    title: 'Stop ' + (index + 1), isWaypoint: true
+                }}));
+            }});
+
+            map.layers.add(new atlas.layer.SymbolLayer(dataSource, null, {{
+                filter: ['==', ['get', 'isWaypoint'], true],
+                iconOptions: {{ image: 'marker-blue', size: 0.8 }},
+                textOptions: {{ textField: ['get', 'title'], offset: [0, -2.5], color: '#ffffff', size: 12 }}
+            }}));
+        }});
+    </script>
+</body>
+</html>"""
+
+    except Exception as e:
+        import traceback
+        return f"<pre>Error: {str(e)}\n\n{traceback.format_exc()}</pre>", 500
+
+
+@manifests_bp.route("/driver/manifest/<manifest_id>/calculate-route/<route_type>", methods=["POST"])
+@login_required
+def calculate_additional_route(manifest_id: str, route_type: str):
+    """Calculate a specific route type on-demand (fastest, shortest, safest)."""
+    user = session.get("user", {})
+
+    if route_type not in ["fastest", "shortest", "safest"]:
+        return jsonify({"success": False, "error": "Invalid route type"}), 400
+
+    try:
+        async def get_and_calculate():
+            async with ParcelTrackingDB() as db:
+                manifest = await db.get_manifest_by_id(manifest_id)
+
+                if user.get("role") == UserManager.ROLE_DRIVER:
+                    if not manifest or manifest.get("driver_id") != user.get("driver_id"):
+                        return {"success": False, "error": "Unauthorized"}
+
+                all_routes = manifest.get("all_routes", {})
+                if route_type in all_routes and all_routes[route_type].get("total_duration_minutes"):
+                    return {"success": True, "message": "Route already calculated", "cached": True,
+                            "route": all_routes[route_type]}
+
+                from config.depots import get_depot_manager
+                from services.maps import BingMapsRouter
+
+                router = BingMapsRouter()
+                depot_mgr = get_depot_manager()
+                addresses = list(dict.fromkeys([item["recipient_address"] for item in manifest["items"]]))
+                start_location = depot_mgr.get_closest_depot_to_address(addresses[0])
+
+                new_route = router.optimize_route(addresses, start_location, route_type=route_type)
+                if new_route:
+                    new_route["split_into_runs"] = False
+                    new_route["total_runs"] = 1
+
+                if new_route:
+                    all_routes[route_type] = new_route
+                    manifest["all_routes"] = all_routes
+                    manifest["selected_route_type"] = route_type
+                    manifest["optimized_route"] = new_route["waypoints"]
+                    manifest["estimated_duration_minutes"] = new_route["total_duration_minutes"]
+                    manifest["estimated_distance_km"] = new_route["total_distance_km"]
+
+                    container = db.database.get_container_client("driver_manifests")
+                    await container.replace_item(item=manifest["id"], body=manifest)
+
+                    return {"success": True, "message": f"{route_type.capitalize()} route calculated",
+                            "route": new_route}
+                return {"success": False, "error": "Failed to calculate route"}
+
+        return jsonify(run_async(get_and_calculate()))
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@manifests_bp.route("/driver/manifest/<manifest_id>/recalculate-routes", methods=["POST"])
+@login_required
+def recalculate_routes(manifest_id: str):
+    """Recalculate all three route types with current Azure Maps data."""
+    user = session.get("user", {})
+
+    try:
+        async def do_recalculate(manifest):
+            from config.depots import get_depot_manager
+            from services.maps import BingMapsRouter
+
+            addresses = list(dict.fromkeys([item["recipient_address"] for item in manifest.get("items", [])]))
+            if not addresses:
+                return False, "No addresses found in manifest"
+
+            depot_mgr = get_depot_manager()
+            start_location = depot_mgr.get_closest_depot_to_address(addresses[0])
+            router = BingMapsRouter()
+            all_routes = router.optimize_all_route_types(addresses, start_location)
+
+            if not all_routes or len(all_routes) < 3:
+                return False, "Failed to calculate routes with Azure Maps"
+
+            current_route_type = manifest.get("selected_route_type", "safest")
+            if current_route_type not in all_routes:
+                current_route_type = "safest"
+            selected = all_routes[current_route_type]
+
+            async with ParcelTrackingDB() as db:
+                await db.update_manifest_route(
+                    manifest_id,
+                    selected["waypoints"],
+                    selected["total_duration_minutes"],
+                    selected["total_distance_km"],
+                    True,
+                    selected.get("traffic_considered", False),
+                    route_type=current_route_type,
+                    all_routes=all_routes,
+                )
+
+            return True, {
+                rt: f"{all_routes[rt]['total_duration_minutes']} min, {all_routes[rt]['total_distance_km']} km"
+                for rt in ["fastest", "shortest", "safest"]
+            }
+
+        async def run():
+            async with ParcelTrackingDB() as db:
+                manifest = await db.get_manifest_by_id(manifest_id)
+            if not manifest:
+                return False, "Manifest not found"
+            if user.get("role") == UserManager.ROLE_DRIVER and manifest.get("driver_id") != user.get("driver_id"):
+                return False, "You can only modify your own manifest"
+            return await do_recalculate(manifest)
+
+        success, result = run_async(run())
+        if success:
+            return jsonify({"success": True, "routes": result})
+        return jsonify({"success": False, "error": result}), (403 if "only modify" in str(result) else 500)
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@manifests_bp.route("/driver/manifest/<manifest_id>/switch-route", methods=["POST"])
+@login_required
+def switch_route(manifest_id: str):
+    """Allow driver to switch between calculated route options."""
+    user = session.get("user", {})
+
+    try:
+        route_type = request.json.get("route_type")
+        if not route_type or route_type not in ["fastest", "shortest", "safest"]:
+            return jsonify({"success": False, "error": "Invalid route type"}), 400
+
+        async def run():
+            async with ParcelTrackingDB() as db:
+                manifest = await db.get_manifest_by_id(manifest_id)
+                if user.get("role") == UserManager.ROLE_DRIVER:
+                    if not manifest or manifest.get("driver_id") != user.get("driver_id"):
+                        return False, "You can only modify your own manifest"
+
+                success = await db.update_driver_route_preference(manifest_id, route_type)
+                if not success:
+                    return False, "Failed to switch route"
+                updated = await db.get_manifest_by_id(manifest_id)
+                return True, updated
+
+        success, result = run_async(run())
+        if success:
+            manifest = result
+            return jsonify({
+                "success": True,
+                "route_type": route_type,
+                "duration": manifest.get("estimated_duration_minutes", 0),
+                "distance": manifest.get("estimated_distance_km", 0),
+                "map_url": url_for("manifests.render_map", manifest_id=manifest_id),
+            })
+        return jsonify({"success": False, "error": result}), (403 if "only modify" in str(result) else 500)
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 # ============================================================================
