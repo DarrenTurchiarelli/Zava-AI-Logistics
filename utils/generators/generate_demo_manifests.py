@@ -30,8 +30,11 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(os.path.dirname(script_dir))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
+if script_dir not in sys.path:
+    sys.path.insert(0, script_dir)
 
 from parcel_tracking_db import ParcelTrackingDB
+from real_addresses import pick_real_address
 
 # Try to import Faker, set flag if available
 try:
@@ -851,10 +854,7 @@ async def generate_large_manifest(num_parcels=120):
         ]
 
         while len(addresses) < num_parcels:
-            street_address = fake.street_address()
-            suburb = fake.city()
-            postcode = random.choice(sydney_postcodes)
-            address = f"{street_address}, {suburb} NSW {postcode}"
+            address, _suburb, _postcode = pick_real_address("NSW", "Sydney")
 
             if address not in used_addresses:
                 used_addresses.add(address)

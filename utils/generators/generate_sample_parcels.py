@@ -163,7 +163,7 @@ async def generate_approval_demo_parcels(db: ParcelTrackingDB) -> dict:
         sender_name="Suspicious Sender",
         sender_address="Unknown Location, Sydney NSW 2000",
         recipient_name="John Doe",
-        recipient_address="12 Fake Street, Melbourne VIC 3000",
+        recipient_address="10 Collins Street, Melbourne VIC 3000",
         recipient_phone="+61400000000",
         recipient_email="fake@suspicious.com",
         service_type="overnight",

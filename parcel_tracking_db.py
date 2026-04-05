@@ -662,6 +662,7 @@ class ParcelTrackingDB:
                     "photo_data": photo_base64,
                     "uploaded_by": uploaded_by,
                     "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "photo_size_kb": round(len(photo_base64) * 3 / 4 / 1024, 1),  # approx decoded size
                 }
             )
 
@@ -696,6 +697,7 @@ class ParcelTrackingDB:
                     "photo_data": photo_base64,
                     "uploaded_by": uploaded_by,
                     "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "photo_size_kb": round(len(photo_base64) * 3 / 4 / 1024, 1),  # approx decoded size
                 }
             )
 
@@ -2092,6 +2094,12 @@ class ParcelTrackingDB:
     async def add_random_test_parcels(self, count: int = 5) -> List[Dict[str, Any]]:
         """Add random test parcels for logistics testing"""
         parcels = []
+        # Import real GNAF-verified address pool
+        import sys as _sys
+        _gen_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "utils", "generators")
+        if _gen_dir not in _sys.path:
+            _sys.path.insert(0, _gen_dir)
+        from real_addresses import pick_real_address
         service_types = ["standard", "express", "overnight", "registered"]
 
         # Distribution centers (matching the 40 from approvals page)
@@ -2171,6 +2179,16 @@ class ParcelTrackingDB:
             "0200": "ACT",
             "2600": "ACT",
         }
+        postcode_city_mapping = {
+            "2000": "Sydney", "2007": "Sydney", "2010": "Sydney",
+            "3000": "Melbourne", "3004": "Melbourne", "3141": "Melbourne",
+            "3181": "Melbourne", "3182": "Melbourne",
+            "4000": "Brisbane", "4006": "Brisbane", "4101": "Brisbane",
+            "5000": "Adelaide", "5006": "Adelaide",
+            "6000": "Perth", "6008": "Perth",
+            "7000": "Hobart", "7001": "Hobart",
+            "0200": "Canberra", "2600": "Canberra",
+        }
         postcodes = list(postcode_state_mapping.keys())
 
         # Australian store locations
@@ -2185,6 +2203,7 @@ class ParcelTrackingDB:
         for _ in range(count):
             postcode = random.choice(postcodes)
             state = postcode_state_mapping[postcode]
+            city = postcode_city_mapping[postcode]
             store = random.choice(store_locations)
             status_info = random.choice(status_options)
 
@@ -2208,10 +2227,10 @@ class ParcelTrackingDB:
             parcel = await self.register_parcel(
                 barcode=fake.ean13(),
                 sender_name=fake.name(),
-                sender_address=fake.address(),
+                sender_address=pick_real_address(state, city)[0],
                 sender_phone=fake.phone_number(),
                 recipient_name=fake.name(),
-                recipient_address=f"{fake.street_address()}, {fake.city()}, {state} {postcode}",
+                recipient_address=pick_real_address(state, city)[0],
                 recipient_phone=fake.phone_number(),
                 destination_postcode=postcode,
                 destination_state=state,
