@@ -103,20 +103,21 @@ def ai_insights():
             # Calculate real metrics
             total_parcels = len(all_parcels)
 
-            # Count by status
-            status_counts = {}
+            # Count by status — normalise to lowercase for case-insensitive matching
+            # (generator stores "Out For Delivery" but some paths use "Out for Delivery")
+            status_counts_lower = {}
             for parcel in all_parcels:
-                status = parcel.get("current_status", "Unknown")
-                status_counts[status] = status_counts.get(status, 0) + 1
+                status = (parcel.get("current_status") or "Unknown").lower()
+                status_counts_lower[status] = status_counts_lower.get(status, 0) + 1
 
-            in_transit = status_counts.get("In Transit", 0)
-            delivered = status_counts.get("Delivered", 0)
-            at_depot = status_counts.get("At Depot", 0)
-            sorting = status_counts.get("Sorting", 0)
-            out_for_delivery = status_counts.get("Out for Delivery", 0)
+            in_transit = status_counts_lower.get("in transit", 0)
+            delivered = status_counts_lower.get("delivered", 0)
+            at_depot = status_counts_lower.get("at depot", 0)
+            sorting = status_counts_lower.get("sorting", 0)
+            out_for_delivery = status_counts_lower.get("out for delivery", 0)
 
             # Calculate success rate (delivered / (delivered + exceptions))
-            exceptions = status_counts.get("Exception", 0) + status_counts.get("Returned", 0)
+            exceptions = status_counts_lower.get("exception", 0) + status_counts_lower.get("returned", 0)
             success_rate = round(
                 (delivered / (delivered + exceptions) * 100) if (delivered + exceptions) > 0 else 0, 
                 1
@@ -131,9 +132,12 @@ def ai_insights():
                 and datetime.fromisoformat(p["created_at"].replace("Z", "+00:00")).date() == today
             )
 
-            # Active items (not delivered or registered)
-            active_statuses = ["In Transit", "Out for Delivery", "At Depot", "Sorting", "Collected"]
-            active_parcels = sum(1 for p in all_parcels if p.get("current_status") in active_statuses)
+            # Active items (not delivered or registered) — case-insensitive
+            active_statuses_lower = {"in transit", "out for delivery", "at depot", "sorting", "collected"}
+            active_parcels = sum(
+                1 for p in all_parcels
+                if (p.get("current_status") or "").lower() in active_statuses_lower
+            )
 
             # Approval metrics
             total_approvals = len(approvals)
