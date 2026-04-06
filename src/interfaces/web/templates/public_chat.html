@@ -238,9 +238,9 @@
     <div class="chat-container">
         <div class="chat-header">
             <div class="d-flex align-items-center">
-                <img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot" style="width: 28px; height: 28px; margin-right: 12px; border-radius: 50%;">
+                <img src="{{ url_for('static', filename='images/ai-foundry.png') }}" alt="AI Foundry" style="width: 28px; height: 28px; margin-right: 12px; border-radius: 50%;">
                 <div>
-                    <h4>Copilot Chat</h4>
+                    <h4>Powered by AI Foundry</h4>
                     <small>Ask about deliveries, tracking, or general inquiries</small>
                 </div>
             </div>
@@ -248,7 +248,7 @@
 
         <div class="chat-messages" id="chatMessages">
             <div class="welcome-section">
-                <img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot">
+                <img src="{{ url_for('static', filename='images/ai-foundry.png') }}" alt="AI Foundry">
                 <h5>Imagine the Possibilities</h5>
                 <p class="text-muted">I can help you with:</p>
                 <div class="capability-badges">
@@ -466,9 +466,9 @@
         const avatarImg = document.createElement('img');
         avatarImg.className = 'message-avatar';
         avatarImg.src = type === 'bot'
-            ? '{{ url_for("static", filename="images/copilot-logo.png") }}'
+            ? '{{ url_for("static", filename="images/ai-foundry.png") }}'
             : '{{ url_for("static", filename="images/user-avatar.png") }}';
-        avatarImg.alt = type === 'bot' ? 'Copilot' : 'You';
+        avatarImg.alt = type === 'bot' ? 'AI Foundry' : 'You';
         avatarImg.style.borderRadius = '50%';
 
         const contentDiv = document.createElement('div');
@@ -490,7 +490,7 @@
 
         const avatarImg = document.createElement('img');
         avatarImg.className = 'message-avatar';
-        avatarImg.src = '{{ url_for("static", filename="images/copilot-logo.png") }}';
+        avatarImg.src = '{{ url_for("static", filename="images/ai-foundry.png") }}';
         avatarImg.style.borderRadius = '50%';
 
         const typingIndicator = document.createElement('div');
@@ -662,7 +662,7 @@
         currentThreadId = null;  // Reset conversation thread
         messagesContainer.innerHTML = `
             <div class="welcome-section">
-                <img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot">
+                <img src="{{ url_for('static', filename='images/ai-foundry.png') }}" alt="AI Foundry">
                 <h5>Imagine the Possibilities</h5>
                 <p class="text-muted">I can help you with:</p>
                 <div class="capability-badges">

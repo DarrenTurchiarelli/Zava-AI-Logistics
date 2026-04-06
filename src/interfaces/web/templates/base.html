@@ -1136,13 +1136,13 @@
 
     <!-- Chat Widget for All Users -->
     <div class="chat-widget">
-        <button class="chat-widget-button" id="chatWidgetToggle" title="Chat with Copilot">
-            <img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot" style="width: 28px; height: 28px;">
+        <button class="chat-widget-button" id="chatWidgetToggle" title="Chat with AI Foundry">
+            <img src="{{ url_for('static', filename='images/ai-foundry.png') }}" alt="AI Foundry" style="width: 28px; height: 28px;">
         </button>
 
         <div class="chat-widget-window" id="chatWidgetWindow">
             <div class="chat-widget-header">
-                <h5><img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot" style="width: 20px; height: 20px; margin-right: 8px;"> Copilot</h5>
+                <h5><img src="{{ url_for('static', filename='images/ai-foundry.png') }}" alt="AI Foundry" style="width: 20px; height: 20px; margin-right: 8px;"> Powered by AI Foundry</h5>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <button class="chat-widget-close" id="chatWidgetMinimize" title="Minimize">
                         <i class="bi bi-dash"></i>
@@ -1155,7 +1155,7 @@
 
             <div class="chat-widget-body" id="chatWidgetMessages">
                 <div class="chat-widget-welcome">
-                    <img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot" style="width: 64px; height: 64px; margin-bottom: 10px;">
+                    <img src="{{ url_for('static', filename='images/ai-foundry.png') }}" alt="AI Foundry" style="width: 64px; height: 64px; margin-bottom: 10px;">
                     <p><strong>Imagine the Possibilities</strong></p>
                     <p>Ask me about deliveries, tracking, or general inquiries.</p>
                 </div>
@@ -1707,7 +1707,7 @@
                 // Reset messages to welcome screen
                 messagesContainer.innerHTML = `
                     <div class="chat-widget-welcome">
-                        <img src="{{ url_for('static', filename='images/copilot-logo.png') }}" alt="Copilot" style="width: 64px; height: 64px; margin-bottom: 10px;">
+                        <img src="{{ url_for('static', filename='images/ai-foundry.png') }}" alt="AI Foundry" style="width: 64px; height: 64px; margin-bottom: 10px;">
                         <p><strong>Imagine the Possibilities</strong></p>
                         <p>Ask me about deliveries, tracking, or general inquiries.</p>
                     </div>
