@@ -330,7 +330,7 @@ class ParcelTrackingDB:
 
             except Exception as e:
                 # Log error but don't fail - some containers might be optional
-                print(f"⚠️ Container creation warning for {container_spec['id']}: {str(e)[:100]}"
+                print(f"⚠️ Container creation warning for {container_spec['id']}: {str(e)[:100]}")
 
     async def close(self):
         """Close database connections and cleanup resources"""
