@@ -2069,7 +2069,6 @@ class ParcelTrackingDB:
             try:
                 async for manifest in container.query_items(
                     query="SELECT * FROM c",
-                    enable_cross_partition_query=True,
                 ):
                     all_manifests.append(manifest)
             except Exception as fetch_err:
