@@ -409,9 +409,12 @@ def auto_assign_manifests():
             "Use your tools in this order:\n"
             "1. Call get_pending_parcels_for_dispatch to find unassigned at-depot parcels.\n"
             "2. Call get_available_drivers to see who is available today.\n"
-            "3. Group parcels geographically by postcode, distribute evenly across drivers.\n"
-            "4. Call create_manifest once per driver with their assigned tracking numbers.\n"
-            "5. Report how many manifests were created and the total parcels assigned."
+            "3. IMPORTANT: Only assign parcels to drivers in the SAME STATE as the parcel destination_state. "
+            "A driver in NSW must only receive NSW parcels. Never mix states in a single manifest.\n"
+            "4. Within each state, group parcels by postcode for geographic efficiency.\n"
+            "5. Call create_manifest once per driver with their assigned tracking numbers.\n"
+            "6. Report how many manifests were created, which driver in which state, "
+            "and if any states have parcels with no available driver."
         )
 
         context = {"mode": "auto_assign", "state_filter": state_filter or "ALL", "max_parcels": max_parcels}

@@ -501,17 +501,41 @@ def create_manifest_tool(driver_id: str, driver_name: str, tracking_numbers: Lis
         if not manifest_items:
             return json.dumps({"success": False, "error": "No valid parcels found", "not_found": not_found})
 
+        # Look up driver state from users container for the manifest record
+        driver_state = ""
+        try:
+            users_container = _get_cosmos_container("users")
+            driver_docs = list(
+                users_container.query_items(
+                    query="SELECT c.state FROM c WHERE c.driver_id = @did OR c.username = @did",
+                    parameters=[{"name": "@did", "value": driver_id}],
+                    enable_cross_partition_query=True,
+                )
+            )
+            if driver_docs:
+                driver_state = driver_docs[0].get("state", "")
+        except Exception:
+            pass
+
         manifest_doc = {
             "id": manifest_id,
             "driver_id": driver_id,
             "driver_name": driver_name,
+            "driver_state": driver_state or "NSW",
+            "driver_location": driver_state or "NSW",
             "manifest_date": manifest_date,
             "status": "active",
             "items": manifest_items,
             "total_items": len(manifest_items),
+            "completed_items": 0,
             "reason": reason,
+            "created_timestamp": now_iso,
             "created_at": now_iso,
             "created_by": "dispatcher_agent",
+            "route_optimized": False,
+            "optimized_route": None,
+            "estimated_duration_minutes": None,
+            "estimated_distance_km": None,
         }
         manifests_container.upsert_item(body=manifest_doc)
 

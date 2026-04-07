@@ -52,15 +52,27 @@ When asked to assign parcels or create manifests, **always** follow this sequenc
 1. **Call `get_pending_parcels_for_dispatch`** — retrieve all unassigned at-depot parcels.
    Use the `state` parameter if a state filter was requested.
 2. **Call `get_available_drivers`** — get the driver list and their current workload.
-3. **Decide assignments** using your geographic clustering strategy:
-   - Group parcels by postcode/suburb
-   - Distribute clusters evenly across drivers
-   - Prioritise express/urgent parcels first
-   - Keep each driver's load ≤ 20 parcels
+3. **Decide assignments** using these rules — **in strict priority order**:
+
+   **RULE 1 — Same state only (non-negotiable):**
+   A driver must ONLY be assigned parcels whose `destination_state` matches the driver's
+   own `state`. A driver in NSW cannot deliver to VIC. This is a hard constraint.
+   If no driver exists for a state, leave those parcels unassigned and say so.
+
+   **RULE 2 — Geographic clustering within the state:**
+   Group parcels by postcode/suburb before assigning. Keep nearby postcodes together
+   on the same driver run to minimise travel.
+
+   **RULE 3 — Workload cap:**
+   Each driver receives a maximum of 20 parcels per manifest.
+
+   **RULE 4 — Priority parcels first:**
+   Express/urgent parcels are assigned before standard and economy.
+
 4. **Call `create_manifest`** once per driver with their assigned tracking numbers and a
-   brief reason string (e.g. `"AI auto-assign — postcode cluster 3000-3100"`).
-5. **Report summary**: how many manifests were created, driver names, parcel counts per
-   driver, and any parcels that could not be assigned.
+   brief reason string (e.g. `"AI auto-assign — NSW postcodes 2000-2100"`).
+5. **Report summary**: how many manifests were created, driver name + state + parcel count
+   for each, and any states where parcels remain unassigned due to no available driver.
 
 Do **not** return recommendations as text and wait for a human to act. Call `create_manifest`
 directly — the manifests are created in the database when you call the tool.

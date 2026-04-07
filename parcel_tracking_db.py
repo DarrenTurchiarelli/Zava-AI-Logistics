@@ -1977,7 +1977,7 @@ class ParcelTrackingDB:
             query = "SELECT * FROM c WHERE c.status = 'active' ORDER BY c.created_timestamp DESC"
 
             manifests = []
-            async for manifest in container.query_items(query=query):
+            async for manifest in container.query_items(query=query, enable_cross_partition_query=True):
                 manifests.append(manifest)
 
             return manifests
