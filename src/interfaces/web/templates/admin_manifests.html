@@ -134,13 +134,16 @@
                     <div class="row align-items-center">
                         <div class="col">
                             <h5 class="mb-0">
-                                <i class="bi bi-list-ul"></i> Driver Manifests Today
+                                <i class="bi bi-list-ul"></i> Driver Manifests
                                 <span id="manifestCount" class="badge bg-light text-dark">{{ manifests|length }}</span>
                             </h5>
                         </div>
-                        <div class="col-auto">
+                        <div class="col-auto d-flex gap-2 flex-wrap align-items-center">
+                            <!-- Date Filter -->
+                            <input type="date" id="dateFilter" class="form-control form-control-sm"
+                                   style="min-width: 150px;" title="Filter by manifest date">
                             <!-- State Filter -->
-                            <select id="stateFilter" class="form-select form-select-sm" style="min-width: 150px;">
+                            <select id="stateFilter" class="form-select form-select-sm" style="min-width: 130px;">
                                 <option value="">All States</option>
                                 <option value="NSW">NSW</option>
                                 <option value="VIC">VIC</option>
@@ -151,6 +154,7 @@
                                 <option value="ACT">ACT</option>
                                 <option value="NT">NT</option>
                             </select>
+                            <button id="clearFilters" class="btn btn-sm btn-outline-light" title="Clear filters">Clear</button>
                         </div>
                     </div>
                 </div>
@@ -175,7 +179,8 @@
                             </thead>
                             <tbody>
                                 {% for manifest in manifests %}
-                                <tr data-state="{{ manifest.driver_state or 'NSW' }}">
+                                <tr data-state="{{ manifest.driver_state or 'NSW' }}"
+                                    data-date="{{ manifest.manifest_date or manifest.created_timestamp[:10] }}">
                                     <td>
                                         <a href="{{ url_for('manifests.view_manifest', manifest_id=manifest.id) }}"
                                            class="text-decoration-none">
@@ -242,7 +247,9 @@
                     <!-- Mobile Card View -->
                     <div class="d-lg-none p-2" id="manifestMobileCards">
                         {% for manifest in manifests %}
-                        <div class="card mb-2 manifest-mobile-card" data-state="{{ manifest.driver_state or 'NSW' }}">
+                        <div class="card mb-2 manifest-mobile-card"
+                             data-state="{{ manifest.driver_state or 'NSW' }}"
+                             data-date="{{ manifest.manifest_date or manifest.created_timestamp[:10] }}">
                             <a href="{{ url_for('manifests.view_manifest', manifest_id=manifest.id) }}" class="text-decoration-none text-dark">
                                 <div class="card-body py-2 px-3">
                                     <div class="d-flex justify-content-between align-items-center mb-1">
@@ -286,89 +293,62 @@
 </div>
 
 <script>
-// State filter functionality - v2
+// Manifest filter — state + date
 (function() {
     'use strict';
 
-    console.log('[DEBUG] State filter script loading...');
-
-    function initStateFilter() {
-        console.log('[DEBUG] Initializing state filter');
-
-        const stateFilter = document.getElementById('stateFilter');
+    function applyFilters() {
+        const selectedState = (document.getElementById('stateFilter') || {}).value || '';
+        const selectedDate  = (document.getElementById('dateFilter')  || {}).value || '';
         const manifestTable = document.getElementById('manifestTable');
         const manifestCount = document.getElementById('manifestCount');
 
-        console.log('[DEBUG] stateFilter found:', !!stateFilter);
-        console.log('[DEBUG] manifestTable found:', !!manifestTable);
-        console.log('[DEBUG] manifestCount found:', !!manifestCount);
+        let visibleCount = 0;
 
-        if (!stateFilter) {
-            console.error('[ERROR] stateFilter element not found!');
-            return;
-        }
-
-        if (!manifestTable) {
-            console.warn('[WARN] manifestTable not found - no manifests to filter');
-            return;
-        }
-
-        if (!manifestCount) {
-            console.error('[ERROR] manifestCount element not found!');
-            return;
-        }
-
-        console.log('[DEBUG] Adding change listener to state filter');
-
-        stateFilter.addEventListener('change', function(e) {
-            const selectedState = e.target.value;
-            console.log('[FILTER] Selected state:', selectedState || 'ALL');
-
-            const tbody = manifestTable.querySelector('tbody');
-            if (!tbody) {
-                console.error('[ERROR] tbody not found in manifestTable');
-                return;
-            }
-
-            const rows = tbody.querySelectorAll('tr');
-            const mobileCards = document.querySelectorAll('.manifest-mobile-card');
-            console.log('[FILTER] Total rows:', rows.length, 'Mobile cards:', mobileCards.length);
-
-            let visibleCount = 0;
-
-            rows.forEach(function(row, index) {
-                const rowState = row.getAttribute('data-state');
-                const shouldShow = !selectedState || rowState === selectedState;
-
-                row.style.display = shouldShow ? '' : 'none';
-
-                if (shouldShow) {
-                    visibleCount++;
-                }
-
-                if (index < 5) { // Log first 5 rows for debugging
-                    console.log(`[FILTER] Row ${index}: state="${rowState}", show=${shouldShow}`);
-                }
+        if (manifestTable) {
+            manifestTable.querySelectorAll('tbody tr').forEach(function(row) {
+                const matchState = !selectedState || row.getAttribute('data-state') === selectedState;
+                const matchDate  = !selectedDate  || row.getAttribute('data-date')  === selectedDate;
+                const show = matchState && matchDate;
+                row.style.display = show ? '' : 'none';
+                if (show) visibleCount++;
             });
+        }
 
-            // Also filter mobile cards
-            mobileCards.forEach(function(card) {
-                const cardState = card.getAttribute('data-state');
-                const shouldShow = !selectedState || cardState === selectedState;
-                card.style.display = shouldShow ? '' : 'none';
-            });
-
-            console.log('[FILTER] Visible rows:', visibleCount);
-            manifestCount.textContent = visibleCount;
+        document.querySelectorAll('.manifest-mobile-card').forEach(function(card) {
+            const matchState = !selectedState || card.getAttribute('data-state') === selectedState;
+            const matchDate  = !selectedDate  || card.getAttribute('data-date')  === selectedDate;
+            card.style.display = (matchState && matchDate) ? '' : 'none';
         });
 
-        console.log('[DEBUG] State filter initialized successfully');
+        if (manifestCount) {
+            // When no filters active, show total count
+            const total = document.querySelectorAll('#manifestTable tbody tr').length
+                        || document.querySelectorAll('.manifest-mobile-card').length;
+            manifestCount.textContent = (selectedState || selectedDate) ? visibleCount : total;
+        }
+    }
+
+    function initFilters() {
+        const stateFilter = document.getElementById('stateFilter');
+        const dateFilter  = document.getElementById('dateFilter');
+        const clearBtn    = document.getElementById('clearFilters');
+
+        if (stateFilter) stateFilter.addEventListener('change', applyFilters);
+        if (dateFilter)  dateFilter.addEventListener('change',  applyFilters);
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function() {
+                if (stateFilter) stateFilter.value = '';
+                if (dateFilter)  dateFilter.value  = '';
+                applyFilters();
+            });
+        }
     }
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initStateFilter);
+        document.addEventListener('DOMContentLoaded', initFilters);
     } else {
-        initStateFilter();
+        initFilters();
     }
 })();
 
