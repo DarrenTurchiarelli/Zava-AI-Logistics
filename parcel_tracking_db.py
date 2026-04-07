@@ -1989,30 +1989,35 @@ class ParcelTrackingDB:
         self,
         page: int = 1,
         per_page: int = 25,
+        date_filter: str = None,
+        state_filter: str = None,
     ) -> Dict[str, Any]:
         """Get paged manifests for admin/depot manager overview.
+
+        Args:
+            page: 1-based page number
+            per_page: rows per page (capped at 100)
+            date_filter: exact manifest_date string YYYY-MM-DD, or None for all
+            state_filter: driver_state code (NSW, VIC, …), or None for all
 
         Returns:
             {
                 "manifests": [...],   # current page rows (projected, no items array)
-                "page": int,          # current page (1-based)
+                "page": int,
                 "per_page": int,
-                "total": int,         # total matching rows across all pages
+                "total": int,
                 "total_pages": int,
             }
-
-        Projection excludes the embedded `items` array — loaded on demand by
-        get_manifest_by_id.  Composite index on driver_manifests handles
-        ORDER BY server-side so no Python sort is needed.
         """
         try:
             container = self.database.get_container_client("driver_manifests")
 
             from datetime import timedelta
+            import math
             cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
 
             page = max(1, page)
-            per_page = min(max(1, per_page), 100)  # cap at 100 rows per page
+            per_page = min(max(1, per_page), 100)
             offset = (page - 1) * per_page
 
             projection = """
@@ -2024,38 +2029,50 @@ class ParcelTrackingDB:
                 c.created_timestamp, c._ts
             """
 
-            # Count query (cheap — no projection cost for COUNT)
-            count_query = "SELECT VALUE COUNT(1) FROM c WHERE c.manifest_date >= @cutoff"
-            count_params = [{"name": "@cutoff", "value": cutoff}]
+            # Build WHERE clauses and params dynamically
+            where_clauses = ["c.manifest_date >= @cutoff"]
+            params: List[Dict] = [{"name": "@cutoff", "value": cutoff}]
+
+            if date_filter:
+                where_clauses.append("c.manifest_date = @date_filter")
+                params.append({"name": "@date_filter", "value": date_filter})
+
+            if state_filter:
+                where_clauses.append("c.driver_state = @state_filter")
+                params.append({"name": "@state_filter", "value": state_filter})
+
+            where_sql = " AND ".join(where_clauses)
+
+            # COUNT — same WHERE, no projection cost
+            count_query = f"SELECT VALUE COUNT(1) FROM c WHERE {where_sql}"
             total = 0
             async for row in container.query_items(
-                query=count_query, parameters=count_params, enable_cross_partition_query=True
+                query=count_query, parameters=params, enable_cross_partition_query=True
             ):
                 total = row
                 break
 
-            # Page query
-            query = f"""
+            # Paged SELECT
+            page_query = f"""
                 SELECT {projection}
                 FROM c
-                WHERE c.manifest_date >= @cutoff
+                WHERE {where_sql}
                 ORDER BY c._ts DESC
                 OFFSET @offset LIMIT @limit
             """
-            parameters = [
-                {"name": "@cutoff",  "value": cutoff},
-                {"name": "@offset",  "value": offset},
-                {"name": "@limit",   "value": per_page},
+            page_params = params + [
+                {"name": "@offset", "value": offset},
+                {"name": "@limit",  "value": per_page},
             ]
 
             manifests = []
             async for manifest in container.query_items(
-                query=query, parameters=parameters, enable_cross_partition_query=True
+                query=page_query, parameters=page_params, enable_cross_partition_query=True
             ):
                 manifests.append(manifest)
 
-            # Fallback for older docs without manifest_date
-            if not manifests and page == 1:
+            # Fallback for older docs without manifest_date (only on page 1, no filters)
+            if not manifests and page == 1 and not date_filter and not state_filter:
                 fallback_query = f"""
                     SELECT {projection}
                     FROM c
@@ -2070,7 +2087,6 @@ class ParcelTrackingDB:
                     manifests.append(manifest)
                 total = len(manifests)
 
-            import math
             return {
                 "manifests": manifests,
                 "page": page,

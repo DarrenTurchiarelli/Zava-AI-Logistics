@@ -302,16 +302,22 @@ def admin_manifests():
     """
     View all active manifests (admin and depot managers only)
 
-    Shows list of all driver manifests with status and parcel counts.
-    Supports ?page= query param for pagination (25 per page).
+    Supports ?page=, ?date=YYYY-MM-DD, ?state=NSW query params.
     """
     try:
-        page = max(1, request.args.get("page", 1, type=int))
-        per_page = 25
+        page        = max(1, request.args.get("page", 1, type=int))
+        per_page    = 25
+        date_filter = request.args.get("date", "").strip() or None
+        state_filter = request.args.get("state", "").strip() or None
 
         async def get_all_manifests():
             async with ParcelTrackingDB() as db:
-                return await db.get_all_active_manifests(page=page, per_page=per_page)
+                return await db.get_all_active_manifests(
+                    page=page,
+                    per_page=per_page,
+                    date_filter=date_filter,
+                    state_filter=state_filter,
+                )
 
         result = run_async(get_all_manifests())
         return render_template(
@@ -321,6 +327,8 @@ def admin_manifests():
             per_page=result["per_page"],
             total=result["total"],
             total_pages=result["total_pages"],
+            date_filter=date_filter or "",
+            state_filter=state_filter or "",
         )
 
     except Exception as e:
@@ -329,6 +337,7 @@ def admin_manifests():
             "admin_manifests.html",
             manifests=[],
             page=1, per_page=25, total=0, total_pages=1,
+            date_filter="", state_filter="",
         )
 
 
