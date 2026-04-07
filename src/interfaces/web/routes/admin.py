@@ -14,6 +14,7 @@ from src.interfaces.web.middleware import login_required
 from parcel_tracking_db import ParcelTrackingDB
 from utils.async_helpers import run_async
 from src.infrastructure.state import StateManager, AgentDecision
+from src.infrastructure.agents.core.base import optimization_agent, sorting_facility_agent
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -168,6 +169,58 @@ def ai_insights():
 
     insights = run_async(get_insights())
     return render_template("ai_insights.html", insights=insights)
+
+
+@admin_bp.route("/api/insights/refresh", methods=["POST"])
+@login_required
+def insights_refresh():
+    """
+    Call Optimisation and Sorting Facility agents for live recommendations.
+    Returns JSON consumed by the AI Insights page Refresh button.
+    """
+    async def _call_agents():
+        async with ParcelTrackingDB() as db:
+            all_parcels = await db.get_all_parcels()
+
+        status_lower = {}
+        for p in all_parcels:
+            s = (p.get("current_status") or "unknown").lower()
+            status_lower[s] = status_lower.get(s, 0) + 1
+
+        at_depot      = status_lower.get("at depot", 0)
+        out_delivery  = status_lower.get("out for delivery", 0)
+        sorting       = status_lower.get("sorting", 0)
+        total         = len(all_parcels)
+
+        # --- Optimisation Agent ---
+        opt_data = {
+            "total_parcels": total,
+            "at_depot": at_depot,
+            "out_for_delivery": out_delivery,
+            "sorting": sorting,
+        }
+        opt_result = await optimization_agent(opt_data)
+
+        # --- Sorting Facility Agent ---
+        sf_data = {
+            "facility": "network",
+            "at_depot": at_depot,
+            "sorting": sorting,
+            "total": total,
+        }
+        sf_result = await sorting_facility_agent(sf_data)
+
+        return {
+            "optimisation": opt_result.get("response", ""),
+            "sorting_facility": sf_result.get("response", ""),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    try:
+        data = run_async(_call_agents())
+        return jsonify({"success": True, **data})
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
 
 
 @admin_bp.route("/dashboard")
