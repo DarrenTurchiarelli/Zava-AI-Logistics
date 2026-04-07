@@ -14,7 +14,11 @@ from src.interfaces.web.middleware import login_required
 from parcel_tracking_db import ParcelTrackingDB
 from utils.async_helpers import run_async
 from src.infrastructure.state import StateManager, AgentDecision
-from src.infrastructure.agents.core.base import optimization_agent, sorting_facility_agent
+from src.infrastructure.agents.core.base import (
+    call_azure_agent,
+    OPTIMIZATION_AGENT_ID,
+    SORTING_FACILITY_AGENT_ID,
+)
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -221,28 +225,82 @@ def insights_refresh():
             s = (p.get("current_status") or "unknown").lower()
             status_lower[s] = status_lower.get(s, 0) + 1
 
-        at_depot      = status_lower.get("at depot", 0)
-        out_delivery  = status_lower.get("out for delivery", 0)
-        sorting       = status_lower.get("sorting", 0)
-        total         = len(all_parcels)
+        at_depot     = status_lower.get("at depot", 0)
+        in_transit   = status_lower.get("in transit", 0) + status_lower.get("in_transit", 0)
+        out_delivery = status_lower.get("out for delivery", 0)
+        sorting      = status_lower.get("sorting", 0)
+        delivered    = status_lower.get("delivered", 0)
+        exceptions   = status_lower.get("exception", 0) + status_lower.get("returned", 0)
+        total        = len(all_parcels)
+        success_rate = round((delivered / (delivered + exceptions) * 100) if (delivered + exceptions) > 0 else 0, 1)
 
-        # --- Optimisation Agent ---
-        opt_data = {
-            "total_parcels": total,
-            "at_depot": at_depot,
-            "out_for_delivery": out_delivery,
-            "sorting": sorting,
-        }
-        opt_result = await optimization_agent(opt_data)
+        # Per-DC active counts for facility context
+        active_statuses = {"at depot", "sorting", "out for delivery", "in transit", "in_transit"}
+        dc_active: dict = {}
+        for p in all_parcels:
+            if (p.get("current_status") or "").lower() in active_statuses:
+                loc = (p.get("store_location") or "").strip()
+                if loc and loc.upper() not in ("UNKNOWN", "TO BE ADVISED", "TBA", ""):
+                    dc_active[loc] = dc_active.get(loc, 0) + 1
+        dc_summary = ", ".join(f"{dc}: {cnt} active parcels" for dc, cnt in sorted(dc_active.items()))
+        if not dc_summary:
+            dc_summary = "No facility-level breakdown available"
 
-        # --- Sorting Facility Agent ---
-        sf_data = {
-            "facility": "network",
-            "at_depot": at_depot,
-            "sorting": sorting,
-            "total": total,
-        }
-        sf_result = await sorting_facility_agent(sf_data)
+        now_str = datetime.now(timezone.utc).strftime("%A %d %B %Y, %H:%M UTC")
+
+        # --- Optimisation Agent — network-analytics prompt ---
+        opt_message = f"""You are the Optimisation Agent for Zava, an Australian last-mile delivery network.
+
+Analyse the following LIVE operational snapshot taken at {now_str} and provide concise, actionable recommendations.
+
+## Live Network Snapshot
+- Total parcels in system: {total}
+- At depot: {at_depot}
+- Sorting: {sorting}
+- In transit: {in_transit}
+- Out for delivery: {out_delivery}
+- Delivered today: {delivered}
+- Exceptions / returned: {exceptions}
+- Delivery success rate: {success_rate}%
+
+## Facility Breakdown
+{dc_summary}
+
+## Task
+1. Identify the top 2-3 operational bottlenecks visible in this data.
+2. Give one specific, actionable recommendation for each.
+3. Highlight any risk that warrants immediate attention.
+
+Be direct and specific. Use the actual numbers above. Do not ask for more data."""
+
+        opt_result = await call_azure_agent(OPTIMIZATION_AGENT_ID, opt_message)
+
+        # --- Sorting Facility Agent — capacity-analytics prompt ---
+        busiest_dc = max(dc_active, key=dc_active.get) if dc_active else "unknown"
+        busiest_count = dc_active.get(busiest_dc, 0)
+
+        sf_message = f"""You are the Sorting Facility Agent for Zava. Assess current facility capacity and recommend routing actions.
+
+## Live Snapshot — {now_str}
+- Total parcels in network: {total}
+- Currently sorting: {sorting}
+- At depot (queued): {at_depot}
+- Out for delivery: {out_delivery}
+
+## Facility Active Parcel Counts
+{dc_summary}
+
+## Busiest Facility
+- {busiest_dc}: {busiest_count} active parcels
+
+## Task
+1. Assess whether any facility is approaching capacity limits.
+2. Recommend specific load-balancing or routing actions if needed.
+3. Flag any facilities that should receive diverted parcels or be pre-emptively prepared.
+
+Base your response on the actual numbers above. Be concise and operational."""
+
+        sf_result = await call_azure_agent(SORTING_FACILITY_AGENT_ID, sf_message)
 
         return {
             "optimisation": opt_result.get("response", ""),
