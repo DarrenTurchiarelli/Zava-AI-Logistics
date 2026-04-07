@@ -301,20 +301,35 @@ def mark_delivery_complete(manifest_id: str, barcode: str):
 def admin_manifests():
     """
     View all active manifests (admin and depot managers only)
-    
+
     Shows list of all driver manifests with status and parcel counts.
+    Supports ?page= query param for pagination (25 per page).
     """
     try:
+        page = max(1, request.args.get("page", 1, type=int))
+        per_page = 25
+
         async def get_all_manifests():
             async with ParcelTrackingDB() as db:
-                return await db.get_all_active_manifests()
+                return await db.get_all_active_manifests(page=page, per_page=per_page)
 
-        manifests = run_async(get_all_manifests())
-        return render_template("admin_manifests.html", manifests=manifests)
+        result = run_async(get_all_manifests())
+        return render_template(
+            "admin_manifests.html",
+            manifests=result["manifests"],
+            page=result["page"],
+            per_page=result["per_page"],
+            total=result["total"],
+            total_pages=result["total_pages"],
+        )
 
     except Exception as e:
         flash(f"Error loading manifests: {str(e)}", "danger")
-        return render_template("admin_manifests.html", manifests=[])
+        return render_template(
+            "admin_manifests.html",
+            manifests=[],
+            page=1, per_page=25, total=0, total_pages=1,
+        )
 
 
 @manifests_bp.route("/admin/manifests/create", methods=["POST"])

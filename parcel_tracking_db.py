@@ -1985,17 +1985,25 @@ class ParcelTrackingDB:
             print(f"❌ Error dismissing address note: {e}")
             return False
 
-    async def get_all_active_manifests(self) -> List[Dict[str, Any]]:
-        """Get all manifests for admin/depot manager overview.
+    async def get_all_active_manifests(
+        self,
+        page: int = 1,
+        per_page: int = 25,
+    ) -> Dict[str, Any]:
+        """Get paged manifests for admin/depot manager overview.
 
-        Returns manifests from the last 30 days, projected to list-view fields only.
-        The embedded `items` array is excluded — it can be hundreds of parcels per
-        manifest and is never needed for the summary list.  Full detail is loaded
-        on demand by get_manifest_by_id when a user opens a specific manifest.
+        Returns:
+            {
+                "manifests": [...],   # current page rows (projected, no items array)
+                "page": int,          # current page (1-based)
+                "per_page": int,
+                "total": int,         # total matching rows across all pages
+                "total_pages": int,
+            }
 
-        Uses a composite index so ORDER BY is done server-side (no Python sort,
-        scales to thousands of drivers).  Capped at 500 rows; add pagination at
-        the route layer if the depot grows beyond that.
+        Projection excludes the embedded `items` array — loaded on demand by
+        get_manifest_by_id.  Composite index on driver_manifests handles
+        ORDER BY server-side so no Python sort is needed.
         """
         try:
             container = self.database.get_container_client("driver_manifests")
@@ -2003,23 +2011,42 @@ class ParcelTrackingDB:
             from datetime import timedelta
             cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
 
-            # Projection — only the 12 fields the admin list view actually renders.
-            # Excluding 'items' (embedded parcel array) keeps each row tiny regardless
-            # of how many parcels are in the manifest.
-            query = """
-                SELECT
-                    c.id, c.driver_id, c.driver_name, c.driver_state,
-                    c.manifest_date, c.status,
-                    c.total_items, c.completed_items,
-                    c.route_optimized,
-                    c.estimated_distance_km, c.estimated_duration_minutes,
-                    c.created_timestamp, c._ts
+            page = max(1, page)
+            per_page = min(max(1, per_page), 100)  # cap at 100 rows per page
+            offset = (page - 1) * per_page
+
+            projection = """
+                c.id, c.driver_id, c.driver_name, c.driver_state,
+                c.manifest_date, c.status,
+                c.total_items, c.completed_items,
+                c.route_optimized,
+                c.estimated_distance_km, c.estimated_duration_minutes,
+                c.created_timestamp, c._ts
+            """
+
+            # Count query (cheap — no projection cost for COUNT)
+            count_query = "SELECT VALUE COUNT(1) FROM c WHERE c.manifest_date >= @cutoff"
+            count_params = [{"name": "@cutoff", "value": cutoff}]
+            total = 0
+            async for row in container.query_items(
+                query=count_query, parameters=count_params, enable_cross_partition_query=True
+            ):
+                total = row
+                break
+
+            # Page query
+            query = f"""
+                SELECT {projection}
                 FROM c
                 WHERE c.manifest_date >= @cutoff
                 ORDER BY c._ts DESC
-                OFFSET 0 LIMIT 500
+                OFFSET @offset LIMIT @limit
             """
-            parameters = [{"name": "@cutoff", "value": cutoff}]
+            parameters = [
+                {"name": "@cutoff",  "value": cutoff},
+                {"name": "@offset",  "value": offset},
+                {"name": "@limit",   "value": per_page},
+            ]
 
             manifests = []
             async for manifest in container.query_items(
@@ -2027,30 +2054,34 @@ class ParcelTrackingDB:
             ):
                 manifests.append(manifest)
 
-            # Fallback for older docs that pre-date the manifest_date field.
-            if not manifests:
-                fallback_query = """
-                    SELECT
-                        c.id, c.driver_id, c.driver_name, c.driver_state,
-                        c.manifest_date, c.status,
-                        c.total_items, c.completed_items,
-                        c.route_optimized,
-                        c.estimated_distance_km, c.estimated_duration_minutes,
-                        c.created_timestamp, c._ts
+            # Fallback for older docs without manifest_date
+            if not manifests and page == 1:
+                fallback_query = f"""
+                    SELECT {projection}
                     FROM c
                     ORDER BY c._ts DESC
-                    OFFSET 0 LIMIT 200
+                    OFFSET 0 LIMIT @limit
                 """
                 async for manifest in container.query_items(
-                    query=fallback_query, enable_cross_partition_query=True
+                    query=fallback_query,
+                    parameters=[{"name": "@limit", "value": per_page}],
+                    enable_cross_partition_query=True,
                 ):
                     manifests.append(manifest)
+                total = len(manifests)
 
-            return manifests
+            import math
+            return {
+                "manifests": manifests,
+                "page": page,
+                "per_page": per_page,
+                "total": total,
+                "total_pages": max(1, math.ceil(total / per_page)),
+            }
 
         except Exception as e:
             print(f"❌ Error retrieving manifests: {e}")
-            return []
+            return {"manifests": [], "page": 1, "per_page": per_page, "total": 0, "total_pages": 1}
 
     async def get_manifest_for_parcel(self, barcode: str) -> Optional[Dict[str, Any]]:
         """Get the active manifest containing a specific parcel"""
