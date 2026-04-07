@@ -2110,10 +2110,8 @@ class ParcelTrackingDB:
             }
 
         except Exception as e:
-            import traceback
-            print(f"❌ Error retrieving manifests: {type(e).__name__}: {e}")
-            print(traceback.format_exc())
-            raise
+            print(f"❌ Error retrieving manifests: {e}")
+            return {"manifests": [], "page": 1, "per_page": per_page, "total": 0, "total_pages": 1}
 
     async def get_manifest_for_parcel(self, barcode: str) -> Optional[Dict[str, Any]]:
         """Get the active manifest containing a specific parcel"""

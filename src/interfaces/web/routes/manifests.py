@@ -332,10 +332,7 @@ def admin_manifests():
         )
 
     except Exception as e:
-        import traceback
-        err_detail = traceback.format_exc()
-        print(f"❌ admin_manifests route error: {err_detail}")
-        flash(f"Error loading manifests: {type(e).__name__}: {e}", "danger")
+        flash(f"Error loading manifests: {str(e)}", "danger")
         return render_template(
             "admin_manifests.html",
             manifests=[],
