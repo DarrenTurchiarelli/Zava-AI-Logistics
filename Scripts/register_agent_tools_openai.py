@@ -1,4 +1,4 @@
-"""
+﻿"""
 Register Cosmos DB tools with Customer Service Agent
 Uses Azure Open AI Assistants API directly (same pattern as create_foundry_agents_openai.py)
 Runs during deployment to enable agent data access
@@ -13,7 +13,7 @@ from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from src.infrastructure.agents.tools.cosmos_tools import AGENT_TOOLS
+from src.infrastructure.agents.tools.cosmos_tools import CUSTOMER_SERVICE_TOOLS as AGENT_TOOLS
 from src.infrastructure.agents.core.prompt_loader import get_agent_prompt
 from config.company import COMPANY_EMAIL, COMPANY_NAME, COMPANY_PHONE
 
