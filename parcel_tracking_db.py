@@ -2062,53 +2062,30 @@ class ParcelTrackingDB:
 
             where_sql = " AND ".join(where_clauses)
 
-            # COUNT — same WHERE, no projection cost
-            count_query = f"SELECT VALUE COUNT(1) FROM c WHERE {where_sql}"
-            total = 0
-            async for row in container.query_items(
-                query=count_query, parameters=params, enable_cross_partition_query=True
-            ):
-                total = row
-                break
+            # Fetch ALL matching docs in the 30-day window; paginate in Python.
+            # Avoids OFFSET/LIMIT cross-partition issues and ORDER BY composite index
+            # requirements on existing containers.
+            fetch_query = f"SELECT {projection} FROM c WHERE {where_sql}"
 
-            # Paged SELECT — no ORDER BY to avoid composite index requirement on existing
-            # containers (create_container_if_not_exists never updates indexing policy).
-            # We sort in Python after fetch; 30-day window keeps the dataset small.
-            page_query = f"""
-                SELECT {projection}
-                FROM c
-                WHERE {where_sql}
-                OFFSET @offset LIMIT @limit
-            """
-            page_params = params + [
-                {"name": "@offset", "value": offset},
-                {"name": "@limit",  "value": per_page},
-            ]
-
-            manifests = []
+            all_manifests = []
             async for manifest in container.query_items(
-                query=page_query, parameters=page_params, enable_cross_partition_query=True
+                query=fetch_query, parameters=params, enable_cross_partition_query=True
             ):
-                manifests.append(manifest)
+                all_manifests.append(manifest)
 
-            # Sort newest first in Python
-            manifests.sort(key=lambda m: m.get("_ts", 0), reverse=True)
-
-            # Fallback for older docs without manifest_date (only on page 1, no filters)
-            if not manifests and page == 1 and not date_filter and not state_filter:
-                fallback_query = f"""
-                    SELECT {projection}
-                    FROM c
-                    OFFSET 0 LIMIT @limit
-                """
+            # Fallback: no manifest_date field on older docs — fetch without WHERE
+            if not all_manifests and not date_filter and not state_filter:
                 async for manifest in container.query_items(
-                    query=fallback_query,
-                    parameters=[{"name": "@limit", "value": per_page}],
+                    query=f"SELECT {projection} FROM c",
                     enable_cross_partition_query=True,
                 ):
-                    manifests.append(manifest)
-                manifests.sort(key=lambda m: m.get("_ts", 0), reverse=True)
-                total = len(manifests)
+                    all_manifests.append(manifest)
+
+            # Sort newest first, paginate in Python
+            all_manifests.sort(key=lambda m: m.get("_ts", 0), reverse=True)
+            total = len(all_manifests)
+            offset = (page - 1) * per_page
+            manifests = all_manifests[offset: offset + per_page]
 
             return {
                 "manifests": manifests,
