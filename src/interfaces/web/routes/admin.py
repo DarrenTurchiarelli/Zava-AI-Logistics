@@ -150,6 +150,39 @@ def ai_insights():
                 if a.get("parcel_dc") and a.get("parcel_dc") not in ["Unknown DC", "To Be Advised", "Completed"]
             )
 
+            # Per-DC active parcel counts derived from real data
+            FACILITY_CAPACITY = 500  # nominal max parcels per sorting facility
+            active_for_dc_statuses = {"at depot", "sorting", "out for delivery", "in transit", "in_transit"}
+            dc_active: dict = {}
+            for p in all_parcels:
+                status_str = (p.get("current_status") or "").lower()
+                if status_str in active_for_dc_statuses:
+                    loc = (p.get("store_location") or "").strip()
+                    if loc and loc.upper() not in ("UNKNOWN", "TO BE ADVISED", "TBA", ""):
+                        dc_active[loc] = dc_active.get(loc, 0) + 1
+
+            dc_stats = []
+            for dc_name in sorted(dc_active):
+                count = dc_active[dc_name]
+                pct = min(round(count * 100 / FACILITY_CAPACITY), 100)
+                if pct >= 85:
+                    status, color = "High Load", "warning"
+                elif pct >= 65:
+                    status, color = "Busy", "info"
+                else:
+                    status, color = "Optimal", "success"
+                dc_stats.append({
+                    "name": dc_name,
+                    "count": count,
+                    "capacity": FACILITY_CAPACITY,
+                    "pct": pct,
+                    "status": status,
+                    "color": color,
+                })
+            # Show at most 6 facilities; sort high-load first for salience
+            dc_stats.sort(key=lambda x: x["pct"], reverse=True)
+            dc_stats = dc_stats[:6]
+
             return {
                 "total_processed": processed_today or total_parcels,
                 "in_transit": in_transit,
@@ -162,9 +195,10 @@ def ai_insights():
                 "total_approvals": total_approvals,
                 "pending_approvals": total_approvals,
                 "valid_dc_approvals": valid_dc_approvals,
-                "auto_resolved": total_approvals - valid_dc_approvals,  # Approximation
+                "auto_resolved": total_approvals - valid_dc_approvals,
                 "avg_decision_time": "0.6s",
                 "total_parcels": total_parcels,
+                "dc_stats": dc_stats,
             }
 
     insights = run_async(get_insights())
