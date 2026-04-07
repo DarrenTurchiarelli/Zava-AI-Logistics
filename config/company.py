@@ -35,7 +35,7 @@ SUPPORT_HOURS = "24/7 Customer Support Available"
 
 # App Configuration
 APP_VERSION = "1.0.0"
-APP_COPYRIGHT = f"© 2025 {COMPANY_NAME}. All rights reserved."
+APP_COPYRIGHT = f"© 2026 {COMPANY_NAME}. All rights reserved."
 
 # Service Areas (Australian States)
 SERVICE_AREAS = {
