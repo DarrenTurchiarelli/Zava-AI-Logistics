@@ -80,17 +80,32 @@ AZURE_MAPS_SUBSCRIPTION_KEY="your-key"
 
 ## 🚀 Azure Deployment
 
-```powershell
-# One-command deployment
-.\deploy_to_azure.ps1
+### Option 1 — PowerShell script (recommended for first-time setup)
 
-# Code only
+```powershell
+# 1. Login and select your subscription
+az login
+az account set --subscription "<your-subscription-id-or-name>"
+
+# 2. Verify the correct subscription is active
+az account show --query "{name:name, id:id, state:state}" -o table
+
+# 3. Run the deployment (creates all Azure resources automatically)
+.\deploy_to_azure.ps1
+```
+
+On subsequent deploys you can push code only without re-provisioning infrastructure:
+
+```powershell
 .\deploy_to_azure.ps1 -CodeOnly
 ```
 
 Deploys: Cosmos DB, AI Hub, OpenAI, Maps, Speech, Vision, 8 agents, RBAC, demo data.
 
-**Automated Deployment (GitHub Actions):**
+> **Tip:** `az account list --output table` lists all subscriptions you have access to if you are unsure of the name or ID.
+
+### Option 2 — GitHub Actions (CI/CD)
+
 ```
 1. Setup: Follow .github/GITHUB_ACTIONS_SETUP.md
 2. Go to: Actions → Deploy Infrastructure & Application
