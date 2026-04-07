@@ -272,12 +272,8 @@ async function getAddressSuggestions(fieldId, query) {
     }
 
     try {
-        const response = await fetch('/api/autocomplete-address', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ query: query })
+        const response = await fetch('/api/autocomplete-address?query=' + encodeURIComponent(query), {
+            method: 'GET'
         });
 
         const data = await response.json();
