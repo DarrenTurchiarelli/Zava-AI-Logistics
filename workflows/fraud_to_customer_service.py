@@ -111,20 +111,18 @@ class FraudToCustomerServiceWorkflow:
             # Step 1: Fraud Detection Analysis
             await self._step_1_fraud_detection(context)
 
-            # Step 2: Determine if customer notification needed
-            if context.fraud_risk_score >= 0.7:  # High risk threshold
+            # Step 2-5: Routing driven entirely by the agent's recommended_action.
+            # No hardcoded numeric thresholds — the Fraud Detection agent decides.
+            action = (context.recommended_action or "monitor_only").lower()
+            if action in ("notify_customer", "require_identity_verification", "hold_parcels"):
                 await self._step_2_generate_customer_warning(context)
-
-                # Step 3: Send notification
                 await self._step_3_send_notification(context)
 
-                # Step 4: Check if identity verification needed
-                if context.fraud_risk_score >= 0.85:  # Very high risk
+                if action in ("require_identity_verification", "hold_parcels"):
                     context.identity_verification_required = True
                     await self._step_4_identity_verification(context)
 
-                # Step 5: Hold parcels if fraud confirmed
-                if context.fraud_risk_score >= 0.9 or context.identity_verification_required:
+                if action == "hold_parcels":
                     await self._step_5_hold_parcels(context)
 
             # Mark workflow as completed
@@ -220,17 +218,15 @@ Keep message concise (200-300 words), professional, and actionable.
         """Step 3: Send notification to customer"""
         self._log_step(context, "Sending fraud warning notification", "info")
 
-        # Determine best notification method based on risk level
-        if context.fraud_risk_score >= 0.9:
-            # Very high risk: multi-channel notification
+        # Notification channel driven by the agent's recommended_action
+        action = (context.recommended_action or "notify_customer").lower()
+        if action == "hold_parcels":
             notification_methods = ["email", "sms", "phone_call"]
             context.notification_method = "multi_channel"
-        elif context.fraud_risk_score >= 0.8:
-            # High risk: email + SMS
+        elif action == "require_identity_verification":
             notification_methods = ["email", "sms"]
             context.notification_method = "email_sms"
         else:
-            # Medium-high risk: email only
             notification_methods = ["email"]
             context.notification_method = "email"
 

@@ -387,83 +387,52 @@ def create_manifest():
 @role_required(UserManager.ROLE_ADMIN, UserManager.ROLE_DEPOT_MANAGER)
 def auto_assign_manifests():
     """
-    AI-powered automatic manifest creation using DISPATCHER_AGENT
-    
-    Intelligently assigns pending parcels to available drivers.
-    
+    AI-powered automatic manifest creation using DISPATCHER_AGENT.
+
+    The agent autonomously calls get_pending_parcels_for_dispatch,
+    get_available_drivers, and create_manifest tools to build manifests
+    without any hardcoded routing logic in Python.
+
     Form Data:
-        max_parcels (int): Maximum parcels to assign (default: 20)
-        state_filter (str): Optional state filter for parcels
+        max_parcels (int): Maximum parcels per query batch (default: 20)
+        state_filter (str): Optional Australian state filter
     """
     try:
         max_parcels = int(request.form.get("max_parcels", 20))
-        state_filter = request.form.get("state_filter", "")
+        state_filter = request.form.get("state_filter", "").strip()
 
-        async def auto_assign():
-            async with ParcelTrackingDB() as db:
-                # Get pending parcels
-                pending_parcels = await db.get_pending_parcels(
-                    status="at_depot", 
-                    max_count=max_parcels, 
-                    state=state_filter if state_filter else None
-                )
+        # Build a brief directive — the agent does all the database work via tools
+        state_clause = f" for state {state_filter}" if state_filter else " across all states"
+        prompt = (
+            f"Please auto-assign all pending parcels{state_clause} to available drivers and create manifests.\n"
+            f"Batch limit: {max_parcels} parcels maximum.\n\n"
+            "Use your tools in this order:\n"
+            "1. Call get_pending_parcels_for_dispatch to find unassigned at-depot parcels.\n"
+            "2. Call get_available_drivers to see who is available today.\n"
+            "3. Group parcels geographically by postcode, distribute evenly across drivers.\n"
+            "4. Call create_manifest once per driver with their assigned tracking numbers.\n"
+            "5. Report how many manifests were created and the total parcels assigned."
+        )
 
-                if not pending_parcels:
-                    state_msg = f" in {state_filter}" if state_filter else ""
-                    return {"success": False, "message": f"No pending parcels found{state_msg}"}
+        context = {"mode": "auto_assign", "state_filter": state_filter or "ALL", "max_parcels": max_parcels}
 
-                # Get available drivers
-                drivers = await db.get_available_drivers(state=state_filter if state_filter else None)
+        agent_result = run_async(dispatcher_agent({"details": prompt, "context": context}))
 
-                if not drivers:
-                    return {"success": False, "message": "No available drivers found"}
-
-                # Filter drivers with existing manifests
-                # TODO: Check for drivers with unfilled manifests
-                
-                # Prepare data for DISPATCHER_AGENT
-                route_request = {
-                    "parcel_count": len(pending_parcels),
-                    "available_drivers": [d["driver_id"] for d in drivers],
-                    "service_level": "standard",
-                    "delivery_window": "08:00 - 18:00",
-                    "zone": state_filter or "ALL",
-                    "parcels": [
-                        {
-                            "barcode": p["barcode"],
-                            "tracking_number": p.get("tracking_number", p["barcode"]),
-                            "address": p["recipient_address"],
-                            "postcode": p.get("postcode", ""),
-                            "priority": p.get("priority", 2),
-                            "recipient_name": p.get("recipient_name", ""),
-                        }
-                        for p in pending_parcels
-                    ],
-                }
-
-                # Call DISPATCHER_AGENT
-                agent_result = await dispatcher_agent(route_request)
-
-                if not agent_result.get("success"):
-                    # Fallback to round-robin
-                    return await _fallback_round_robin_assignment(db, pending_parcels, drivers)
-
-                # Parse AI recommendations and create manifests
-                # TODO: Implement AI response parsing
-                
-                return {
-                    "success": True,
-                    "manifests_created": 0,
-                    "parcels_assigned": 0,
-                    "message": "Auto-assignment requires implementation"
-                }
-
-        result = run_async(auto_assign())
-
-        if result.get("success"):
-            flash(f"✅ Created {result.get('manifests_created', 0)} manifests", "success")
+        if agent_result.get("success"):
+            response_text = agent_result.get("response", "")
+            # Parse manifest count from agent summary
+            import re
+            count_match = re.search(r"(\d+)\s+manifest", response_text, re.IGNORECASE)
+            parcels_match = re.search(r"(\d+)\s+parcel", response_text, re.IGNORECASE)
+            manifests_created = int(count_match.group(1)) if count_match else 1
+            parcels_assigned = int(parcels_match.group(1)) if parcels_match else max_parcels
+            flash(
+                f"✅ Dispatcher agent created {manifests_created} manifest(s) for "
+                f"{parcels_assigned} parcel(s){state_clause}.",
+                "success",
+            )
         else:
-            flash(f"⚠️ {result.get('message', 'Auto-assign failed')}", "warning")
+            flash(f"⚠️ Dispatcher agent failed: {agent_result.get('error', 'Unknown error')}", "warning")
 
         return redirect(url_for("manifests.admin_manifests"))
 
