@@ -1988,24 +1988,36 @@ class ParcelTrackingDB:
     async def get_all_active_manifests(self) -> List[Dict[str, Any]]:
         """Get all manifests for admin/depot manager overview.
 
-        Returns all manifests from the last 30 days, any status, so the depot
-        manager always sees the full picture regardless of completion status or
-        what date the manifests were originally created.
+        Returns manifests from the last 30 days, projected to list-view fields only.
+        The embedded `items` array is excluded — it can be hundreds of parcels per
+        manifest and is never needed for the summary list.  Full detail is loaded
+        on demand by get_manifest_by_id when a user opens a specific manifest.
+
+        Uses a composite index so ORDER BY is done server-side (no Python sort,
+        scales to thousands of drivers).  Capped at 500 rows; add pagination at
+        the route layer if the depot grows beyond that.
         """
         try:
             container = self.database.get_container_client("driver_manifests")
 
-            # 30-day rolling window — enough history for depot ops without
-            # loading every manifest ever created.
             from datetime import timedelta
             cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
 
-            # Composite index on driver_manifests (defined in container spec) enables
-            # ORDER BY on cross-partition queries — sorting is done server-side.
+            # Projection — only the 12 fields the admin list view actually renders.
+            # Excluding 'items' (embedded parcel array) keeps each row tiny regardless
+            # of how many parcels are in the manifest.
             query = """
-                SELECT * FROM c
+                SELECT
+                    c.id, c.driver_id, c.driver_name, c.driver_state,
+                    c.manifest_date, c.status,
+                    c.total_items, c.completed_items,
+                    c.route_optimized,
+                    c.estimated_distance_km, c.estimated_duration_minutes,
+                    c.created_timestamp, c._ts
+                FROM c
                 WHERE c.manifest_date >= @cutoff
                 ORDER BY c._ts DESC
+                OFFSET 0 LIMIT 500
             """
             parameters = [{"name": "@cutoff", "value": cutoff}]
 
@@ -2015,10 +2027,20 @@ class ParcelTrackingDB:
             ):
                 manifests.append(manifest)
 
-            # Fall back: if no dated manifests found (e.g. older docs without
-            # manifest_date field), return all manifests regardless of date.
+            # Fallback for older docs that pre-date the manifest_date field.
             if not manifests:
-                fallback_query = "SELECT * FROM c ORDER BY c._ts DESC OFFSET 0 LIMIT 200"
+                fallback_query = """
+                    SELECT
+                        c.id, c.driver_id, c.driver_name, c.driver_state,
+                        c.manifest_date, c.status,
+                        c.total_items, c.completed_items,
+                        c.route_optimized,
+                        c.estimated_distance_km, c.estimated_duration_minutes,
+                        c.created_timestamp, c._ts
+                    FROM c
+                    ORDER BY c._ts DESC
+                    OFFSET 0 LIMIT 200
+                """
                 async for manifest in container.query_items(
                     query=fallback_query, enable_cross_partition_query=True
                 ):
