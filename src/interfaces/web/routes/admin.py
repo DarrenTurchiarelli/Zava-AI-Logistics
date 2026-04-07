@@ -302,9 +302,32 @@ Base your response on the actual numbers above. Be concise and operational."""
 
         sf_result = await call_azure_agent(SORTING_FACILITY_AGENT_ID, sf_message)
 
+        opt_text = opt_result.get("response") or ""
+        sf_text = sf_result.get("response") or ""
+
+        # Fallback: if SF agent didn't respond, generate a data-driven summary from live numbers
+        if not sf_text:
+            top_dcs = sorted(dc_active.items(), key=lambda x: x[1], reverse=True)[:3]
+            dc_lines = "\n".join(f"• {dc}: {cnt} active parcels" for dc, cnt in top_dcs) if top_dcs else "• No facility data available"
+            load_level = "elevated" if sorting > 400 else "normal"
+            divert_note = (
+                f"Consider diverting arriving parcels from {busiest_dc} to reduce queue times."
+                if busiest_count > 200
+                else "No immediate routing intervention required."
+            )
+            sf_text = (
+                f"### Facility Status — Live Snapshot\n\n"
+                f"**Currently sorting:** {sorting} parcels | **At depot (queued):** {at_depot} parcels\n\n"
+                f"**Top active facilities:**\n{dc_lines}\n\n"
+                f"**Busiest facility:** {busiest_dc} ({busiest_count} active parcels)\n\n"
+                f"**Assessment:** Network load is {load_level}. {divert_note}"
+            )
+            if not sf_result.get("success"):
+                sf_text += f"\n\n_Agent unavailable — {sf_result.get('error', 'check SORTING_FACILITY_AGENT_ID configuration')}_"
+
         return {
-            "optimisation": opt_result.get("response", ""),
-            "sorting_facility": sf_result.get("response", ""),
+            "optimisation": opt_text,
+            "sorting_facility": sf_text,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
 
