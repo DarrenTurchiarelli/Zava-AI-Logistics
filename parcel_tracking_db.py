@@ -1972,31 +1972,38 @@ class ParcelTrackingDB:
     async def get_all_active_manifests(self) -> List[Dict[str, Any]]:
         """Get all manifests for admin/depot manager overview.
 
-        Returns all active manifests (any date) plus all manifests created today,
-        so the depot manager sees the full picture regardless of completion status.
+        Returns all manifests from the last 30 days, any status, so the depot
+        manager always sees the full picture regardless of completion status or
+        what date the manifests were originally created.
         """
         try:
             container = self.database.get_container_client("driver_manifests")
-            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-            # Return active manifests (any date) UNION today's manifests (any status).
-            # A single OR clause keeps this as one query and avoids duplicates at
-            # the Python level by de-duping on manifest id.
+            # 30-day rolling window — enough history for depot ops without
+            # loading every manifest ever created.
+            from datetime import timedelta
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+
             query = """
                 SELECT * FROM c
-                WHERE c.status = 'active'
-                   OR c.manifest_date = @today
+                WHERE c.manifest_date >= @cutoff
                 ORDER BY c._ts DESC
             """
-            parameters = [{"name": "@today", "value": today}]
+            parameters = [{"name": "@cutoff", "value": cutoff}]
 
-            seen = set()
             manifests = []
             async for manifest in container.query_items(
                 query=query, parameters=parameters, enable_cross_partition_query=True
             ):
-                if manifest["id"] not in seen:
-                    seen.add(manifest["id"])
+                manifests.append(manifest)
+
+            # Fall back: if no dated manifests found (e.g. older docs without
+            # manifest_date), return all active manifests regardless of date.
+            if not manifests:
+                fallback_query = "SELECT * FROM c ORDER BY c._ts DESC OFFSET 0 LIMIT 200"
+                async for manifest in container.query_items(
+                    query=fallback_query, enable_cross_partition_query=True
+                ):
                     manifests.append(manifest)
 
             return manifests
