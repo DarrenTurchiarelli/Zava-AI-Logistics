@@ -1,7 +1,7 @@
 ﻿"""
-Register Cosmos DB tools with Customer Service Agent
-Uses Azure Open AI Assistants API directly (same pattern as create_foundry_agents_openai.py)
-Runs during deployment to enable agent data access
+Register Cosmos DB tools with AI Agents (Customer Service + Dispatcher).
+Uses Azure OpenAI Assistants API directly.
+Runs during deployment to enable agent data access.
 """
 
 import os
@@ -11,45 +11,41 @@ from dotenv import load_dotenv
 from openai import AzureOpenAI
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
-# Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from src.infrastructure.agents.tools.cosmos_tools import CUSTOMER_SERVICE_TOOLS as AGENT_TOOLS
+from src.infrastructure.agents.tools.cosmos_tools import CUSTOMER_SERVICE_TOOLS, DISPATCHER_TOOLS
 from src.infrastructure.agents.core.prompt_loader import get_agent_prompt
 from config.company import COMPANY_EMAIL, COMPANY_NAME, COMPANY_PHONE
 
-# Fix Windows console encoding
-if sys.platform == 'win32':
+if sys.platform == "win32":
     try:
-        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     except (AttributeError, OSError):
         import io
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 load_dotenv(override=True)
 
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 CUSTOMER_SERVICE_AGENT_ID = os.getenv("CUSTOMER_SERVICE_AGENT_ID")
+DISPATCHER_AGENT_ID = os.getenv("DISPATCHER_AGENT_ID")
 
 print("=" * 70)
-print("🔧 Registering Cosmos DB Tools with Customer Service Agent")
+print("Registering Cosmos DB Tools with Azure AI Agents")
 print("=" * 70)
 print()
 
-# Validate environment
 if not AZURE_OPENAI_ENDPOINT:
-    print("❌ AZURE_OPENAI_ENDPOINT not set")
+    print("ERROR: AZURE_OPENAI_ENDPOINT not set")
     sys.exit(1)
 
 if not CUSTOMER_SERVICE_AGENT_ID:
-    print("❌ CUSTOMER_SERVICE_AGENT_ID not set")
+    print("ERROR: CUSTOMER_SERVICE_AGENT_ID not set")
     print("   Run create_foundry_agents_openai.py first")
     sys.exit(1)
 
-print(f"📡 Connecting to Azure OpenAI")
-print(f"   Endpoint: {AZURE_OPENAI_ENDPOINT}")
-print(f"   Agent ID: {CUSTOMER_SERVICE_AGENT_ID}")
+print(f"Connecting to Azure OpenAI: {AZURE_OPENAI_ENDPOINT}")
 print()
 
 credential = DefaultAzureCredential()
@@ -57,24 +53,22 @@ token_provider = get_bearer_token_provider(credential, "https://cognitiveservice
 client = AzureOpenAI(
     azure_endpoint=AZURE_OPENAI_ENDPOINT,
     azure_ad_token_provider=token_provider,
-    api_version="2024-05-01-preview"
+    api_version="2024-05-01-preview",
 )
 
+errors = 0
+
+# ---------------------------------------------------------------------------
+# Customer Service Agent
+# ---------------------------------------------------------------------------
+print("-" * 70)
+print("Customer Service Agent")
+print("-" * 70)
 try:
-    # Get current agent
-    print("📋 Retrieving agent...")
     agent = client.beta.assistants.retrieve(CUSTOMER_SERVICE_AGENT_ID)
-    
-    print(f"   ✓ Found: {agent.name}")
-    print(f"   Model: {agent.model}")
-    print(f"   Current tools: {len(agent.tools) if agent.tools else 0}")
-    print()
-    
-    # Load system prompt
-    print("📄 Loading system prompt from Agent-Skills/customer-service/...")
+    print(f"  Found: {agent.name}  (current tools: {len(agent.tools) if agent.tools else 0})")
+
     base_prompt = get_agent_prompt("customer-service")
-    
-    # Enhance with company info and tool guidelines
     enhanced_instructions = f"""{base_prompt}
 
 ## Company Information
@@ -86,55 +80,75 @@ try:
 ## Tool Guidelines
 
 **Available Tools:**
-- `track_parcel_tool` - Look up parcel by tracking number or barcode
-- `search_parcels_by_recipient_tool` - Search by recipient name/postcode/address
+- `track_parcel` - Look up parcel by tracking number or barcode
+- `search_parcels_by_recipient` - Search by recipient name/postcode/address
+- `search_parcels_by_driver` - Search by driver name or ID
+- `get_delivery_statistics` - Return delivery counts and status breakdown
 
 **When to Use Tools:**
-- Call `track_parcel_tool` when customer asks about a specific tracking number
-- Call `search_parcels_by_recipient_tool` when searching by name/address
+- Call `track_parcel` when customer asks about a specific tracking number
+- Call `search_parcels_by_recipient` when searching by name/address
 - NEVER call tools for general questions (hours, phone number, etc.)
 
 ## Response Guidelines
 
-- Answer the customer's question directly
-- Be conversational and natural  
+- Answer the customer question directly
+- Be conversational and natural
 - Keep responses concise
 - Photos auto-display in UI - just acknowledge they exist
 """
-    
-    # Register tools
-    print(f"🔧 Registering {len(AGENT_TOOLS)} Cosmos DB tools...")
-    for tool in AGENT_TOOLS:
-        print(f"   ✓ {tool['function']['name']}")
-    print()
-    
-    # Update agent with tools
-    updated_agent = client.beta.assistants.update(
+
+    updated = client.beta.assistants.update(
         CUSTOMER_SERVICE_AGENT_ID,
-        tools=AGENT_TOOLS,
-        instructions=enhanced_instructions
+        tools=CUSTOMER_SERVICE_TOOLS,
+        instructions=enhanced_instructions,
     )
-    
-    print(f"✅ Successfully registered tools!")
-    print(f"   Agent: {updated_agent.name}")
-    print(f"   Tools: {len(updated_agent.tools) if updated_agent.tools else 0}")
-    
-    print("📝 Registered Tools:")
-    for i, tool in enumerate(AGENT_TOOLS, 1):
-        func_name = tool['function']['name']
-        func_desc = tool['function']['description']
-        print(f"   {i}. {func_name}")
-        print(f"      {func_desc}")
+    print(f"  Registered {len(updated.tools)} tools:")
+    for t in updated.tools:
+        if hasattr(t, "function"):
+            print(f"    - {t.function.name}")
+    print("  Customer Service Agent ready")
     print()
-    
-    print("✅ Customer Service Agent ready!")
-    print("   The agent can now access Cosmos DB for parcel tracking")
-    print()
-    
-    sys.exit(0)
-    
 except Exception as e:
-    print(f"❌ Error: {e}")
-    import traceback
-    traceback.print_exc()
+    print(f"  ERROR: {e}")
+    import traceback; traceback.print_exc()
+    errors += 1
+
+# ---------------------------------------------------------------------------
+# Dispatcher Agent
+# ---------------------------------------------------------------------------
+print("-" * 70)
+print("Dispatcher Agent")
+print("-" * 70)
+if not DISPATCHER_AGENT_ID:
+    print("  WARNING: DISPATCHER_AGENT_ID not set - skipping")
+    print()
+else:
+    try:
+        agent = client.beta.assistants.retrieve(DISPATCHER_AGENT_ID)
+        print(f"  Found: {agent.name}  (current tools: {len(agent.tools) if agent.tools else 0})")
+
+        dispatcher_prompt = get_agent_prompt("dispatcher")
+
+        updated = client.beta.assistants.update(
+            DISPATCHER_AGENT_ID,
+            tools=DISPATCHER_TOOLS,
+            instructions=dispatcher_prompt,
+        )
+        print(f"  Registered {len(updated.tools)} tools:")
+        for t in updated.tools:
+            if hasattr(t, "function"):
+                print(f"    - {t.function.name}")
+        print("  Dispatcher Agent ready")
+        print()
+    except Exception as e:
+        print(f"  ERROR: {e}")
+        import traceback; traceback.print_exc()
+        errors += 1
+
+if errors:
+    print(f"Completed with {errors} error(s)")
     sys.exit(1)
+else:
+    print("All agents registered successfully")
+    sys.exit(0)
