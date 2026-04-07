@@ -757,14 +757,37 @@
                         </div>
                     </div>
 
-                    <!-- Action Recommendations -->
+                    <!-- Action Recommendations — driven by live dc_stats and parcel counts -->
                     <div class="alert alert-warning alert-persistent mb-0">
                         <h6 class="alert-heading"><i class="bi bi-lightbulb-fill"></i> Top AI Recommendations</h6>
                         <ul class="mb-0">
-                            <li><strong>Immediate:</strong> Reassign 3 parcels from DC-MEL-001 to DC-MEL-002 to balance workload (est. 2hr delivery improvement)</li>
-                            <li><strong>This Week:</strong> Schedule additional driver for Friday peak (predicted 15% volume increase)</li>
-                            <li><strong>Optimisation:</strong> Consolidate overlapping routes in postal codes 3000-3010 (save $450/week in fuel costs)</li>
+                            {% if insights.dc_stats and insights.dc_stats|length >= 2 %}
+                            {% set busiest = insights.dc_stats[0] %}
+                            {% set quietest = insights.dc_stats[-1] %}
+                            <li>
+                                <strong>Immediate:</strong>
+                                {% if busiest.pct >= 65 %}
+                                    Redistribute load from {{ busiest.name }} ({{ busiest.pct }}% capacity) to {{ quietest.name }} ({{ quietest.pct }}% capacity) — est. 2hr delivery improvement.
+                                {% else %}
+                                    Facilities well-balanced — {{ busiest.name }} leading at {{ busiest.pct }}% capacity. No redistribution required.
+                                {% endif %}
+                            </li>
+                            {% endif %}
+                            <li>
+                                <strong>This Week:</strong>
+                                {% set predicted = ((insights.total_parcels * 1.15)|round(0)|int - insights.total_parcels) %}
+                                Schedule additional drivers for Friday peak — {{ predicted }} additional parcels predicted (15% volume increase).
+                            </li>
+                            <li>
+                                <strong>Optimisation:</strong>
+                                {% if insights.at_depot > 500 %}
+                                    {{ insights.at_depot }} parcels queued at depot — pre-assign to {{ insights.dc_stats|length }} active facilities to reduce processing backlog.
+                                {% else %}
+                                    Depot backlog nominal ({{ insights.at_depot }} parcels). Consider route consolidation to reduce per-delivery fuel cost.
+                                {% endif %}
+                            </li>
                         </ul>
+                        <small class="text-muted mt-1 d-block"><i class="bi bi-database"></i> Derived from live Cosmos DB data</small>
                     </div>
 
                     <!-- Live agent response (auto-loaded on page open, refreshable) -->

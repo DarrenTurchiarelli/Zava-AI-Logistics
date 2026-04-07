@@ -149,6 +149,8 @@ def chatbot_query():
         response_data = {"response": response_text}
         if isinstance(result, dict) and result.get("thread_id"):
             response_data["thread_id"] = result["thread_id"]
+        if isinstance(result, dict) and result.get("tools_used"):
+            response_data["tools_used"] = result["tools_used"]
         if delivery_photos:
             response_data["delivery_photos"] = delivery_photos
         if lodgement_photos:

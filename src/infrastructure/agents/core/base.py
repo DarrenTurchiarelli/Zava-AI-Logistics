@@ -179,6 +179,7 @@ async def call_azure_agent(
 
         max_iterations = 30
         iteration = 0
+        tools_used = []  # Track tool calls for UI trace panel
 
         while iteration < max_iterations:
             run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
@@ -198,6 +199,12 @@ async def call_azure_agent(
 
                         print(f"   🔨 Calling tool: {function_name}")
                         print(f"      Arguments: {function_args}")
+
+                        # Record for UI trace panel
+                        tools_used.append({
+                            "tool": function_name,
+                            "args": function_args,
+                        })
 
                         # Emit tool_start event to SSE stream if a queue was provided
                         if event_queue is not None:
@@ -310,6 +317,7 @@ async def call_azure_agent(
             "agent_id": agent_id,
             "thread_id": thread.id,
             "response": response_text,
+            "tools_used": tools_used,
             "metadata": {"run_id": run_result.id, "status": run_result.status},
         }
 
