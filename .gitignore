@@ -141,3 +141,5 @@ static/reports/*.csv
 
 # Azure App Service logs
 webapp-logs/
+
+DEMO_FIXES.md

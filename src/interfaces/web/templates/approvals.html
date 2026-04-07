@@ -903,13 +903,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         <li><strong>Skipped:</strong> ${result.skipped || 0} requests (manual review required)</li>
                         ${dcSkippedText}
                     </ul>${aiSection}
+                    <div class="mt-3">
+                        <button class="btn btn-sm btn-primary" onclick="window.location.reload()">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh approvals list
+                        </button>
+                    </div>
                 `;
                 agentResults.style.display = 'block';
-                
-                // Reload page after 3 seconds to show updated approvals
-                setTimeout(() => {
-                    window.location.reload();
-                }, 3000);
             } else {
                 agentStatus.className = 'badge bg-danger';
                 agentStatus.textContent = 'Error';
@@ -923,12 +923,6 @@ document.addEventListener('DOMContentLoaded', function() {
             agentResults.style.display = 'block';
         } finally {
             runAgentBtn.disabled = false;
-            
-            // Reset status after 5 seconds
-            setTimeout(() => {
-                agentStatus.className = 'badge bg-secondary';
-                agentStatus.textContent = 'Ready';
-            }, 5000);
         }
     });
 
