@@ -309,9 +309,28 @@ class ParcelTrackingDB:
                     **ttl_kwargs,
                 )
                 print(f"✓ Container ready: {container_spec['id']}")
+
+                # Patch indexing policy on existing containers — create_container_if_not_exists
+                # does NOT update the policy if the container already exists.
+                # driver_manifests needs composite indexes for cross-partition ORDER BY.
+                if container_spec["id"] == "driver_manifests" and "compositeIndexes" in container_spec["indexing_policy"]:
+                    try:
+                        container_client = self.database.get_container_client(container_spec["id"])
+                        props = await container_client.read()
+                        existing_composite = props.get("indexingPolicy", {}).get("compositeIndexes", [])
+                        if not existing_composite:
+                            await self.database.replace_container(
+                                container=container_spec["id"],
+                                partition_key=container_spec["partition_key"],
+                                indexing_policy=container_spec["indexing_policy"],
+                            )
+                            print(f"✓ Composite indexes applied to driver_manifests")
+                    except Exception as patch_err:
+                        print(f"⚠️ Could not patch driver_manifests indexing: {str(patch_err)[:100]}")
+
             except Exception as e:
                 # Log error but don't fail - some containers might be optional
-                print(f"⚠️ Container creation warning for {container_spec['id']}: {str(e)[:100]}")
+                print(f"⚠️ Container creation warning for {container_spec['id']}: {str(e)[:100]}"
 
     async def close(self):
         """Close database connections and cleanup resources"""
@@ -2052,12 +2071,13 @@ class ParcelTrackingDB:
                 total = row
                 break
 
-            # Paged SELECT
+            # Paged SELECT — no ORDER BY to avoid composite index requirement on existing
+            # containers (create_container_if_not_exists never updates indexing policy).
+            # We sort in Python after fetch; 30-day window keeps the dataset small.
             page_query = f"""
                 SELECT {projection}
                 FROM c
                 WHERE {where_sql}
-                ORDER BY c._ts DESC
                 OFFSET @offset LIMIT @limit
             """
             page_params = params + [
@@ -2071,12 +2091,14 @@ class ParcelTrackingDB:
             ):
                 manifests.append(manifest)
 
+            # Sort newest first in Python
+            manifests.sort(key=lambda m: m.get("_ts", 0), reverse=True)
+
             # Fallback for older docs without manifest_date (only on page 1, no filters)
             if not manifests and page == 1 and not date_filter and not state_filter:
                 fallback_query = f"""
                     SELECT {projection}
                     FROM c
-                    ORDER BY c._ts DESC
                     OFFSET 0 LIMIT @limit
                 """
                 async for manifest in container.query_items(
@@ -2085,6 +2107,7 @@ class ParcelTrackingDB:
                     enable_cross_partition_query=True,
                 ):
                     manifests.append(manifest)
+                manifests.sort(key=lambda m: m.get("_ts", 0), reverse=True)
                 total = len(manifests)
 
             return {
