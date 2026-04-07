@@ -5,6 +5,9 @@ Complete implementation with CQRS pattern integration
 """
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
 from datetime import datetime, timezone
+import json
+import os
+import re
 import random
 
 from src.interfaces.web.middleware import login_required, depot_manager_required
@@ -12,6 +15,87 @@ from parcel_tracking_db import ParcelTrackingDB
 from utils.async_helpers import run_async
 
 approvals_bp = Blueprint('approvals', __name__, url_prefix='/approvals')
+
+
+def _ai_batch_approve(items: list, config: dict) -> dict:
+    """
+    Call Azure OpenAI to decide approve/reject/manual_review for a batch of approvals.
+
+    Returns a dict keyed by approval id:
+        { approval_id: {"decision": "approve"|"reject"|"manual_review", "reasoning": "..."} }
+
+    On any failure returns {} so the caller falls back to rule-based logic.
+    """
+    if not items:
+        return {}
+    try:
+        from openai import AzureOpenAI
+        from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+
+        endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+        model    = os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME", "gpt-4o")
+        if not endpoint:
+            return {}
+
+        credential     = DefaultAzureCredential()
+        token_provider = get_bearer_token_provider(
+            credential, "https://cognitiveservices.azure.com/.default"
+        )
+        client = AzureOpenAI(
+            azure_endpoint=endpoint,
+            azure_ad_token_provider=token_provider,
+            api_version="2024-05-01-preview",
+        )
+
+        fraud_high = config.get("fraud_threshold_high", 70)
+        fraud_low  = config.get("fraud_threshold_low",  30)
+        max_value  = config.get("value_threshold",     500)
+
+        rows = "\n".join(
+            f"ID:{item['id']} | type:{item.get('request_type','?')} | "
+            f"fraud:{item.get('fraud_risk',0)}% | value:${item.get('value',0)} | "
+            f"status:{item.get('parcel_status','?')} | desc:{str(item.get('description',''))[:120]}"
+            for item in items
+        )
+
+        prompt = (
+            f"You are a parcel approval agent for a logistics company.\n"
+            f"Config thresholds: fraud_high={fraud_high}%, fraud_low={fraud_low}%, max_value=${max_value}.\n\n"
+            f"For each approval request below, decide: approve, reject, or manual_review.\n"
+            f"Return ONLY a JSON object like:\n"
+            f'  {{"decisions":[{{"id":"...","decision":"approve","reasoning":"one sentence"}},...]}}\n\n'
+            f"Approvals:\n{rows}"
+        )
+
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+        )
+
+        raw = response.choices[0].message.content or ""
+        # Extract JSON object from response (may have surrounding text)
+        match = re.search(r'\{[\s\S]*\}', raw)
+        if not match:
+            return {}
+        data = json.loads(match.group())
+        decisions = data.get("decisions", data) if isinstance(data, dict) else data
+        if not isinstance(decisions, list):
+            return {}
+
+        return {
+            d["id"]: {
+                "decision":  d.get("decision", "manual_review"),
+                "reasoning": d.get("reasoning", d.get("reason", "")),
+            }
+            for d in decisions
+            if "id" in d
+        }
+
+    except Exception as exc:
+        print(f"⚠️ _ai_batch_approve failed — falling back to rules: {exc}")
+        return {}
+
 
 
 @approvals_bp.route('/')
@@ -213,85 +297,121 @@ def run_agent():
         async def process_with_agent():
             async with ParcelTrackingDB() as db:
                 pending = await db.get_all_pending_approvals()
-                
-                approved_count = 0
-                rejected_count = 0
-                skipped_count = 0
+
+                approved_count   = 0
+                rejected_count   = 0
+                skipped_count    = 0
                 skipped_dc_count = 0
-                
+
+                # ── Pass 1: collect items that belong to selected DCs ──────────
+                qualifying = []
                 for approval in pending:
                     parcel_barcode = approval.get("parcel_barcode")
-                    request_type = approval.get("request_type", "")
-                    description = approval.get("description", "")
-                    
                     parcel = await db.get_parcel_by_barcode(parcel_barcode)
                     if not parcel:
                         skipped_count += 1
                         continue
-                    
-                    # Check DC matching
+
                     parcel_dc = approval.get("parcel_dc", "UNKNOWN")
-                    dc_matched = any(selected_dc in parcel_dc or parcel_dc.startswith(selected_dc) 
-                                   for selected_dc in selected_dcs)
-                    
+                    dc_matched = any(
+                        selected_dc in parcel_dc or parcel_dc.startswith(selected_dc)
+                        for selected_dc in selected_dcs
+                    )
                     if not dc_matched:
                         skipped_dc_count += 1
                         continue
-                    
-                    fraud_risk = parcel.get("fraud_risk_score", 0)
-                    value = parcel.get("declared_value", 0)
-                    status = approval.get("parcel_status", parcel.get("current_status", ""))
-                    
-                    auto_approve = False
-                    auto_reject = False
-                    reason_text = ""
-                    
-                    # Auto-rejection criteria
-                    if fraud_risk > fraud_threshold_high:
-                        auto_reject = True
-                        reason_text = f"High fraud risk: {fraud_risk}%"
-                    elif reject_blacklist and "blacklist" in description.lower():
-                        auto_reject = True
-                        reason_text = "Blacklisted address"
-                    elif reject_duplicate and "duplicate" in description.lower():
-                        auto_reject = True
-                        reason_text = "Duplicate request"
-                    elif reject_missing_docs and "missing" in description.lower():
-                        auto_reject = True
-                        reason_text = "Missing documentation"
-                    # Auto-approval criteria
-                    elif fraud_risk < fraud_threshold_low and value < value_threshold:
-                        auto_approve = True
-                        reason_text = f"Low risk ({fraud_risk}%), standard value (${value})"
-                    elif approve_delivered and status == "Delivered":
-                        auto_approve = True
-                        reason_text = "Standard delivery confirmation"
-                    elif approve_verified and "verified" in description.lower():
-                        auto_approve = True
-                        reason_text = "Verified sender/recipient"
-                    
-                    if auto_approve:
+
+                    qualifying.append({
+                        "approval":     approval,
+                        "parcel":       parcel,
+                        "id":           approval["id"],
+                        "request_type": approval.get("request_type", ""),
+                        "description":  approval.get("description", ""),
+                        "fraud_risk":   parcel.get("fraud_risk_score", 0),
+                        "value":        parcel.get("declared_value", 0),
+                        "parcel_status": approval.get(
+                            "parcel_status", parcel.get("current_status", "")
+                        ),
+                    })
+
+                # ── Pass 2: ask LLM for batch decisions (falls back to {} on failure)
+                ai_cfg = {
+                    "fraud_threshold_high": fraud_threshold_high,
+                    "fraud_threshold_low":  fraud_threshold_low,
+                    "value_threshold":      value_threshold,
+                }
+                ai_decisions = _ai_batch_approve(qualifying, ai_cfg)
+
+                # ── Pass 3: apply decisions ────────────────────────────────────
+                ai_decisions_out: dict = {}
+                for item in qualifying:
+                    approval   = item["approval"]
+                    parcel     = item["parcel"]
+                    app_id     = item["id"]
+                    description = item["description"]
+                    fraud_risk  = item["fraud_risk"]
+                    value       = item["value"]
+                    status      = item["parcel_status"]
+
+                    if app_id in ai_decisions:
+                        ai_dec    = ai_decisions[app_id]
+                        decision  = ai_dec["decision"]
+                        reasoning = ai_dec["reasoning"]
+                        source    = "AI"
+                    else:
+                        # Rule-based fallback
+                        reasoning = ""
+                        if fraud_risk > fraud_threshold_high:
+                            decision  = "reject"
+                            reasoning = f"High fraud risk: {fraud_risk}%"
+                        elif reject_blacklist and "blacklist" in description.lower():
+                            decision  = "reject"
+                            reasoning = "Blacklisted address"
+                        elif reject_duplicate and "duplicate" in description.lower():
+                            decision  = "reject"
+                            reasoning = "Duplicate request"
+                        elif reject_missing_docs and "missing" in description.lower():
+                            decision  = "reject"
+                            reasoning = "Missing documentation"
+                        elif fraud_risk < fraud_threshold_low and value < value_threshold:
+                            decision  = "approve"
+                            reasoning = f"Low risk ({fraud_risk}%), standard value (${value})"
+                        elif approve_delivered and status == "Delivered":
+                            decision  = "approve"
+                            reasoning = "Standard delivery confirmation"
+                        elif approve_verified and "verified" in description.lower():
+                            decision  = "approve"
+                            reasoning = "Verified sender/recipient"
+                        else:
+                            decision  = "manual_review"
+                            reasoning = "Does not meet auto-approve or auto-reject criteria"
+                        source = "rules"
+
+                    ai_decisions_out[app_id] = {
+                        "decision":  decision,
+                        "reasoning": reasoning,
+                        "source":    source,
+                    }
+
+                    if decision == "approve":
                         await db.approve_request(
-                            approval["id"],
-                            approver,
-                            f"AI Agent: {reason_text}",
+                            app_id, approver, f"AI Agent ({source}): {reasoning}"
                         )
                         approved_count += 1
-                    elif auto_reject:
+                    elif decision == "reject":
                         await db.reject_request(
-                            approval["id"],
-                            approver,
-                            f"AI Agent: {reason_text}",
+                            app_id, approver, f"AI Agent ({source}): {reasoning}"
                         )
                         rejected_count += 1
                     else:
                         skipped_count += 1
-                
+
                 return {
-                    "approved": approved_count,
-                    "rejected": rejected_count,
-                    "skipped": skipped_count,
-                    "skipped_dc": skipped_dc_count,
+                    "approved":     approved_count,
+                    "rejected":     rejected_count,
+                    "skipped":      skipped_count,
+                    "skipped_dc":   skipped_dc_count,
+                    "ai_decisions": ai_decisions_out,
                 }
         
         results = run_async(process_with_agent())

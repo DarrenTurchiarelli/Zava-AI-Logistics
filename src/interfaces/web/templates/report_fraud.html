@@ -167,48 +167,170 @@
                     </div>
                     {% endif %}
 
-                    <!-- Workflow Results -->
+                    <!-- Workflow Results Timeline -->
                     {% if workflow_result %}
                     <div class="card mb-3 border-warning">
-                        <div class="card-header bg-warning text-dark">
+                        <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
                             <strong><i class="bi bi-gear-fill"></i> Automated Protection Workflow Activated</strong>
+                            <span class="badge bg-dark">{{ workflow_result.workflow_id }}</span>
                         </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-4">
-                                    <div class="text-center">
-                                        <i class="bi bi-shield-check fs-1 text-success"></i>
-                                        <p class="mb-0"><strong>Risk Score</strong></p>
-                                        <h3 class="text-danger">{{ (workflow_result.fraud_detection.risk_score * 100)|int }}%</h3>
-                                    </div>
+                        <div class="card-body pb-2">
+
+                            {# ── Step 1: Fraud Detection ──────────────────────── #}
+                            {% set risk_pct = (workflow_result.fraud_detection.risk_score * 100) | int %}
+                            {% if risk_pct >= 85 %}
+                                {% set risk_color = "danger" %}
+                                {% set risk_icon  = "shield-x" %}
+                            {% elif risk_pct >= 70 %}
+                                {% set risk_color = "warning" %}
+                                {% set risk_icon  = "shield-exclamation" %}
+                            {% else %}
+                                {% set risk_color = "primary" %}
+                                {% set risk_icon  = "shield-check" %}
+                            {% endif %}
+                            <div class="d-flex mb-3">
+                                <div class="me-3 text-center" style="min-width:2.5rem;">
+                                    <span class="badge rounded-pill bg-{{ risk_color }} p-2">
+                                        <i class="bi bi-{{ risk_icon }} fs-5"></i>
+                                    </span>
+                                    <div style="width:2px; min-height:30px; background:#dee2e6; margin: 4px auto;"></div>
                                 </div>
-                                <div class="col-md-4">
-                                    <div class="text-center">
-                                        <i class="bi bi-envelope-check fs-1 text-primary"></i>
-                                        <p class="mb-0"><strong>Notification</strong></p>
-                                        <h5>{% if workflow_result.customer_engagement.notification_sent %}<span class="text-success">✓ Sent</span>{% else %}<span class="text-muted">Not Sent</span>{% endif %}</h5>
-                                        <small class="text-muted">{{ workflow_result.customer_engagement.notification_method }}</small>
+                                <div class="flex-grow-1">
+                                    <p class="mb-1 fw-semibold">Step 1 — Fraud Analysis</p>
+                                    <p class="mb-1 small">
+                                        Risk Score: <strong class="text-{{ risk_color }}">{{ risk_pct }}%</strong>
+                                        {% if workflow_result.fraud_detection.action %}
+                                        &nbsp;|&nbsp; Action: <em>{{ workflow_result.fraud_detection.action }}</em>
+                                        {% endif %}
+                                    </p>
+                                    {% if workflow_result.fraud_detection.indicators %}
+                                    <div class="d-flex flex-wrap gap-1">
+                                        {% for ind in workflow_result.fraud_detection.indicators %}
+                                        <span class="badge bg-{{ risk_color }} bg-opacity-75 text-dark" style="font-size:0.7rem;">{{ ind }}</span>
+                                        {% endfor %}
                                     </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="text-center">
-                                        <i class="bi bi-box-seam fs-1 text-warning"></i>
-                                        <p class="mb-0"><strong>Parcels Held</strong></p>
-                                        <h3>{{ workflow_result.outcome.parcels_held }}</h3>
-                                    </div>
+                                    {% endif %}
                                 </div>
                             </div>
-                            <hr>
-                            <div class="alert alert-success mb-0">
-                                <i class="bi bi-check-circle-fill"></i> <strong>Protection Active:</strong>
-                                {% if workflow_result.customer_engagement.notification_sent %}
-                                We've sent you a personalized fraud warning message with protection tips.
-                                {% endif %}
-                                {% if workflow_result.outcome.case_escalated %}
-                                This case has been escalated for security review.
-                                {% endif %}
-                                <br><small class="text-muted">Workflow ID: {{ workflow_result.workflow_id }}</small>
+
+                            {# ── Step 2: Customer Notification ────────────────── #}
+                            <div class="d-flex mb-3">
+                                <div class="me-3 text-center" style="min-width:2.5rem;">
+                                    {% if workflow_result.customer_engagement.notification_sent %}
+                                    <span class="badge rounded-pill bg-success p-2"><i class="bi bi-envelope-check fs-5"></i></span>
+                                    {% else %}
+                                    <span class="badge rounded-pill bg-secondary p-2"><i class="bi bi-envelope fs-5"></i></span>
+                                    {% endif %}
+                                    <div style="width:2px; min-height:30px; background:#dee2e6; margin: 4px auto;"></div>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <p class="mb-1 fw-semibold">Step 2 — Customer Warning</p>
+                                    {% if workflow_result.customer_engagement.notification_sent %}
+                                    <p class="mb-0 small text-success">
+                                        <i class="bi bi-check-circle-fill"></i>
+                                        Personalised fraud warning sent
+                                        {% if workflow_result.customer_engagement.notification_method %}
+                                        via <strong>{{ workflow_result.customer_engagement.notification_method }}</strong>
+                                        {% endif %}
+                                    </p>
+                                    {% else %}
+                                    <p class="mb-0 small text-muted">No notification sent (risk below threshold or no contact info)</p>
+                                    {% endif %}
+                                </div>
                             </div>
+
+                            {# ── Step 3: Identity Verification ────────────────── #}
+                            <div class="d-flex mb-3">
+                                <div class="me-3 text-center" style="min-width:2.5rem;">
+                                    {% if workflow_result.customer_engagement.identity_verified %}
+                                    <span class="badge rounded-pill bg-success p-2"><i class="bi bi-person-check fs-5"></i></span>
+                                    {% elif risk_pct >= 85 %}
+                                    <span class="badge rounded-pill bg-warning p-2"><i class="bi bi-person-exclamation fs-5"></i></span>
+                                    {% else %}
+                                    <span class="badge rounded-pill bg-secondary p-2"><i class="bi bi-person fs-5"></i></span>
+                                    {% endif %}
+                                    <div style="width:2px; min-height:30px; background:#dee2e6; margin: 4px auto;"></div>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <p class="mb-1 fw-semibold">Step 3 — Identity Verification</p>
+                                    {% if workflow_result.customer_engagement.identity_verified %}
+                                    <p class="mb-0 small text-success"><i class="bi bi-check-circle-fill"></i> Identity verified successfully</p>
+                                    {% elif risk_pct >= 85 %}
+                                    <p class="mb-0 small text-warning"><i class="bi bi-exclamation-triangle-fill"></i> Verification triggered — awaiting response (risk ≥ 85%)</p>
+                                    {% else %}
+                                    <p class="mb-0 small text-muted">Not required (risk below 85%)</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            {# ── Step 4: Parcel Security ──────────────────────── #}
+                            <div class="d-flex mb-3">
+                                <div class="me-3 text-center" style="min-width:2.5rem;">
+                                    {% if workflow_result.outcome.parcels_held > 0 %}
+                                    <span class="badge rounded-pill bg-danger p-2"><i class="bi bi-box-seam fs-5"></i></span>
+                                    {% else %}
+                                    <span class="badge rounded-pill bg-secondary p-2"><i class="bi bi-box-seam fs-5"></i></span>
+                                    {% endif %}
+                                    <div style="width:2px; min-height:30px; background:#dee2e6; margin: 4px auto;"></div>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <p class="mb-1 fw-semibold">Step 4 — Parcel Security</p>
+                                    {% if workflow_result.outcome.parcels_held > 0 %}
+                                    <p class="mb-0 small text-danger">
+                                        <i class="bi bi-lock-fill"></i>
+                                        <strong>{{ workflow_result.outcome.parcels_held }}</strong> parcel{{ 's' if workflow_result.outcome.parcels_held != 1 else '' }} placed on hold pending investigation
+                                    </p>
+                                    {% else %}
+                                    <p class="mb-0 small text-muted">No parcels held (automatic hold threshold not met)</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            {# ── Step 5: Escalation ───────────────────────────── #}
+                            <div class="d-flex mb-2">
+                                <div class="me-3 text-center" style="min-width:2.5rem;">
+                                    {% if workflow_result.outcome.case_escalated %}
+                                    <span class="badge rounded-pill bg-danger p-2"><i class="bi bi-flag-fill fs-5"></i></span>
+                                    {% else %}
+                                    <span class="badge rounded-pill bg-success p-2"><i class="bi bi-flag fs-5"></i></span>
+                                    {% endif %}
+                                </div>
+                                <div class="flex-grow-1">
+                                    <p class="mb-1 fw-semibold">Step 5 — Case Escalation</p>
+                                    {% if workflow_result.outcome.case_escalated %}
+                                    <p class="mb-0 small text-danger">
+                                        <i class="bi bi-exclamation-octagon-fill"></i> Escalated to security team
+                                        {% if workflow_result.outcome.escalation_reason %}
+                                        — <em>{{ workflow_result.outcome.escalation_reason }}</em>
+                                        {% endif %}
+                                    </p>
+                                    {% else %}
+                                    <p class="mb-0 small text-success"><i class="bi bi-check-circle-fill"></i> No escalation required</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            {# ── Audit Log ────────────────────────────────────── #}
+                            {% if workflow_result.workflow_log %}
+                            <hr class="my-2">
+                            <details>
+                                <summary class="small text-muted" style="cursor:pointer;">
+                                    <i class="bi bi-journal-text"></i> Audit log ({{ workflow_result.workflow_log | length }} events)
+                                </summary>
+                                <ol class="mt-2 mb-0 ps-3" style="font-size:0.78rem;">
+                                    {% for entry in workflow_result.workflow_log %}
+                                    {% set lvl_map = {"success":"success","info":"primary","warning":"warning","error":"danger"} %}
+                                    {% set lvl_col = lvl_map.get(entry.level, "secondary") %}
+                                    <li class="mb-1">
+                                        <span class="badge bg-{{ lvl_col }} me-1" style="font-size:0.65rem;">{{ entry.level | upper }}</span>
+                                        {{ entry.message }}
+                                        <span class="text-muted ms-1" style="font-size:0.65rem;">{{ entry.timestamp[:19] | replace("T"," ") if entry.timestamp else "" }}</span>
+                                    </li>
+                                    {% endfor %}
+                                </ol>
+                            </details>
+                            {% endif %}
+
                         </div>
                     </div>
                     {% endif %}

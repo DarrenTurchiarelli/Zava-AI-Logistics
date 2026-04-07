@@ -98,7 +98,11 @@ class AzureOpenAIAgentClient:
 
 
 async def call_azure_agent(
-    agent_id: str, message: str, context: Optional[Dict[str, Any]] = None, thread_id: Optional[str] = None
+    agent_id: str,
+    message: str,
+    context: Optional[Dict[str, Any]] = None,
+    thread_id: Optional[str] = None,
+    event_queue: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
     Universal function to call any Azure OpenAI Assistant (agent)
@@ -195,6 +199,17 @@ async def call_azure_agent(
                         print(f"   🔨 Calling tool: {function_name}")
                         print(f"      Arguments: {function_args}")
 
+                        # Emit tool_start event to SSE stream if a queue was provided
+                        if event_queue is not None:
+                            try:
+                                event_queue.put_nowait({
+                                    "type": "tool_start",
+                                    "tool": function_name,
+                                    "args_preview": str(function_args)[:300],
+                                })
+                            except Exception:
+                                pass
+
                         # Execute the tool function (sync — no event-loop dance needed)
                         if function_name in TOOL_FUNCTIONS:
                             tool_function = TOOL_FUNCTIONS[function_name]
@@ -207,6 +222,17 @@ async def call_azure_agent(
 
                             tool_outputs.append({"tool_call_id": tool_call.id, "output": output})
                             print(f"      ✅ Tool output: {output[:200]}...")
+
+                            # Emit tool_done event
+                            if event_queue is not None:
+                                try:
+                                    event_queue.put_nowait({
+                                        "type": "tool_done",
+                                        "tool": function_name,
+                                        "preview": output[:400],
+                                    })
+                                except Exception:
+                                    pass
                         else:
                             print(f"      ❌ Tool function not found: {function_name}")
                             tool_outputs.append(
@@ -271,6 +297,13 @@ async def call_azure_agent(
             response_text = "No response from assistant"
 
         print(f"✅ Extracted response text ({len(response_text)} chars): {response_text[:200]}...")
+
+        # Emit completion event
+        if event_queue is not None:
+            try:
+                event_queue.put_nowait({"type": "complete", "summary": response_text[:600]})
+            except Exception:
+                pass
 
         return {
             "success": True,
@@ -549,12 +582,13 @@ Assign to appropriate driver and confirm delivery plan.
     return await call_azure_agent(DELIVERY_COORDINATION_AGENT_ID, message, routing_info)
 
 
-async def dispatcher_agent(route_data: Dict[str, Any]) -> Dict[str, Any]:
+async def dispatcher_agent(route_data: Dict[str, Any], event_queue: Optional[Any] = None) -> Dict[str, Any]:
     """
     Call Dispatcher Agent for route optimization and driver assignment
 
     Args:
         route_data: Dictionary with parcels, drivers, capacity, SLAs
+        event_queue: Optional queue.Queue for streaming SSE events
 
     Returns:
         Optimized route assignments and driver allocations
@@ -579,7 +613,7 @@ async def dispatcher_agent(route_data: Dict[str, Any]) -> Dict[str, Any]:
 Provide optimized route manifest with driver assignments and capacity utilization.
 """
 
-    return await call_azure_agent(DISPATCHER_AGENT_ID, message, route_data)
+    return await call_azure_agent(DISPATCHER_AGENT_ID, message, route_data, event_queue=event_queue)
 
 
 async def driver_agent(delivery_action: Dict[str, Any]) -> Dict[str, Any]:

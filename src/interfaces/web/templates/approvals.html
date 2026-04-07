@@ -882,6 +882,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 const dcSkippedText = result.skipped_dc > 0 
                     ? `<li><strong>Skipped (wrong DC):</strong> ${result.skipped_dc} requests (not from selected distribution centers)</li>` 
                     : '';
+
+                // If AI reasoning came back, show a per-card explanation
+                const aiDecs = result.ai_decisions || {};
+                let aiRows = '';
+                Object.entries(aiDecs).forEach(([id, dec]) => {
+                    const icon = dec.decision === 'approve'
+                        ? '✅' : dec.decision === 'reject' ? '❌' : '⚠️';
+                    const src  = dec.source === 'AI' ? '<span class="badge bg-primary ms-1" style="font-size:0.65rem;">AI</span>' : '<span class="badge bg-secondary ms-1" style="font-size:0.65rem;">rule</span>';
+                    aiRows += `<li class="small">${icon} <code>${id.slice(-6)}</code> — ${dec.reasoning}${src}</li>`;
+                });
+                const aiSection = aiRows
+                    ? `<details class="mt-2"><summary class="small text-muted">AI reasoning per request</summary><ul class="mt-1 mb-0">${aiRows}</ul></details>`
+                    : '';
                 
                 agentResultsContent.innerHTML = `
                     <ul class="mb-0">
@@ -889,7 +902,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <li><strong>Rejected:</strong> ${result.rejected || 0} requests</li>
                         <li><strong>Skipped:</strong> ${result.skipped || 0} requests (manual review required)</li>
                         ${dcSkippedText}
-                    </ul>
+                    </ul>${aiSection}
                 `;
                 agentResults.style.display = 'block';
                 

@@ -22,7 +22,7 @@
                         <i class="bi bi-stars"></i> Let AI intelligently assign pending parcels to available drivers based on:
                         <strong>capacity, location, priority, and workload balance</strong>
                     </p>
-                    <form method="POST" action="{{ url_for('manifests.auto_assign_manifests') }}" class="row g-3">
+                    <form id="autoAssignForm" method="POST" action="{{ url_for('manifests.auto_assign_manifests') }}" class="row g-3">
                         <div class="col-md-4">
                             <label for="max_parcels" class="form-label">Max Parcels to Assign</label>
                             <input type="number" class="form-control" id="max_parcels" name="max_parcels"
@@ -43,11 +43,30 @@
                             </select>
                         </div>
                         <div class="col-md-4 d-flex align-items-end">
-                            <button type="submit" class="btn btn-sm w-100" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
+                            <button type="submit" id="btnAutoAssign" class="btn btn-sm w-100" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
                                 <i class="bi bi-robot"></i> AI Auto-Assign Parcels
                             </button>
                         </div>
                     </form>
+
+                    <!-- Agent Activity Panel (hidden until job starts) -->
+                    <div id="agentActivityPanel" class="mt-3" style="display:none;">
+                        <div class="card border-primary">
+                            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
+                                <span><i class="bi bi-cpu-fill"></i> <strong>Dispatcher Agent — Live Activity</strong></span>
+                                <span id="agentStatusBadge" class="badge bg-warning text-dark">Running…</span>
+                            </div>
+                            <div class="card-body p-0">
+                                <div id="agentActivityLog" style="max-height:320px; overflow-y:auto; font-family:monospace; font-size:0.82rem; background:#0d1117; color:#c9d1d9; padding:12px;">
+                                    <div class="text-muted">Connecting to dispatcher agent…</div>
+                                </div>
+                            </div>
+                            <div class="card-footer bg-light py-2" id="agentSummaryFooter" style="display:none;">
+                                <strong><i class="bi bi-check-circle-fill text-success"></i> Summary:</strong>
+                                <span id="agentSummaryText" class="text-dark"></span>
+                            </div>
+                        </div>
+                    </div>
                     <div class="alert alert-info alert-permanent mt-3 mb-0">
                         <small>
                             <i class="bi bi-info-circle"></i>
@@ -351,6 +370,108 @@
     } else {
         initStateFilter();
     }
+})();
+
+// ── Dispatcher Agent SSE streaming ───────────────────────────────────────────
+(function () {
+    'use strict';
+
+    function appendLog(html) {
+        const log = document.getElementById('agentActivityLog');
+        if (!log) return;
+        const div = document.createElement('div');
+        div.innerHTML = html;
+        log.appendChild(div);
+        log.scrollTop = log.scrollHeight;
+    }
+
+    function setStatus(text, cls) {
+        const badge = document.getElementById('agentStatusBadge');
+        if (!badge) return;
+        badge.textContent = text;
+        badge.className = 'badge ' + cls;
+    }
+
+    function startDispatchJob(formData) {
+        const panel = document.getElementById('agentActivityPanel');
+        const logEl = document.getElementById('agentActivityLog');
+        panel.style.display = '';
+        logEl.innerHTML = '<div style="color:#8b949e;">▶ Starting dispatcher agent&hellip;</div>';
+        setStatus('Running…', 'bg-warning text-dark');
+
+        fetch('{{ url_for("manifests.auto_assign_async") }}', {
+            method: 'POST',
+            headers: {'X-Requested-With': 'XMLHttpRequest'},
+            body: formData
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.job_id) {
+                appendLog('<span style="color:#f85149;">✗ Failed to start job: ' + (data.error || 'unknown') + '</span>');
+                setStatus('Failed', 'bg-danger');
+                return;
+            }
+            const evtSource = new EventSource('{{ url_for("manifests.auto_assign_events", job_id="__JOB_ID__") }}'.replace('__JOB_ID__', data.job_id));
+
+            evtSource.addEventListener('tool_start', function (e) {
+                const d = JSON.parse(e.data);
+                appendLog('<span style="color:#79c0ff;">⚙ ' + d.tool + '</span> <span style="color:#8b949e;">' + (d.args_preview || '') + '</span>');
+            });
+
+            evtSource.addEventListener('tool_done', function (e) {
+                const d = JSON.parse(e.data);
+                appendLog('<span style="color:#56d364;">✓ ' + d.tool + '</span> <span style="color:#8b949e;">' + (d.preview || '') + '</span>');
+            });
+
+            evtSource.addEventListener('complete', function (e) {
+                const d = JSON.parse(e.data);
+                const footer = document.getElementById('agentSummaryFooter');
+                const summaryText = document.getElementById('agentSummaryText');
+                if (footer && summaryText) {
+                    summaryText.textContent = d.summary || 'Done.';
+                    footer.style.display = '';
+                }
+                appendLog('<span style="color:#56d364; font-weight:bold;">✅ Agent complete.</span>');
+                setStatus('Done', 'bg-success');
+                evtSource.close();
+                appendLog('<div class="mt-2"><a href="" class="btn btn-sm btn-outline-primary" style="font-family:sans-serif;">↻ Refresh to see manifests</a></div>');
+            });
+
+            evtSource.addEventListener('error_event', function (e) {
+                try {
+                    const d = JSON.parse(e.data);
+                    appendLog('<span style="color:#f85149;">✗ Error: ' + d.message + '</span>');
+                } catch (_) {}
+                setStatus('Error', 'bg-danger');
+                evtSource.close();
+            });
+
+            evtSource.onerror = function () {
+                setStatus('Disconnected', 'bg-secondary');
+                evtSource.close();
+            };
+        })
+        .catch(err => {
+            appendLog('<span style="color:#f85149;">✗ Request failed: ' + err + '</span>');
+            setStatus('Failed', 'bg-danger');
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.getElementById('autoAssignForm');
+        const btn  = document.getElementById('btnAutoAssign');
+        if (!form || !btn) return;
+
+        form.addEventListener('submit', function (e) {
+            // If JS is available, use SSE path; otherwise fall through to normal POST
+            if (window.EventSource) {
+                e.preventDefault();
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Running…';
+                startDispatchJob(new FormData(form));
+            }
+        });
+    });
 })();
 </script>
 {% endblock %}

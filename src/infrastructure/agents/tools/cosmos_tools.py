@@ -559,6 +559,95 @@ def create_manifest_tool(driver_id: str, driver_name: str, tracking_numbers: Lis
         return json.dumps({"success": False, "error": str(e)})
 
 
+def update_delivery_status_tool(
+    tracking_number: str,
+    new_status: str,
+    location: str,
+    driver_note: str = "",
+) -> str:
+    """
+    Tool for Delivery Coordination Agent to update a parcel's delivery status and location.
+
+    Args:
+        tracking_number: Barcode or tracking number of the parcel
+        new_status: New status (e.g. 'out_for_delivery', 'delivered', 'carded', 'exception')
+        location: Current location or delivery address
+        driver_note: Optional driver or coordination note
+
+    Returns:
+        JSON string confirming the update or describing the error
+    """
+    print(
+        f"🔧 Agent Tool: update_delivery_status_tool called — "
+        f"tracking={tracking_number}, status={new_status}, location={location}"
+    )
+
+    ALLOWED_STATUSES = {
+        "out_for_delivery", "delivered", "carded", "in_transit",
+        "exception", "returned", "at_depot",
+    }
+    if new_status not in ALLOWED_STATUSES:
+        return json.dumps({
+            "success": False,
+            "error": f"Invalid status '{new_status}'. Allowed: {sorted(ALLOWED_STATUSES)}",
+        })
+
+    try:
+        container = _get_cosmos_container("parcels")
+
+        parcels = list(container.query_items(
+            query="""SELECT * FROM c
+                     WHERE c.tracking_number = @id1
+                        OR c.barcode = @id2
+                        OR c.id = @id3""",
+            parameters=[
+                {"name": "@id1", "value": tracking_number},
+                {"name": "@id2", "value": tracking_number},
+                {"name": "@id3", "value": tracking_number},
+            ],
+            enable_cross_partition_query=True,
+        ))
+
+        if not parcels:
+            return json.dumps({"success": False, "error": f"Parcel {tracking_number} not found"})
+
+        parcel = parcels[0]
+        old_status = parcel.get("current_status", "unknown")
+
+        parcel["current_status"] = new_status
+        parcel["current_location"] = location
+        parcel["last_updated"] = datetime.now(timezone.utc).isoformat()
+        if new_status == "delivered":
+            parcel["is_delivered"] = True
+
+        # Append to event history
+        event = {
+            "status": new_status,
+            "location": location,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "updated_by": "delivery_coordination_agent",
+            "note": driver_note or "",
+        }
+        parcel.setdefault("tracking_events", []).append(event)
+
+        container.upsert_item(body=parcel)
+
+        print(f"   ✅ Updated {tracking_number}: {old_status} → {new_status} @ {location}")
+        return json.dumps({
+            "success": True,
+            "tracking_number": tracking_number,
+            "old_status": old_status,
+            "new_status": new_status,
+            "location": location,
+            "timestamp": event["timestamp"],
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return json.dumps({"success": False, "error": str(e)})
+
+
 def get_performance_metrics_tool(days_back: int = 7, state: str = None) -> str:
     """
     Tool for Optimization agent to retrieve rich delivery performance data.
@@ -876,8 +965,47 @@ OPTIMIZATION_TOOLS = [
     },
 ]
 
+# Delivery Coordination Agent tools
+DELIVERY_COORDINATION_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "update_delivery_status",
+            "description": (
+                "Update a parcel's delivery status and location in the database. "
+                "Call this after deciding on an action for a parcel — e.g. marking it "
+                "out_for_delivery, delivered, carded, or flagging an exception. "
+                "Always call this to persist the coordination decision."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "tracking_number": {
+                        "type": "string",
+                        "description": "Barcode or tracking number of the parcel to update.",
+                    },
+                    "new_status": {
+                        "type": "string",
+                        "enum": ["out_for_delivery", "delivered", "carded", "in_transit", "exception", "returned", "at_depot"],
+                        "description": "The new delivery status to set.",
+                    },
+                    "location": {
+                        "type": "string",
+                        "description": "Current location or delivery address (e.g. '123 Main St, Sydney NSW 2000').",
+                    },
+                    "driver_note": {
+                        "type": "string",
+                        "description": "Optional coordination note or driver instruction.",
+                    },
+                },
+                "required": ["tracking_number", "new_status", "location"],
+            },
+        },
+    },
+]
+
 # Full combined list (union of all per-agent sets) — used by TOOL_FUNCTIONS dispatch in base.py
-AGENT_TOOLS = CUSTOMER_SERVICE_TOOLS + DISPATCHER_TOOLS + OPTIMIZATION_TOOLS
+AGENT_TOOLS = CUSTOMER_SERVICE_TOOLS + DISPATCHER_TOOLS + OPTIMIZATION_TOOLS + DELIVERY_COORDINATION_TOOLS
 
 
 # Tool execution mapping — every tool callable dispatched through base.py
@@ -893,4 +1021,6 @@ TOOL_FUNCTIONS = {
     "create_manifest": create_manifest_tool,
     # Optimization Agent
     "get_performance_metrics": get_performance_metrics_tool,
+    # Delivery Coordination Agent
+    "update_delivery_status": update_delivery_status_tool,
 }

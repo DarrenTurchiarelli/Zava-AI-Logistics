@@ -6,8 +6,13 @@ AI-powered auto-assignment, and real-time delivery tracking.
 """
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, Response, stream_with_context
 from datetime import datetime
+import asyncio
+import json
+import queue as _queue
 import re
 import csv
+import threading
+import uuid
 from typing import Dict, Any, List
 from pathlib import Path
 
@@ -18,6 +23,10 @@ from user_manager import UserManager
 from src.infrastructure.agents import dispatcher_agent
 
 manifests_bp = Blueprint('manifests', __name__)
+
+# ── In-memory job store for SSE dispatcher streams ───────────────────────────
+# Maps job_id -> {"q": queue.Queue, "done": threading.Event}
+_dispatch_jobs: Dict[str, Dict] = {}
 
 
 @manifests_bp.route("/driver/manifest")
@@ -442,6 +451,112 @@ def auto_assign_manifests():
     except Exception as e:
         flash(f"Error during auto-assign: {str(e)}", "danger")
         return redirect(url_for("manifests.admin_manifests"))
+
+
+# ── SSE: start async dispatcher job ──────────────────────────────────────────
+
+@manifests_bp.route("/admin/manifests/auto_assign/async", methods=["POST"])
+@role_required(UserManager.ROLE_ADMIN, UserManager.ROLE_DEPOT_MANAGER)
+def auto_assign_async():
+    """
+    Start a dispatcher agent run asynchronously and return a job_id.
+    The client then connects to /auto_assign/events/<job_id> to stream progress.
+    """
+    try:
+        max_parcels = int(request.form.get("max_parcels") or request.json.get("max_parcels", 20) if request.is_json else request.form.get("max_parcels", 20))
+        state_filter = (request.json.get("state_filter", "") if request.is_json else request.form.get("state_filter", "")).strip()
+    except Exception:
+        max_parcels = 20
+        state_filter = ""
+
+    job_id = uuid.uuid4().hex
+    q: _queue.Queue = _queue.Queue()
+    done_event = threading.Event()
+    _dispatch_jobs[job_id] = {"q": q, "done": done_event}
+
+    state_clause = f" for state {state_filter}" if state_filter else " across all states"
+    prompt = (
+        f"Please auto-assign all pending parcels{state_clause} to available drivers and create manifests.\n"
+        f"Batch limit: {max_parcels} parcels maximum.\n\n"
+        "Use your tools in this order:\n"
+        "1. Call get_pending_parcels_for_dispatch to find unassigned at-depot parcels.\n"
+        "2. Call get_available_drivers to see who is available today.\n"
+        "3. IMPORTANT: Only assign parcels to drivers in the SAME STATE as the parcel destination_state. "
+        "A driver in NSW must only receive NSW parcels. Never mix states in a single manifest.\n"
+        "4. Within each state, group parcels by postcode for geographic efficiency.\n"
+        "5. Call create_manifest once per driver with their assigned tracking numbers.\n"
+        "6. Report how many manifests were created, which driver in which state, "
+        "and if any states have parcels with no available driver."
+    )
+    context = {"mode": "auto_assign", "state_filter": state_filter or "ALL", "max_parcels": max_parcels}
+
+    def _run_agent():
+        try:
+            asyncio.run(dispatcher_agent({"details": prompt, "context": context}, event_queue=q))
+        except Exception as e:
+            try:
+                q.put_nowait({"type": "error", "message": str(e)})
+            except Exception:
+                pass
+        finally:
+            done_event.set()
+            try:
+                q.put_nowait({"type": "done"})
+            except Exception:
+                pass
+
+    thread = threading.Thread(target=_run_agent, daemon=True)
+    thread.start()
+
+    return jsonify({"job_id": job_id})
+
+
+# ── SSE: stream dispatcher job events ────────────────────────────────────────
+
+@manifests_bp.route("/admin/manifests/auto_assign/events/<job_id>")
+@role_required(UserManager.ROLE_ADMIN, UserManager.ROLE_DEPOT_MANAGER)
+def auto_assign_events(job_id: str):
+    """Server-Sent Events stream for a dispatcher job."""
+    if job_id not in _dispatch_jobs:
+        return jsonify({"error": "Job not found"}), 404
+
+    job = _dispatch_jobs[job_id]
+    q: _queue.Queue = job["q"]
+    done_event: threading.Event = job["done"]
+
+    def generate():
+        import time as _time
+        _SSE_TYPE_MAP = {
+            "tool_start": "tool_start",
+            "tool_done": "tool_done",
+            "complete": "complete",
+            "error": "error_event",
+            "done": "done",
+        }
+        # Keep streaming until the done sentinel arrives or 4-minute timeout
+        deadline = _time.time() + 240
+        while _time.time() < deadline:
+            try:
+                event = q.get(timeout=1.0)
+                sse_name = _SSE_TYPE_MAP.get(event.get("type", ""), "message")
+                yield f"event: {sse_name}\ndata: {json.dumps(event)}\n\n"
+                if event.get("type") in ("done", "error"):
+                    break
+            except _queue.Empty:
+                # Send heartbeat to keep connection alive
+                yield ": heartbeat\n\n"
+        # Clean up job entry after stream ends
+        _dispatch_jobs.pop(job_id, None)
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @manifests_bp.route("/admin/manifests/<manifest_id>", methods=["GET", "DELETE"])
