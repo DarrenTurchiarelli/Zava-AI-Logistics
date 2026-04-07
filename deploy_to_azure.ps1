@@ -388,6 +388,23 @@ if (-not $SkipInfrastructure -and -not $CodeOnly) {
         exit 1
     }
 
+    # Persist AppServiceName immediately so -CodeOnly works on any subsequent run,
+    # even if the script fails before the final save at the end.
+    $earlyConfig = @{
+        AppServiceName          = $WebAppName
+        FrontendResourceGroup   = $frontendRgName
+        MiddlewareResourceGroup = $middlewareRgName
+        BackendResourceGroup    = $backendRgName
+        SharedResourceGroup     = $sharedRgName
+        Location                = $Location
+        Environment             = $Environment
+        Sku                     = $Sku
+        DeploymentDate          = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+        Url                     = "https://$WebAppName.azurewebsites.net"
+    }
+    $earlyConfig | ConvertTo-Json | Set-Content $deploymentConfigFile
+    Write-Host "  ✓ Deployment config saved early ($deploymentConfigFile) — -CodeOnly will work from now on" -ForegroundColor Green
+
     # Wait for RBAC permissions to propagate
     Write-Host ""
     Write-Host "[3/7] Waiting for cross-resource group RBAC permissions to propagate..." -ForegroundColor Yellow
