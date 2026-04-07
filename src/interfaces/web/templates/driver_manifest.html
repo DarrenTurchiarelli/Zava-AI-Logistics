@@ -108,8 +108,8 @@
                                 <i class="bi bi-check-circle"></i> Using {{ manifest.route_type_display }}
                             </span>
                             {% endif %}
-                            <button class="btn btn-sm btn-outline-primary" onclick="recalculateAllRoutes('{{ manifest.id }}')" title="Recalculate all three route types with current Azure Maps data">
-                                <i class="bi bi-arrow-clockwise"></i> Recalculate Routes
+                            <button class="btn btn-sm btn-outline-primary" onclick="recalculateAllRoutes('{{ manifest.id }}')" title="Refresh all three route options with current Azure Maps data">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh Routes
                             </button>
                         </div>
                     </div>
@@ -172,7 +172,7 @@
                                     </p>
                                     <hr>
                                     <button class="btn btn-sm" type="button" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
-                                        <i class="bi bi-calculator" style="color: #007FFF;"></i> Calculate Route
+                                        <i class="bi bi-calculator" style="color: #007FFF;"></i> Optimise Route
                                     </button>
                                     <div class="mt-2 d-none" id="fastest-spinner">
                                         <div class="spinner-border spinner-border-sm" role="status">
@@ -226,7 +226,7 @@
                                     </p>
                                     <hr>
                                     <button class="btn btn-sm" type="button" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
-                                        <i class="bi bi-calculator" style="color: #007FFF;"></i> Calculate Route
+                                        <i class="bi bi-calculator" style="color: #007FFF;"></i> Optimise Route
                                     </button>
                                     <div class="mt-2 d-none" id="shortest-spinner">
                                         <div class="spinner-border spinner-border-sm" role="status">
@@ -285,7 +285,7 @@
                                     </p>
                                     <hr>
                                     <button class="btn btn-sm" type="button" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
-                                        <i class="bi bi-calculator" style="color: #007FFF;"></i> Calculate Route
+                                        <i class="bi bi-calculator" style="color: #007FFF;"></i> Optimise Route
                                     </button>
                                     <div class="mt-2 d-none" id="safest-spinner">
                                         <div class="spinner-border spinner-border-sm" role="status">
