@@ -294,8 +294,8 @@
 
                     <div class="alert alert-info alert-persistent mt-3 mb-0">
                         <small>
-                            <i class="bi bi-info-circle"></i> <strong>Architecture:</strong> All agents are deployed as persistent Azure AI Foundry agents with dedicated agent IDs.
-                            The Customer Service Agent includes Cosmos DB function calling tools for real-time parcel tracking. 2 additional agents available for future integration.
+                            <i class="bi bi-info-circle"></i> <strong>Architecture:</strong> All 8 agents are deployed as persistent Azure AI Foundry agents with dedicated agent IDs.
+                            Customer Service and Dispatcher agents include real-time Cosmos DB function-calling tools for live parcel tracking and manifest assignment.
                         </small>
                     </div>
                 </div>
@@ -365,20 +365,68 @@
                             <div class="card bg-light h-100">
                                 <div class="card-body">
                                     <h6 class="text-primary"><i class="bi bi-robot"></i> AI Routing Recommendations</h6>
-                                    <div class="recommendation-item p-2 mb-2" style="cursor: pointer; border-left: 3px solid #0dcaf0;" data-bs-toggle="modal" data-bs-target="#routingBalanceModal">
-                                        <strong>Load Balancing:</strong> Redirect next 25 parcels to DC-MEL-003 (reduce DC-MEL-002 wait by 15 min)
-                                        <small class="text-muted d-block"><i class="bi bi-clock"></i> Impact: High • Confidence: 92%</small>
-                                    </div>
-                                    <div class="recommendation-item p-2 mb-2" style="cursor: pointer; border-left: 3px solid #198754;" data-bs-toggle="modal" data-bs-target="#priorityRoutingModal">
-                                        <strong>Priority Routing:</strong> 12 express parcels arriving - route to DC-MEL-001 for fastest processing
-                                        <small class="text-muted d-block"><i class="bi bi-clock"></i> Impact: Medium • Confidence: 88%</small>
-                                    </div>
-                                    <div class="recommendation-item p-2" style="cursor: pointer; border-left: 3px solid #ffc107;" data-bs-toggle="modal" data-bs-target="#throughputOptModal">
-                                        <strong>Throughput:</strong> DC-MEL-002 slowing - recommend shift change in 30 min to maintain flow
-                                        <small class="text-muted d-block"><i class="bi bi-clock"></i> Impact: Medium • Confidence: 76%</small>
-                                    </div>
+                                    {% if insights.dc_stats %}
+                                        {% set busiest = insights.dc_stats[0] %}
+                                        {% set least_busy = insights.dc_stats[-1] %}
+                                        {% set pct_diff = busiest.pct - least_busy.pct %}
+                                        {% set balance_impact = "High" if busiest.pct >= 75 else "Medium" %}
+                                        {% set balance_confidence = 95 if busiest.pct >= 80 else (85 if busiest.pct >= 60 else 72) %}
+                                        {% set balance_color = "#0dcaf0" if balance_impact == "High" else "#198754" %}
+
+                                        <!-- Load Balancing -->
+                                        {% if pct_diff >= 10 %}
+                                        <div class="recommendation-item p-2 mb-2" style="border-left: 3px solid {{ balance_color }};">
+                                            <strong>Load Balancing:</strong> Redirect parcels from {{ busiest.name }} ({{ busiest.pct }}% capacity) to {{ least_busy.name }} ({{ least_busy.pct }}% capacity)
+                                            <small class="text-muted d-block"><i class="bi bi-clock"></i> Impact: {{ balance_impact }} • Confidence: {{ balance_confidence }}%</small>
+                                        </div>
+                                        {% else %}
+                                        <div class="recommendation-item p-2 mb-2" style="border-left: 3px solid #198754;">
+                                            <strong>Load Balancing:</strong> Facilities balanced — {{ busiest.name }} at {{ busiest.pct }}%, no redistribution required
+                                            <small class="text-muted d-block"><i class="bi bi-clock"></i> Impact: Low • Confidence: 94%</small>
+                                        </div>
+                                        {% endif %}
+
+                                        <!-- Depot / Sort Throughput -->
+                                        {% if insights.at_depot >= 500 %}
+                                        <div class="recommendation-item p-2 mb-2" style="border-left: 3px solid #dc3545;">
+                                            <strong>Depot Backlog:</strong> {{ insights.at_depot }} parcels queued — increase sort throughput or pre-assign to additional drivers
+                                            <small class="text-muted d-block"><i class="bi bi-clock"></i> Impact: High • Confidence: 90%</small>
+                                        </div>
+                                        {% elif insights.at_depot >= 200 %}
+                                        <div class="recommendation-item p-2 mb-2" style="border-left: 3px solid #ffc107;">
+                                            <strong>Depot Queue:</strong> {{ insights.at_depot }} parcels at depot — monitor closely; consider additional manifest runs
+                                            <small class="text-muted d-block"><i class="bi bi-clock"></i> Impact: Medium • Confidence: 83%</small>
+                                        </div>
+                                        {% elif insights.sorting >= 400 %}
+                                        <div class="recommendation-item p-2 mb-2" style="border-left: 3px solid #ffc107;">
+                                            <strong>Sort Throughput:</strong> {{ insights.sorting }} parcels in sorting — consider priority lanes for express items
+                                            <small class="text-muted d-block"><i class="bi bi-clock"></i> Impact: Medium • Confidence: 81%</small>
+                                        </div>
+                                        {% else %}
+                                        <div class="recommendation-item p-2 mb-2" style="border-left: 3px solid #198754;">
+                                            <strong>Throughput:</strong> Sorting pipeline healthy — {{ insights.sorting }} parcels in sort, all within normal range
+                                            <small class="text-muted d-block"><i class="bi bi-clock"></i> Impact: Low • Confidence: 89%</small>
+                                        </div>
+                                        {% endif %}
+
+                                        <!-- Delivery Dispatch -->
+                                        {% set delivery_pct = ((insights.out_for_delivery / insights.active_parcels) * 100) | round(0) | int if insights.active_parcels > 0 else 0 %}
+                                        {% if delivery_pct < 20 and insights.at_depot > 100 %}
+                                        <div class="recommendation-item p-2" style="border-left: 3px solid #ffc107;">
+                                            <strong>Delivery Dispatch:</strong> Only {{ delivery_pct }}% of active parcels are out for delivery — review driver allocation and manifest assignments
+                                            <small class="text-muted d-block"><i class="bi bi-clock"></i> Impact: Medium • Confidence: 87%</small>
+                                        </div>
+                                        {% else %}
+                                        <div class="recommendation-item p-2" style="border-left: 3px solid #198754;">
+                                            <strong>Route Efficiency:</strong> {{ insights.out_for_delivery }} parcels out for delivery ({{ delivery_pct }}% of active) — network operating normally
+                                            <small class="text-muted d-block"><i class="bi bi-clock"></i> Impact: Low • Confidence: 91%</small>
+                                        </div>
+                                        {% endif %}
+                                    {% else %}
+                                        <p class="text-muted small mb-0">No facility data available for routing recommendations.</p>
+                                    {% endif %}
                                     <small class="text-muted mt-2 d-block">
-                                        <i class="bi bi-robot"></i> AI-powered routing • <i class="bi bi-hand-index"></i> Click for details
+                                        <i class="bi bi-robot"></i> AI-powered routing — live data
                                     </small>
                                 </div>
                             </div>
