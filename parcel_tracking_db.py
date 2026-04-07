@@ -1970,22 +1970,39 @@ class ParcelTrackingDB:
             return False
 
     async def get_all_active_manifests(self) -> List[Dict[str, Any]]:
-        """Get all active manifests for admin overview"""
+        """Get all manifests for admin/depot manager overview.
+
+        Returns all active manifests (any date) plus all manifests created today,
+        so the depot manager sees the full picture regardless of completion status.
+        """
         try:
             container = self.database.get_container_client("driver_manifests")
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-            # ORDER BY _ts (system property) — always present, avoids failures on
-            # older documents that predate the created_timestamp field
-            query = "SELECT * FROM c WHERE c.status = 'active' ORDER BY c._ts DESC"
+            # Return active manifests (any date) UNION today's manifests (any status).
+            # A single OR clause keeps this as one query and avoids duplicates at
+            # the Python level by de-duping on manifest id.
+            query = """
+                SELECT * FROM c
+                WHERE c.status = 'active'
+                   OR c.manifest_date = @today
+                ORDER BY c._ts DESC
+            """
+            parameters = [{"name": "@today", "value": today}]
 
+            seen = set()
             manifests = []
-            async for manifest in container.query_items(query=query, enable_cross_partition_query=True):
-                manifests.append(manifest)
+            async for manifest in container.query_items(
+                query=query, parameters=parameters, enable_cross_partition_query=True
+            ):
+                if manifest["id"] not in seen:
+                    seen.add(manifest["id"])
+                    manifests.append(manifest)
 
             return manifests
 
         except Exception as e:
-            print(f"❌ Error retrieving active manifests: {e}")
+            print(f"❌ Error retrieving manifests: {e}")
             return []
 
     async def get_manifest_for_parcel(self, barcode: str) -> Optional[Dict[str, Any]]:
