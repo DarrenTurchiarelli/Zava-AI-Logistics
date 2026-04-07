@@ -1974,13 +1974,10 @@ class ParcelTrackingDB:
         try:
             container = self.database.get_container_client("driver_manifests")
 
-            # Get only today's active manifests
-            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            query = "SELECT * FROM c WHERE c.status = 'active' AND c.manifest_date = @today ORDER BY c.created_timestamp DESC"
-            parameters = [{"name": "@today", "value": today}]
+            query = "SELECT * FROM c WHERE c.status = 'active' ORDER BY c.created_timestamp DESC"
 
             manifests = []
-            async for manifest in container.query_items(query=query, parameters=parameters):
+            async for manifest in container.query_items(query=query):
                 manifests.append(manifest)
 
             return manifests

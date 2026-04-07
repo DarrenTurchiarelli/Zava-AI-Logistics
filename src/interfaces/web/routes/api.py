@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any
 
 from services.maps_service import get_maps_service
-from services.speech import get_speech_service
+from services.speech import get_speech_service, AVAILABLE_VOICES
 from src.interfaces.web.middleware import login_required
 from parcel_tracking_db import ParcelTrackingDB
 from utils.async_helpers import run_async
@@ -124,6 +124,19 @@ def autocomplete_address() -> tuple[Dict[str, Any], int]:
     except Exception as e:
         print(f"Address autocomplete error: {e}")
         return jsonify({"suggestions": []}), 200
+
+
+@api_bp.route("/speech/voices", methods=["GET"])
+def get_voices():
+    """
+    Return the list of available Azure Neural voice personas.
+
+    Public endpoint consumed by the chatbot voice selector dropdown.
+
+    Returns:
+        JSON with voices dict keyed by persona name
+    """
+    return jsonify({"voices": AVAILABLE_VOICES}), 200
 
 
 @api_bp.route("/speech/synthesize", methods=["POST"])
