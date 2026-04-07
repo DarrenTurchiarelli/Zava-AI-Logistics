@@ -142,18 +142,34 @@ class FraudToCustomerServiceWorkflow:
         """Step 1: Analyze message with fraud detection agent"""
         self._log_step(context, "Starting fraud detection analysis", "info")
 
-        # Call fraud detection agent
+        # Call fraud detection agent — returns a ThreatAnalysis dataclass
         fraud_analysis = await analyze_with_fraud_agent(
             message_content=context.message_content, sender_info=context.sender_info
         )
 
-        # Extract results
-        context.fraud_risk_score = fraud_analysis.get("risk_score", 0.0)
-        context.fraud_indicators = fraud_analysis.get("risk_indicators", [])
-        context.recommended_action = fraud_analysis.get("recommended_action", "monitor")
+        # Extract results from ThreatAnalysis dataclass (attribute access, not dict)
+        context.fraud_risk_score = fraud_analysis.confidence_score
+        context.fraud_indicators = fraud_analysis.risk_indicators or []
 
-        if fraud_analysis.get("associated_tracking_numbers"):
-            context.suspicious_parcel_ids = fraud_analysis["associated_tracking_numbers"]
+        # Derive recommended_action from threat level if the agent didn't embed it in the
+        # ai_response text.  The fraud system prompt now instructs the agent to include
+        # a recommended_action keyword, but we fall back to threshold mapping for safety.
+        ai_text = (fraud_analysis.ai_response or "").lower()
+        if "hold_parcels" in ai_text:
+            context.recommended_action = "hold_parcels"
+        elif "require_identity_verification" in ai_text:
+            context.recommended_action = "require_identity_verification"
+        elif "notify_customer" in ai_text:
+            context.recommended_action = "notify_customer"
+        else:
+            # Derive from threat level
+            level_name = fraud_analysis.threat_level.value if fraud_analysis.threat_level else "low"
+            mapping = {
+                "critical": "hold_parcels",
+                "high": "require_identity_verification",
+                "medium": "notify_customer",
+            }
+            context.recommended_action = mapping.get(level_name, "monitor_only")
 
         self._log_step(
             context,
