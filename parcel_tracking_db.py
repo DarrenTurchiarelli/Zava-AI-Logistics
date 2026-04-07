@@ -2062,30 +2062,45 @@ class ParcelTrackingDB:
 
             where_sql = " AND ".join(where_clauses)
 
-            # Fetch ALL matching docs in the 30-day window; paginate in Python.
-            # Avoids OFFSET/LIMIT cross-partition issues and ORDER BY composite index
-            # requirements on existing containers.
-            fetch_query = f"SELECT {projection} FROM c WHERE {where_sql}"
-
+            # Use SELECT * (no projection) to avoid any query syntax issues with
+            # multi-line projection strings on cross-partition queries.
+            # Fetch all docs in container, filter/sort/page entirely in Python.
             all_manifests = []
-            async for manifest in container.query_items(
-                query=fetch_query, parameters=params, enable_cross_partition_query=True
-            ):
-                all_manifests.append(manifest)
-
-            # Fallback: no manifest_date field on older docs — fetch without WHERE
-            if not all_manifests and not date_filter and not state_filter:
+            try:
                 async for manifest in container.query_items(
-                    query=f"SELECT {projection} FROM c",
+                    query="SELECT * FROM c",
                     enable_cross_partition_query=True,
                 ):
                     all_manifests.append(manifest)
+            except Exception as fetch_err:
+                print(f"❌ driver_manifests fetch error: {type(fetch_err).__name__}: {fetch_err}")
+                raise
+
+            # Apply filters in Python
+            cutoff_ts = cutoff  # already YYYY-MM-DD string
+            filtered = []
+            for m in all_manifests:
+                md = m.get("manifest_date", "")
+                if md and md >= cutoff_ts:
+                    if date_filter and md != date_filter:
+                        continue
+                    if state_filter and m.get("driver_state", "") != state_filter:
+                        continue
+                    filtered.append(m)
+
+            # If nothing matched, fall back to all docs (handles missing manifest_date)
+            if not filtered and not date_filter and not state_filter:
+                filtered = all_manifests
 
             # Sort newest first, paginate in Python
-            all_manifests.sort(key=lambda m: m.get("_ts", 0), reverse=True)
-            total = len(all_manifests)
+            filtered.sort(key=lambda m: m.get("_ts", 0), reverse=True)
+            total = len(filtered)
             offset = (page - 1) * per_page
-            manifests = all_manifests[offset: offset + per_page]
+            manifests = filtered[offset: offset + per_page]
+
+            # Strip items array before returning (keeps response small)
+            for m in manifests:
+                m.pop("items", None)
 
             return {
                 "manifests": manifests,
@@ -2096,8 +2111,10 @@ class ParcelTrackingDB:
             }
 
         except Exception as e:
-            print(f"❌ Error retrieving manifests: {e}")
-            return {"manifests": [], "page": 1, "per_page": per_page, "total": 0, "total_pages": 1}
+            import traceback
+            print(f"❌ Error retrieving manifests: {type(e).__name__}: {e}")
+            print(traceback.format_exc())
+            raise
 
     async def get_manifest_for_parcel(self, barcode: str) -> Optional[Dict[str, Any]]:
         """Get the active manifest containing a specific parcel"""
