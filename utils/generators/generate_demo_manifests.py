@@ -639,8 +639,12 @@ async def create_driver_manifests(db: ParcelTrackingDB, state_barcodes: dict):
         query = """
             SELECT c.barcode FROM c
             WHERE c.destination_city = @location
-            AND c.current_status = 'registered'
+            AND c.is_delivered = false
             AND (NOT IS_DEFINED(c.assigned_driver) OR c.assigned_driver = null)
+            AND c.current_status != 'Delivered'
+            AND c.current_status != 'delivered'
+            AND c.current_status != 'Out For Delivery'
+            AND c.current_status != 'out_for_delivery'
         """
         parameters = [{"name": "@location", "value": driver_location}]
 
@@ -653,8 +657,12 @@ async def create_driver_manifests(db: ParcelTrackingDB, state_barcodes: dict):
             query = """
                 SELECT c.barcode FROM c
                 WHERE c.destination_state = @state
-                AND c.current_status = 'registered'
+                AND c.is_delivered = false
                 AND (NOT IS_DEFINED(c.assigned_driver) OR c.assigned_driver = null)
+                AND c.current_status != 'Delivered'
+                AND c.current_status != 'delivered'
+                AND c.current_status != 'Out For Delivery'
+                AND c.current_status != 'out_for_delivery'
             """
             parameters = [{"name": "@state", "value": driver_state}]
 
