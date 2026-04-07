@@ -1974,7 +1974,9 @@ class ParcelTrackingDB:
         try:
             container = self.database.get_container_client("driver_manifests")
 
-            query = "SELECT * FROM c WHERE c.status = 'active' ORDER BY c.created_timestamp DESC"
+            # ORDER BY _ts (system property) — always present, avoids failures on
+            # older documents that predate the created_timestamp field
+            query = "SELECT * FROM c WHERE c.status = 'active' ORDER BY c._ts DESC"
 
             manifests = []
             async for manifest in container.query_items(query=query, enable_cross_partition_query=True):
