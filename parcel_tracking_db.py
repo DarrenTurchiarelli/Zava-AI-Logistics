@@ -1984,10 +1984,11 @@ class ParcelTrackingDB:
             from datetime import timedelta
             cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
 
+            # NOTE: ORDER BY on cross-partition queries requires a composite
+            # index. Avoid it here and sort in Python instead.
             query = """
                 SELECT * FROM c
                 WHERE c.manifest_date >= @cutoff
-                ORDER BY c._ts DESC
             """
             parameters = [{"name": "@cutoff", "value": cutoff}]
 
@@ -1998,13 +1999,16 @@ class ParcelTrackingDB:
                 manifests.append(manifest)
 
             # Fall back: if no dated manifests found (e.g. older docs without
-            # manifest_date), return all active manifests regardless of date.
+            # manifest_date field), return all manifests regardless of date.
             if not manifests:
-                fallback_query = "SELECT * FROM c ORDER BY c._ts DESC OFFSET 0 LIMIT 200"
+                fallback_query = "SELECT * FROM c OFFSET 0 LIMIT 200"
                 async for manifest in container.query_items(
                     query=fallback_query, enable_cross_partition_query=True
                 ):
                     manifests.append(manifest)
+
+            # Sort newest-first in Python (avoids cross-partition ORDER BY index requirement)
+            manifests.sort(key=lambda m: m.get("_ts", 0), reverse=True)
 
             return manifests
 
