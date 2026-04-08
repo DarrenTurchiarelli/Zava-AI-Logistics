@@ -1502,9 +1502,22 @@
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Asking agents…';
 
+        const timeoutId = setTimeout(() => {
+            const optEl = document.getElementById('liveOptResponse');
+            const sfEl  = document.getElementById('liveSFResponse');
+            if (optEl && optEl.classList.contains('fst-italic')) {
+                optEl.className = 'small text-warning fst-italic';
+                optEl.textContent = 'Agent is taking longer than expected — click Refresh to retry.';
+            }
+            if (sfEl) { sfEl.className = 'small text-warning fst-italic'; sfEl.textContent = ''; }
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Refresh';
+        }, 15000);
+
         fetch('{{ url_for("admin.insights_refresh") }}', { method: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest'} })
             .then(r => r.json())
             .then(data => {
+                clearTimeout(timeoutId);
                 if (data.success) {
                     const optEl = document.getElementById('liveOptResponse');
                     const sfEl  = document.getElementById('liveSFResponse');
@@ -1523,6 +1536,7 @@
                 }
             })
             .catch(() => {
+                clearTimeout(timeoutId);
                 const optEl = document.getElementById('liveOptResponse');
                 const sfEl  = document.getElementById('liveSFResponse');
                 if (optEl) { optEl.className = 'small text-warning fst-italic'; optEl.textContent = 'Agent unavailable — check connectivity or retry.'; }
