@@ -558,6 +558,10 @@
                         </div>
                     </div>
 
+                    <div class="alert alert-info py-2 px-3 mb-4 border-0 rounded" style="background:rgba(13,110,253,0.07);">
+                        <small><i class="bi bi-info-circle"></i> <strong>Note:</strong> These are industry benchmark figures. Live notification telemetry requires <strong>Azure Communication Services</strong> integration, which is not enabled in this deployment.</small>
+                    </div>
+
                     <!-- How It Works -->
                     <div class="row g-4 mb-4">
                         <div class="col-md-6">
@@ -801,11 +805,11 @@
                                 <div class="row g-0">
                                     <div class="col-md-6 p-3 border-end">
                                         <h6 class="text-success"><i class="bi bi-graph-up"></i> Optimisation Agent</h6>
-                                        <div id="liveOptResponse" class="small text-muted fst-italic" style="white-space:pre-wrap;"><span class="spinner-border spinner-border-sm me-1"></span> Querying agent…</div>
+                                        <div id="liveOptResponse" class="small text-muted fst-italic" style="white-space:pre-wrap;"><span class="spinner-border spinner-border-sm me-1"></span> Loading agent analysis…</div>
                                     </div>
                                     <div class="col-md-6 p-3">
                                         <h6 class="text-primary"><i class="bi bi-building"></i> Sorting Facility Agent</h6>
-                                        <div id="liveSFResponse" class="small text-muted fst-italic" style="white-space:pre-wrap;"><span class="spinner-border spinner-border-sm me-1"></span> Querying agent…</div>
+                                        <div id="liveSFResponse" class="small text-muted fst-italic" style="white-space:pre-wrap;"><span class="spinner-border spinner-border-sm me-1"></span> Loading agent analysis…</div>
                                     </div>
                                 </div>
                             </div>
@@ -1518,7 +1522,12 @@
                     if (sfEl)  sfEl.textContent = '';
                 }
             })
-            .catch(err => alert('Request failed: ' + err))
+            .catch(() => {
+                const optEl = document.getElementById('liveOptResponse');
+                const sfEl  = document.getElementById('liveSFResponse');
+                if (optEl) { optEl.className = 'small text-warning fst-italic'; optEl.textContent = 'Agent unavailable — check connectivity or retry.'; }
+                if (sfEl)  { sfEl.className  = 'small text-warning fst-italic'; sfEl.textContent  = ''; }
+            })
             .finally(() => {
                 btn.disabled = false;
                 btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Refresh';
