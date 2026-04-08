@@ -733,7 +733,7 @@
                                         <div class="mb-3 recommendation-item" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#peakDayModal">
                                             <div class="d-flex justify-content-between mb-1 align-items-center">
                                                 <small class="text-muted"><i class="bi bi-info-circle text-primary"></i> Peak Demand Day</small>
-                                                <strong class="text-dark">Friday</strong>
+                                                <strong class="text-dark"><span class="js-peak-day">Friday</span></strong>
                                             </div>
                                             <small class="text-muted">
                                                 <i class="bi bi-calendar-event"></i> Prepare extra capacity
@@ -780,7 +780,7 @@
                             <li>
                                 <strong>This Week:</strong>
                                 {% set predicted = ((insights.total_parcels * 1.15)|round(0)|int - insights.total_parcels) %}
-                                Schedule additional drivers for Friday peak — {{ predicted }} additional parcels predicted (15% volume increase).
+                                Schedule additional drivers for <span class="js-peak-day">Friday</span> peak — {{ predicted }} additional parcels predicted (15% volume increase).
                             </li>
                             <li>
                                 <strong>Optimisation:</strong>
@@ -1106,7 +1106,7 @@
                     <div class="card-body">
                         <p><strong>Capacity Planning for Next Week:</strong></p>
                         <ul class="mb-0">
-                            <li>Add 1 temporary driver for Friday peak (estimated 25 extra parcels)</li>
+                            <li>Add 1 temporary driver for <span class="js-peak-day">Friday</span> peak (estimated 25 extra parcels)</li>
                             <li>Extend sorting facility hours by 2 hours on Thursday</li>
                             <li>Pre-position stock at DC-MEL-001 for faster processing</li>
                             <li>Estimated additional cost: $450 vs. $1,200 for overtime/expedited delivery</li>
@@ -1140,23 +1140,23 @@
             </div>
             <div class="modal-body">
                 <div class="alert alert-info">
-                    <strong><i class="bi bi-robot"></i> AI Confidence:</strong> 82% (High) | <strong>Predicted Peak:</strong> Friday
+                    <strong><i class="bi bi-robot"></i> AI Confidence:</strong> 82% (High) | <strong>Predicted Peak:</strong> <span class="js-peak-day">Friday</span>
                 </div>
 
                 <h6 class="text-primary"><i class="bi bi-clipboard-data"></i> Weekly Pattern Analysis</h6>
                 <div class="row mb-3">
                     <div class="col-md-6">
-                        <p><strong>Historical Friday Volumes:</strong></p>
+                        <p><strong>Historical <span class="js-peak-day">Friday</span> Volumes:</strong></p>
                         <ul>
                             <li>Average: 135% of Monday baseline</li>
-                            <li>Last 4 Fridays: +32%, +28%, +35%, +31%</li>
+                            <li>Last 4 <span class="js-peak-day">Friday</span>s: +32%, +28%, +35%, +31%</li>
                             <li>Contributing factor: Weekend delivery preparation</li>
                         </ul>
                     </div>
                     <div class="col-md-6">
                         <div class="card border-warning">
                             <div class="card-body text-center">
-                                <small class="text-muted d-block">Expected Friday Volume</small>
+                                <small class="text-muted d-block">Expected <span class="js-peak-day">Friday</span> Volume</small>
                                 <h3 class="text-warning mb-0">{{ (insights.total_parcels * 1.35)|round(0)|int }}</h3>
                                 <small class="text-muted">+35% above baseline</small>
                             </div>
@@ -1169,7 +1169,7 @@
                     <div class="card-body">
                         <ul class="mb-0">
                             <li>Schedule additional sorting staff for Thursday evening</li>
-                            <li>Confirm Friday driver availability (consider standby driver)</li>
+                            <li>Confirm <span class="js-peak-day">Friday</span> driver availability (consider standby driver)</li>
                             <li>Pre-sort high-priority parcels Wednesday/Thursday</li>
                             <li>Enable overflow capacity at DC-MEL-001</li>
                         </ul>
@@ -1568,6 +1568,15 @@
                 <li><strong>${fmtTime(t2)}:</strong> Email sent to customer at 142 Burke St — Parcel arriving within 15 minutes</li>
                 <li><strong>${fmtTime(t3)}:</strong> SMS sent to customer at 88 Lonsdale St — Driver approaching your location</li>
             `;
+        })();
+
+        // Compute next Friday's date label so "Peak Demand Day" is always current
+        (function () {
+            const now = new Date();
+            const daysUntilFri = (5 - now.getDay() + 7) % 7 || 7;
+            const nextFri = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysUntilFri);
+            const label = 'Friday ' + nextFri.getDate() + ' ' + nextFri.toLocaleString('default', { month: 'short' });
+            document.querySelectorAll('.js-peak-day').forEach(function (el) { el.textContent = label; });
         })();
 
         // Auto-load live agent analysis on page open so the panel is never stale
