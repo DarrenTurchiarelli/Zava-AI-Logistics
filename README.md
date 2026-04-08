@@ -218,4 +218,4 @@ pytest tests/integration/   # requires Azure credentials
 
 Non-Commercial Open Source License — see [LICENSE](LICENSE).
 
-**Maintained by:** Microsoft Australia
+**Maintained by:** Darren Turchiarelli - Microsoft Australia
