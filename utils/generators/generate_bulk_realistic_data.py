@@ -393,6 +393,12 @@ AUSTRALIAN_LOCATIONS = {
     'NT': ['Darwin', 'Alice Springs', 'Palmerston', 'Katherine', 'Nhulunbuy']
 }
 
+# One DC is designated "High Load" for the Sorting Facility Agent demo.
+# It receives enough active parcels to exceed 85% of the 500-parcel capacity threshold,
+# which triggers the "High Load" badge and prompts AI routing recommendations.
+HIGH_LOAD_DC = "DC-SYD-001"  # Sydney hub — change here to target a different DC
+HIGH_LOAD_TARGET = 450       # Parcels to create (500 * 90% → well into High Load territory)
+
 # Diverse recipient names (matching Voice & Text Examples)
 COMMON_RECIPIENTS = [
     "Dr. Emma Wilson", "Sarah Johnson", "Michael Chen", "Olivia Brown",
@@ -659,10 +665,65 @@ async def create_realistic_parcel(db: ParcelTrackingDB, state: str, city: str, i
     
     return barcode
 
+async def create_high_load_dc_scenario(db: ParcelTrackingDB) -> int:
+    """Flood HIGH_LOAD_DC with active parcels so the Sorting Facility Agent demo shows
+    a 'High Load' facility alongside optimal ones — enabling AI routing recommendations."""
+    print(f"\n  🔴 Generating High Load scenario for {HIGH_LOAD_DC} ({HIGH_LOAD_TARGET} parcels)...")
+
+    # Only active statuses count toward DC capacity in the dashboard
+    active_statuses = ['At Depot', 'At Depot', 'At Depot', 'Sorting', 'Sorting']
+    created = 0
+
+    for i in range(HIGH_LOAD_TARGET):
+        barcode = generate_barcode(prefix='HL')
+        status = random.choice(active_statuses)
+        # Spread senders/recipients for realism
+        sender = random.choice(SENDER_NAMES)
+        recipient = random.choice(COMMON_RECIPIENTS + [fake.name() for _ in range(2)])
+        address, suburb, postcode = pick_real_address('NSW', 'Sydney')
+
+        for attempt in range(3):
+            try:
+                await db.register_parcel(
+                    barcode=barcode,
+                    sender_name=sender,
+                    sender_address=f"Warehouse, Sydney NSW",
+                    sender_phone=fake.phone_number(),
+                    recipient_name=recipient,
+                    recipient_address=address,
+                    recipient_phone=fake.phone_number(),
+                    destination_postcode=str(postcode),
+                    destination_state='NSW',
+                    destination_city='Sydney',
+                    weight=round(random.uniform(0.1, 25.0), 2),
+                    dimensions=f"{random.randint(10,60)}x{random.randint(10,60)}x{random.randint(5,40)}",
+                    service_type=random.choice(['standard', 'express']),
+                    store_location=HIGH_LOAD_DC,
+                    current_status=status,
+                )
+                created += 1
+                break
+            except ValueError as e:
+                if 'already exists' in str(e) and attempt < 2:
+                    barcode = generate_barcode(prefix='HL')
+                    continue
+                break
+            except Exception:
+                break
+
+        if (i + 1) % 100 == 0:
+            pct = min(round(created * 100 / 500), 100)
+            print(f"    Progress: {i+1}/{HIGH_LOAD_TARGET}  ({pct}% capacity)", end='\r')
+
+    print(f"    ✓ {HIGH_LOAD_DC}: {created} active parcels created ({min(round(created*100/500),100)}% capacity → High Load)")
+    return created
+
+
 async def main():
     parser = argparse.ArgumentParser(description='Generate bulk realistic parcel data')
     parser.add_argument('--count', type=int, default=2000, help='Number of parcels to generate (default: 2000)')
     parser.add_argument('--demo-only', action='store_true', help='Only create demo parcels (RG857954, DT202512170037), skip bulk generation')
+    parser.add_argument('--skip-high-load', action='store_true', help='Skip High Load DC scenario generation')
     args = parser.parse_args()
     
     total_parcels = args.count
@@ -698,6 +759,14 @@ async def main():
 
         print(f"\n✓ Demo parcels: {demo_created} created, {demo_skipped} already existed")
         print()
+
+        # Step 1b: High Load DC scenario (skip if --demo-only or --skip-high-load)
+        if not args.demo_only and not args.skip_high_load:
+            print("📦 Step 1b: High Load DC Scenario (Sorting Facility Agent Demo)")
+            print("-" * 80)
+            hl_count = await create_high_load_dc_scenario(db)
+            print(f"✓ High Load scenario: {hl_count:,} parcels at {HIGH_LOAD_DC}")
+            print()
 
         if args.demo_only:
             print("=" * 80)

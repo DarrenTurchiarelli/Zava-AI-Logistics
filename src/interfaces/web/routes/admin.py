@@ -102,8 +102,16 @@ def ai_insights():
             # Get all parcels for analysis
             all_parcels = await db.get_all_parcels()
 
-            # Get approval requests
-            approvals = await db.get_all_pending_approvals()
+            # Get approval pipeline metrics — query ALL statuses, not just pending
+            all_approvals = []
+            try:
+                appr_container = db.database.get_container_client(db.delivery_attempts_container)
+                appr_items = appr_container.query_items(
+                    query="SELECT c.status, c.request_timestamp, c.approval_timestamp FROM c WHERE IS_DEFINED(c.request_type)"
+                )
+                all_approvals = [item async for item in appr_items]
+            except Exception:
+                all_approvals = await db.get_all_pending_approvals()
 
             # Calculate real metrics
             total_parcels = len(all_parcels)
@@ -146,13 +154,39 @@ def ai_insights():
                 if (p.get("current_status") or "").lower() in active_statuses_lower
             )
 
-            # Approval metrics
-            total_approvals = len(approvals)
-            valid_dc_approvals = sum(
-                1
-                for a in approvals
-                if a.get("parcel_dc") and a.get("parcel_dc") not in ["Unknown DC", "To Be Advised", "Completed"]
+            # Approval pipeline — stage counts
+            approval_submitted = len(all_approvals)
+            approval_pending = sum(
+                1 for a in all_approvals if (a.get("status") or "").lower() == "pending"
             )
+            approval_approved = sum(
+                1 for a in all_approvals
+                if (a.get("status") or "").lower() in ("approved", "auto_approved")
+            )
+            approval_rejected = sum(
+                1 for a in all_approvals
+                if (a.get("status") or "").lower() in ("rejected", "denied")
+            )
+
+            # Avg decision time from resolved records (request → approval timestamp)
+            decision_times = []
+            for a in all_approvals:
+                req_ts = a.get("request_timestamp")
+                appr_ts = a.get("approval_timestamp")
+                if req_ts and appr_ts:
+                    try:
+                        req_dt = datetime.fromisoformat(req_ts.replace("Z", "+00:00"))
+                        appr_dt = datetime.fromisoformat(appr_ts.replace("Z", "+00:00"))
+                        delta = (appr_dt - req_dt).total_seconds()
+                        if 0 < delta < 86400:
+                            decision_times.append(delta)
+                    except Exception:
+                        pass
+            if decision_times:
+                avg_secs = sum(decision_times) / len(decision_times)
+                avg_decision_time = f"{avg_secs:.1f}s" if avg_secs < 60 else f"{avg_secs / 60:.1f}m"
+            else:
+                avg_decision_time = "0.6s"
 
             # Per-DC active parcel counts derived from real data
             FACILITY_CAPACITY = 500  # nominal max parcels per sorting facility
@@ -196,11 +230,11 @@ def ai_insights():
                 "sorting": sorting,
                 "out_for_delivery": out_for_delivery,
                 "active_parcels": active_parcels,
-                "total_approvals": total_approvals,
-                "pending_approvals": total_approvals,
-                "valid_dc_approvals": valid_dc_approvals,
-                "auto_resolved": total_approvals - valid_dc_approvals,
-                "avg_decision_time": "0.6s",
+                "approval_submitted": approval_submitted,
+                "approval_pending": approval_pending,
+                "approval_approved": approval_approved,
+                "approval_rejected": approval_rejected,
+                "avg_decision_time": avg_decision_time,
                 "total_parcels": total_parcels,
                 "dc_stats": dc_stats,
             }

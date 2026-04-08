@@ -110,40 +110,63 @@
         </div>
     </div>
 
-    <!-- AI Performance -->
+    <!-- AI Approval Pipeline -->
     <div class="row mb-4">
         <div class="col-12">
-            <a href="{{ url_for('approvals.list_approvals') }}" class="text-decoration-none">
-                <div class="card shadow-sm card-hover">
-                    <div class="card-header bg-primary text-white py-2">
-                        <h6 class="mb-0"><i class="bi bi-robot"></i> AI Agent Performance</h6>
-                    </div>
-                    <div class="card-body py-2">
-                        <div class="row text-center g-2">
-                            <div class="col-6 col-md-3">
-                                <i class="bi bi-lightning-charge text-warning" style="font-size: 1.5rem;"></i>
-                                <h5 class="mt-1 mb-0">{{ insights.total_approvals }}</h5>
-                                <p class="text-muted mb-0 small">Total Requests</p>
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white py-2 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="bi bi-robot"></i> AI Approval Agent Pipeline</h6>
+                    <a href="{{ url_for('approvals.list_approvals') }}" class="btn btn-sm btn-light text-primary">View All</a>
+                </div>
+                <div class="card-body py-3">
+                    <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap flex-md-nowrap">
+                        <!-- Stage 1: Submitted -->
+                        <div class="text-center flex-fill">
+                            <div class="border rounded p-2 bg-light">
+                                <i class="bi bi-inbox text-secondary" style="font-size: 1.4rem;"></i>
+                                <h4 class="mt-1 mb-0 text-secondary">{{ insights.approval_submitted }}</h4>
+                                <p class="text-muted mb-0 small">Submitted</p>
                             </div>
-                            <div class="col-6 col-md-3">
-                                <i class="bi bi-check-all text-success" style="font-size: 1.5rem;"></i>
-                                <h5 class="mt-1 mb-0">{{ insights.valid_dc_approvals }}</h5>
-                                <p class="text-muted mb-0 small">Ready for Processing</p>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <i class="bi bi-hourglass-split text-primary" style="font-size: 1.5rem;"></i>
-                                <h5 class="mt-1 mb-0">{{ insights.pending_approvals }}</h5>
+                        </div>
+                        <i class="bi bi-arrow-right text-muted d-none d-md-block flex-shrink-0"></i>
+                        <!-- Stage 2: Pending Review -->
+                        <div class="text-center flex-fill">
+                            <div class="border border-warning rounded p-2">
+                                <i class="bi bi-hourglass-split text-warning" style="font-size: 1.4rem;"></i>
+                                <h4 class="mt-1 mb-0 text-warning">{{ insights.approval_pending }}</h4>
                                 <p class="text-muted mb-0 small">Pending Review</p>
                             </div>
-                            <div class="col-6 col-md-3">
-                                <i class="bi bi-stopwatch text-primary" style="font-size: 1.5rem;"></i>
-                                <h5 class="mt-1 mb-0">{{ insights.avg_decision_time }}</h5>
+                        </div>
+                        <i class="bi bi-arrow-right text-muted d-none d-md-block flex-shrink-0"></i>
+                        <!-- Stage 3: Approved -->
+                        <div class="text-center flex-fill">
+                            <div class="border border-success rounded p-2">
+                                <i class="bi bi-check-circle text-success" style="font-size: 1.4rem;"></i>
+                                <h4 class="mt-1 mb-0 text-success">{{ insights.approval_approved }}</h4>
+                                <p class="text-muted mb-0 small">Approved</p>
+                            </div>
+                        </div>
+                        <span class="text-muted d-none d-md-block flex-shrink-0">/</span>
+                        <!-- Stage 4: Rejected -->
+                        <div class="text-center flex-fill">
+                            <div class="border border-danger rounded p-2">
+                                <i class="bi bi-x-circle text-danger" style="font-size: 1.4rem;"></i>
+                                <h4 class="mt-1 mb-0 text-danger">{{ insights.approval_rejected }}</h4>
+                                <p class="text-muted mb-0 small">Rejected</p>
+                            </div>
+                        </div>
+                        <span class="text-muted d-none d-md-block flex-shrink-0">·</span>
+                        <!-- Stat: Avg Decision Time -->
+                        <div class="text-center flex-fill">
+                            <div class="border border-primary rounded p-2">
+                                <i class="bi bi-stopwatch text-primary" style="font-size: 1.4rem;"></i>
+                                <h4 class="mt-1 mb-0 text-primary">{{ insights.avg_decision_time }}</h4>
                                 <p class="text-muted mb-0 small">Avg Decision Time</p>
                             </div>
                         </div>
                     </div>
                 </div>
-            </a>
+            </div>
         </div>
     </div>
 
