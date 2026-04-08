@@ -403,10 +403,10 @@ COMMON_RECIPIENTS = [
 
 # Sample sender names/companies
 SENDER_NAMES = [
-    "Amazon Australia", "eBay Seller", "Woolworths", "Coles Online",
-    "The Iconic", "MyDeal", "Kogan", "Catch.com.au", "Private Sender",
-    "JB Hi-Fi", "Harvey Norman", "Bunnings", "Chemist Warehouse",
-    "Myer", "David Jones", "Cotton On", "Country Road"
+    "Apex Online Retail", "BidMart Seller", "FreshGrocer Direct", "Pantry Plus Online",
+    "StyleHub AU", "BargainBay", "TechVault", "DealZone.com.au", "Private Sender",
+    "SoundStage Electronics", "HomePro Warehouse", "BuildRight Supplies", "WellnessOne Pharmacy",
+    "Prestige Department Store", "Luxe Living Co.", "ThreadsCo Apparel", "Heritage & Range"
 ]
 
 # Demo parcels for Voice & Text Examples (these must exist)
@@ -414,7 +414,7 @@ DEMO_PARCELS = [
     {
         'tracking_number': 'RG857954',
         'recipient_name': 'Dr. Emma Wilson',
-        'sender_name': 'Amazon Australia',
+        'sender_name': 'Apex Online Retail',
         'status': 'Out For Delivery',
         'address': '123 Medical Centre Drive, Sydney NSW 2000',
         'phone': '+61 2 9555 1234',
