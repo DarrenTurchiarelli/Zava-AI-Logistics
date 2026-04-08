@@ -351,20 +351,20 @@
                     <div class="row g-4 mb-4">
                         {% for dc in insights.dc_stats %}
                         <div class="col-md-4">
-                            <div class="card border-{{ dc.color }} h-100">
+                            <div class="card h-100" style="border-color: {% if dc.color == 'warning' %}#d97706{% elif dc.color == 'success' %}#198754{% else %}#0dcaf0{% endif %};">
                                 <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <h6 class="text-{{ dc.color }} mb-0">
+                                        <h6 class="mb-0 fw-bold" style="color: {% if dc.color == 'warning' %}#b45309{% elif dc.color == 'success' %}#198754{% else %}#0dcaf0{% endif %};">
                                             <i class="bi bi-building{% if dc.color == 'warning' %}-exclamation{% elif dc.color == 'success' %}-check{% endif %}"></i>
                                             {{ dc.name }}
                                         </h6>
-                                        <span class="badge bg-{{ dc.color }}{% if dc.color == 'warning' %} text-dark{% endif %}">{{ dc.status }}</span>
+                                        <span class="badge fw-semibold" style="background-color: {% if dc.color == 'warning' %}#f59e0b{% elif dc.color == 'success' %}#198754{% else %}#0dcaf0{% endif %}; color: {% if dc.color == 'warning' %}#1c1917{% else %}#fff{% endif %};">{{ dc.status }}</span>
                                     </div>
                                     <div class="mb-3">
                                         <small class="text-muted d-block">Active Parcels</small>
                                         <div class="progress" style="height: 25px;">
-                                            <div class="progress-bar bg-{{ dc.color }}" role="progressbar"
-                                                 style="width: {{ dc.pct }}%;"
+                                            <div class="progress-bar fw-bold" role="progressbar"
+                                                 style="width: {{ dc.pct }}%; background-color: {% if dc.color == 'warning' %}#f59e0b{% elif dc.color == 'success' %}#198754{% else %}#0dcaf0{% endif %}; color: {% if dc.color == 'warning' %}#1c1917{% else %}#fff{% endif %};"
                                                  aria-valuenow="{{ dc.pct }}" aria-valuemin="0" aria-valuemax="100">{{ dc.pct }}%</div>
                                         </div>
                                     </div>
