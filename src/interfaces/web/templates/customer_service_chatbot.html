@@ -785,6 +785,14 @@ async function sendMessage() {
             }
             addMessage(aiResponse);
 
+            // Persistent Azure AI Foundry provenance badge — visible on every response
+            const provHtml = `<div class="mt-1" style="font-size:0.7rem; color:#6c757d; font-style:normal;">
+                <i class="bi bi-robot" style="color:#0078d4;"></i>
+                <span style="color:#0078d4; font-weight:500;">Azure AI Foundry</span> &middot; GPT-4o
+                ${data.thread_id ? `&middot; <span title="Conversation thread" style="font-family:monospace; font-size:0.65rem; opacity:0.7;">${data.thread_id.slice(0, 18)}&hellip;</span>` : ''}
+            </div>`;
+            addMessage(provHtml);
+
             // Show tool-trace panel when agent called Cosmos DB tools
             if (data.tools_used && data.tools_used.length > 0) {
                 const toolLabels = {
