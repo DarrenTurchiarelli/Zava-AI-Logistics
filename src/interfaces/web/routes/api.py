@@ -53,7 +53,8 @@ def validate_address() -> tuple[Dict[str, Any], int]:
             ), 200
         else:
             return jsonify({
-                "valid": False, 
+                "valid": False,
+                "unavailable": result.get("unavailable", False),
                 "message": result.get("message", "Address could not be validated")
             }), 200
 
@@ -97,7 +98,7 @@ def autocomplete_address() -> tuple[Dict[str, Any], int]:
             "typeahead": True,
         }
 
-        response = requests.get(url, params=params, timeout=5)
+        response = requests.get(url, params=params, timeout=10)
 
         if response.status_code == 200:
             results = response.json()

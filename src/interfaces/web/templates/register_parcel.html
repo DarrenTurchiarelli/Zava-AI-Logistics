@@ -246,11 +246,13 @@ async function validateAddress(addressField, statusElementId) {
             if (data.formatted_address && data.formatted_address !== address) {
                 document.getElementById(addressField).value = data.formatted_address;
             }
+        } else if (data.unavailable) {
+            statusElement.innerHTML = '<span class="badge bg-secondary"><i class="bi bi-info-circle"></i> Validation unavailable — you can continue</span>';
         } else {
             statusElement.innerHTML = '<span class="badge bg-warning"><i class="bi bi-exclamation-triangle-fill"></i> Could not validate</span>';
             if (data.message) {
                 const errorDiv = document.createElement('div');
-                errorDiv.className = 'alert alert-danger alert-sm mt-2 mb-0';
+                errorDiv.className = 'alert alert-warning alert-sm mt-2 mb-0';
                 errorDiv.innerHTML = `<i class="bi bi-exclamation-triangle"></i> ${data.message}`;
                 statusElement.appendChild(errorDiv);
             }

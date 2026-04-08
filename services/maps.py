@@ -1042,6 +1042,8 @@ class BingMapsRouter:
                 "message": "Valid Australian address",
             }
 
+        except requests.exceptions.Timeout:
+            return {"valid": False, "unavailable": True, "message": "Address validation is temporarily unavailable — your registration can continue without it."}
         except Exception as e:
             print(f"❌ Error validating address '{address}': {e}")
             return {"valid": False, "message": f"Validation error: {str(e)}"}
