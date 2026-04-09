@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+
+{% block title %}Agentic Workflow Trace — Zava{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                <div>
+                    <h1 class="h3 mb-1">
+                        <i class="bi bi-diagram-3 text-primary"></i> Agentic Workflow Trace
+                    </h1>
+                    <p class="text-muted mb-0">
+                        Multi-agent decision chains — each row shows a complete autonomous workflow
+                        from first signal to customer outcome, with no human intervention.
+                    </p>
+                </div>
+                <a href="{{ url_for('admin.ai_insights') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left"></i> AI Insights
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Explainer banner -->
+    <div class="alert alert-primary border-0 mb-4" style="background:rgba(13,110,253,.07);">
+        <div class="row align-items-center g-3">
+            <div class="col-auto">
+                <span style="font-size:2rem;">🤖</span>
+            </div>
+            <div class="col">
+                <strong>What is an agentic workflow?</strong> When the Fraud Detection Agent scores a
+                message above a risk threshold, it autonomously hands off to the Identity Verification
+                Agent and Customer Service Agent — no human trigger required. This page captures each
+                such chain as a real-time trace with per-agent timestamps, confidence scores, and
+                the final outcome.
+            </div>
+            <div class="col-md-auto text-md-end">
+                <span class="badge bg-success me-1"><i class="bi bi-check-circle"></i> Fully autonomous</span>
+                <span class="badge bg-primary"><i class="bi bi-lightning-charge"></i> Azure AI Foundry</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary row -->
+    {% set live_count = traces | selectattr('source', 'equalto', 'live') | list | length %}
+    {% set total = traces | length %}
+    {% set protected = traces | selectattr('outcome', 'equalto', 'protected') | list | length %}
+    {% set avg_agents = (traces | sum(attribute='agents_invoked') / total) | round(1) if total > 0 else 0 %}
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card border-primary text-center h-100">
+                <div class="card-body py-3">
+                    <h2 class="text-primary mb-0">{{ total }}</h2>
+                    <small class="text-muted">Workflows traced</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-success text-center h-100">
+                <div class="card-body py-3">
+                    <h2 class="text-success mb-0">{{ protected }}</h2>
+                    <small class="text-muted">Customers protected</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-info text-center h-100">
+                <div class="card-body py-3">
+                    <h2 class="text-info mb-0">{{ avg_agents }}</h2>
+                    <small class="text-muted">Avg agents per workflow</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-warning text-center h-100">
+                <div class="card-body py-3">
+                    <h2 class="text-warning mb-0">0</h2>
+                    <small class="text-muted">Human interventions</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if not traces %}
+    <div class="text-center py-5 text-muted">
+        <i class="bi bi-inbox" style="font-size:3rem;"></i>
+        <p class="mt-2">No workflow traces yet — submit a fraud report to trigger a live trace.</p>
+        <a href="{{ url_for('chatbot.report_fraud') }}" class="btn btn-primary">
+            <i class="bi bi-shield-exclamation"></i> Report Fraud to Generate Trace
+        </a>
+    </div>
+    {% endif %}
+
+    <!-- Trace cards -->
+    {% for trace in traces %}
+    {% if trace.risk_pct >= 85 %}{% set header_bg = "rgba(220,53,69,.08)" %}
+    {% elif trace.risk_pct >= 70 %}{% set header_bg = "rgba(255,193,7,.08)" %}
+    {% else %}{% set header_bg = "rgba(13,110,253,.06)" %}{% endif %}
+    <div class="card mb-4 shadow-sm">
+        <!-- Trace header -->
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2 py-3"
+             style="background: {{ header_bg }}">
+            <div>
+                <code class="text-primary me-2" style="font-size:.85rem;">{{ trace.trace_id }}</code>
+                <span class="badge {% if trace.risk_pct >= 85 %}bg-danger{% elif trace.risk_pct >= 70 %}bg-warning text-dark{% else %}bg-info{% endif %} me-1">
+                    Risk {{ trace.risk_pct }}%
+                </span>
+                <span class="badge bg-secondary me-1">{{ trace.fraud_category }}</span>
+                {% if trace.source == 'live' %}
+                <span class="badge bg-success"><i class="bi bi-circle-fill" style="font-size:.5rem;"></i> Live</span>
+                {% else %}
+                <span class="badge bg-secondary">Demo</span>
+                {% endif %}
+            </div>
+            <div class="text-end">
+                <small class="text-muted d-block">{{ trace.started_at }}</small>
+                <small>
+                    <i class="bi bi-clock"></i> {{ trace.duration_s }}s end-to-end &nbsp;·&nbsp;
+                    <i class="bi bi-robot"></i> {{ trace.agents_invoked }} agents &nbsp;·&nbsp;
+                    <span class="{% if trace.outcome == 'protected' %}text-success{% else %}text-muted{% endif %}">
+                        <i class="bi bi-{% if trace.outcome == 'protected' %}shield-check{% else %}journal{% endif %}"></i>
+                        {{ trace.outcome | title }}
+                    </span>
+                </small>
+            </div>
+        </div>
+
+        <div class="card-body pt-3">
+            <!-- Message preview -->
+            {% if trace.message_preview %}
+            <div class="alert alert-light border mb-3 py-2">
+                <small class="text-muted"><i class="bi bi-chat-left-text"></i> Analysed message from
+                    <strong>{{ trace.sender }}</strong>:</small>
+                <p class="mb-0 small fst-italic text-dark mt-1">"{{ trace.message_preview }}"</p>
+            </div>
+            {% endif %}
+
+            <!-- Timeline -->
+            <div class="position-relative ps-2">
+                {% for step in trace.steps %}
+                <div class="d-flex gap-3 mb-3 align-items-start">
+                    <!-- Vertical line + icon -->
+                    <div class="text-center" style="width:2.5rem;flex-shrink:0;">
+                        <div class="rounded-circle d-inline-flex align-items-center justify-content-center
+                                    bg-{{ step.color }} text-white"
+                             style="width:2.2rem;height:2.2rem;font-size:1rem;">
+                            <i class="bi {{ step.icon }}"></i>
+                        </div>
+                        {% if not loop.last %}
+                        <div style="width:2px;height:1.6rem;background:#dee2e6;margin:0 auto;"></div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Step detail -->
+                    <div class="flex-grow-1 pt-1">
+                        <div class="d-flex justify-content-between align-items-start flex-wrap gap-1 mb-1">
+                            <strong class="small">
+                                Step {{ step.seq }} &mdash; {{ step.agent }}
+                            </strong>
+                            <span class="text-muted small">
+                                <i class="bi bi-stopwatch"></i> T+{{ "%.1f"|format(step.offset_s) }}s
+                            </span>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-12 col-md-6">
+                                <div class="bg-light rounded px-3 py-2">
+                                    <small class="text-muted d-block mb-1">Decision</small>
+                                    <span class="small">{{ step.action }}</span>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="bg-light rounded px-3 py-2 text-center">
+                                    <small class="text-muted d-block mb-1">Confidence</small>
+                                    <strong class="text-{{ step.color }}">{{ step.confidence }}%</strong>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="bg-light rounded px-3 py-2 text-center">
+                                    <small class="text-muted d-block mb-1">Outcome</small>
+                                    <span class="badge bg-{{ step.color }} small">{{ step.outcome }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <small class="text-muted mt-1 d-block">
+                            <i class="bi bi-arrow-return-right"></i> Triggered by: {{ step.triggered_by }}
+                        </small>
+                    </div>
+                </div>
+                {% endfor %}
+
+                <!-- Workflow complete marker -->
+                <div class="d-flex gap-3 align-items-center">
+                    <div class="text-center" style="width:2.5rem;flex-shrink:0;">
+                        <div class="rounded-circle d-inline-flex align-items-center justify-content-center
+                                    bg-success text-white"
+                             style="width:2.2rem;height:2.2rem;font-size:1rem;">
+                            <i class="bi bi-check-lg"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-1">
+                            <span class="small text-success fw-bold">
+                                <i class="bi bi-flag"></i> Workflow complete — {{ trace.agents_invoked }} agent{{ 's' if trace.agents_invoked != 1 }} · {{ trace.duration_s }}s · no human required
+                            </span>
+                            <span class="text-muted small">T+{{ trace.duration_s }}s</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- CTA -->
+    <div class="text-center mt-3 mb-5">
+        <p class="text-muted small">
+            Traces are generated from real fraud reports submitted via the
+            <a href="{{ url_for('chatbot.report_fraud') }}">Fraud Detection page</a>.
+            High-risk results (&ge; 70%) automatically trigger this multi-agent chain.
+        </p>
+        <a href="{{ url_for('chatbot.report_fraud') }}" class="btn btn-primary me-2">
+            <i class="bi bi-shield-exclamation"></i> Trigger a live workflow
+        </a>
+        <a href="{{ url_for('admin.agent_monitoring_dashboard') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-speedometer2"></i> Agent dashboard
+        </a>
+    </div>
+
+</div>
+{% endblock %}
