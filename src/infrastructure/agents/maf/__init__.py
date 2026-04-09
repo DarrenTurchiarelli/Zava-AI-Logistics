@@ -8,7 +8,7 @@ This package wraps all MAF primitives:
   - SequentialBuilder / HandoffBuilder workflows (maf/workflows.py)
 """
 
-from .client import call_maf_agent, get_maf_client
+from .client import call_maf_agent, make_chat_client
 from .middleware import LoggingMiddleware
 from .tools import (
     track_parcel,
@@ -24,7 +24,7 @@ from .workflows import run_fraud_workflow
 
 __all__ = [
     "call_maf_agent",
-    "get_maf_client",
+    "make_chat_client",
     "LoggingMiddleware",
     "track_parcel",
     "search_parcels_by_recipient",

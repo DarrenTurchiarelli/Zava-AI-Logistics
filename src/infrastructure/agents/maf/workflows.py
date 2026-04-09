@@ -1,27 +1,9 @@
 """
-MAF multi-agent workflows using SequentialBuilder and HandoffBuilder.
+MAF v1.0 multi-agent workflows using SequentialBuilder.
 
-Two workflows are implemented here:
-
-1. FraudDetectionWorkflow  (SequentialBuilder, replaces FraudToCustomerServiceWorkflow)
-   fraud_agent ──► customer_service_agent
-   With a conditional sub-step: if risk ≥ 0.85, identity_agent is injected
-   between fraud and customer_service.
-
-2. DispatcherWorkflow  (SequentialBuilder)
-   dispatcher_agent  ──► optimization_agent
-   Used for AI Auto-Assign manifest generation.
-
-Usage::
-
-    from src.infrastructure.agents.maf.workflows import run_fraud_workflow
-
-    result = await run_fraud_workflow(
-        message_content="Suspicious SMS asking for re-delivery fee",
-        customer_name="Jane Smith",
-        customer_email="jane@example.com",
-        customer_phone="+61411123456",
-    )
+Two workflows:
+1. FraudDetectionWorkflow -- fraud_agent -> [identity_agent] -> customer_service_agent
+2. DispatcherWorkflow     -- dispatcher_agent -> optimization_agent (SequentialBuilder)
 """
 
 from __future__ import annotations
@@ -35,71 +17,17 @@ from dotenv import load_dotenv
 
 load_dotenv(override=False)
 
-from agent_framework.azure import AzureOpenAIAssistantsClient
+from agent_framework import Agent
 from agent_framework.orchestrations import SequentialBuilder
-from azure.identity.aio import DefaultAzureCredential, ManagedIdentityCredential, get_bearer_token_provider
-from openai.lib.azure import AsyncAzureOpenAI
 
 from src.infrastructure.agents.core.prompt_loader import get_agent_prompt
+from src.infrastructure.agents.maf.client import make_agent, make_chat_client
 from src.infrastructure.agents.maf.tools import (
     search_parcels_by_recipient,
     track_parcel,
 )
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 _OPENAI_ENDPOINT: str = os.getenv("AZURE_OPENAI_ENDPOINT", "")
-_MODEL: str = (
-    os.getenv("FOUNDRY_MODEL_DEPLOYMENT_NAME")
-    or os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME")
-    or "gpt-4o"
-)
-
-_AGENT_IDS = {
-    "fraud_risk": os.getenv("FRAUD_RISK_AGENT_ID", ""),
-    "identity": os.getenv("IDENTITY_AGENT_ID", ""),
-    "customer_service": os.getenv("CUSTOMER_SERVICE_AGENT_ID", ""),
-    "dispatcher": os.getenv("DISPATCHER_AGENT_ID", ""),
-    "optimization": os.getenv("OPTIMIZATION_AGENT_ID", ""),
-}
-
-
-def _credential():
-    if os.getenv("USE_MANAGED_IDENTITY", "false").lower() == "true":
-        return ManagedIdentityCredential()
-    return DefaultAzureCredential(
-        exclude_managed_identity_credential=True,
-        exclude_visual_studio_code_credential=True,
-        additionally_allowed_tenants=["*"],
-    )
-
-
-def _assistants_client(agent_key: str, middleware=None) -> AzureOpenAIAssistantsClient:
-    """Build an AzureOpenAIAssistantsClient for the given agent key.
-
-    We construct AsyncAzureOpenAI ourselves with an Azure AD token provider so
-    that AzureOpenAIAssistantsClient skips its own env-var api_key resolution.
-    """
-    token_provider = get_bearer_token_provider(
-        _credential(), "https://cognitiveservices.azure.com/.default"
-    )
-    async_openai = AsyncAzureOpenAI(
-        azure_endpoint=_OPENAI_ENDPOINT,
-        azure_ad_token_provider=token_provider,
-        api_version="2024-05-01-preview",
-    )
-    assistant_id = _AGENT_IDS.get(agent_key, "")
-    kwargs: dict = {
-        "deployment_name": _MODEL,
-        "async_client": async_openai,
-    }
-    if assistant_id:
-        kwargs["assistant_id"] = assistant_id
-    if middleware:
-        kwargs["middleware"] = middleware
-    return AzureOpenAIAssistantsClient(**kwargs)
 
 
 def _load_prompt(agent_key: str, fallback: str = "") -> str:
@@ -110,14 +38,12 @@ def _load_prompt(agent_key: str, fallback: str = "") -> str:
 
 
 def _parse_risk_score(text: str) -> float:
-    """Extract a 0-1 risk score from agent output like 'RISK_SCORE: 0.87'."""
     match = re.search(r"RISK_SCORE:\s*([0-9.]+)", text, re.IGNORECASE)
     if match:
         try:
             return min(1.0, max(0.0, float(match.group(1))))
         except ValueError:
             pass
-    # Fallback: look for percentage
     match = re.search(r"\b([0-9]{1,3})\s*%", text)
     if match:
         return float(match.group(1)) / 100.0
@@ -125,30 +51,35 @@ def _parse_risk_score(text: str) -> float:
 
 
 # ---------------------------------------------------------------------------
-# Fraud Detection Workflow
+# Fallback instructions
 # ---------------------------------------------------------------------------
 
 _FRAUD_INSTRUCTIONS_FALLBACK = (
     "You are Zava's Fraud Detection Agent. Analyse the provided message for fraud "
-    "indicators such as phishing, impersonation, fee-fraud, or social engineering. "
-    "Assign a risk score between 0.00 and 1.00 and include it in your response on a "
-    "dedicated line formatted exactly as: RISK_SCORE: <value>. "
-    "Categorise threats and recommend one of: NO_ACTION, WARN_CUSTOMER, "
-    "VERIFY_IDENTITY, HOLD_PARCEL."
+    "indicators. Assign a risk score 0.00-1.00 on a dedicated line: RISK_SCORE: <value>. "
+    "Recommend: NO_ACTION / WARN_CUSTOMER / VERIFY_IDENTITY / HOLD_PARCEL."
 )
-
 _IDENTITY_INSTRUCTIONS_FALLBACK = (
-    "You are Zava's Identity Verification Agent. A high-risk fraud event has been "
-    "detected. Verify the customer's details against the information provided. "
-    "State clearly whether identity can be confirmed or not, and what follow-up is needed."
+    "You are Zava's Identity Verification Agent. A high-risk fraud event was detected. "
+    "Verify the customer's details and state whether identity is confirmed."
 )
-
 _CS_FRAUD_INSTRUCTIONS_FALLBACK = (
     "You are Zava's Customer Service Agent responding to a fraud alert. "
-    "Draft a clear, empathetic message to the customer warning them about the "
-    "suspicious activity. Include next steps and Zava's support contact details."
+    "Draft a clear, empathetic warning to the customer with next steps."
+)
+_DISPATCHER_FALLBACK = (
+    "You are Zava's Dispatcher Agent. Assign pending parcels to available drivers using "
+    "geographic clustering, workload balancing, and priority. Return a manifest list."
+)
+_OPTIMIZATION_FALLBACK = (
+    "You are Zava's Optimization Agent. Review the Dispatcher's manifest and suggest "
+    "route or load-balance improvements to reduce cost and delivery time."
 )
 
+
+# ---------------------------------------------------------------------------
+# Fraud Detection Workflow
+# ---------------------------------------------------------------------------
 
 async def run_fraud_workflow(
     message_content: str,
@@ -159,136 +90,77 @@ async def run_fraud_workflow(
     activity_type: str = "message",
 ) -> Dict[str, Any]:
     """
-    MAF-based replacement for FraudToCustomerServiceWorkflow.execute().
-
-    Step 1 — Fraud Detection Agent  analyses the suspicious content.
-    Step 2 — (conditional, risk ≥ 0.85) Identity Verification Agent verifies customer.
-    Step 3 — Customer Service Agent  composes the customer-facing warning.
-
-    Returns a dict with keys:
-        fraud_analysis, risk_score, risk_level,
-        identity_verification (optional), customer_notification,
-        recommended_action, workflow_steps: list[dict]
+    Step 1 - Fraud Detection Agent analyses suspicious content.
+    Step 2 - (conditional, risk >= 0.85) Identity Verification Agent.
+    Step 3 - Customer Service Agent composes customer-facing warning (risk >= 0.70).
     """
     if not _OPENAI_ENDPOINT:
-        raise RuntimeError(
-            "AZURE_OPENAI_ENDPOINT is not set."
-        )
+        raise RuntimeError("AZURE_OPENAI_ENDPOINT is not set.")
 
-    # ------------------------------------------------------------------
-    # Build initial fraud-analysis prompt
-    # ------------------------------------------------------------------
-    fraud_prompt = f"""
-Analyse the following suspicious {activity_type} for fraud indicators.
-
-Content: {message_content}
-Sender email: {sender_email or 'unknown'}
-Customer name: {customer_name or 'unknown'}
-Customer email: {customer_email or 'not provided'}
-Customer phone: {customer_phone or 'not provided'}
-
-Provide a structured analysis with:
-1. Threat category (phishing / impersonation / fee_fraud / social_engineering / none)
-2. Specific indicators found
-3. RISK_SCORE: <0.00–1.00>
-4. Recommended action (NO_ACTION / WARN_CUSTOMER / VERIFY_IDENTITY / HOLD_PARCEL)
-5. Justification
-""".strip()
+    fraud_prompt = (
+        f"Analyse the following suspicious {activity_type} for fraud indicators.\n\n"
+        f"Content: {message_content}\n"
+        f"Sender email: {sender_email or 'unknown'}\n"
+        f"Customer name: {customer_name or 'unknown'}\n"
+        f"Customer email: {customer_email or 'not provided'}\n"
+        f"Customer phone: {customer_phone or 'not provided'}\n\n"
+        "Provide: threat category, indicators, RISK_SCORE: <0.00-1.00>, "
+        "recommended action, justification."
+    )
 
     workflow_steps: list[Dict[str, Any]] = []
+    chat_client = make_chat_client()
 
-    # ------------------------------------------------------------------
     # Step 1: Fraud Detection
-    # ------------------------------------------------------------------
     fraud_instructions = _load_prompt("fraud-detection", _FRAUD_INSTRUCTIONS_FALLBACK)
-    fraud_response_text = ""
-
+    fraud_agent = Agent(
+        client=chat_client,
+        name="zava-fraud-detection",
+        instructions=fraud_instructions or None,
+    )
     try:
-        async with _assistants_client("fraud_risk").as_agent(
-            name="zava-fraud-detection",
-            instructions=fraud_instructions,
-        ) as fraud_agent:
-            fraud_result = await fraud_agent.run(fraud_prompt)
-            fraud_response_text = str(fraud_result)
-
+        fraud_result = await fraud_agent.run(fraud_prompt)
+        fraud_response_text = str(fraud_result)
         risk_score = _parse_risk_score(fraud_response_text)
-        workflow_steps.append(
-            {
-                "step": 1,
-                "agent": "Fraud Detection",
-                "input_length": len(fraud_prompt),
-                "risk_score": risk_score,
-                "success": True,
-            }
-        )
+        workflow_steps.append({"step": 1, "agent": "Fraud Detection", "risk_score": risk_score, "success": True})
     except Exception as exc:
-        return {
-            "success": False,
-            "error": f"Fraud Detection Agent failed: {exc}",
-            "workflow_steps": workflow_steps,
-        }
-
-    risk_score = _parse_risk_score(fraud_response_text)
+        return {"success": False, "error": f"Fraud Detection Agent failed: {exc}", "workflow_steps": workflow_steps}
 
     # Determine risk level
     if risk_score >= 0.90:
-        risk_level = "critical"
-        recommended_action = "HOLD_PARCEL"
+        risk_level, recommended_action = "critical", "HOLD_PARCEL"
     elif risk_score >= 0.85:
-        risk_level = "very_high"
-        recommended_action = "VERIFY_IDENTITY"
+        risk_level, recommended_action = "very_high", "VERIFY_IDENTITY"
     elif risk_score >= 0.70:
-        risk_level = "high"
-        recommended_action = "WARN_CUSTOMER"
+        risk_level, recommended_action = "high", "WARN_CUSTOMER"
     elif risk_score >= 0.40:
-        risk_level = "medium"
-        recommended_action = "WARN_CUSTOMER"
+        risk_level, recommended_action = "medium", "WARN_CUSTOMER"
     else:
-        risk_level = "low"
-        recommended_action = "NO_ACTION"
+        risk_level, recommended_action = "low", "NO_ACTION"
 
-    # ------------------------------------------------------------------
-    # Step 2 (conditional): Identity Verification — risk ≥ 0.85
-    # ------------------------------------------------------------------
+    # Step 2 (conditional): Identity Verification
     identity_response_text: Optional[str] = None
-
     if risk_score >= 0.85:
         identity_prompt = (
             f"Verify customer: {customer_name or 'unknown'}, "
             f"email: {customer_email or 'not provided'}, "
             f"phone: {customer_phone or 'not provided'}. "
-            f"Fraud risk: {risk_score:.0%}. "
-            f"Fraud analysis summary:\n{fraud_response_text[:500]}"
+            f"Fraud risk: {risk_score:.0%}.\nFraud summary:\n{fraud_response_text[:500]}"
         )
-        identity_instructions = _load_prompt(
-            "identity", _IDENTITY_INSTRUCTIONS_FALLBACK
+        id_agent = Agent(
+            client=make_chat_client(),  # fresh client per agent
+            name="zava-identity",
+            instructions=_load_prompt("identity", _IDENTITY_INSTRUCTIONS_FALLBACK) or None,
         )
         try:
-            async with _assistants_client("identity").as_agent(
-                name="zava-identity",
-                instructions=identity_instructions,
-            ) as id_agent:
-                id_result = await id_agent.run(identity_prompt)
-                identity_response_text = str(id_result)
-
-            workflow_steps.append(
-                {
-                    "step": 2,
-                    "agent": "Identity Verification",
-                    "triggered_by": f"risk_score={risk_score:.0%}",
-                    "success": True,
-                }
-            )
+            id_result = await id_agent.run(identity_prompt)
+            identity_response_text = str(id_result)
+            workflow_steps.append({"step": 2, "agent": "Identity Verification", "success": True})
         except Exception as exc:
-            workflow_steps.append(
-                {"step": 2, "agent": "Identity Verification", "success": False, "error": str(exc)}
-            )
+            workflow_steps.append({"step": 2, "agent": "Identity Verification", "success": False, "error": str(exc)})
 
-    # ------------------------------------------------------------------
-    # Step 3: Customer Service notification (if risk ≥ 0.70)
-    # ------------------------------------------------------------------
+    # Step 3: Customer Service notification
     cs_response_text: Optional[str] = None
-
     if risk_score >= 0.70:
         parts = [
             f"Send a fraud warning to customer: {customer_name or 'the customer'}.",
@@ -296,36 +168,19 @@ Provide a structured analysis with:
             f"Fraud analysis:\n{fraud_response_text[:600]}",
         ]
         if identity_response_text:
-            parts.append(f"\nIdentity check result:\n{identity_response_text[:400]}")
-        cs_prompt = "\n".join(parts)
-
-        cs_instructions = _load_prompt("customer-service", _CS_FRAUD_INSTRUCTIONS_FALLBACK)
+            parts.append(f"\nIdentity check:\n{identity_response_text[:400]}")
+        cs_agent = Agent(
+            client=make_chat_client(),  # fresh client per agent
+            name="zava-customer-service",
+            instructions=_load_prompt("customer-service", _CS_FRAUD_INSTRUCTIONS_FALLBACK) or None,
+            tools=[track_parcel, search_parcels_by_recipient],
+        )
         try:
-            async with _assistants_client("customer_service").as_agent(
-                name="zava-customer-service",
-                instructions=cs_instructions,
-                tools=[track_parcel, search_parcels_by_recipient],
-            ) as cs_agent:
-                cs_result = await cs_agent.run(cs_prompt)
-                cs_response_text = str(cs_result)
-
-            workflow_steps.append(
-                {
-                    "step": len(workflow_steps) + 1,
-                    "agent": "Customer Service",
-                    "triggered_by": f"risk_score={risk_score:.0%}",
-                    "success": True,
-                }
-            )
+            cs_result = await cs_agent.run("\n".join(parts))
+            cs_response_text = str(cs_result)
+            workflow_steps.append({"step": len(workflow_steps) + 1, "agent": "Customer Service", "success": True})
         except Exception as exc:
-            workflow_steps.append(
-                {
-                    "step": len(workflow_steps) + 1,
-                    "agent": "Customer Service",
-                    "success": False,
-                    "error": str(exc),
-                }
-            )
+            workflow_steps.append({"step": len(workflow_steps) + 1, "agent": "Customer Service", "success": False, "error": str(exc)})
 
     return {
         "success": True,
@@ -340,81 +195,57 @@ Provide a structured analysis with:
 
 
 # ---------------------------------------------------------------------------
-# Dispatcher Workflow  (SequentialBuilder demo)
+# Dispatcher Workflow (SequentialBuilder)
 # ---------------------------------------------------------------------------
-
-_DISPATCHER_FALLBACK = (
-    "You are Zava's Dispatcher Agent. Assign the provided pending parcels to available "
-    "drivers using geographic clustering, workload balancing, and priority weighting. "
-    "Return a structured manifest assignment list."
-)
-
-_OPTIMIZATION_FALLBACK = (
-    "You are Zava's Optimization Agent. Review the manifest assignment produced by the "
-    "Dispatcher Agent and suggest route or load-balance improvements to reduce fuel cost "
-    "and delivery time."
-)
-
 
 async def run_dispatcher_workflow(
     state: str = "",
     manifest_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Two-stage SequentialBuilder workflow:
-      dispatcher_agent → optimization_agent
-
-    Returns dict with dispatcher_output, optimization_output.
+    Two-stage SequentialBuilder: dispatcher_agent -> optimization_agent.
+    Returns dict with dispatcher_output and optimization_output.
     """
     if not _OPENAI_ENDPOINT:
-        raise RuntimeError(
-            "AZURE_OPENAI_ENDPOINT is not set."
-        )
+        raise RuntimeError("AZURE_OPENAI_ENDPOINT is not set.")
 
     context_str = (
         f"\n\nContext:\n{json.dumps(manifest_context, indent=2, default=str)}"
-        if manifest_context
-        else ""
+        if manifest_context else ""
     )
-    initial_message = (
-        f"Assign pending parcels to available drivers"
-        f"{' in ' + state if state else ''}.{context_str}"
-    )
+    initial_message = f"Assign pending parcels to available drivers{' in ' + state if state else ''}.{context_str}"
 
-    dispatcher_instructions = _load_prompt("dispatcher", _DISPATCHER_FALLBACK)
-    optimization_instructions = _load_prompt("optimization", _OPTIMIZATION_FALLBACK)
+    # Each agent needs its own client instance (different names/instructions)
+    dispatcher_agent = Agent(
+        client=make_chat_client(),
+        name="zava-dispatcher",
+        instructions=_load_prompt("dispatcher", _DISPATCHER_FALLBACK) or None,
+    )
+    optimization_agent = Agent(
+        client=make_chat_client(),
+        name="zava-optimization",
+        instructions=_load_prompt("optimization", _OPTIMIZATION_FALLBACK) or None,
+    )
 
     dispatcher_text = ""
     optimization_text = ""
 
     try:
-        async with _assistants_client("dispatcher").as_agent(
-            name="zava-dispatcher",
-            instructions=dispatcher_instructions,
-        ) as dispatcher_agent:
-            async with _assistants_client("optimization").as_agent(
-                name="zava-optimization",
-                instructions=optimization_instructions,
-            ) as optimization_agent:
-                workflow = SequentialBuilder(
-                    participants=[dispatcher_agent, optimization_agent]
-                ).build()
+        workflow = SequentialBuilder(
+            participants=[dispatcher_agent, optimization_agent]
+        ).build()
 
-                outputs = []
-                async for event in workflow.run(initial_message, stream=True):
-                    if hasattr(event, "type") and event.type == "output":
-                        outputs.append(event.data)
+        outputs = []
+        async for event in workflow.run(initial_message, stream=True):
+            if hasattr(event, "type") and event.type == "output":
+                outputs.append(event.data)
 
-                if len(outputs) >= 1:
-                    dispatcher_text = str(outputs[0])
-                if len(outputs) >= 2:
-                    optimization_text = str(outputs[1])
+        if len(outputs) >= 1:
+            dispatcher_text = str(outputs[0])
+        if len(outputs) >= 2:
+            optimization_text = str(outputs[1])
 
-        return {
-            "success": True,
-            "dispatcher_output": dispatcher_text,
-            "optimization_output": optimization_text,
-        }
+        return {"success": True, "dispatcher_output": dispatcher_text, "optimization_output": optimization_text}
 
     except Exception as exc:
         return {
