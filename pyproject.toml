@@ -49,8 +49,14 @@ dependencies = [
     # Azure Cosmos DB
     "azure-cosmos>=4.5.0",
     
-    # Microsoft Agent Framework
-    "semantic-kernel>=0.9.0",
+    # Microsoft Agent Framework v1.0
+    "agent-framework-azure-ai==1.0.0rc3",
+    "agent-framework-core==1.0.0rc3",
+    "agent-framework-orchestrations",
+    "azure-ai-agentserver-agentframework==1.0.0b16",
+    "azure-ai-agentserver-core==1.0.0b16",
+    "debugpy>=1.8.0",
+    "agent-dev-cli",
     
     # Configuration and Validation
     "python-dotenv>=1.0.0",

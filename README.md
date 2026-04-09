@@ -36,6 +36,31 @@ Agent system prompts: `src/infrastructure/agents/skills/` — edit the `system-p
 
 ---
 
+## Azure Deployment
+
+```powershell
+# First deployment — creates all Azure resources
+az login
+az account set --subscription "<your-subscription>"
+.\deploy_to_azure.ps1
+
+# Code-only redeploy (skips infrastructure)
+.\deploy_to_azure.ps1 -CodeOnly
+```
+
+The deployment script automatically provisions: Cosmos DB, AI Hub & Project, Azure OpenAI (GPT-4o), Azure Maps, Speech, Vision, App Service, all RBAC assignments, creates all 8 agents, registers Cosmos DB tools with the Customer Service agent, initialises default users, and generates demo data.
+
+**Default accounts after deployment:**
+
+| Username | Password | Role |
+|----------|----------|------|
+| admin | admin123 | Admin |
+| depot_mgr | depot123 | Depot Manager |
+| driver001–003 | driver123 | Driver |
+| support | support123 | Customer Service |
+
+---
+
 ## Quick Start (Local)
 
 ```powershell
@@ -56,8 +81,6 @@ python utils/generators/generate_fresh_test_data.py
 # Start the app
 $env:FLASK_ENV='development'; py app.py
 ```
-
-Open [http://127.0.0.1:5000](http://127.0.0.1:5000) — login: `admin` / `admin123`
 
 ### Required environment variables
 
@@ -91,31 +114,6 @@ SORTING_FACILITY_AGENT_ID=asst_XXX
 DELIVERY_COORDINATION_AGENT_ID=asst_XXX
 OPTIMIZATION_AGENT_ID=asst_XXX
 ```
-
----
-
-## Azure Deployment
-
-```powershell
-# First deployment — creates all Azure resources
-az login
-az account set --subscription "<your-subscription>"
-.\deploy_to_azure.ps1
-
-# Code-only redeploy (skips infrastructure)
-.\deploy_to_azure.ps1 -CodeOnly
-```
-
-The deployment script automatically provisions: Cosmos DB, AI Hub & Project, Azure OpenAI (GPT-4o), Azure Maps, Speech, Vision, App Service, all RBAC assignments, creates all 8 agents, registers Cosmos DB tools with the Customer Service agent, initialises default users, and generates demo data.
-
-**Default accounts after deployment:**
-
-| Username | Password | Role |
-|----------|----------|------|
-| admin | admin123 | Admin |
-| depot_mgr | depot123 | Depot Manager |
-| driver001–003 | driver123 | Driver |
-| support | support123 | Customer Service |
 
 ---
 
