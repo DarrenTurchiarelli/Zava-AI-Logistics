@@ -27,6 +27,13 @@ import argparse
 import asyncio
 import os
 import sys
+from pathlib import Path
+
+# Ensure the workspace root is on sys.path so `src.*` imports resolve whether
+# this script is run directly (python maf_agent_server.py) or via agentdev.
+_ROOT = Path(__file__).resolve().parents[3]  # …/Zava-AI-Logistics
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 
 # NOTE: override=True so env vars in deployed environment take precedence
 # over .env defaults.  This is intentional for server / container mode.
