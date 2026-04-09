@@ -2,8 +2,6 @@
 
 Parcel tracking and logistics management platform powered by **8 Azure AI Foundry agents** with end-to-end intelligent automation. Built with Python/Flask, Azure Cosmos DB, Azure Maps, Azure Speech Services, and the Microsoft Agent Framework.
 
-**Live demo:** [zava-dev-web-xhjuqo.azurewebsites.net](https://zava-dev-web-xhjuqo.azurewebsites.net) &nbsp;|&nbsp; Login: `admin` / `admin123`
-
 ---
 
 ## Features
