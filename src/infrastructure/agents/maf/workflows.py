@@ -35,7 +35,7 @@ from dotenv import load_dotenv
 
 load_dotenv(override=False)
 
-from agent_framework.azure import AzureAIClient
+from agent_framework.azure import AzureOpenAIAssistantsClient
 from agent_framework.orchestrations import SequentialBuilder
 from azure.identity.aio import DefaultAzureCredential, ManagedIdentityCredential
 
@@ -49,16 +49,20 @@ from src.infrastructure.agents.maf.tools import (
 # Helpers
 # ---------------------------------------------------------------------------
 
-_FOUNDRY_ENDPOINT: str = (
-    os.getenv("FOUNDRY_PROJECT_ENDPOINT")
-    or os.getenv("AZURE_AI_PROJECT_ENDPOINT")
-    or ""
-)
+_OPENAI_ENDPOINT: str = os.getenv("AZURE_OPENAI_ENDPOINT", "")
 _MODEL: str = (
     os.getenv("FOUNDRY_MODEL_DEPLOYMENT_NAME")
     or os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME")
     or "gpt-4o"
 )
+
+_AGENT_IDS = {
+    "fraud_risk": os.getenv("FRAUD_RISK_AGENT_ID", ""),
+    "identity": os.getenv("IDENTITY_AGENT_ID", ""),
+    "customer_service": os.getenv("CUSTOMER_SERVICE_AGENT_ID", ""),
+    "dispatcher": os.getenv("DISPATCHER_AGENT_ID", ""),
+    "optimization": os.getenv("OPTIMIZATION_AGENT_ID", ""),
+}
 
 
 def _credential():
@@ -71,12 +75,20 @@ def _credential():
     )
 
 
-def _client() -> AzureAIClient:
-    return AzureAIClient(
-        project_endpoint=_FOUNDRY_ENDPOINT,
-        model_deployment_name=_MODEL,
-        credential=_credential(),
-    )
+def _assistants_client(agent_key: str, middleware=None) -> AzureOpenAIAssistantsClient:
+    """Build an AzureOpenAIAssistantsClient for the given agent key."""
+    assistant_id = _AGENT_IDS.get(agent_key, "")
+    kwargs = {
+        "endpoint": _OPENAI_ENDPOINT,
+        "deployment_name": _MODEL,
+        "credential": _credential(),
+        "api_version": "2024-05-01-preview",
+    }
+    if assistant_id:
+        kwargs["assistant_id"] = assistant_id
+    if middleware:
+        kwargs["middleware"] = middleware
+    return AzureOpenAIAssistantsClient(**kwargs)
 
 
 def _load_prompt(agent_key: str, fallback: str = "") -> str:
@@ -147,9 +159,9 @@ async def run_fraud_workflow(
         identity_verification (optional), customer_notification,
         recommended_action, workflow_steps: list[dict]
     """
-    if not _FOUNDRY_ENDPOINT:
+    if not _OPENAI_ENDPOINT:
         raise RuntimeError(
-            "FOUNDRY_PROJECT_ENDPOINT (or AZURE_AI_PROJECT_ENDPOINT) is not set."
+            "AZURE_OPENAI_ENDPOINT is not set."
         )
 
     # ------------------------------------------------------------------
@@ -181,7 +193,7 @@ Provide a structured analysis with:
     fraud_response_text = ""
 
     try:
-        async with _client().as_agent(
+        async with _assistants_client("fraud_risk").as_agent(
             name="zava-fraud-detection",
             instructions=fraud_instructions,
         ) as fraud_agent:
@@ -241,7 +253,7 @@ Provide a structured analysis with:
             "identity", _IDENTITY_INSTRUCTIONS_FALLBACK
         )
         try:
-            async with _client().as_agent(
+            async with _assistants_client("identity").as_agent(
                 name="zava-identity",
                 instructions=identity_instructions,
             ) as id_agent:
@@ -278,7 +290,7 @@ Provide a structured analysis with:
 
         cs_instructions = _load_prompt("customer-service", _CS_FRAUD_INSTRUCTIONS_FALLBACK)
         try:
-            async with _client().as_agent(
+            async with _assistants_client("customer_service").as_agent(
                 name="zava-customer-service",
                 instructions=cs_instructions,
                 tools=[track_parcel, search_parcels_by_recipient],
@@ -343,9 +355,9 @@ async def run_dispatcher_workflow(
 
     Returns dict with dispatcher_output, optimization_output.
     """
-    if not _FOUNDRY_ENDPOINT:
+    if not _OPENAI_ENDPOINT:
         raise RuntimeError(
-            "FOUNDRY_PROJECT_ENDPOINT (or AZURE_AI_PROJECT_ENDPOINT) is not set."
+            "AZURE_OPENAI_ENDPOINT is not set."
         )
 
     context_str = (
@@ -365,11 +377,11 @@ async def run_dispatcher_workflow(
     optimization_text = ""
 
     try:
-        async with _client().as_agent(
+        async with _assistants_client("dispatcher").as_agent(
             name="zava-dispatcher",
             instructions=dispatcher_instructions,
         ) as dispatcher_agent:
-            async with _client().as_agent(
+            async with _assistants_client("optimization").as_agent(
                 name="zava-optimization",
                 instructions=optimization_instructions,
             ) as optimization_agent:

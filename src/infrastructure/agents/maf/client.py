@@ -1,14 +1,11 @@
 """
-MAF AzureAIClient-based agent caller.
+MAF AzureOpenAIAssistantsClient-based agent caller.
 
-Replaces the raw-OpenAI Assistants API polling loop in base.py with the
-MAF SDK primitives:
-  - AzureAIClient  (connects to Azure AI Foundry project)
-  - as_agent()     (creates / reuses a named persistent agent)
-  - agent.run()    (single-turn invocation with automatic tool dispatch)
-
-Each agent is lazily constructed the first time it is called, then cached
-for the process lifetime (persistent sessions).
+Uses the MAF SDK's AzureOpenAIAssistantsClient which wraps the Azure OpenAI
+Assistants API — the same API the existing asst_XXX agents were created with.
+This gives us MAF's @tool dispatch, AgentMiddleware, and WorkflowBuilder on
+top of the existing persistent Foundry agents, without requiring the newer
+Azure AI Projects Agents API endpoint.
 
 Feature flag: set USE_MAF=true in .env to activate this path.  While
 USE_MAF is absent or false the legacy call_azure_agent() in base.py is
@@ -17,11 +14,9 @@ used unchanged.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import os
-from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 
@@ -30,7 +25,7 @@ load_dotenv(override=False)
 # ---------------------------------------------------------------------------
 # MAF SDK imports
 # ---------------------------------------------------------------------------
-from agent_framework.azure import AzureAIClient
+from agent_framework.azure import AzureOpenAIAssistantsClient
 from azure.identity.aio import (
     DefaultAzureCredential,
     ManagedIdentityCredential,
@@ -59,36 +54,38 @@ from src.infrastructure.agents.maf.tools import (
 # Environment
 # ---------------------------------------------------------------------------
 
-_FOUNDRY_ENDPOINT: str = (
-    os.getenv("FOUNDRY_PROJECT_ENDPOINT")
-    or os.getenv("AZURE_AI_PROJECT_ENDPOINT")
-    or ""
-)
+_OPENAI_ENDPOINT: str = os.getenv("AZURE_OPENAI_ENDPOINT", "")
 _MODEL: str = (
     os.getenv("FOUNDRY_MODEL_DEPLOYMENT_NAME")
     or os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME")
     or "gpt-4o"
 )
 
-# Tool sets per agent role
-_CUSTOMER_SERVICE_TOOLS = [
-    track_parcel,
-    search_parcels_by_recipient,
-    search_parcels_by_driver,
-]
-_DISPATCHER_TOOLS = [
-    get_pending_parcels_for_dispatch,
-    get_available_drivers,
-    get_delivery_statistics,
-]
-_OPTIMIZATION_TOOLS = [
-    get_performance_metrics,
-    get_delivery_statistics,
-]
-_DRIVER_TOOLS = [
-    track_parcel,
-    update_delivery_status,
-]
+# All agent IDs (existing asst_XXX persistent agents)
+_AGENT_IDS: Dict[str, str] = {
+    "customer_service": os.getenv("CUSTOMER_SERVICE_AGENT_ID", ""),
+    "fraud_risk": os.getenv("FRAUD_RISK_AGENT_ID", ""),
+    "identity": os.getenv("IDENTITY_AGENT_ID", ""),
+    "dispatcher": os.getenv("DISPATCHER_AGENT_ID", ""),
+    "parcel_intake": os.getenv("PARCEL_INTAKE_AGENT_ID", ""),
+    "sorting_facility": os.getenv("SORTING_FACILITY_AGENT_ID", ""),
+    "delivery_coordination": os.getenv("DELIVERY_COORDINATION_AGENT_ID", ""),
+    "optimization": os.getenv("OPTIMIZATION_AGENT_ID", ""),
+    "driver": os.getenv("DRIVER_AGENT_ID", ""),
+}
+
+# Tool sets per agent role (passed to as_agent so MAF handles dispatch)
+_AGENT_TOOL_MAP: Dict[str, list] = {
+    "customer_service": [track_parcel, search_parcels_by_recipient, search_parcels_by_driver],
+    "fraud_risk": [],
+    "identity": [],
+    "dispatcher": [get_pending_parcels_for_dispatch, get_available_drivers, get_delivery_statistics],
+    "parcel_intake": [],
+    "sorting_facility": [],
+    "delivery_coordination": [],
+    "optimization": [get_performance_metrics, get_delivery_statistics],
+    "driver": [track_parcel, update_delivery_status],
+}
 
 
 # ---------------------------------------------------------------------------
@@ -107,49 +104,42 @@ def _make_credential():
 
 
 # ---------------------------------------------------------------------------
-# AzureAIClient factory
+# Client factory
 # ---------------------------------------------------------------------------
 
 def get_maf_client(
     *,
+    agent_key: str = "customer_service",
     middleware: Optional[list] = None,
-) -> AzureAIClient:
+) -> AzureOpenAIAssistantsClient:
     """
-    Build a fresh AzureAIClient connected to the Foundry project.
+    Build an AzureOpenAIAssistantsClient wired to the given agent's asst_XXX ID.
 
-    A new client is returned each call; credential objects are async
-    so they must not be shared across threads.
+    Uses the Azure OpenAI Assistants API — compatible with the existing
+    persistent agents created during deployment.
     """
-    if not _FOUNDRY_ENDPOINT:
+    if not _OPENAI_ENDPOINT:
         raise RuntimeError(
-            "FOUNDRY_PROJECT_ENDPOINT (or AZURE_AI_PROJECT_ENDPOINT) is not set. "
-            "Add it to your .env file."
+            "AZURE_OPENAI_ENDPOINT is not set. Add it to your .env file."
         )
+    assistant_id = _AGENT_IDS.get(agent_key, "")
+    if not assistant_id:
+        raise RuntimeError(
+            f"No agent ID configured for '{agent_key}'. "
+            f"Set {agent_key.upper()}_AGENT_ID in your .env file."
+        )
+
     kwargs: Dict[str, Any] = {
-        "project_endpoint": _FOUNDRY_ENDPOINT,
-        "model_deployment_name": _MODEL,
+        "endpoint": _OPENAI_ENDPOINT,
+        "deployment_name": _MODEL,
+        "assistant_id": assistant_id,
         "credential": _make_credential(),
+        "api_version": "2024-05-01-preview",
     }
     if middleware:
         kwargs["middleware"] = middleware
-    return AzureAIClient(**kwargs)
 
-
-# ---------------------------------------------------------------------------
-# Per-agent name → tool list mapping
-# ---------------------------------------------------------------------------
-
-_AGENT_TOOL_MAP: Dict[str, list] = {
-    "customer_service": _CUSTOMER_SERVICE_TOOLS,
-    "fraud_risk": [],
-    "identity": [],
-    "dispatcher": _DISPATCHER_TOOLS,
-    "parcel_intake": [],
-    "sorting_facility": [],
-    "delivery_coordination": [],
-    "optimization": _OPTIMIZATION_TOOLS,
-    "driver": _DRIVER_TOOLS,
-}
+    return AzureOpenAIAssistantsClient(**kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -165,24 +155,15 @@ async def call_maf_agent(
     stream: bool = False,
 ) -> Dict[str, Any]:
     """
-    Invoke a named MAF agent and return a dict compatible with the
-    legacy call_azure_agent() return shape.
+    Invoke a named MAF agent via the OpenAI Assistants API.
 
-    Args:
-        agent_key:   Logical agent name used in _AGENT_TOOL_MAP, e.g.
-                     'customer_service', 'fraud_risk', etc.
-        message:     User / system message to send.
-        context:     Optional extra context dict appended to the message.
-        event_queue: Optional asyncio Queue for SSE streaming events.
-        stream:      If True, enable MAF streaming (get_final_response).
-
-    Returns:
+    Returns a dict compatible with legacy call_azure_agent():
         {
             "success": bool,
             "agent_key": str,
             "response": str | None,
             "tools_used": list[str],
-            "error": str | None,          # present only on failure
+            "error": str | None,
         }
     """
     from src.infrastructure.agents.maf.middleware import LoggingMiddleware
@@ -195,22 +176,22 @@ async def call_maf_agent(
     else:
         full_message = message
 
-    agent_tools = _AGENT_TOOL_MAP.get(agent_key, [])
+    tools_used: List[str] = []
+    agent_tools = _AGENT_TOOL_MAP.get(agent_key, []) or None
 
     # Load system prompt from skills folder (falls back to empty string)
+    instructions = ""
     try:
         instructions = get_agent_prompt(agent_key.replace("_", "-"))
     except Exception:
-        instructions = ""
-
-    tools_used: List[str] = []
+        pass
 
     try:
-        client = get_maf_client(middleware=middleware)
+        client = get_maf_client(agent_key=agent_key, middleware=middleware)
         async with client.as_agent(
             name=f"zava-{agent_key.replace('_', '-')}",
-            instructions=instructions,
-            tools=agent_tools if agent_tools else None,
+            instructions=instructions or None,
+            tools=agent_tools,
         ) as agent:
             if stream:
                 stream_result = await agent.run(full_message, stream=True)
@@ -237,3 +218,4 @@ async def call_maf_agent(
             "tools_used": tools_used,
             "error": error_msg,
         }
+
