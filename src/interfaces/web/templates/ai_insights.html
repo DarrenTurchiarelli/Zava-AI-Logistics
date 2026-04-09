@@ -648,18 +648,19 @@
                         <div class="col-md-4">
                             <div class="card border-primary h-100">
                                 <div class="card-body">
-                                    <h6 class="card-title text-dark">
-                                        <i class="bi bi-cash-coin"></i> Cost Reduction Opportunities
+                                    <h6 class="card-title text-dark d-flex justify-content-between align-items-center">
+                                        <span><i class="bi bi-cash-coin"></i> Cost Reduction Opportunities</span>
+                                        <small id="cost-tile-badge" class="badge bg-secondary" style="font-size:0.6rem;font-weight:400;">Page load data</small>
                                     </h6>
                                     <div class="mt-3">
                                         <!-- Route Optimisation -->
                                         <div class="recommendation-item" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#routeOptModal">
                                             <div class="d-flex justify-content-between mb-2 align-items-center">
                                                 <small><i class="bi bi-info-circle text-primary"></i> Route Optimisation</small>
-                                                <span class="badge bg-success">$2,400/mo</span>
+                                                <span id="tile-route-savings" class="badge bg-success">$2,400/mo</span>
                                             </div>
                                             <div class="progress mb-3" style="height: 8px;">
-                                                <div class="progress-bar bg-success" style="width: 85%"></div>
+                                                <div id="tile-route-bar" class="progress-bar bg-success" style="width: 85%"></div>
                                             </div>
                                         </div>
 
@@ -667,10 +668,10 @@
                                         <div class="recommendation-item" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#depotConsolModal">
                                             <div class="d-flex justify-content-between mb-2 align-items-center">
                                                 <small><i class="bi bi-info-circle text-primary"></i> Depot Consolidation</small>
-                                                <span class="badge bg-primary">$1,800/mo</span>
+                                                <span id="tile-depot-savings" class="badge bg-primary">$1,800/mo</span>
                                             </div>
                                             <div class="progress mb-3" style="height: 8px;">
-                                                <div class="progress-bar bg-primary" style="width: 65%"></div>
+                                                <div id="tile-depot-bar" class="progress-bar bg-primary" style="width: 65%"></div>
                                             </div>
                                         </div>
 
@@ -678,16 +679,16 @@
                                         <div class="recommendation-item" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#exceptionModal">
                                             <div class="d-flex justify-content-between mb-2 align-items-center">
                                                 <small><i class="bi bi-info-circle text-primary"></i> Exception Reduction</small>
-                                                <span class="badge bg-warning">$950/mo</span>
+                                                <span id="tile-exception-savings" class="badge bg-warning" style="color:#1c1917;">$950/mo</span>
                                             </div>
                                             <div class="progress" style="height: 8px;">
-                                                <div class="progress-bar bg-warning" style="width: 45%"></div>
+                                                <div id="tile-exception-bar" class="progress-bar bg-warning" style="width: 45%"></div>
                                             </div>
                                         </div>
                                     </div>
                                     <hr>
                                     <div class="text-center">
-                                        <strong class="text-success">Potential Savings: $5,150/mo</strong>
+                                        <strong class="text-success">Potential Savings: <span id="tile-total-savings">$5,150</span>/mo</strong>
                                         <br>
                                         <small class="text-muted"><i class="bi bi-hand-index"></i> Click items for details</small>
                                     </div>
@@ -698,37 +699,38 @@
                         <div class="col-md-4">
                             <div class="card border-primary h-100">
                                 <div class="card-body">
-                                    <h6 class="card-title text-dark">
-                                        <i class="bi bi-bullseye"></i> Resource Allocation
+                                    <h6 class="card-title text-dark d-flex justify-content-between align-items-center">
+                                        <span><i class="bi bi-bullseye"></i> Resource Allocation</span>
+                                        <small id="resource-tile-badge" class="badge bg-secondary" style="font-size:0.6rem;font-weight:400;">Page load data</small>
                                     </h6>
                                     <div class="mt-3">
                                         <div class="alert alert-light border mb-2 py-2">
                                             <small class="text-muted d-block">Driver Efficiency</small>
                                             <div class="d-flex justify-content-between align-items-center">
-                                                <strong>{{ ((insights.out_for_delivery / (insights.out_for_delivery + insights.at_depot)) * 100)|round(1) if (insights.out_for_delivery + insights.at_depot) > 0 else 0 }}%</strong>
-                                                <span class="badge bg-success">Optimal</span>
+                                                <strong id="tile-driver-eff">{{ ((insights.out_for_delivery / (insights.out_for_delivery + insights.at_depot)) * 100)|round(1) if (insights.out_for_delivery + insights.at_depot) > 0 else 0 }}%</strong>
+                                                <span id="tile-driver-badge" class="badge bg-success">Optimal</span>
                                             </div>
                                         </div>
 
                                         <div class="alert alert-light border mb-2 py-2">
-                                            <small class="text-muted d-block">Depot Utilization</small>
+                                            <small class="text-muted d-block">Depot Utilisation</small>
                                             <div class="d-flex justify-content-between align-items-center">
-                                                <strong>{{ ((insights.at_depot / insights.total_parcels) * 100)|round(1) if insights.total_parcels > 0 else 0 }}%</strong>
-                                                <span class="badge bg-info">Good</span>
+                                                <strong id="tile-depot-util">{{ ((insights.at_depot / insights.total_parcels) * 100)|round(1) if insights.total_parcels > 0 else 0 }}%</strong>
+                                                <span id="tile-depot-badge" class="badge bg-info">Good</span>
                                             </div>
                                         </div>
 
                                         <div class="alert alert-light border mb-0 py-2">
                                             <small class="text-muted d-block">Sorting Throughput</small>
                                             <div class="d-flex justify-content-between align-items-center">
-                                                <strong>{{ ((insights.sorting / insights.total_parcels) * 100)|round(1) if insights.total_parcels > 0 else 0 }}%</strong>
-                                                <span class="badge bg-warning">Monitor</span>
+                                                <strong id="tile-sorting-tput">{{ ((insights.sorting / insights.total_parcels) * 100)|round(1) if insights.total_parcels > 0 else 0 }}%</strong>
+                                                <span id="tile-sorting-badge" class="badge bg-warning" style="color:#1c1917;">Monitor</span>
                                             </div>
                                         </div>
                                     </div>
                                     <hr>
                                     <small class="text-muted">
-                                        <i class="bi bi-info-circle"></i> AI-Optimised resource distribution
+                                        <i class="bi bi-info-circle"></i> Updated from live Cosmos DB on Refresh
                                     </small>
                                 </div>
                             </div>
@@ -737,15 +739,16 @@
                         <div class="col-md-4">
                             <div class="card border-warning h-100">
                                 <div class="card-body">
-                                    <h6 class="card-title text-dark">
-                                        <i class="bi bi-graph-up-arrow"></i> Predictive Analytics
+                                    <h6 class="card-title text-dark d-flex justify-content-between align-items-center">
+                                        <span><i class="bi bi-graph-up-arrow"></i> Predictive Analytics</span>
+                                        <small id="predict-tile-badge" class="badge bg-secondary" style="font-size:0.6rem;font-weight:400;">Page load data</small>
                                     </h6>
                                     <div class="mt-3">
                                         <!-- Volume Prediction -->
                                         <div class="mb-3 recommendation-item" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#volumePredictModal">
                                             <div class="d-flex justify-content-between mb-1 align-items-center">
                                                 <small class="text-muted"><i class="bi bi-info-circle text-primary"></i> Next Week Volume</small>
-                                                <strong class="text-success">+{{ ((insights.total_parcels * 1.15)|round(0)|int - insights.total_parcels) }}</strong>
+                                                <strong id="tile-volume-increase" class="text-success">+{{ ((insights.total_parcels * 1.15)|round(0)|int - insights.total_parcels) }}</strong>
                                             </div>
                                             <small class="text-success">
                                                 <i class="bi bi-arrow-up"></i> 15% increase predicted
@@ -767,9 +770,9 @@
                                         <div class="recommendation-item" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#exceptionRiskModal">
                                             <div class="d-flex justify-content-between mb-1 align-items-center">
                                                 <small class="text-muted"><i class="bi bi-info-circle text-primary"></i> Exception Risk</small>
-                                                <strong class="text-success">Low ({{ (100 - insights.success_rate)|round(1) }}%)</strong>
+                                                <strong id="tile-exception-risk" class="text-success">Low ({{ (100 - insights.success_rate)|round(1) }}%)</strong>
                                             </div>
-                                            <small class="text-success">
+                                            <small id="tile-exception-risk-sub" class="text-success">
                                                 <i class="bi bi-shield-check"></i> Below industry average
                                             </small>
                                         </div>
@@ -784,10 +787,10 @@
                         </div>
                     </div>
 
-                    <!-- Action Recommendations — driven by live dc_stats and parcel counts -->
-                    <div class="alert alert-warning alert-persistent mb-0">
+                    <!-- Action Recommendations — updated by live agent data on Refresh -->
+                    <div class="alert alert-warning alert-persistent mb-0" id="top-recommendations-panel">
                         <h6 class="alert-heading"><i class="bi bi-lightbulb-fill"></i> Top AI Recommendations</h6>
-                        <ul class="mb-0">
+                        <ul class="mb-0" id="top-recommendations-list">
                             {% if insights.dc_stats and insights.dc_stats|length >= 2 %}
                             {% set busiest = insights.dc_stats[0] %}
                             {% set quietest = insights.dc_stats[-1] %}
@@ -814,7 +817,7 @@
                                 {% endif %}
                             </li>
                         </ul>
-                        <small class="text-muted mt-1 d-block"><i class="bi bi-database"></i> Derived from live Cosmos DB data</small>
+                        <small class="text-muted mt-1 d-block"><i class="bi bi-database"></i> <span id="reco-source-label">Derived from live Cosmos DB data</span></small>
                     </div>
 
                     <!-- Live agent response (auto-loaded on page open, refreshable) -->
@@ -1550,6 +1553,100 @@
                     if (ts) ts.textContent = new Date(data.generated_at).toLocaleTimeString();
                     document.getElementById('liveInsightsPanel').style.display = '';
                     setTimestamps(data.generated_at);
+
+                    // ── Populate live tiles from structured summary ───────────
+                    if (data.summary) {
+                        const s = data.summary;
+                        const liveBadge = 'Live data';
+                        const liveBadgeClass = 'badge bg-success';
+
+                        // Helper: safe set text
+                        function setText(id, val) {
+                            const el = document.getElementById(id);
+                            if (el) el.textContent = val;
+                        }
+                        function setClass(id, cls) {
+                            const el = document.getElementById(id);
+                            if (el) el.className = cls;
+                        }
+                        function setStyle(id, prop, val) {
+                            const el = document.getElementById(id);
+                            if (el) el.style[prop] = val;
+                        }
+
+                        // Cost Reduction tile
+                        setText('tile-route-savings', '$' + s.route_savings.toLocaleString() + '/mo');
+                        setText('tile-depot-savings', s.depot_savings > 0 ? '$' + s.depot_savings.toLocaleString() + '/mo' : 'N/A');
+                        setText('tile-exception-savings', '$' + s.exception_savings.toLocaleString() + '/mo');
+                        setText('tile-total-savings', '$' + s.total_savings.toLocaleString());
+                        setStyle('tile-route-bar', 'width', s.route_pct + '%');
+                        setStyle('tile-depot-bar', 'width', s.depot_pct + '%');
+                        setStyle('tile-exception-bar', 'width', s.exception_pct + '%');
+                        setText('cost-tile-badge', liveBadge);
+                        setClass('cost-tile-badge', liveBadgeClass);
+
+                        // Resource Allocation tile
+                        const driverBadgeLabels = { success: 'Optimal', info: 'Good', warning: 'Monitor' };
+                        const depotBadgeLabels =  { success: 'Good',    info: 'Monitor', warning: 'High' };
+                        const sortBadgeLabels =   { success: 'Good',    info: 'Moderate', warning: 'Busy' };
+                        setText('tile-driver-eff', s.driver_efficiency + '%');
+                        setText('tile-driver-badge', driverBadgeLabels[s.driver_badge] || s.driver_badge);
+                        setClass('tile-driver-badge', 'badge bg-' + s.driver_badge);
+                        setText('tile-depot-util', s.depot_utilisation + '%');
+                        setText('tile-depot-badge', depotBadgeLabels[s.depot_badge] || s.depot_badge);
+                        setClass('tile-depot-badge', 'badge bg-' + s.depot_badge);
+                        setText('tile-sorting-tput', s.sorting_throughput + '%');
+                        setText('tile-sorting-badge', sortBadgeLabels[s.sorting_badge] || s.sorting_badge);
+                        setClass('tile-sorting-badge', 'badge bg-' + s.sorting_badge + (s.sorting_badge === 'warning' ? '' : ''));
+                        if (s.sorting_badge === 'warning') {
+                            document.getElementById('tile-sorting-badge') && (document.getElementById('tile-sorting-badge').style.color = '#1c1917');
+                        }
+                        setText('resource-tile-badge', liveBadge);
+                        setClass('resource-tile-badge', liveBadgeClass);
+
+                        // Predictive Analytics tile
+                        setText('tile-volume-increase', '+' + s.predicted_increase.toLocaleString());
+                        // Update all js-peak-day spans
+                        document.querySelectorAll('.js-peak-day').forEach(el => { el.textContent = s.peak_day; });
+                        const riskColor = s.exception_risk_class === 'danger' ? 'text-danger' : s.exception_risk_class === 'warning' ? 'text-warning' : 'text-success';
+                        setText('tile-exception-risk', s.exception_risk_label + ' (' + s.exception_rate + '%)');
+                        setClass('tile-exception-risk', riskColor);
+                        const riskIcon = s.exception_risk_class === 'danger' ? 'bi-exclamation-triangle-fill' : s.exception_risk_class === 'warning' ? 'bi-exclamation-circle' : 'bi-shield-check';
+                        const riskSub = s.exception_risk_class === 'danger' ? 'Above industry average — action needed' : s.exception_risk_class === 'warning' ? 'Approaching industry average' : 'Below industry average';
+                        const riskSubEl = document.getElementById('tile-exception-risk-sub');
+                        if (riskSubEl) { riskSubEl.className = riskColor; riskSubEl.innerHTML = `<i class="bi ${riskIcon}"></i> ${riskSub}`; }
+                        setText('predict-tile-badge', liveBadge);
+                        setClass('predict-tile-badge', liveBadgeClass);
+
+                        // Update Top Recommendations from live structured data
+                        const rList = document.getElementById('top-recommendations-list');
+                        if (rList && s.busiest && s.busiest.name) {
+                            let recoHTML = '';
+                            // Immediate: DC load balance
+                            if (s.busiest.pct >= 65) {
+                                recoHTML += `<li><strong>Immediate:</strong> Redistribute load from ${s.busiest.name} (${s.busiest.pct}% capacity) to ${s.busiest.quietest_name} (${s.busiest.quietest_pct}% capacity) — est. 2hr delivery improvement.</li>`;
+                            } else {
+                                recoHTML += `<li><strong>Immediate:</strong> Facilities well-balanced — ${s.busiest.name} leading at ${s.busiest.pct}% capacity. No redistribution required.</li>`;
+                            }
+                            // This Week: volume peak
+                            recoHTML += `<li><strong>This Week:</strong> Schedule additional drivers for <span class="js-peak-day">${s.peak_day}</span> peak — ${s.predicted_increase.toLocaleString()} additional parcels predicted (15% volume increase).</li>`;
+                            // Optimisation: depot backlog or route consolidation
+                            if (s.at_depot > 500) {
+                                recoHTML += `<li><strong>Optimisation:</strong> ${s.at_depot.toLocaleString()} parcels queued at depot — pre-assign to active facilities to reduce processing backlog.</li>`;
+                            } else {
+                                recoHTML += `<li><strong>Optimisation:</strong> Depot backlog nominal (${s.at_depot.toLocaleString()} parcels). Consider route consolidation — est. $${s.route_savings.toLocaleString()}/mo fuel saving.</li>`;
+                            }
+                            // Overloaded DCs
+                            if (s.overloaded_dcs && s.overloaded_dcs.length > 0) {
+                                const names = s.overloaded_dcs.map(d => `${d.name} (${d.pct}%)`).join(', ');
+                                recoHTML += `<li><strong class="text-danger">Alert:</strong> ${s.overloaded_dcs.length} facilit${s.overloaded_dcs.length > 1 ? 'ies' : 'y'} at critical load: ${names} — immediate diversion required.</li>`;
+                            }
+                            rList.innerHTML = recoHTML;
+                            setText('reco-source-label', 'Updated from live Cosmos DB data via AI agent at ' + new Date(data.generated_at).toLocaleTimeString());
+                        }
+                    }
+                    // ─────────────────────────────────────────────────────────
+
                     document.getElementById('liveInsightsPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 } else {
                     const optEl = document.getElementById('liveOptResponse');

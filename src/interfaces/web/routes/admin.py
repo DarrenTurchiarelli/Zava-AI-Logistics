@@ -339,6 +339,119 @@ Base your response on the actual numbers above. Be concise and operational."""
         opt_text = opt_result.get("response") or ""
         sf_text = sf_result.get("response") or ""
 
+        # ── Structured summary for live tile population ───────────────────────
+        exception_rate = round(
+            (exceptions / total * 100) if total > 0 else 0, 1
+        )
+        # Driver efficiency: out-for-delivery vs (out-for-delivery + at-depot)
+        util_denom = out_delivery + at_depot
+        driver_efficiency = round(
+            (out_delivery / util_denom * 100) if util_denom > 0 else 0, 1
+        )
+        depot_utilisation = round(
+            (at_depot / total * 100) if total > 0 else 0, 1
+        )
+        sorting_throughput = round(
+            (sorting / total * 100) if total > 0 else 0, 1
+        )
+
+        # Cost reduction estimates driven by live data
+        # Route optimisation: 8% of active delivery cost (proxy: out_delivery routes × $14 avg fuel)
+        route_savings = max(int(out_delivery * 14 * 0.08), 200)
+        # Depot consolidation: flag only if any DC is very quiet (<25% of another DC)
+        active_counts = list(dc_active.values())
+        depot_savings = 0
+        if len(active_counts) >= 2:
+            ratio = min(active_counts) / max(active_counts) if max(active_counts) > 0 else 1
+            if ratio < 0.35:
+                depot_savings = int(max(active_counts) * 3.5)
+        # Exception reduction: each % point saved × ~$19/exception
+        exception_savings = int((exception_rate * total / 100) * 19 * 0.40)
+        total_savings = route_savings + depot_savings + exception_savings
+
+        # Overloaded DC warning (any DC ≥85%)
+        overloaded_dcs = [
+            {"name": dc, "count": cnt, "pct": min(round(cnt * 100 / 500), 100)}
+            for dc, cnt in sorted(dc_active.items(), key=lambda x: x[1], reverse=True)
+            if cnt >= 425  # ≥85% of 500
+        ]
+        busiest_info = {}
+        if dc_active:
+            bd = max(dc_active, key=dc_active.get)
+            busiest_info = {
+                "name": bd,
+                "count": dc_active[bd],
+                "pct": min(round(dc_active[bd] * 100 / 500), 100),
+            }
+            quietest_dc = min(dc_active, key=dc_active.get)
+            busiest_info["quietest_name"] = quietest_dc
+            busiest_info["quietest_pct"] = min(round(dc_active[quietest_dc] * 100 / 500), 100)
+
+        # Predictive: volume next week (+15% simple trend)
+        predicted_increase = int(total * 0.15)
+        # Peak day: next weekday after today that is Thu or Fri (high-volume pattern)
+        today_wd = datetime.now().weekday()  # Mon=0 … Sun=6
+        days_to_peak = {0: 4, 1: 3, 2: 2, 3: 1, 4: 0, 5: 2, 6: 1}.get(today_wd, 1)
+        peak_date = datetime.now() + timedelta(days=days_to_peak if days_to_peak > 0 else 7)
+        peak_day_label = peak_date.strftime("%A %-d %b") if hasattr(peak_date, 'strftime') else "Friday"
+        # Windows strftime doesn't support %-d, use %#d on Windows
+        try:
+            peak_day_label = peak_date.strftime("%A %#d %b")
+        except ValueError:
+            peak_day_label = peak_date.strftime("%A %d %b").replace(" 0", " ")
+
+        exception_risk_label = (
+            "High" if exception_rate > 12
+            else "Medium" if exception_rate > 5
+            else "Low"
+        )
+        exception_risk_class = (
+            "danger" if exception_rate > 12
+            else "warning" if exception_rate > 5
+            else "success"
+        )
+
+        # Resource allocation badge logic
+        def _badge(pct, warn=70, ok=50):
+            if pct > warn:
+                return "warning"
+            if pct > ok:
+                return "info"
+            return "success"
+
+        summary = {
+            # Cost reduction tile
+            "route_savings": route_savings,
+            "depot_savings": depot_savings,
+            "exception_savings": exception_savings,
+            "total_savings": total_savings,
+            "route_pct": min(round(route_savings / max(total_savings, 1) * 100), 100),
+            "depot_pct": min(round(depot_savings / max(total_savings, 1) * 100), 100),
+            "exception_pct": min(round(exception_savings / max(total_savings, 1) * 100), 100),
+            # Resource allocation tile
+            "driver_efficiency": driver_efficiency,
+            "driver_badge": _badge(driver_efficiency, warn=80, ok=50),
+            "depot_utilisation": depot_utilisation,
+            "depot_badge": _badge(depot_utilisation, warn=70, ok=40),
+            "sorting_throughput": sorting_throughput,
+            "sorting_badge": _badge(sorting_throughput, warn=40, ok=20),
+            # Predictive analytics tile
+            "predicted_increase": predicted_increase,
+            "peak_day": peak_day_label,
+            "exception_rate": exception_rate,
+            "exception_risk_label": exception_risk_label,
+            "exception_risk_class": exception_risk_class,
+            # Recommendations
+            "total": total,
+            "at_depot": at_depot,
+            "out_delivery": out_delivery,
+            "sorting": sorting,
+            "busiest": busiest_info,
+            "overloaded_dcs": overloaded_dcs,
+            "success_rate": success_rate,
+        }
+        # ─────────────────────────────────────────────────────────────────────
+
         # Fallback: if SF agent didn't respond, generate a data-driven summary from live numbers
         if not sf_text:
             top_dcs = sorted(dc_active.items(), key=lambda x: x[1], reverse=True)[:3]
@@ -362,6 +475,7 @@ Base your response on the actual numbers above. Be concise and operational."""
         return {
             "optimisation": opt_text,
             "sorting_facility": sf_text,
+            "summary": summary,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
 
