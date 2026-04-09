@@ -348,17 +348,20 @@ if (-not $SkipInfrastructure -and -not $CodeOnly) {
 
     # Update-EnvFile is defined at the top of the script — available everywhere.
 
-    $openAIEndpoint    = $bicepOutputJson.middleware.value.openAIServiceEndpoint
-    $aiProjectEndpoint = $bicepOutputJson.middleware.value.aiProjectEndpoint
-    $cosmosEndpoint    = $bicepOutputJson.backend.value.cosmosDbEndpoint
+    $openAIEndpoint      = $bicepOutputJson.middleware.value.openAIServiceEndpoint
+    $aiServicesEndpoint  = $bicepOutputJson.middleware.value.aiServicesEndpoint
+    $aiProjectEndpoint   = $bicepOutputJson.middleware.value.aiProjectEndpoint
+    $cosmosEndpoint      = $bicepOutputJson.backend.value.cosmosDbEndpoint
 
-    Update-EnvFile "AZURE_OPENAI_ENDPOINT"      $openAIEndpoint
-    Update-EnvFile "AZURE_AI_PROJECT_ENDPOINT"  $aiProjectEndpoint
-    Update-EnvFile "COSMOS_DB_ENDPOINT"         $cosmosEndpoint
+    Update-EnvFile "AZURE_OPENAI_ENDPOINT"        $openAIEndpoint
+    Update-EnvFile "AZURE_AI_SERVICES_ENDPOINT"   $aiServicesEndpoint
+    Update-EnvFile "AZURE_AI_PROJECT_ENDPOINT"    $aiProjectEndpoint
+    Update-EnvFile "COSMOS_DB_ENDPOINT"           $cosmosEndpoint
 
-    if ($openAIEndpoint)    { Write-Host "  ✓ AZURE_OPENAI_ENDPOINT     = $openAIEndpoint" -ForegroundColor Green }
-    if ($aiProjectEndpoint) { Write-Host "  ✓ AZURE_AI_PROJECT_ENDPOINT = $aiProjectEndpoint" -ForegroundColor Green }
-    if ($cosmosEndpoint)    { Write-Host "  ✓ COSMOS_DB_ENDPOINT        = $cosmosEndpoint" -ForegroundColor Green }
+    if ($openAIEndpoint)     { Write-Host "  ✓ AZURE_OPENAI_ENDPOINT       = $openAIEndpoint" -ForegroundColor Green }
+    if ($aiServicesEndpoint) { Write-Host "  ✓ AZURE_AI_SERVICES_ENDPOINT  = $aiServicesEndpoint" -ForegroundColor Green }
+    if ($aiProjectEndpoint)  { Write-Host "  ✓ AZURE_AI_PROJECT_ENDPOINT   = $aiProjectEndpoint" -ForegroundColor Green }
+    if ($cosmosEndpoint)     { Write-Host "  ✓ COSMOS_DB_ENDPOINT           = $cosmosEndpoint" -ForegroundColor Green }
     Write-Host "  ✓ .env updated — subsequent script runs will use these values" -ForegroundColor Green
     Write-Host ""
     Write-Host "  📋 Deployment Details:" -ForegroundColor Cyan
@@ -367,7 +370,7 @@ if (-not $SkipInfrastructure -and -not $CodeOnly) {
     Write-Host "       URL: $($bicepOutputJson.frontend.value.appServiceUrl)" -ForegroundColor Gray
     Write-Host ""
     Write-Host "     Middleware Resource Group: $middlewareRgName" -ForegroundColor White
-    Write-Host "       Azure OpenAI: $($bicepOutputJson.middleware.value.openAIServiceName)" -ForegroundColor Gray
+    Write-Host "       Azure AI Services : $($bicepOutputJson.middleware.value.openAIServiceName)" -ForegroundColor Gray
     Write-Host "       AI Hub: $($bicepOutputJson.middleware.value.aiHubName)" -ForegroundColor Gray
     Write-Host "       AI Project: $($bicepOutputJson.middleware.value.aiProjectName)" -ForegroundColor Gray
     Write-Host ""
