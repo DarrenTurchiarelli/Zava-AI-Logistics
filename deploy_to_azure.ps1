@@ -1132,8 +1132,13 @@ if (-not $cosmosCheck) {
             # Set encoding for Unicode output on Windows
             $env:PYTHONIOENCODING = "utf-8"
             
-            # CRITICAL: Ensure environment variables are set for user initialization
-            # (Inherits from container initialization, but verify they're still set)
+            # CRITICAL: Clear key-based connection string — local auth was re-disabled above.
+            # Leaving COSMOS_CONNECTION_STRING set would cause setup_users.py to use the
+            # now-invalidated key and hang indefinitely waiting for a 401 that never resolves.
+            $env:COSMOS_CONNECTION_STRING = ""
+            $env:COSMOS_DB_KEY = ""
+            
+            # Ensure endpoint and database name are set (used by managed identity path)
             if (-not $env:COSMOS_DB_ENDPOINT) {
                 $env:COSMOS_DB_ENDPOINT = $bicepOutputJson.backend.value.cosmosDbEndpoint
                 $env:COSMOS_DB_DATABASE_NAME = "logisticstracking"
