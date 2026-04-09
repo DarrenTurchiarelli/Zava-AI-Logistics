@@ -533,7 +533,7 @@
                 <div class="card-header bg-primary text-white">
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="mb-0"><i class="bi bi-calendar-check"></i> Delivery Coordination Agent - Customer Communication</h5>
-                        <small id="delivery-updated" class="text-white-50" style="font-size:0.75rem;"></small>
+                        <small id="delivery-updated" class="text-white-50" style="font-size:0.75rem;">Illustrative data — representative industry benchmarks</small>
                     </div>
                 </div>
                 <div class="card-body">
@@ -1513,7 +1513,7 @@
     }
 
     function setTimestamps(iso) {
-        ['sorting-updated', 'delivery-updated', 'optimisation-updated'].forEach(id => {
+        ['sorting-updated', 'optimisation-updated'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.textContent = fmt(iso);
         });
