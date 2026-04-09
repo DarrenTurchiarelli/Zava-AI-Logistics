@@ -103,6 +103,21 @@ $pythonExe = if (Test-Path (Join-Path $PSScriptRoot ".venv\Scripts\python.exe"))
 } else {
     $null
 }
+
+# Ensure all requirements are installed in the local venv before running any Python scripts
+# (generators, setup_users.py, etc.). On a clean machine or fresh clone this will install
+# faker and other packages that are in requirements.txt but not yet in the venv.
+if ($pythonExe) {
+    $pipExe = Join-Path (Split-Path $pythonExe) "pip.exe"
+    if (-not (Test-Path $pipExe)) { $pipExe = $pythonExe.Replace("python.exe","pip.exe").Replace("python","pip") }
+    Write-Host "  📦 Ensuring local Python dependencies are installed..." -ForegroundColor Cyan
+    & $pythonExe -m pip install -r requirements.txt --quiet --disable-pip-version-check 2>&1 | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "  ✓ Python dependencies up to date" -ForegroundColor Green
+    } else {
+        Write-Host "  ⚠ pip install had warnings (non-fatal — continuing)" -ForegroundColor Yellow
+    }
+}
 if ($pythonExe) {
     Write-Host "✓ Python: $pythonExe" -ForegroundColor Green
 } else {
