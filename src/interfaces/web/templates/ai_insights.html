@@ -1533,7 +1533,7 @@
         });
     }
 
-    function runRefresh() {
+    function runRefresh(scroll) {
         const btn = document.getElementById('btnRefreshInsights');
         if (!btn) return;
         btn.disabled = true;
@@ -1569,7 +1569,7 @@
                     if (data.summary) {
                         const s = data.summary;
                         const liveBadge = 'Live data';
-                        const liveBadgeClass = 'badge bg-success';
+                        const liveBadgeClass = 'badge bg-success text-white';
 
                         // Helper: safe set text
                         function setText(id, val) {
@@ -1600,15 +1600,16 @@
                         const driverBadgeLabels = { success: 'Optimal', info: 'Good', warning: 'Monitor' };
                         const depotBadgeLabels =  { success: 'Good',    info: 'Monitor', warning: 'High' };
                         const sortBadgeLabels =   { success: 'Good',    info: 'Moderate', warning: 'Busy' };
+                        const badgeClass = (b) => b === 'warning' ? 'badge bg-warning' : 'badge bg-' + b + ' text-white';
                         setText('tile-driver-eff', s.driver_efficiency + '%');
                         setText('tile-driver-badge', driverBadgeLabels[s.driver_badge] || s.driver_badge);
-                        setClass('tile-driver-badge', 'badge bg-' + s.driver_badge);
+                        setClass('tile-driver-badge', badgeClass(s.driver_badge));
                         setText('tile-depot-util', s.depot_utilisation + '%');
                         setText('tile-depot-badge', depotBadgeLabels[s.depot_badge] || s.depot_badge);
-                        setClass('tile-depot-badge', 'badge bg-' + s.depot_badge);
+                        setClass('tile-depot-badge', badgeClass(s.depot_badge));
                         setText('tile-sorting-tput', s.sorting_throughput + '%');
                         setText('tile-sorting-badge', sortBadgeLabels[s.sorting_badge] || s.sorting_badge);
-                        setClass('tile-sorting-badge', 'badge bg-' + s.sorting_badge + (s.sorting_badge === 'warning' ? '' : ''));
+                        setClass('tile-sorting-badge', badgeClass(s.sorting_badge));
                         if (s.sorting_badge === 'warning') {
                             document.getElementById('tile-sorting-badge') && (document.getElementById('tile-sorting-badge').style.color = '#1c1917');
                         }
@@ -1658,7 +1659,7 @@
                     }
                     // ─────────────────────────────────────────────────────────
 
-                    document.getElementById('liveInsightsPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    if (scroll) { document.getElementById('liveInsightsPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
                 } else {
                     const optEl = document.getElementById('liveOptResponse');
                     const sfEl  = document.getElementById('liveSFResponse');
@@ -1683,7 +1684,7 @@
 
     document.addEventListener('DOMContentLoaded', function () {
         const btn = document.getElementById('btnRefreshInsights');
-        if (btn) btn.addEventListener('click', runRefresh);
+        if (btn) btn.addEventListener('click', function () { runRefresh(true); });
 
         // Generate notification timestamps relative to now so they always look current
         (function populateRecentNotifications() {
@@ -1712,8 +1713,8 @@
             document.querySelectorAll('.js-peak-day').forEach(function (el) { el.textContent = label; });
         })();
 
-        // Auto-load live agent analysis on page open so the panel is never stale
-        runRefresh();
+        // Auto-load live agent analysis on page open; scroll=false so tiles stay in view
+        runRefresh(false);
     });
 })();
 </script>
