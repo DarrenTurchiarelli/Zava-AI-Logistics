@@ -28,6 +28,10 @@ from config.company import COMPANY_EMAIL, COMPANY_NAME, COMPANY_PHONE
 
 load_dotenv()
 
+# Feature flag: set USE_MAF=true to route agent calls through the MAF v1.0 SDK
+# instead of the raw OpenAI Assistants API.  Safe to toggle at runtime.
+_USE_MAF: bool = os.getenv("USE_MAF", "false").lower() == "true"
+
 # Azure OpenAI Configuration  
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 AZURE_AI_MODEL_DEPLOYMENT_NAME = os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME", "gpt-4o")
@@ -42,6 +46,27 @@ OPTIMIZATION_AGENT_ID = os.getenv("OPTIMIZATION_AGENT_ID")
 CUSTOMER_SERVICE_AGENT_ID = os.getenv("CUSTOMER_SERVICE_AGENT_ID")
 FRAUD_RISK_AGENT_ID = os.getenv("FRAUD_RISK_AGENT_ID")
 IDENTITY_AGENT_ID = os.getenv("IDENTITY_AGENT_ID")
+
+# Reverse-lookup: asst_XXX → MAF agent key (used by call_azure_agent when USE_MAF=true)
+_AGENT_ID_TO_KEY: dict[str, str] = {}
+
+
+def _build_agent_id_map() -> None:
+    """Populate _AGENT_ID_TO_KEY lazily after env vars are loaded."""
+    mapping = {
+        CUSTOMER_SERVICE_AGENT_ID: "customer_service",
+        FRAUD_RISK_AGENT_ID: "fraud_risk",
+        IDENTITY_AGENT_ID: "identity",
+        DISPATCHER_AGENT_ID: "dispatcher",
+        PARCEL_INTAKE_AGENT_ID: "parcel_intake",
+        SORTING_FACILITY_AGENT_ID: "sorting_facility",
+        DELIVERY_COORDINATION_AGENT_ID: "delivery_coordination",
+        OPTIMIZATION_AGENT_ID: "optimization",
+        DRIVER_AGENT_ID: "driver",
+    }
+    for agent_id, key in mapping.items():
+        if agent_id:
+            _AGENT_ID_TO_KEY[agent_id] = key
 
 
 class AzureOpenAIAgentClient:
@@ -119,6 +144,34 @@ async def call_azure_agent(
     print(f"\n🤖 Calling Azure OpenAI Assistant: {agent_id}")
     print(f"📍 Endpoint: {AZURE_OPENAI_ENDPOINT}")
     print(f"📝 Message length: {len(message)} chars")
+
+    # ------------------------------------------------------------------
+    # MAF v1.0 fast-path (feature flag: USE_MAF=true)
+    # ------------------------------------------------------------------
+    if _USE_MAF:
+        if not _AGENT_ID_TO_KEY:
+            _build_agent_id_map()
+        agent_key = _AGENT_ID_TO_KEY.get(agent_id or "", "")
+        if agent_key:
+            print(f"🚀 Routing to MAF SDK  (agent_key={agent_key})")
+            try:
+                from src.infrastructure.agents.maf.client import call_maf_agent
+
+                maf_result = await call_maf_agent(
+                    agent_key,
+                    message,
+                    context=context,
+                    event_queue=event_queue,
+                )
+                # Normalise return shape to match legacy callers
+                maf_result["agent_id"] = agent_id
+                maf_result.setdefault("thread_id", None)
+                return maf_result
+            except Exception as maf_exc:
+                print(f"⚠️  MAF call failed ({maf_exc}), falling back to legacy path")
+        else:
+            print(f"⚠️  No MAF key for agent_id={agent_id!r}, using legacy path")
+    # ------------------------------------------------------------------
 
     if not AZURE_OPENAI_ENDPOINT:
         error_msg = "AZURE_OPENAI_ENDPOINT not configured in environment variables"

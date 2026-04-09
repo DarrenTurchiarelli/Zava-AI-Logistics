@@ -411,7 +411,11 @@ async def fraud_detection_to_customer_service_workflow(
     trigger_type: str = "message_report",
 ) -> Dict[str, Any]:
     """
-    Execute fraud detection → customer service workflow
+    Execute fraud detection → customer service workflow.
+
+    When USE_MAF=true this delegates to the MAF v1.0 SDK workflow
+    (SequentialBuilder with AzureAIClient agents).  Otherwise the legacy
+    FraudToCustomerServiceWorkflow class is used unchanged.
 
     Args:
         message_content: Suspicious message text
@@ -422,11 +426,28 @@ async def fraud_detection_to_customer_service_workflow(
     Returns:
         Workflow summary with complete results
     """
+    import os
+
+    if os.getenv("USE_MAF", "false").lower() == "true":
+        from src.infrastructure.agents.maf.workflows import run_fraud_workflow
+
+        return await run_fraud_workflow(
+            message_content=message_content,
+            customer_name=customer_info.get("name", ""),
+            customer_email=customer_info.get("email", ""),
+            customer_phone=customer_info.get("phone", ""),
+            sender_email=sender_info.get("sender_email", ""),
+            activity_type=trigger_type,
+        )
+
+    # Legacy path
     workflow = FraudToCustomerServiceWorkflow()
     context = await workflow.execute(
-        message_content=message_content, sender_info=sender_info, customer_info=customer_info, trigger_type=trigger_type
+        message_content=message_content,
+        sender_info=sender_info,
+        customer_info=customer_info,
+        trigger_type=trigger_type,
     )
-
     return workflow.get_workflow_summary(context)
 
 
