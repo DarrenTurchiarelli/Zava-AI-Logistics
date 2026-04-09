@@ -41,11 +41,11 @@ from agent_framework import (
     AgentResponseUpdate,
     Content,
     Message,
+    WorkflowBuilder,
     WorkflowContext,
     handler,
 )
 from agent_framework.azure import AzureAIClient
-from agent_framework.orchestrations import WorkflowBuilder
 from azure.ai.agentserver.agentframework import from_agent_framework
 from azure.identity.aio import DefaultAzureCredential, ManagedIdentityCredential
 

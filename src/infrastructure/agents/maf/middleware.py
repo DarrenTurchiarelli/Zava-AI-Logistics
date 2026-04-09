@@ -8,24 +8,26 @@ the Zava UI (via the event_queue channel used by SSE routes).
 
 from __future__ import annotations
 
+import json
 import time
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Optional
 
-from agent_framework import Message
-from agent_framework.middleware import MiddlewareBase
+from agent_framework import AgentContext, AgentMiddleware
 
 
-class LoggingMiddleware(MiddlewareBase):
+class LoggingMiddleware(AgentMiddleware):
     """
     Logs each agent invocation with timing and surfaced tool names.
 
-    Attach once at the workflow level so all agents in the pipeline
-    share the same middleware instance.
+    Attach at the client level so all agents in the pipeline share
+    the same middleware instance.
 
     Usage::
 
-        client = get_maf_client(
-            middleware=[LoggingMiddleware(event_queue=my_queue)]
+        from agent_framework.azure import AzureAIClient
+        client = AzureAIClient(
+            ...,
+            middleware=[LoggingMiddleware(event_queue=my_queue)],
         )
     """
 
@@ -39,36 +41,24 @@ class LoggingMiddleware(MiddlewareBase):
         self._agent_name = agent_name
 
     # ------------------------------------------------------------------
-    # MiddlewareBase contract
+    # AgentMiddleware contract
     # ------------------------------------------------------------------
 
-    async def on_agent_start(
-        self,
-        messages: list[Message],
-        *,
-        next_handler: Callable,
-        **kwargs: Any,
-    ) -> Any:
+    async def process(self, context: AgentContext, call_next) -> None:
         start = time.monotonic()
-        self._emit("start", {"agent": self._agent_name, "input_length": len(messages)})
+        name = getattr(context.agent, "name", self._agent_name)
+        self._emit("start", {"agent": name, "input_length": len(context.messages)})
 
-        result = await next_handler(messages, **kwargs)
+        await call_next()
 
         elapsed = round((time.monotonic() - start) * 1000)
-        tools = self._extract_tool_names(result)
-        self._emit(
-            "complete",
-            {"agent": self._agent_name, "elapsed_ms": elapsed, "tools_used": tools},
-        )
-        return result
+        self._emit("complete", {"agent": name, "elapsed_ms": elapsed})
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 
-    def _emit(self, event: str, payload: Dict[str, Any]) -> None:
-        import json
-
+    def _emit(self, event: str, payload: dict) -> None:
         data = json.dumps({"event": event, **payload})
         print(f"[MAF] {data}")
 
@@ -78,15 +68,3 @@ class LoggingMiddleware(MiddlewareBase):
             except Exception:
                 pass  # Non-blocking — never crash an agent run over logging
 
-    @staticmethod
-    def _extract_tool_names(result: Any) -> list[str]:
-        """Pull tool names from a list[Message] or a single Message."""
-        names: list[str] = []
-        messages = result if isinstance(result, list) else [result]
-        for msg in messages:
-            if hasattr(msg, "tool_calls") and msg.tool_calls:
-                for tc in msg.tool_calls:
-                    name = getattr(getattr(tc, "function", None), "name", None)
-                    if name:
-                        names.append(name)
-        return names
