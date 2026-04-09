@@ -52,9 +52,15 @@ from agent_framework import (
     WorkflowContext,
     handler,
 )
-from agent_framework.azure import AzureAIClient
-from azure.ai.agentserver.agentframework import from_agent_framework
-from azure.identity.aio import DefaultAzureCredential, ManagedIdentityCredential
+from agent_framework.azure import AzureOpenAIAssistantsClient
+from azure.identity.aio import DefaultAzureCredential, ManagedIdentityCredential, get_bearer_token_provider
+from openai.lib.azure import AsyncAzureOpenAI
+
+# NOTE: azure.ai.agentserver is imported lazily in run_server() to avoid its
+# module-level init fetching an AZURE_OPENAI_API_KEY from the project discovery
+# endpoint and polluting the environment, which breaks credential-based auth.
+# NOTE: We build AsyncAzureOpenAI ourselves (passing async_client=...) so that
+# AzureOpenAIAssistantsClient skips its env-var api_key lookup entirely.
 
 # ---------------------------------------------------------------------------
 # Local tools and prompt
@@ -70,16 +76,13 @@ from src.infrastructure.agents.maf.tools import (
 # Environment
 # ---------------------------------------------------------------------------
 
-_FOUNDRY_ENDPOINT: str = (
-    os.getenv("FOUNDRY_PROJECT_ENDPOINT")
-    or os.getenv("AZURE_AI_PROJECT_ENDPOINT")
-    or ""
-)
+_OPENAI_ENDPOINT: str = os.getenv("AZURE_OPENAI_ENDPOINT", "")
 _MODEL: str = (
     os.getenv("FOUNDRY_MODEL_DEPLOYMENT_NAME")
     or os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME")
     or "gpt-4o"
 )
+_CS_AGENT_ID: str = os.getenv("CUSTOMER_SERVICE_AGENT_ID", "")
 
 
 def _credential():
@@ -90,6 +93,33 @@ def _credential():
         exclude_visual_studio_code_credential=True,
         additionally_allowed_tenants=["*"],
     )
+
+
+def _make_assistants_client(middleware=None) -> AzureOpenAIAssistantsClient:
+    """Build an AzureOpenAIAssistantsClient for the Customer Service agent.
+
+    We construct AsyncAzureOpenAI ourselves (using an Azure AD token provider
+    from the DefaultAzureCredential) and pass it as async_client so that
+    AzureOpenAIAssistantsClient skips its own env-var api_key resolution.
+    This avoids a stale AZURE_OPENAI_API_KEY user env var from overriding
+    credential-based auth on resources where key auth is disabled.
+    """
+    token_provider = get_bearer_token_provider(
+        _credential(), "https://cognitiveservices.azure.com/.default"
+    )
+    async_openai = AsyncAzureOpenAI(
+        azure_endpoint=_OPENAI_ENDPOINT,
+        azure_ad_token_provider=token_provider,
+        api_version="2024-05-01-preview",
+    )
+    kwargs: dict = {
+        "deployment_name": _MODEL,
+        "assistant_id": _CS_AGENT_ID,
+        "async_client": async_openai,
+    }
+    if middleware:
+        kwargs["middleware"] = middleware
+    return AzureOpenAIAssistantsClient(**kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -129,11 +159,10 @@ class CustomerServiceExecutor:
 # Build & serve
 # ---------------------------------------------------------------------------
 
-async def _build_workflow_agent(maf_client: AzureAIClient):
+async def _build_workflow_agent():
     """
-    Create the persistent Customer Service agent and wrap it in a
-    single-node WorkflowBuilder, then call .as_agent() to produce a
-    value suitable for from_agent_framework().
+    Create the Customer Service agent using AzureOpenAIAssistantsClient and
+    wrap it in a single-node WorkflowBuilder for HTTP server mode.
     """
     instructions = ""
     try:
@@ -141,12 +170,12 @@ async def _build_workflow_agent(maf_client: AzureAIClient):
     except Exception:
         pass
 
-    cs_agent_ctx = maf_client.as_agent(
+    client = _make_assistants_client()
+    cs_agent_ctx = client.as_agent(
         name="zava-customer-service",
-        instructions=instructions,
+        instructions=instructions or None,
         tools=[track_parcel, search_parcels_by_recipient, search_parcels_by_driver],
     )
-    # Enter the async context manager to get the live agent handle
     cs_agent = await cs_agent_ctx.__aenter__()
 
     executor = CustomerServiceExecutor(cs_agent)
@@ -155,7 +184,7 @@ async def _build_workflow_agent(maf_client: AzureAIClient):
         .build()
         .as_agent(
             name="Zava Customer Service",
-            instructions=instructions,
+            instructions=instructions or None,
         )
     )
     return workflow_agent, cs_agent_ctx
@@ -163,28 +192,25 @@ async def _build_workflow_agent(maf_client: AzureAIClient):
 
 async def run_server() -> None:
     """Start the HTTP server for the Agent Inspector."""
-    if not _FOUNDRY_ENDPOINT:
+    # Import lazily so module-level init in agentserver does not run during CLI mode.
+    from azure.ai.agentserver.agentframework import from_agent_framework  # noqa: PLC0415
+
+    if not _OPENAI_ENDPOINT or not _CS_AGENT_ID:
         sys.exit(
-            "❌  FOUNDRY_PROJECT_ENDPOINT (or AZURE_AI_PROJECT_ENDPOINT) is not set.\n"
-            "    Add it to your .env file and try again."
+            "❌  AZURE_OPENAI_ENDPOINT and CUSTOMER_SERVICE_AGENT_ID must be set.\n"
+            "    Add them to your .env file and try again."
         )
 
-    maf_client = AzureAIClient(
-        project_endpoint=_FOUNDRY_ENDPOINT,
-        model_deployment_name=_MODEL,
-        credential=_credential(),
-    )
-
-    workflow_agent, _ctx = await _build_workflow_agent(maf_client)
+    workflow_agent, _ctx = await _build_workflow_agent()
     print("✅  Zava Customer Service Agent ready — starting HTTP server …")
     await from_agent_framework(workflow_agent).run_async()
 
 
 async def run_cli() -> None:
     """Interactive terminal loop — useful for quick smoke-tests."""
-    if not _FOUNDRY_ENDPOINT:
+    if not _OPENAI_ENDPOINT or not _CS_AGENT_ID:
         sys.exit(
-            "❌  FOUNDRY_PROJECT_ENDPOINT (or AZURE_AI_PROJECT_ENDPOINT) is not set."
+            "❌  AZURE_OPENAI_ENDPOINT and CUSTOMER_SERVICE_AGENT_ID must be set."
         )
 
     instructions = ""
@@ -193,15 +219,10 @@ async def run_cli() -> None:
     except Exception:
         pass
 
-    maf_client = AzureAIClient(
-        project_endpoint=_FOUNDRY_ENDPOINT,
-        model_deployment_name=_MODEL,
-        credential=_credential(),
-    )
-
-    async with maf_client.as_agent(
+    client = _make_assistants_client()
+    async with client.as_agent(
         name="zava-customer-service",
-        instructions=instructions,
+        instructions=instructions or None,
         tools=[track_parcel, search_parcels_by_recipient, search_parcels_by_driver],
     ) as agent:
         print("Zava Customer Service Agent  (type 'exit' to quit)\n")

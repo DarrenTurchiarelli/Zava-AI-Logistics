@@ -29,7 +29,9 @@ from agent_framework.azure import AzureOpenAIAssistantsClient
 from azure.identity.aio import (
     DefaultAzureCredential,
     ManagedIdentityCredential,
+    get_bearer_token_provider,
 )
+from openai.lib.azure import AsyncAzureOpenAI
 
 # ---------------------------------------------------------------------------
 # Prompt loader (existing helper)
@@ -115,8 +117,10 @@ def get_maf_client(
     """
     Build an AzureOpenAIAssistantsClient wired to the given agent's asst_XXX ID.
 
-    Uses the Azure OpenAI Assistants API — compatible with the existing
-    persistent agents created during deployment.
+    We construct AsyncAzureOpenAI ourselves with an Azure AD token provider so
+    that AzureOpenAIAssistantsClient skips its own env-var api_key resolution.
+    This avoids a stale AZURE_OPENAI_API_KEY user env var overriding credential
+    auth on resources where key-based authentication is disabled.
     """
     if not _OPENAI_ENDPOINT:
         raise RuntimeError(
@@ -129,12 +133,18 @@ def get_maf_client(
             f"Set {agent_key.upper()}_AGENT_ID in your .env file."
         )
 
+    token_provider = get_bearer_token_provider(
+        _make_credential(), "https://cognitiveservices.azure.com/.default"
+    )
+    async_openai = AsyncAzureOpenAI(
+        azure_endpoint=_OPENAI_ENDPOINT,
+        azure_ad_token_provider=token_provider,
+        api_version="2024-05-01-preview",
+    )
     kwargs: Dict[str, Any] = {
-        "endpoint": _OPENAI_ENDPOINT,
         "deployment_name": _MODEL,
         "assistant_id": assistant_id,
-        "credential": _make_credential(),
-        "api_version": "2024-05-01-preview",
+        "async_client": async_openai,
     }
     if middleware:
         kwargs["middleware"] = middleware

@@ -37,7 +37,8 @@ load_dotenv(override=False)
 
 from agent_framework.azure import AzureOpenAIAssistantsClient
 from agent_framework.orchestrations import SequentialBuilder
-from azure.identity.aio import DefaultAzureCredential, ManagedIdentityCredential
+from azure.identity.aio import DefaultAzureCredential, ManagedIdentityCredential, get_bearer_token_provider
+from openai.lib.azure import AsyncAzureOpenAI
 
 from src.infrastructure.agents.core.prompt_loader import get_agent_prompt
 from src.infrastructure.agents.maf.tools import (
@@ -76,13 +77,23 @@ def _credential():
 
 
 def _assistants_client(agent_key: str, middleware=None) -> AzureOpenAIAssistantsClient:
-    """Build an AzureOpenAIAssistantsClient for the given agent key."""
+    """Build an AzureOpenAIAssistantsClient for the given agent key.
+
+    We construct AsyncAzureOpenAI ourselves with an Azure AD token provider so
+    that AzureOpenAIAssistantsClient skips its own env-var api_key resolution.
+    """
+    token_provider = get_bearer_token_provider(
+        _credential(), "https://cognitiveservices.azure.com/.default"
+    )
+    async_openai = AsyncAzureOpenAI(
+        azure_endpoint=_OPENAI_ENDPOINT,
+        azure_ad_token_provider=token_provider,
+        api_version="2024-05-01-preview",
+    )
     assistant_id = _AGENT_IDS.get(agent_key, "")
-    kwargs = {
-        "endpoint": _OPENAI_ENDPOINT,
+    kwargs: dict = {
         "deployment_name": _MODEL,
-        "credential": _credential(),
-        "api_version": "2024-05-01-preview",
+        "async_client": async_openai,
     }
     if assistant_id:
         kwargs["assistant_id"] = assistant_id
