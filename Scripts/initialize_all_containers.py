@@ -56,8 +56,8 @@ async def initialize_all_containers():
         # Define all 10 containers with partition keys
         containers = [
             ("parcels", "/store_location", "Parcel records"),
-            ("TrackingEvents", "/barcode", "Tracking event history"),
-            ("DeliveryAttempts", "/barcode", "Delivery attempt records"),
+            ("tracking_events", "/barcode", "Tracking event history"),
+            ("delivery_attempts", "/barcode", "Delivery attempt records"),
             ("feedback", "/tracking_number", "Customer feedback"),
             ("company_info", "/info_type", "Company configuration"),
             ("suspicious_messages", "/report_date", "Fraud detection logs"),

@@ -17,8 +17,8 @@ from azure.identity.aio import DefaultAzureCredential
 
 REQUIRED_CONTAINERS = [
     "parcels",
-    "TrackingEvents",
-    "DeliveryAttempts",
+    "tracking_events",
+    "delivery_attempts",
     "feedback",
     "company_info",
     "suspicious_messages",
