@@ -5,6 +5,7 @@
 #
 # Usage:
 #   .\scripts\generate_demo_data.ps1
+#   .\scripts\generate_demo_data.ps1 -CosmosAccountName <account-name>
 #   .\scripts\generate_demo_data.ps1 -Count 500
 #   .\scripts\generate_demo_data.ps1 -Count 100 -DemoOnly
 #   .\scripts\generate_demo_data.ps1 -Count 2000 -SkipHighLoad
@@ -16,7 +17,7 @@
 
 param(
     [Parameter(Mandatory=$false)]
-    [string]$CosmosAccountName = "zava-dev-cosmos-xhjuqo",
+    [string]$CosmosAccountName = "",
 
     [Parameter(Mandatory=$false)]
     [string]$ResourceGroup = "RG-Zava-Backend-dev",
@@ -39,6 +40,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Off
+$projectRoot = Split-Path $PSScriptRoot -Parent
 
 Write-Host ""
 Write-Host ("=" * 70) -ForegroundColor Cyan
@@ -74,6 +76,52 @@ if ($userEmail -notlike "*microsoft.com*") {
 
 # ── Step 2: Verify Cosmos DB account exists ───────────────────────────────────
 Write-Host "[2/4] Verifying Cosmos DB account..." -ForegroundColor Yellow
+
+if ([string]::IsNullOrWhiteSpace($CosmosAccountName)) {
+    $cosmosListOutput = az cosmosdb list `
+        --resource-group $ResourceGroup `
+        --query "[].name" --output json 2>&1
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  ✗ Could not list Cosmos DB accounts in '$ResourceGroup'" -ForegroundColor Red
+        Write-Host "    $cosmosListOutput" -ForegroundColor Yellow
+        exit 1
+    }
+
+    $cosmosAccounts = @($cosmosListOutput | ConvertFrom-Json)
+    if ($cosmosAccounts.Count -eq 0) {
+        Write-Host "  ✗ No Cosmos DB account found in '$ResourceGroup'" -ForegroundColor Red
+        Write-Host "    Check the -ResourceGroup parameter" -ForegroundColor Yellow
+        exit 1
+    }
+
+    if ($cosmosAccounts.Count -eq 1) {
+        $CosmosAccountName = $cosmosAccounts[0]
+    } else {
+        $deploymentConfigPath = Join-Path $projectRoot ".azure-deployment.json"
+        $matchingAccounts = @()
+
+        if (Test-Path $deploymentConfigPath) {
+            $deploymentConfig = Get-Content $deploymentConfigPath -Raw | ConvertFrom-Json
+            if ($deploymentConfig.AppServiceName -match '-([^-]+)$') {
+                $deploymentSuffix = $Matches[1]
+                $matchingAccounts = @($cosmosAccounts | Where-Object { $_ -like "*-$deploymentSuffix" })
+            }
+        }
+
+        if ($matchingAccounts.Count -ne 1) {
+            Write-Host "  ✗ Multiple Cosmos DB accounts found in '$ResourceGroup':" -ForegroundColor Red
+            $cosmosAccounts | ForEach-Object {
+                Write-Host "    - $_" -ForegroundColor Yellow
+            }
+            Write-Host "    Specify the intended account with -CosmosAccountName" -ForegroundColor Yellow
+            exit 1
+        }
+
+        $CosmosAccountName = $matchingAccounts[0]
+        Write-Host "  ✓ Matched current deployment: $CosmosAccountName" -ForegroundColor Green
+    }
+}
 
 $cosmosCheck = az cosmosdb show `
     --name $CosmosAccountName `
@@ -174,8 +222,12 @@ $env:COSMOS_DB_KEY            = ""        # Clear any stale key to force credent
 $env:COSMOS_CONNECTION_STRING = ""        # Clear connection string to avoid key-based fallback
 $env:AZURE_TENANT_ID          = $tenantId # Ensure DefaultAzureCredential picks the right tenant
 
-# Locate Python
-$pythonExe = (Get-Command python -ErrorAction SilentlyContinue)?.Source
+# Prefer the project virtual environment so generator dependencies are available.
+$venvPython = Join-Path $projectRoot ".venv\Scripts\python.exe"
+$pythonExe = if (Test-Path $venvPython) { $venvPython } else { $null }
+if (-not $pythonExe) {
+    $pythonExe = (Get-Command python -ErrorAction SilentlyContinue)?.Source
+}
 if (-not $pythonExe) {
     $pythonExe = (Get-Command python3 -ErrorAction SilentlyContinue)?.Source
 }
@@ -197,7 +249,7 @@ Write-Host "  Command: python $($generatorArgs -join ' ')" -ForegroundColor Gray
 Write-Host ""
 
 # Run from project root so relative imports resolve correctly
-Push-Location (Split-Path $PSScriptRoot -Parent)
+Push-Location $projectRoot
 try {
     & $pythonExe @generatorArgs
     $exitCode = $LASTEXITCODE
