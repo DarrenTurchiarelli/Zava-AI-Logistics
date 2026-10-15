@@ -16,7 +16,7 @@ param appInsightsId string
 
 var resourcePrefix = 'zava-${environment}'
 var aiServicesName = '${resourcePrefix}-aisvc-${uniqueSuffix}'   // AIServices kind — new name forces clean create (kind is immutable)
-var openAIServiceName = aiServicesName                         // backward-compat alias used by outputs and RBAC modules
+var foundryProjectName = '${aiServicesName}-project'
 var aiHubName = '${resourcePrefix}-aihub-${uniqueSuffix}'
 var aiProjectName = '${resourcePrefix}-aiproject-${uniqueSuffix}'
 var storageAccountName = 'zava${environment}st${uniqueSuffix}'
@@ -78,6 +78,19 @@ resource gpt4oDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-
       version: '2024-08-06'
     }
     raiPolicyName: 'Microsoft.Default'
+  }
+}
+
+resource foundryProject 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' = {
+  parent: openAIService
+  name: foundryProjectName
+  location: location
+  identity: {
+    type: 'SystemAssigned'
+  }
+  properties: {
+    displayName: 'Zava AI Project'
+    description: 'Microsoft Foundry project for Zava logistics agents'
   }
 }
 
@@ -157,9 +170,9 @@ output openAIServicePrincipalId string = openAIService.identity.principalId
 output aiHubName string = aiHub.name
 output aiHubId string = aiHub.id
 output aiHubPrincipalId string = aiHub.identity.principalId
-output aiProjectName string = aiProject.name
-output aiProjectEndpoint string = aiProject.properties.discoveryUrl
-output aiProjectId string = aiProject.id
+output aiProjectName string = foundryProject.name
+output aiProjectEndpoint string = 'https://${openAIService.name}.services.ai.azure.com/api/projects/${foundryProject.name}'
+output aiProjectId string = foundryProject.id
 output aiProjectPrincipalId string = aiProject.identity.principalId
 output storageAccountName string = storageAccount.name
 output storageAccountId string = storageAccount.id

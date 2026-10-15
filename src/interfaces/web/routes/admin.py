@@ -632,15 +632,15 @@ def api_health():
     # ── 2. Azure OpenAI / AI Agents ─────────────────────────────────────────
     t0 = time.monotonic()
     try:
-        endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
+        endpoint = os.getenv("AZURE_AI_PROJECT_ENDPOINT", "")
         agent_id = os.getenv("CUSTOMER_SERVICE_AGENT_ID", "")
         if not endpoint or not agent_id:
-            raise ValueError("AZURE_OPENAI_ENDPOINT or CUSTOMER_SERVICE_AGENT_ID not configured")
+            raise ValueError("AZURE_AI_PROJECT_ENDPOINT or CUSTOMER_SERVICE_AGENT_ID not configured")
 
-        from src.infrastructure.agents.core.base import AzureOpenAIAgentClient
-        client = AzureOpenAIAgentClient().get_client()
-        # Retrieve agent metadata – fast, proves auth + connectivity
-        client.beta.assistants.retrieve(agent_id)
+        from azure.ai.projects import AIProjectClient
+        from azure.identity import DefaultAzureCredential
+        client = AIProjectClient(endpoint=endpoint, credential=DefaultAzureCredential())
+        client.agents.get(agent_id)
         results["ai_agents"] = {"status": "ok", "label": "AI Agents", "latency_ms": round((time.monotonic() - t0) * 1000)}
     except Exception as e:
         results["ai_agents"] = {"status": "offline", "label": "AI Agents", "latency_ms": None, "error": str(e)[:120]}
@@ -652,9 +652,7 @@ def api_health():
         if not fraud_id:
             raise ValueError("FRAUD_RISK_AGENT_ID not configured")
 
-        from src.infrastructure.agents.core.base import AzureOpenAIAgentClient
-        client = AzureOpenAIAgentClient().get_client()
-        client.beta.assistants.retrieve(fraud_id)
+        client.agents.get(fraud_id)
         results["fraud_detection"] = {"status": "ok", "label": "Fraud Detection", "latency_ms": round((time.monotonic() - t0) * 1000)}
     except Exception as e:
         results["fraud_detection"] = {"status": "offline", "label": "Fraud Detection", "latency_ms": None, "error": str(e)[:120]}

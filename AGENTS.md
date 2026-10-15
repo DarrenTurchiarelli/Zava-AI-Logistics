@@ -2,6 +2,8 @@
 
 Technical documentation for AI coding agents working with the Zava Azure AI-powered parcel tracking system.
 
+This project was built with the microsoft-foundry skill. Before working on or answering questions about Foundry agents, read the microsoft-foundry skill first. If you are in VS Code, read the vscode-microsoft-foundry skill first.
+
 ## Project Overview
 
 Zava is a last-mile delivery platform powered by **8 Azure AI Foundry agents** with end-to-end intelligent automation. Built with Flask, Azure Cosmos DB, Azure Maps, and the Microsoft Agent Framework.
@@ -584,7 +586,8 @@ The deployment script automatically:
 3. ✅ Enables managed identity on all services (Cosmos DB, Speech, Vision, OpenAI)
 4. ✅ **Configures all RBAC permissions via Bicep template:**
    - Cosmos DB Built-in Data Contributor (data plane access)
-   - Cognitive Services OpenAI User (for App Service, AI Hub, AI Project)
+  - Foundry User (for App Service at the Foundry project scope)
+  - Cognitive Services OpenAI User (for AI Hub and AI Project identities)
    - Cognitive Services User (Speech & Vision services)
    - **Waits 60 seconds for RBAC replication across Azure regions**
    - **Retries operations if permissions not immediately available**
@@ -797,7 +800,8 @@ pip install -r requirements.txt
 
 The deployment script automatically:
 - Assigns **Cosmos DB Built-in Data Contributor** role via Bicep template
-- Assigns **Cognitive Services OpenAI User** role for Azure OpenAI access
+- Assigns **Foundry User** to App Service at the Foundry project scope
+- Assigns **Cognitive Services OpenAI User** to AI resource identities
 - Assigns **Cognitive Services User** role for Speech & Vision services
 - Waits 60 seconds for Azure RBAC replication across regions
 - **Restarts App Service to refresh managed identity credentials** (prevents "Unauthorized" errors on first use)

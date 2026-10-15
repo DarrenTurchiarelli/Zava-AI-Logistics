@@ -23,16 +23,16 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
-from openai import AzureOpenAI
-from azure.identity import AzureCliCredential, ManagedIdentityCredential, get_bearer_token_provider
+from azure.ai.projects import AIProjectClient
+from azure.identity import DefaultAzureCredential, ManagedIdentityCredential
 from dotenv import load_dotenv
 
 from config.company import COMPANY_NAME
 
 load_dotenv()
 # Configuration - Using centralized agent ID from .env
-FRAUD_RISK_AGENT_ID = os.getenv("FRAUD_RISK_AGENT_ID", "asst_ARutauXhW2tWVWB0UVqALhFA")  # Fallback to old ID
-AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
+FRAUD_RISK_AGENT_ID = os.getenv("FRAUD_RISK_AGENT_ID", "fraud-risk-agent")
+AZURE_AI_PROJECT_ENDPOINT = os.getenv("AZURE_AI_PROJECT_ENDPOINT")
 
 
 class ThreatLevel(Enum):
@@ -194,18 +194,22 @@ class FraudRiskAgent:
     def _analyze_with_ai_sync(self, message_content: str, sender_info: str) -> ThreatAnalysis:
         """Synchronous Azure AI agent analysis"""
         try:
-            # Connect to Azure OpenAI using token credential (no API key needed)
+            if not AZURE_AI_PROJECT_ENDPOINT:
+                raise ValueError("AZURE_AI_PROJECT_ENDPOINT is not configured")
+
             if os.getenv("USE_MANAGED_IDENTITY", "false").lower() == "true":
                 credential = ManagedIdentityCredential()
             else:
-                credential = AzureCliCredential()
+                credential = DefaultAzureCredential(
+                    exclude_managed_identity_credential=True,
+                    additionally_allowed_tenants=["*"],
+                )
 
-            token_provider = get_bearer_token_provider(credential, "https://cognitiveservices.azure.com/.default")
-            client = AzureOpenAI(
-                azure_endpoint=AZURE_OPENAI_ENDPOINT,
-                azure_ad_token_provider=token_provider,
-                api_version="2024-05-01-preview"
+            project = AIProjectClient(
+                endpoint=AZURE_AI_PROJECT_ENDPOINT,
+                credential=credential,
             )
+            client = project.get_openai_client(agent_name=FRAUD_RISK_AGENT_ID)
 
             # Prepare prompt for the Fraud & Risk Agent
             analysis_prompt = f"""
@@ -237,35 +241,10 @@ class FraudRiskAgent:
             Format your response clearly with each section labeled.
             """
 
-            # Create thread with message, run agent, wait for completion
-            thread = client.beta.threads.create(
-                messages=[{"role": "user", "content": analysis_prompt}]
-            )
-            run = client.beta.threads.runs.create_and_poll(
-                thread_id=thread.id,
-                assistant_id=self.agent_id
-            )
-
-            print(f"🔍 Run status: {run.status}")
-
-            # Get the assistant's response
-            messages = client.beta.threads.messages.list(thread_id=thread.id, order="desc", limit=1)
-            ai_response_obj = next(
-                (m for m in messages.data if m.role == "assistant"), None
-            )
-
-            # Extract text from message content
-            if ai_response_obj and ai_response_obj.content:
-                content = ai_response_obj.content[0]
-                if hasattr(content, "text"):
-                    ai_response = content.text.value
-                else:
-                    ai_response = str(content)
-                print(f"✅ Extracted AI response: {len(ai_response)} chars")
-                print(f"📄 AI Response preview: {ai_response[:500]}...")
-            else:
-                print(f"⚠️ No AI response received")
-                ai_response = ""
+            response = client.responses.create(input=analysis_prompt)
+            ai_response = response.output_text or ""
+            print(f"✅ Extracted AI response: {len(ai_response)} chars")
+            print(f"📄 AI Response preview: {ai_response[:500]}...")
 
             # Parse the AI response into structured data
             analysis = self._parse_ai_response(ai_response, message_content, sender_info)

@@ -4,9 +4,9 @@ Provides unified interface to call all 9 Azure AI Foundry persistent agents
 This module replaces local Python agent implementations with real Azure AI agents
 
 Required Azure RBAC Permissions for Managed Identity:
-- Cognitive Services OpenAI Contributor (for OpenAI operations)
-- Azure AI Developer (for agents/write permissions)
-- Cognitive Services User (for agents/read permissions)
+- Foundry User on the Foundry project (for Agent Framework model access)
+- Cosmos DB Built-in Data Contributor (for agent tools)
+- Cognitive Services User (for Speech and Vision operations)
 
 Setup Instructions:
 1. Enable managed identity on App Service
@@ -28,9 +28,8 @@ from config.company import COMPANY_EMAIL, COMPANY_NAME, COMPANY_PHONE
 
 load_dotenv()
 
-# Feature flag: set USE_MAF=true to route agent calls through the MAF v1.0 SDK
-# instead of the raw OpenAI Assistants API.  Safe to toggle at runtime.
-_USE_MAF: bool = os.getenv("USE_MAF", "false").lower() == "true"
+# The Assistants API is retired. All agent calls use Microsoft Agent Framework.
+_USE_MAF: bool = True
 
 # Azure OpenAI Configuration  
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
@@ -146,7 +145,7 @@ async def call_azure_agent(
     print(f"📝 Message length: {len(message)} chars")
 
     # ------------------------------------------------------------------
-    # MAF v1.0 fast-path (feature flag: USE_MAF=true)
+    # Microsoft Agent Framework is the supported runtime path.
     # ------------------------------------------------------------------
     if _USE_MAF:
         if not _AGENT_ID_TO_KEY:
@@ -168,9 +167,23 @@ async def call_azure_agent(
                 maf_result.setdefault("thread_id", None)
                 return maf_result
             except Exception as maf_exc:
-                print(f"⚠️  MAF call failed ({maf_exc}), falling back to legacy path")
+                error_msg = f"MAF agent '{agent_key}' failed: {maf_exc}"
+                print(f"❌ {error_msg}")
+                return {
+                    "success": False,
+                    "agent_id": agent_id,
+                    "error": error_msg,
+                    "response": None,
+                }
         else:
-            print(f"⚠️  No MAF key for agent_id={agent_id!r}, using legacy path")
+            error_msg = f"No Agent Framework mapping for agent_id={agent_id!r}"
+            print(f"❌ {error_msg}")
+            return {
+                "success": False,
+                "agent_id": agent_id,
+                "error": error_msg,
+                "response": None,
+            }
     # ------------------------------------------------------------------
 
     if not AZURE_OPENAI_ENDPOINT:

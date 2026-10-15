@@ -1,15 +1,12 @@
-﻿"""
-Register Cosmos DB tools with AI Agents (Customer Service + Dispatcher).
-Uses Azure OpenAI Assistants API directly.
-Runs during deployment to enable agent data access.
-"""
+﻿"""Register Cosmos DB function tools with Microsoft Foundry prompt agents."""
 
 import os
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
-from openai import AzureOpenAI
-from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+from azure.ai.projects import AIProjectClient
+from azure.ai.projects.models import FunctionTool, PromptAgentDefinition
+from azure.identity import DefaultAzureCredential
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.infrastructure.agents.tools.cosmos_tools import CUSTOMER_SERVICE_TOOLS, DISPATCHER_TOOLS
@@ -25,9 +22,10 @@ if sys.platform == "win32":
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
-load_dotenv(override=True)
+load_dotenv(override=False)
 
-AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
+AZURE_AI_PROJECT_ENDPOINT = os.getenv("AZURE_AI_PROJECT_ENDPOINT")
+AZURE_AI_MODEL_DEPLOYMENT_NAME = os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME", "gpt-4o")
 CUSTOMER_SERVICE_AGENT_ID = os.getenv("CUSTOMER_SERVICE_AGENT_ID")
 DISPATCHER_AGENT_ID = os.getenv("DISPATCHER_AGENT_ID")
 
@@ -36,8 +34,8 @@ print("Registering Cosmos DB Tools with Azure AI Agents")
 print("=" * 70)
 print()
 
-if not AZURE_OPENAI_ENDPOINT:
-    print("ERROR: AZURE_OPENAI_ENDPOINT not set")
+if not AZURE_AI_PROJECT_ENDPOINT:
+    print("ERROR: AZURE_AI_PROJECT_ENDPOINT not set")
     sys.exit(1)
 
 if not CUSTOMER_SERVICE_AGENT_ID:
@@ -45,18 +43,27 @@ if not CUSTOMER_SERVICE_AGENT_ID:
     print("   Run create_foundry_agents_openai.py first")
     sys.exit(1)
 
-print(f"Connecting to Azure OpenAI: {AZURE_OPENAI_ENDPOINT}")
+print(f"Connecting to Microsoft Foundry: {AZURE_AI_PROJECT_ENDPOINT}")
 print()
 
-credential = DefaultAzureCredential()
-token_provider = get_bearer_token_provider(credential, "https://cognitiveservices.azure.com/.default")
-client = AzureOpenAI(
-    azure_endpoint=AZURE_OPENAI_ENDPOINT,
-    azure_ad_token_provider=token_provider,
-    api_version="2024-05-01-preview",
+client = AIProjectClient(
+    endpoint=AZURE_AI_PROJECT_ENDPOINT,
+    credential=DefaultAzureCredential(),
 )
 
 errors = 0
+
+
+def convert_function_tools(tool_definitions):
+    return [
+        FunctionTool(
+            name=tool["function"]["name"],
+            description=tool["function"].get("description"),
+            parameters=tool["function"]["parameters"],
+            strict=False,
+        )
+        for tool in tool_definitions
+    ]
 
 # ---------------------------------------------------------------------------
 # Customer Service Agent
@@ -65,9 +72,6 @@ print("-" * 70)
 print("Customer Service Agent")
 print("-" * 70)
 try:
-    agent = client.beta.assistants.retrieve(CUSTOMER_SERVICE_AGENT_ID)
-    print(f"  Found: {agent.name}  (current tools: {len(agent.tools) if agent.tools else 0})")
-
     base_prompt = get_agent_prompt("customer-service")
     enhanced_instructions = f"""{base_prompt}
 
@@ -98,15 +102,21 @@ try:
 - Photos auto-display in UI - just acknowledge they exist
 """
 
-    updated = client.beta.assistants.update(
-        CUSTOMER_SERVICE_AGENT_ID,
-        tools=CUSTOMER_SERVICE_TOOLS,
-        instructions=enhanced_instructions,
+    customer_service_tools = convert_function_tools(CUSTOMER_SERVICE_TOOLS)
+    updated = client.agents.create_version(
+        agent_name=CUSTOMER_SERVICE_AGENT_ID,
+        description="Real-time customer inquiries and parcel tracking",
+        metadata={"display_name": "Customer Service Agent"},
+        definition=PromptAgentDefinition(
+            model=AZURE_AI_MODEL_DEPLOYMENT_NAME,
+            instructions=enhanced_instructions,
+            temperature=0.7,
+            tools=customer_service_tools,
+        ),
     )
-    print(f"  Registered {len(updated.tools)} tools:")
-    for t in updated.tools:
-        if hasattr(t, "function"):
-            print(f"    - {t.function.name}")
+    print(f"  Registered {len(customer_service_tools)} tools in version {updated.version}:")
+    for tool in customer_service_tools:
+        print(f"    - {tool.name}")
     print("  Customer Service Agent ready")
     print()
 except Exception as e:
@@ -125,20 +135,22 @@ if not DISPATCHER_AGENT_ID:
     print()
 else:
     try:
-        agent = client.beta.assistants.retrieve(DISPATCHER_AGENT_ID)
-        print(f"  Found: {agent.name}  (current tools: {len(agent.tools) if agent.tools else 0})")
-
         dispatcher_prompt = get_agent_prompt("dispatcher")
-
-        updated = client.beta.assistants.update(
-            DISPATCHER_AGENT_ID,
-            tools=DISPATCHER_TOOLS,
-            instructions=dispatcher_prompt,
+        dispatcher_tools = convert_function_tools(DISPATCHER_TOOLS)
+        updated = client.agents.create_version(
+            agent_name=DISPATCHER_AGENT_ID,
+            description="Intelligent parcel-to-driver assignment",
+            metadata={"display_name": "Dispatcher Agent"},
+            definition=PromptAgentDefinition(
+                model=AZURE_AI_MODEL_DEPLOYMENT_NAME,
+                instructions=dispatcher_prompt,
+                temperature=0.3,
+                tools=dispatcher_tools,
+            ),
         )
-        print(f"  Registered {len(updated.tools)} tools:")
-        for t in updated.tools:
-            if hasattr(t, "function"):
-                print(f"    - {t.function.name}")
+        print(f"  Registered {len(dispatcher_tools)} tools in version {updated.version}:")
+        for tool in dispatcher_tools:
+            print(f"    - {tool.name}")
         print("  Dispatcher Agent ready")
         print()
     except Exception as e:

@@ -428,7 +428,7 @@ if (-not $SkipInfrastructure -and -not $CodeOnly) {
     Write-Host "[3/7] Waiting for cross-resource group RBAC permissions to propagate..." -ForegroundColor Yellow
     Write-Host "  ℹ  Bicep template assigned the following roles across resource groups:" -ForegroundColor Cyan
     Write-Host "     • App Service → Cosmos DB Built-in Data Contributor (Backend RG)" -ForegroundColor Gray
-    Write-Host "     • App Service → Cognitive Services OpenAI User (Middleware RG)" -ForegroundColor Gray
+    Write-Host "     • App Service → Foundry User (Foundry project scope)" -ForegroundColor Gray
     Write-Host "     • App Service → Cognitive Services User for Speech/Vision (Shared RG)" -ForegroundColor Gray
     Write-Host "     • AI Hub/Project → Cognitive Services OpenAI User (Middleware RG)" -ForegroundColor Gray
     Write-Host ""
@@ -521,8 +521,8 @@ if (-not $pythonExe) {
         return (Read-Host "  Enter choice [R/S/Q]").Trim().ToUpper()
     }
 
-    # Use openai.AzureOpenAI + DefaultAzureCredential (picks up 'az login' locally, Managed Identity in Azure)
-    # No API key enable/disable needed
+    # Use the current Microsoft Foundry project API with DefaultAzureCredential.
+    $env:AZURE_AI_PROJECT_ENDPOINT         = $bicepOutputJson.middleware.value.aiProjectEndpoint
     $env:AZURE_OPENAI_ENDPOINT            = $bicepOutputJson.middleware.value.openAIServiceEndpoint
     $env:AZURE_AI_MODEL_DEPLOYMENT_NAME   = "gpt-4o"
     $env:PYTHONIOENCODING                 = "utf-8"

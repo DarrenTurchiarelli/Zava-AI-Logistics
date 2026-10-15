@@ -1,17 +1,13 @@
-"""
-Create all required Azure AI Foundry agents for Zava Logistics
-Uses openai.AzureOpenAI with DefaultAzureCredential (no API keys).
-Returns agent IDs as JSON for integration with deployment scripts.
-"""
+"""Create the Microsoft Foundry prompt agents required by Zava Logistics."""
 
 import os
 import sys
 import json
-import warnings
 from pathlib import Path
 from dotenv import load_dotenv
-from openai import AzureOpenAI
-from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+from azure.ai.projects import AIProjectClient
+from azure.ai.projects.models import PromptAgentDefinition
+from azure.identity import DefaultAzureCredential
 
 # Add parent directory to path to import from src module
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -28,12 +24,9 @@ if sys.platform == 'win32':
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
-load_dotenv(override=True)
+load_dotenv(override=False)
 
-# Suppress openai SDK deprecation warnings for beta.assistants (still functional)
-warnings.filterwarnings("ignore", category=DeprecationWarning, module="openai")
-
-AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
+AZURE_AI_PROJECT_ENDPOINT = os.getenv("AZURE_AI_PROJECT_ENDPOINT")
 AZURE_AI_MODEL_DEPLOYMENT_NAME = os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME", "gpt-4o")
 
 # Agent definitions - load prompts from Agent-Skills folder
@@ -107,23 +100,19 @@ AGENTS = [
 def create_agents():
     """Create all required agents and return their IDs"""
     
-    if not AZURE_OPENAI_ENDPOINT:
-        print("ERROR: AZURE_OPENAI_ENDPOINT not set", file=sys.stderr)
+    if not AZURE_AI_PROJECT_ENDPOINT:
+        print("ERROR: AZURE_AI_PROJECT_ENDPOINT not set", file=sys.stderr)
         return None
 
     agent_ids = {}
 
     try:
-        # DefaultAzureCredential picks up 'az login' locally, Managed Identity in Azure
-        credential = DefaultAzureCredential()
-        token_provider = get_bearer_token_provider(credential, "https://cognitiveservices.azure.com/.default")
-        client = AzureOpenAI(
-            azure_endpoint=AZURE_OPENAI_ENDPOINT,
-            azure_ad_token_provider=token_provider,
-            api_version="2024-05-01-preview"
+        client = AIProjectClient(
+            endpoint=AZURE_AI_PROJECT_ENDPOINT,
+            credential=DefaultAzureCredential(),
         )
 
-        print(">>> Creating Azure AI Foundry Agents (via openai.AzureOpenAI + DefaultAzureCredential)...")
+        print(">>> Creating Microsoft Foundry prompt agents...")
         print("=" * 60)
 
         for agent_def in AGENTS:
@@ -132,29 +121,35 @@ def create_agents():
 
                 instructions = get_agent_prompt(agent_def["prompt_folder"])
 
-                agent = client.beta.assistants.create(
-                    model=AZURE_AI_MODEL_DEPLOYMENT_NAME,
-                    name=agent_def["name"],
-                    instructions=instructions,
+                agent_name = agent_def["name"].lower().replace(" & ", "-").replace(" ", "-")
+                agent = client.agents.create_version(
+                    agent_name=agent_name,
                     description=agent_def["description"],
-                    temperature=agent_def["temperature"]
+                    metadata={"display_name": agent_def["name"]},
+                    definition=PromptAgentDefinition(
+                        model=AZURE_AI_MODEL_DEPLOYMENT_NAME,
+                        instructions=instructions,
+                        temperature=agent_def["temperature"],
+                    ),
                 )
 
-                agent_ids[agent_def["env_var"]] = agent.id
-                print(f"[OK] {agent.id}")
+                agent_ids[agent_def["env_var"]] = agent.name
+                print(f"[OK] {agent.name} (version {agent.version})")
 
             except Exception as e:
                 print(f"[FAIL] {e}", file=sys.stderr)
 
         print("=" * 60)
-        print(f"[SUCCESS] Created {len(agent_ids)}/{len(AGENTS)} agents successfully")
+        print(f"[SUCCESS] Created {len(agent_ids)}/{len(AGENTS)} agent versions successfully")
 
         if len(agent_ids) == len(AGENTS):
             print("\nAgent IDs:")
             for env_var, agent_id in agent_ids.items():
                 print(f"  {env_var}={agent_id}")
 
-        return agent_ids
+            return agent_ids
+
+        return None
 
     except Exception as e:
         print(f"ERROR: Failed to create agents: {e}", file=sys.stderr)

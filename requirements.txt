@@ -6,10 +6,10 @@ gunicorn>=21.2.0
 Werkzeug>=3.0.0
 
 # Azure AI and Cognitive Services
-azure-ai-projects>=1.0.0
+azure-ai-projects>=2.6.1,<2.7.0
 azure-identity>=1.12.0
 azure-core>=1.26.0
-openai>=1.30.0  # Azure OpenAI Assistants API
+openai>=1.30.0
 azure-ai-vision-imageanalysis>=1.0.0  # Azure AI Vision for OCR and image analysis
 azure-cognitiveservices-speech>=1.35.0  # Azure Speech Services for voice input/output
 
@@ -22,12 +22,8 @@ agent-framework-core>=1.8.1
 agent-framework-openai>=1.8.1        # OpenAIChatClient (renamed from OpenAIChatCompletionClient)
 agent-framework-foundry>=1.8.1      # FoundryChatClient, FoundryMemoryProvider (replaces agent-framework-azure-ai)
 agent-framework-orchestrations      # SequentialBuilder, HandoffBuilder, GroupChatBuilder, MagenticBuilder
-# HTTP server hosting for Agent Inspector / agentdev CLI
-azure-ai-agentserver-agentframework==1.0.0b17
-azure-ai-agentserver-core==1.0.0b16  # held at b16 — b5 is a major-version break, review separately
 # Debug tooling
 debugpy>=1.8.0
-agent-dev-cli
 
 # Data Processing
 python-dotenv>=1.0.0

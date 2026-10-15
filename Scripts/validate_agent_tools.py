@@ -6,8 +6,8 @@ import os
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
-from openai import AzureOpenAI
-from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+from azure.ai.projects import AIProjectClient
+from azure.identity import DefaultAzureCredential
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -20,9 +20,9 @@ if sys.platform == "win32":
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
-load_dotenv(override=True)
+load_dotenv(override=False)
 
-AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
+AZURE_AI_PROJECT_ENDPOINT = os.getenv("AZURE_AI_PROJECT_ENDPOINT")
 CUSTOMER_SERVICE_AGENT_ID = os.getenv("CUSTOMER_SERVICE_AGENT_ID")
 DISPATCHER_AGENT_ID = os.getenv("DISPATCHER_AGENT_ID")
 
@@ -39,16 +39,13 @@ def validate_agent_tools():
     print("=" * 70)
     print()
 
-    if not AZURE_OPENAI_ENDPOINT:
-        print("ERROR: AZURE_OPENAI_ENDPOINT not set")
+    if not AZURE_AI_PROJECT_ENDPOINT:
+        print("ERROR: AZURE_AI_PROJECT_ENDPOINT not set")
         return False
 
-    credential = DefaultAzureCredential()
-    token_provider = get_bearer_token_provider(credential, "https://cognitiveservices.azure.com/.default")
-    client = AzureOpenAI(
-        azure_endpoint=AZURE_OPENAI_ENDPOINT,
-        azure_ad_token_provider=token_provider,
-        api_version="2024-05-01-preview",
+    client = AIProjectClient(
+        endpoint=AZURE_AI_PROJECT_ENDPOINT,
+        credential=DefaultAzureCredential(),
     )
 
     all_ok = True
@@ -59,9 +56,10 @@ def validate_agent_tools():
             continue
 
         try:
-            agent = client.beta.assistants.retrieve(agent_id)
-            tool_count = len(agent.tools) if agent.tools else 0
-            tools_names = [t.function.name for t in agent.tools if hasattr(t, "function")]
+            agent = client.agents.get(agent_id).versions.latest
+            tools = agent.definition.tools or []
+            tool_count = len(tools)
+            tools_names = [tool.name for tool in tools if hasattr(tool, "name")]
 
             if tool_count >= min_tools:
                 print(f"  OK    {label}: {tool_count} tools registered")

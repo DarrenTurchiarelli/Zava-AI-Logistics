@@ -241,8 +241,9 @@ Invoke-WebRequest "https://$webAppName/health" -UseBasicParsing
 - ✅ **Managed Identity**: Enabled automatically
 - ✅ **RBAC Permissions**: Granted during deployment
   - Cosmos DB Data Contributor
-  - Cognitive Services OpenAI Contributor  
-  - Azure AI Developer
+  - Foundry User (App Service, Foundry project scope)
+  - Cognitive Services OpenAI User (AI resource identities)
+  - Cognitive Services User (Speech and Vision)
 - ✅ **No Connection Strings**: Uses managed identity authentication
 - ✅ **Secrets Management**: `.env` file excluded from Git
 - ✅ **Cosmos DB**: Local auth disabled (`DisableLocalAuth=true`)

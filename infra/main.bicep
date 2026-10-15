@@ -148,14 +148,14 @@ module cosmosRoleAssignment 'modules/rbac/cosmosDbDataContributor.bicep' = {
   }
 }
 
-// Cognitive Services OpenAI User for App Service (deployed to Middleware RG)
-module openAIAppServiceRbac 'modules/rbac/cognitiveServicesUser.bicep' = {
+// Foundry User for App Service at the project scope (deployed to Middleware RG)
+module foundryAppServiceRbac 'modules/rbac/foundryProjectUser.bicep' = {
   scope: middlewareRg
-  name: 'openai-appservice-rbac-${uniqueSuffix}'
+  name: 'foundry-appservice-rbac-${uniqueSuffix}'
   params: {
     principalId: frontend.outputs.appServicePrincipalId
-    cognitiveServiceName: middleware.outputs.openAIServiceName
-    serviceType: 'openai'
+    foundryAccountName: middleware.outputs.openAIServiceName
+    foundryProjectName: middleware.outputs.aiProjectName
   }
 }
 
@@ -248,6 +248,7 @@ output middleware object = {
   aiHubName: middleware.outputs.aiHubName
   aiProjectName: middleware.outputs.aiProjectName
   aiProjectEndpoint: middleware.outputs.aiProjectEndpoint
+  aiProjectId: middleware.outputs.aiProjectId
 }
 
 output backend object = {
