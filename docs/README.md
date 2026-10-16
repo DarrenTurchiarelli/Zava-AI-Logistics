@@ -5,6 +5,7 @@ Documentation for the Zava logistics platform.
 ## Contents
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture overview
+- [FOUNDRY_TOOLBOX_DESIGN.md](FOUNDRY_TOOLBOX_DESIGN.md) - Why Zava uses versioned read/write Foundry toolboxes, including architecture and tradeoffs
 - [DEVELOPMENT.md](DEVELOPMENT.md) - Developer guide
 - [TESTING.md](TESTING.md) - Testing strategy and guide
 - [DEPLOYMENT.md](DEPLOYMENT.md) - Deployment guide
