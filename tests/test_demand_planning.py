@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from azure.core.exceptions import HttpResponseError, ServiceRequestError, ServiceResponseError
 from itsdangerous import TimestampSigner
 from openai import OpenAIError
 from pydantic import ValidationError
@@ -1281,6 +1282,9 @@ def test_expired_preview_and_chat_context_are_explicit_errors(chat_client, monke
     [
         (PlannerChatUnavailable("Not configured"), 503),
         (OpenAIError("Provider unavailable"), 503),
+        (HttpResponseError("Foundry project access denied"), 503),
+        (ServiceRequestError("Foundry network request failed"), 503),
+        (ServiceResponseError("Foundry network response failed"), 503),
         (PlannerChatResponseError("Incomplete response"), 502),
     ],
 )
@@ -1306,39 +1310,175 @@ def test_chat_needs_authentication(flask_app):
     assert flask_app.test_client().post("/api/demand-planning/chat").status_code == 302
 
 
-def test_interpreter_uses_existing_azure_model_and_json_validation(monkeypatch):
+def _agent_engine_context(start, operations=None):
+    from src.interfaces.web.routes import admin
+
+    context = admin._demand_context(start=start, operations=operations)
+    return {
+        "facility": asdict(context["facility"]), "scenario": asdict(context["scenario"]),
+        "horizon": context["horizon"], "start": context["start"].isoformat(),
+        "operations": asdict(operations) if operations else None,
+        "cost_assumptions": asdict(context["costs"]),
+        "current": admin._projection_metrics(context["selected"]),
+        "options": [{"label": option["label"], "inputs": option["inputs"],
+                     "metrics": admin._projection_metrics(option["projection"])} for option in context["options"]],
+    }
+
+
+def _agent_tool_call(name, arguments="{}", call_id="call-1"):
+    item = SimpleNamespace(type="function_call", name=name, arguments=arguments, call_id=call_id)
+    item.model_dump = lambda **kwargs: {
+        "type": "function_call", "name": name, "arguments": arguments, "call_id": call_id,
+    }
+    return item
+
+
+def _agent_response(*calls, text=""):
+    return SimpleNamespace(status="completed", output=list(calls), output_text=text)
+
+
+def test_interpreter_invokes_registered_foundry_agent_with_real_planning_tools(monkeypatch, start):
     from src.infrastructure.agents import demand_planner_chat as chat
 
-    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://example.openai.azure.com/")
-    monkeypatch.setenv("AZURE_AI_MODEL_DEPLOYMENT_NAME", "existing-demo-model")
+    monkeypatch.setenv("AZURE_AI_PROJECT_ENDPOINT", "https://example.services.ai.azure.com/api/projects/zava")
+    monkeypatch.setenv("DEMAND_PLANNER_AGENT_NAME", "demand-planner")
+    monkeypatch.setenv("DEMAND_PLANNER_AGENT_VERSION", "3")
+    monkeypatch.setenv("USE_MANAGED_IDENTITY", "false")
     client = MagicMock()
     client.with_options.return_value = client
-    client.chat.completions.create.return_value = SimpleNamespace(
-        choices=[
-            SimpleNamespace(
-                finish_reason="stop",
-                message=SimpleNamespace(content='{"reply":"I will model the truck delay.","changes":{"delay":2}}'),
-            )
-        ]
-    )
-    factory = MagicMock()
-    factory.get_client.return_value = client
-    monkeypatch.setattr(chat, "AzureOpenAIAgentClient", lambda: factory)
+    client.__enter__.return_value = client
+    client.responses.create.side_effect = [
+        _agent_response(_agent_tool_call("get_workload_snapshot")),
+        _agent_response(_agent_tool_call("simulate_scenario", '{"changes":{"delay":2}}', "call-2")),
+        _agent_response(text='{"reply":"I will model the truck delay.","changes":{"delay":2}}'),
+    ]
+    project_client = MagicMock()
+    project_client.__enter__.return_value = project_client
+    project_client.get_openai_client.return_value = client
+    monkeypatch.setattr(chat, "AIProjectClient", lambda **kwargs: project_client)
+    monkeypatch.setattr(chat, "DefaultAzureCredential", MagicMock())
+    context = _agent_engine_context(start)
     result = chat.interpret_question(
-        "Delay by two hours.", [ChatMessage(role="user", content="Hello")], {"scenario": {}}
+        "Delay by two hours.", [ChatMessage(role="user", content="Hello")], context,
     )
     assert result.changes == {"delay": 2}
-    arguments = client.chat.completions.create.call_args.kwargs
-    assert arguments["model"] == "existing-demo-model"
-    assert arguments["response_format"] == {"type": "json_object"}
-    assert json.loads(arguments["messages"][-1]["content"])["question"] == "Delay by two hours."
+    arguments = client.responses.create.call_args_list[0].kwargs
+    assert arguments["extra_body"] == {"agent_reference": {"type": "agent_reference", "name": "demand-planner", "version": "3"}}
+    assert "model" not in arguments
+    assert arguments["store"] is False
+    assert arguments["tool_choice"] == {"type": "function", "name": "get_workload_snapshot"}
+    assert json.loads(arguments["input"][1]["content"])["question"] == "Delay by two hours."
+    outputs = [item for item in arguments["input"] if item.get("type") == "function_call_output"]
+    assert json.loads(outputs[0]["output"])["current"]["total_cost"] == 45840
+    assert json.loads(outputs[1]["output"])["validated_changes"] == {"delay": 2}
+    assert json.loads(outputs[1]["output"])["applied"] is False
+    client.chat.completions.create.assert_not_called()
     assert client.with_options.call_args.kwargs["max_retries"] == 0
+
+
+def test_agent_definition_declares_dedicated_strict_tools():
+    from src.infrastructure.agents.demand_planner_chat import agent_definition
+
+    definition = agent_definition("existing-demo-model").as_dict()
+    assert definition["model"] == "existing-demo-model"
+    assert "dedicated Microsoft Foundry" in definition["instructions"]
+    assert [tool["name"] for tool in definition["tools"]] == [
+        "get_workload_snapshot", "compare_response_options", "simulate_scenario",
+        "get_network_snapshot", "compare_network_options", "simulate_network_scenario",
+    ]
+    assert all(tool["strict"] for tool in definition["tools"])
+    schema = definition["tools"][2]["parameters"]["properties"]["changes"]
+    assert set(schema["required"]) == set(LIMITS)
+    assert schema["additionalProperties"] is False
+
+
+def test_agent_tools_preserve_hybrid_snapshot_costs_and_do_not_apply(start):
+    from src.infrastructure.agents.demand_planner_chat import PlanningTools
+
+    operations = _operations({"parcels": [{"id": "p1", "current_location": "DC-SYD-001", "status": "Sorting"}]})
+    from src.interfaces.web.routes import admin
+
+    context = admin._demand_context(
+        facility_code="DC-SYD-001", start=start, operations=operations,
+        scenario=Scenario(lane_outage=1), costs=CostAssumptions(extra_hourly=200),
+    )
+    engine = _agent_engine_context(start)
+    engine.update(
+        facility=asdict(context["facility"]), scenario=asdict(context["scenario"]),
+        operations=asdict(operations), cost_assumptions=asdict(context["costs"]),
+    )
+    original = json.dumps(engine, default=str)
+    tools = PlanningTools(engine)
+    output = tools.execute("simulate_scenario", '{"changes":{"extra_staff":4,"restore_lane":1,"delay":null}}')
+    assert output["metrics"]["cost"] == 7900
+    assert output["metrics"]["total_cost"] == 53740
+    assert output["validated_changes"] == {"extra_staff": 4, "restore_lane": 1}
+    assert output["applied"] is False
+    assert json.dumps(engine, default=str) == original
+    assert "options" not in tools.execute("get_workload_snapshot", "{}")
+    assert tools.execute("compare_response_options", "{}")["options"] == engine["options"]
+
+
+@pytest.mark.parametrize("name,arguments", [
+    ("write_parcel", "{}"), ("get_workload_snapshot", '{"id":"p1"}'),
+    ("simulate_scenario", "not json"), ("simulate_scenario", "[]"),
+    ("simulate_scenario", '{"changes":{"extra_staff":9}}'),
+    ("simulate_scenario", '{"changes":{"extra_staff":true}}'),
+    ("simulate_scenario", '{"changes":{"extra_staff":"4"}}'),
+    ("simulate_scenario", '{"changes":{"release_approval":1}}'),
+    ("simulate_scenario", '{"changes":{"cost_extra_hourly":1}}'),
+    ("simulate_scenario", '{"changes":[]}' ),
+    ("simulate_scenario", '{"changes":{},"facility":"other"}'),
+])
+def test_agent_tools_reject_invalid_or_operational_calls(start, name, arguments):
+    from src.infrastructure.agents.demand_planner_chat import PlanningTools
+
+    with pytest.raises(PlannerChatResponseError):
+        PlanningTools(_agent_engine_context(start)).execute(name, arguments)
+
+
+@pytest.mark.parametrize("failure", ["no_snapshot", "no_simulation", "different_patch", "incomplete", "turn_limit", "call_limit", "timeout"])
+def test_agent_loop_enforces_grounding_calculation_and_execution_limits(monkeypatch, start, failure):
+    from src.infrastructure.agents import demand_planner_chat as chat
+
+    snapshot = _agent_response(_agent_tool_call("get_workload_snapshot"))
+    final = _agent_response(text='{"reply":"Preview four sorters.","changes":{"extra_staff":4}}')
+    responses = {
+        "no_snapshot": [final],
+        "no_simulation": [snapshot, final],
+        "different_patch": [snapshot, _agent_response(_agent_tool_call("simulate_scenario", '{"changes":{"delay":2}}')), final],
+        "incomplete": [SimpleNamespace(status="incomplete")],
+        "turn_limit": [snapshot] * 6,
+        "call_limit": [_agent_response(*[_agent_tool_call("get_workload_snapshot", call_id=str(i)) for i in range(9)])],
+        "timeout": [],
+    }
+    client = MagicMock()
+    client.with_options.return_value = client
+    client.responses.create.side_effect = responses[failure]
+    if failure == "timeout":
+        monkeypatch.setattr(chat, "monotonic", MagicMock(side_effect=[0, 56]))
+    with pytest.raises(PlannerChatResponseError):
+        chat._run_agent(client, "demand-planner", "1", "Add four sorters", [], _agent_engine_context(start))
+
+
+def test_agent_explanation_returns_no_proposal_after_snapshot_read(start):
+    from src.infrastructure.agents import demand_planner_chat as chat
+
+    client = MagicMock()
+    client.with_options.return_value = client
+    client.responses.create.side_effect = [
+        _agent_response(_agent_tool_call("get_workload_snapshot")),
+        _agent_response(text='{"reply":"Normal operating cost is AUD 45,840.","changes":{}}'),
+    ]
+    result = chat._run_agent(client, "demand-planner", "1", "Explain the costs", [], _agent_engine_context(start))
+    assert result.changes == {}
+    assert "45,840" in result.reply
 
 
 def test_interpreter_missing_configuration_is_not_a_fake_ai_response(monkeypatch):
     from src.infrastructure.agents import demand_planner_chat as chat
 
-    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "")
+    monkeypatch.setenv("AZURE_AI_PROJECT_ENDPOINT", "")
     with pytest.raises(PlannerChatUnavailable):
         chat.interpret_question("Hello", [], {})
 
@@ -1355,16 +1495,16 @@ def test_home_tile_replaces_rbac_and_links_to_planner(flask_app, path, logged_in
     assert response.status_code == 200
     page = response.get_data(as_text=True)
     assert "Role-Based Access Control" not in page
-    assert "Demand &amp; Capacity Planner" in page
+    assert "Network Demand &amp; Capacity" in page
     assert "40 distribution centres" in page
     assert "synthetic future demand and capacity" in page
     planner_link = re.search(
-        r'<a href="([^"]+)"[^>]*>\s*<i class="bi bi-calendar-range"></i> Open Demand Planner',
+        r'<a href="([^"]+)"[^>]*>\s*<i class="bi bi-calendar-range"></i> Open Network Demand &amp; Capacity',
         page,
     ).group(1)
     if logged_in:
-        assert planner_link == "/ai/demand-planning"
+        assert planner_link == "/ai/network-demand-capacity"
     else:
         assert planner_link.startswith("/demo-login/admin?")
-        assert "next=/ai/demand-planning" in planner_link
-    assert "/demo-login/depot_mgr?next=/ai/demand-planning" in page
+        assert "next=/ai/network-demand-capacity" in planner_link
+    assert "/demo-login/depot_mgr?next=/ai/network-demand-capacity" in page

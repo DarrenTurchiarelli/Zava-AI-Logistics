@@ -38,6 +38,8 @@ maps-*.zip
 # Temporary test and debug files
 test_*.py
 !tests/test_demand_planning.py
+!tests/test_network_planning.py
+!tests/test_network_planner_routes.py
 check_*.py
 list_*.py
 debug_*.py

@@ -307,32 +307,32 @@
         <div class="col-lg-6 col-xl-4">
             <div class="card h-100 shadow-sm hover-shadow">
                 <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0"><i class="bi bi-calendar-range"></i> Demand &amp; Capacity Planner</h5>
+                    <h5 class="mb-0"><i class="bi bi-calendar-range"></i> Network Demand &amp; Capacity</h5>
                 </div>
                 <div class="card-body">
                     <p class="card-text">
-                        Explore demand and capacity across 40 distribution centres, compare disruptions, and ask the planner about what-if scenarios.
+                        Explore synthetic network demand across 40 distribution centres, compare constrained responses, and save human decisions with simulated execution.
                     </p>
                     <h6 class="fw-bold">Try it yourself:</h6>
                     <ol class="small">
-                        <li>Select a distribution centre and planning horizon</li>
-                        <li>Model late trucks, staff absence, or extra sorting capacity</li>
-                        <li>Ask a what-if question, review the calculated preview, and apply it to the planner</li>
+                        <li>Find network capacity and priority-processing exposure</li>
+                        <li>Compare rebalancing, labour and combined responses</li>
+                        <li>Save a proposal, approve or reject explicitly, then simulate execution</li>
                     </ol>
                     <div class="alert alert-light border alert-permanent mt-3">
-                        <strong>What to observe:</strong> Hourly backlog, dispatch-cutoff risk, and scenario costs.
-                        Application workload and approval context are combined with synthetic future demand and capacity;
-                        applying a scenario does not change operations.
+                        <strong>What to observe:</strong> Evidence, constrained receiving capacity, illustrative costs and the decision audit.
+                        Drill into the hourly facility planner for application workload and approval context with synthetic future demand and capacity.
+                        No decision dispatches parcels or changes operational rosters.
                     </div>
                     <div class="alert alert-secondary alert-permanent py-3 mt-2">
                         <div class="d-flex justify-content-between align-items-center flex-wrap">
                             <div style="font-size: 0.85rem;" class="mb-2 mb-sm-0">
                                 <i class="bi bi-person-badge"></i> <strong>Try it:</strong>
-                                <a href="{{ url_for('auth.demo_login', username='admin', next=url_for('admin.demand_planning')) }}" class="text-dark fw-bold text-decoration-none"><u>admin</u></a> |
-                                <a href="{{ url_for('auth.demo_login', username='depot_mgr', next=url_for('admin.demand_planning')) }}" class="text-dark fw-bold text-decoration-none"><u>depot_mgr</u></a>
+                                <a href="{{ url_for('auth.demo_login', username='admin', next=url_for('network_planner.index')) }}" class="text-dark fw-bold text-decoration-none"><u>admin</u></a> |
+                                <a href="{{ url_for('auth.demo_login', username='depot_mgr', next=url_for('network_planner.index')) }}" class="text-dark fw-bold text-decoration-none"><u>depot_mgr</u></a>
                             </div>
-                            <a href="{{ url_for('admin.demand_planning') if session.get('user') else url_for('auth.demo_login', username='admin', next=url_for('admin.demand_planning')) }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
-                                <i class="bi bi-calendar-range"></i> Open Demand Planner
+                            <a href="{{ url_for('network_planner.index') if session.get('user') else url_for('auth.demo_login', username='admin', next=url_for('network_planner.index')) }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
+                                <i class="bi bi-calendar-range"></i> Open Network Demand &amp; Capacity
                             </a>
                         </div>
                     </div>

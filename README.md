@@ -22,8 +22,9 @@ Parcel tracking and logistics management platform powered by **8 Azure AI Foundr
 
 ## Demand & Capacity Planning
 
-Open the home page's **Demand & Capacity Planner** tile,
-**AI Insights > Open Demand Planner**, or the **Demand Planner** navigation
+Open the home page's **Network Demand & Capacity** tile for the network hero experience.
+The **hourly facility planner** remains available through
+**AI Insights > Open Demand Planner**, or the network page's **Open hourly facility planner**
 link (`/ai/demand-planning`, login required). Select any of the application's
 40 distribution centres and a rest-of-day, next-24-hour or next-7-day horizon.
 AI Insights, the planner and the Approvals dropdown share one catalogue of centre
@@ -40,6 +41,57 @@ scenario controls. Other input changes recalculate on **Compare scenario**.
 Three response options are ranked by cutoff misses, then incremental
 cost; each retains the selected disruption but replaces mitigation controls.
 Baseline always means normal operations, not the previous scenario.
+
+### Network Demand & Capacity hero
+
+`/ai/network-demand-capacity` is the primary network demo, also linked from the home
+tile, navigation, AI Insights and the hourly planner. It displays all 40 centres,
+daily baseline/revised demand, capacity constraints, priority-processing exposure,
+state rollups, a seven-day outlook and a synthetic event calendar. Focus-centre
+surge, capacity-loss and extended-hours controls support continuous manual replanning.
+
+**Network forecasts, benchmark actuals, event effects, roster hours, transport
+limits and priority exposure are synthetic.** Benchmark errors are arithmetic
+illustrations, not measured forecast accuracy or confidence intervals. Daily exposure
+is not Express SLA, DIFOT or confirmed customer lateness. Explanations list the
+actual model inputs rather than assert real merchant/weather causes. Selected-centre
+application eligibility and freshness are shown separately, never injected into
+the synthetic network forecast.
+
+Three responses compare bounded same-state rebalancing, local labour and combined
+interventions. Transfers conserve parcels, respect receiving spare capacity and
+the synthetic transport reservation. Options show indicative AUD costs, residual
+constraints, priority exposure, staff-hours, loads and receiver utilisation.
+They rank by viability, exposure and cost; infeasible options remain visible but
+cannot be approved. The hourly planner remains the detailed queue/cost drilldown.
+
+Admin/depot-manager users can save proposals with rationale, approve/reject them,
+and **separately simulate execution**. Immutable response assumptions, actor/time
+events and simulated action results are saved in a separate SQLite demo database,
+not operational Cosmos containers. Proposed -> approved -> simulated is enforced;
+repeat simulation is idempotent, rejected plans cannot execute, and changes produce
+a new proposal rather than rewrite an approved plan. This stores feedback; it does
+not train or improve a forecasting model automatically.
+
+The default local store is the Flask instance directory; App Service uses
+`/home/data/network-demo-plans.db`. Override with application config
+`NETWORK_DEMO_STORE_PATH`. This persistence is for a single-instance demonstration,
+not distributed production orchestration. Use a shared transactional service before
+multi-instance rollout. Write failures are visible, not reported as success.
+Decision POSTs require an operations role, CSRF and a signed 30-minute snapshot.
+No decisions alter parcels, approvals, rosters or real transport systems.
+
+The dedicated agent additionally exposes `get_network_snapshot`,
+`compare_network_options` and `simulate_network_scenario`. Network mode is isolated
+from facility-only controls; all proposals are tool-calculated and require explicit
+Apply. Agent tools cannot save, approve or execute plans. Agent registration and
+web-app deployment are separate release steps; missing agent configuration
+returns a visible error, not generic model chat or fake AI output.
+
+Not yet modelled: postcode/catchment drilldown, product/merchant forecasts, live air
+and linehaul legs, measured service commitments, statistical confidence, external
+event feeds, real operational execution and learned forecasting. These must not
+be inferred from the synthetic hero numbers.
 
 ### Hybrid application snapshot and synthetic forecast
 
@@ -146,17 +198,40 @@ required before local code changes appear on the hosted site.
 
 ### Ask the Planner
 
-The open chat panel uses the existing Azure AI model deployment to interpret
-questions about the displayed centre, horizon and scenario. For example:
+The open chat panel invokes a **dedicated, versioned Microsoft Foundry prompt
+agent** backed by the existing project model deployment. The facility agent tools are
+client-executed read-only tools: `get_workload_snapshot`, `simulate_scenario`
+and `compare_response_options`. It must inspect the authorised displayed snapshot
+before answering and simulate any proposed changes before returning them.
+It is not a generic direct Chat Completions call.
+
+Tools execute inside the application's authorised request scope using the frozen
+snapshot, start and cost assumptions. They do not reread Cosmos, access customer
+identifiers, approve parcels or write operations. The Responses API loop is bounded
+to six turns, eight tool calls and a 55-second execution budget, with no retry
+or silent direct-model fallback. Returned patches must match the last successful
+simulation. Requests use an explicit registered agent name and version; registration
+is never performed during a web request.
+
+The agent handles questions about the displayed centre, horizon and scenario. For example:
 “What if the inbound truck is two hours late and 15% of staff are absent?”
 The model proposes a validated patch to supported inputs; the deterministic
 planner engine calculates the preview and costs. **Apply scenario to planner**
 explicitly updates the view. Chat never approves parcels or changes operations.
 
-Configure `AZURE_OPENAI_ENDPOINT` and `AZURE_AI_MODEL_DEPLOYMENT_NAME` (default
-`gpt-4o`). The existing Azure OpenAI client uses managed identity when
+Configure `AZURE_AI_PROJECT_ENDPOINT`, `DEMAND_PLANNER_AGENT_NAME` and
+`DEMAND_PLANNER_AGENT_VERSION`. Missing registration/configuration explicitly
+disables chat; manual planning remains available. Registration tooling uses
+`AZURE_AI_MODEL_DEPLOYMENT_NAME` (default `gpt-4o`) for the agent definition.
+`Scripts/create_demand_planner_agent.py` defaults to local definition validation
+without Azure writes; its explicit `--register` option creates a new Foundry agent
+version and prints the name/version to configure. Agent deployment and web-app
+configuration are separate from local implementation. Verify the registered
+agent's facility and network tool loops before deploying the web app.
+
+The Foundry client uses managed identity when
 `USE_MANAGED_IDENTITY=true`, otherwise the local Azure credential chain. No new
-agent resource, model deployment or API key is required. The identity still needs
+Foundry account, model deployment or API key is required. The identity still needs
 permission to invoke the selected model. Missing configuration, model failures and
 invalid AI output produce visible errors; manual scenario controls remain usable.
 
@@ -184,8 +259,20 @@ ambiguous requests should produce a clarification, not a fabricated forecast.
 | 6 | Sorting Facility | Capacity monitoring, routing decisions | AI Insights refresh |
 | 7 | Delivery Coordination | Multi-stop sequencing, notifications | AI Insights refresh |
 | 8 | Optimisation | Network performance and cost analysis | AI Insights refresh |
+| 9 | Demand Planning | Read-only workload, scenario simulation and indicative cost comparison | On planner chat; dedicated Foundry registration required |
 
 Agent system prompts: `src/infrastructure/agents/skills/` — edit the `system-prompt.md` files directly; changes load dynamically.
+The Demand Planning agent instead uses the versioned definition in
+`src/infrastructure/agents/demand_planner_chat.py`; instruction/tool changes require
+registering a new agent version and updating its configured version.
+
+Current rollout status: `demand-planner` version `1` is registered in the Zava dev
+Foundry project with all six tools. Live facility explanation and costed simulation
+passed. Network calls remain blocked by an effective 10,000-token/minute model
+limit, despite Azure reporting the authorised 100,000-token/minute capacity update.
+The web-app rollout is paused; the existing Azure web app remains on its previously
+deployed direct-model implementation. Do not treat registration alone as a
+completed network-agent rollout.
 
 ---
 

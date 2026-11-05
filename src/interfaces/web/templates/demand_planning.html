@@ -154,7 +154,7 @@
             <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
                 <div>
                     <h2 class="h5 mb-1" id="planner-chat-heading">Ask the Planner</h2>
-                    <p class="small text-muted mb-0">Azure AI interprets your question. The planner engine calculates every scenario result.</p>
+                    <p class="small text-muted mb-0">The dedicated Foundry Demand Planning agent uses read-only workload, simulation and comparison tools. The planner engine calculates every scenario result.</p>
                 </div>
                 <button class="btn btn-sm btn-outline-secondary" type="button" id="planner-chat-clear">Clear chat</button>
             </div>
@@ -189,7 +189,7 @@
                             type="button" data-question="{{ question }}">{{ question }}</button>
                     {% endfor %}
                     <p class="small text-muted mt-2 mb-0">Anonymous application counts, source warnings, synthetic assumptions,
-                        questions, recent chat and the displayed scenario are sent to the configured Azure AI model and may incur charges.
+                        questions, recent chat and the displayed scenario are sent to the configured Foundry agent and its Azure AI model and may incur charges.
                         Customer details and parcel/driver identifiers are not sent from application feeds.
                         Nothing is dispatched, saved to the database or operationally approved.</p>
                     <p class="small text-muted mt-2 mb-0">Recent conversation stays in this browser tab across scenario changes
@@ -198,6 +198,7 @@
             </div>
         </div>
     </section>
+    <a class="btn btn-outline-primary mb-3" href="{{ url_for('network_planner.index', facility=facility.code) }}">Network demand &amp; capacity overview</a>
     <form method="get" class="card shadow-sm mb-4 planner-controls" id="planner-form">
         <div class="card-body">
             <div class="d-flex justify-content-between flex-wrap gap-2 mb-3">

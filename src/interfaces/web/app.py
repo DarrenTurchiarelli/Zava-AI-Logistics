@@ -18,6 +18,7 @@ from .routes.parcels import parcels_bp
 from .routes.manifests import manifests_bp
 from .routes.chatbot import chatbot_bp
 from .routes.admin import admin_bp
+from .routes.network_planning import network_bp
 from .routes.api import api_bp
 from .routes.agent_tools import agent_tools_bp
 
@@ -62,6 +63,7 @@ def create_app(config=None):
     app.register_blueprint(manifests_bp)
     app.register_blueprint(chatbot_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(network_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(agent_tools_bp)
     

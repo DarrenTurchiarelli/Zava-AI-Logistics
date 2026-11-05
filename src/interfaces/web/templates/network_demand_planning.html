@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block title %}Network Demand & Capacity - Zava Logistics{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    {% if error %}
+    <div class="alert alert-danger alert-persistent" role="alert">{{ error }}</div>
+    <a href="{{ url_for('network_planner.index') }}">Reset network planner</a>
+    {% else %}
+    <header class="rounded p-4 text-white mb-4" style="background: var(--dt-primary);">
+        <h1 class="h2">Network Demand &amp; Capacity</h1>
+        <p class="mb-2">Sense → Predict → Explain → Simulate → Recommend → Decide → Execute → Learn</p>
+        <span class="badge bg-light text-dark text-wrap mw-100">Synthetic network demo / human decisions / simulated execution only</span>
+    </header>
+    <div class="alert alert-info alert-persistent">
+        <strong>{{ plan.provenance }}</strong> Network forecasts, benchmark actuals, events, capacity, rosters, transport and
+        priority exposure are synthetic. Exposure is a processing-capacity proxy, <strong>not measured SLA or DIFOT</strong>.
+        Connected application records below are context only, not the source of this network forecast.
+    </div>
+    <form method="get" class="card shadow-sm mb-4" id="network-scenario-form">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-sm-6 col-lg-3"><label class="form-label" for="network-facility">Focus facility</label>
+                    <select name="facility" id="network-facility" class="form-select">
+                        {% for item in plan.facilities %}<option value="{{ item.code }}" {% if item.code == plan.facility_code %}selected{% endif %}>{{ item.code }} - {{ item.name }}</option>{% endfor %}
+                    </select></div>
+                <div class="col-sm-6 col-lg-2"><label class="form-label" for="network-day">Facility-local day</label>
+                    <input type="date" name="day" id="network-day" value="{{ plan.day }}" required class="form-control"></div>
+                {% for name, label, maximum in [('surge','Focus demand uplift (%)',60),('capacity_loss','Focus capacity loss (%)',60),('extra_hours','Extra operating hours',2)] %}
+                <div class="col-sm-6 col-lg-2"><label class="form-label" for="network-{{ name }}">{{ label }}</label>
+                    <input type="number" name="{{ name }}" id="network-{{ name }}" value="{{ plan.inputs[name] }}" min="0" max="{{ maximum }}" step="1" required class="form-control"></div>
+                {% endfor %}
+            </div>
+            <p class="small text-muted mt-3">Scenario controls affect the focus facility. Network capacities and financial rates are illustrative daily assumptions;
+                the existing facility planner provides the hourly queue and editable-rate drill-down.</p>
+            <button class="btn btn-primary" type="submit">Replan network</button>
+            {% if can_decide %}<button class="btn btn-outline-primary" type="submit" name="refresh" value="1">Refresh application context &amp; replan</button>{% endif %}
+            <a class="btn btn-outline-secondary" href="{{ url_for('admin.demand_planning', facility=plan.facility_code) }}">Open hourly facility planner</a>
+        </div>
+    </form>
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3 mb-4" id="network-kpis">
+        {% for label, value, unit in [('Forecast parcels',plan.totals.forecast,''),('Vs synthetic baseline',plan.totals.variance_pct,'%'),('Capacity risks',plan.totals.capacity_risks,''),('Priority exposure risks',plan.totals.service_risks,'')] %}
+        <div class="col"><div class="card h-100 shadow-sm"><div class="card-body">
+            <div class="small text-muted">{{ label }} / {{ plan.day }}</div><div class="h2">{{ '{:,}'.format(value) }}{{ unit }}</div>
+        </div></div></div>
+        {% endfor %}
+    </div>
+    <section class="card shadow-sm mb-4" aria-labelledby="network-focus-heading">
+        <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between gap-2">
+                <h2 class="h4" id="network-focus-heading">{{ plan.selected.name }}</h2>
+                <span class="badge {{ 'bg-danger' if plan.selected.constraint else 'bg-success' }}">Daily constraint: {{ '{:,}'.format(plan.selected.constraint) }} parcels</span>
+            </div>
+            <div class="row g-3 my-2">
+                <div class="col-md-4">Forecast demand: <strong>{{ '{:,}'.format(plan.selected.forecast) }}</strong><br>Effective daily capacity: <strong>{{ '{:,}'.format(plan.selected.capacity) }}</strong></div>
+                <div class="col-md-4">Synthetic priority exposure: <strong>{{ '{:,}'.format(plan.selected.priority_exposure) }}</strong><br>Utilisation: <strong>{{ plan.selected.utilisation_pct }}%</strong></div>
+                <div class="col-md-4">Required vs rostered staff-hours: <strong>{{ plan.selected.required_hours }} / {{ plan.selected.rostered_hours }}</strong><br>Costed transport loads: <strong>{{ plan.selected.transport_loads }}</strong></div>
+            </div>
+            <h3 class="h6">Explain the variance / model evidence</h3>
+            <ul class="small">{% for item in plan.selected.evidence %}<li>{{ item }}</li>{% endfor %}</ul>
+            <p class="small text-muted mb-0">These are model inputs, not observed causal attribution. Actual vs forecast below uses a synthetic benchmark,
+                not measured induction. No statistical confidence interval or trained forecast accuracy is claimed.</p>
+        </div>
+    </section>
+    <section class="mb-4" aria-labelledby="network-responses-heading">
+        <h2 class="h4" id="network-responses-heading">Recommended responses</h2>
+        <p class="small text-muted">Ranked by viability, remaining priority exposure, then indicative response cost. Receiving spare capacity and transport
+            limits constrain transfers. Approval does not mean execution; only viable plans can be approved. All costs are illustrative AUD.</p>
+        <div class="row g-3">
+            {% for option in plan.options %}
+            <div class="col-lg-4"><div class="card h-100 shadow-sm"><div class="card-body">
+                <span class="badge {{ 'bg-success' if option.viable else 'bg-warning text-dark' }}">{{ 'Viable in model' if option.viable else 'Residual constraint / not approvable' }}</span>
+                {% if loop.first and option.viable %}<span class="badge bg-primary">Recommended by model ranking</span>{% endif %}
+                <h3 class="h5 mt-2">{{ option.label }}</h3>
+                <div class="h3">+ AUD {{ '{:,}'.format(option.cost) }}</div>
+                <dl class="row small">
+                    <dt class="col-8">Remaining constraint</dt><dd class="col-4 text-end">{{ '{:,}'.format(option.remaining_constraint) }}</dd>
+                    <dt class="col-8">Priority exposure proxy</dt><dd class="col-4 text-end">{{ '{:,}'.format(option.service_exposure) }}</dd>
+                    <dt class="col-8">Additional staff-hours</dt><dd class="col-4 text-end">{{ option.required_staff_hours }}</dd>
+                    <dt class="col-8">Transport loads</dt><dd class="col-4 text-end">{{ option.transport_loads }}</dd>
+                </dl>
+                {% if option.target_code %}<p class="small">Receiver: <strong>{{ option.target_code }}</strong> / utilisation {{ option.target_utilisation_pct }}%</p>{% endif %}
+                <p class="small">{{ option.customer_impact }}</p>
+                <details class="small mb-3"><summary>Evidence and simulated actions</summary><ul>{% for item in option.evidence %}<li>{{ item }}</li>{% endfor %}</ul>
+                    <pre class="text-wrap">{{ option.actions | tojson(indent=2) }}</pre></details>
+                {% if can_decide %}
+                <form class="demo-decision-form" method="post" action="{{ url_for('network_planner.decisions') }}">
+                    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="snapshot" value="{{ snapshot }}">
+                    <input type="hidden" name="option_id" value="{{ option.id }}"><input type="hidden" name="action" value="save">
+                    <label class="form-label small" for="note-{{ loop.index }}">Planner rationale / override feedback</label>
+                    <input class="form-control form-control-sm mb-2" id="note-{{ loop.index }}" name="note" maxlength="500" placeholder="Why choose this response?">
+                    <button class="btn btn-outline-primary" type="submit">Save proposal for review</button>
+                </form>
+                {% endif %}
+            </div></div></div>
+            {% endfor %}
+        </div>
+    </section>
+    <section class="card shadow-sm mb-4" aria-labelledby="network-agent-heading">
+        <div class="card-body">
+            <h2 class="h4" id="network-agent-heading">Ask the Demand Planning agent</h2>
+            <p class="small text-muted">The dedicated Foundry agent can inspect this network snapshot, compare options and call deterministic simulation tools.
+                It cannot approve or execute plans. Registration is required; there is no direct-model fallback.
+                Anonymous context and your question are sent to Azure AI and may incur model charges.</p>
+            <form id="network-chat-form">
+                <label class="form-label" for="network-chat-question">Question or scenario</label>
+                <textarea class="form-control mb-2" id="network-chat-question" maxlength="2000" required rows="2" placeholder="What if this facility loses 40% capacity? Compare viable responses."></textarea>
+                <button class="btn btn-primary" id="network-chat-send" type="submit">Ask agent</button>
+            </form>
+            <div id="network-chat-result" class="mt-3" aria-live="polite"></div>
+        </div>
+    </section>
+    <section class="card shadow-sm mb-4"><div class="card-body">
+        <h2 class="h4">Demand heatmap / state to facility</h2>
+        <div class="row g-2 mb-3">
+            {% for state in plan.state_rollup %}<div class="col-sm-6 col-lg-3"><div class="rounded border p-3 {{ 'bg-warning-subtle' if state.constraint else 'bg-success-subtle' }}">
+                <strong>{{ state.state }}</strong> / {{ '{:,}'.format(state.forecast) }} parcels<br><span class="small">Capacity {{ '{:,}'.format(state.capacity) }} / constraint {{ '{:,}'.format(state.constraint) }}</span>
+            </div></div>{% endfor %}
+        </div>
+        <div class="table-responsive"><table class="table table-sm align-middle">
+            <caption>Synthetic daily network benchmark. No postcode/catchment, air-leg or real product-level SLA data is connected.</caption>
+            <thead><tr><th>Facility</th><th>Forecast</th><th>Capacity</th><th>Constraint</th><th>Synthetic actual benchmark</th><th>Benchmark error %</th><th>Vs baseline %</th></tr></thead>
+            <tbody>{% for item in plan.facilities %}<tr>
+                <th scope="row"><a href="{{ url_for('network_planner.index', facility=item.code, day=plan.day, **plan.inputs) }}">{{ item.name }}</a> <span class="small text-muted">{{ item.code }}</span></th>
+                <td>{{ '{:,}'.format(item.forecast) }}</td><td>{{ '{:,}'.format(item.capacity) }}</td><td class="{{ 'text-danger fw-bold' if item.constraint else '' }}">{{ '{:,}'.format(item.constraint) }}</td>
+                <td>{{ '{:,}'.format(item.actual) }}</td><td>{{ item.forecast_error_pct }}%</td><td>{{ item.variance_pct }}%</td>
+            </tr>{% endfor %}</tbody>
+        </table></div>
+    </div></section>
+    <div class="row g-3 mb-4">
+        <section class="col-lg-6"><div class="card h-100 shadow-sm"><div class="card-body">
+            <h2 class="h5">Seven-day demand outlook</h2><div class="table-responsive"><table class="table table-sm">
+                <thead><tr><th>Day</th><th>Synthetic baseline</th><th>Revised forecast</th></tr></thead>
+                <tbody>{% for item in plan.outlook %}<tr><th>{{ item.day }}</th><td>{{ '{:,}'.format(item.baseline) }}</td><td>{{ '{:,}'.format(item.forecast) }}</td></tr>{% endfor %}</tbody>
+            </table></div>
+        </div></div></section>
+        <section class="col-lg-6"><div class="card h-100 shadow-sm"><div class="card-body">
+            <h2 class="h5">Peak &amp; event calendar / synthetic inputs</h2>
+            {% for event in plan.events %}<div class="border-bottom mb-2 pb-2"><strong>{{ event.name }}</strong> / {{ event.day }}
+                <p class="small mb-0">{{ event.impact }} / {{ event.note }}</p></div>{% endfor %}
+            <p class="small text-muted">Calendar entries are demo assumptions, not verified merchant, holiday or weather feeds.</p>
+        </div></div></section>
+    </div>
+    <section class="card shadow-sm mb-4"><div class="card-body">
+        <h2 class="h5">Connected application context / {{ plan.facility_code }}</h2>
+        {% if operations %}
+        <p>Eligible current application records: <strong>{{ '{:,}'.format(operations.eligible) if operations.initial_queues is not none else 'Unavailable' }}</strong> /
+            held {{ operations.held if operations.initial_queues is not none else 'Unavailable' }} /
+            awaiting review {{ operations.awaiting_review if operations.initial_queues is not none else 'Unavailable' }}.</p>
+        <p class="small text-muted">Read {{ operations.fetched_at }}. Read time is not operational freshness. This context is not injected into the synthetic daily network forecast.</p>
+        <ul class="small">{% for warning in operations.warnings %}<li>{{ warning }}</li>{% endfor %}</ul>
+        {% else %}<p class="small">Operational source context requires an admin or depot manager role; the network model remains synthetic.</p>{% endif %}
+        <a href="{{ url_for('admin.demand_planning', facility=plan.facility_code) }}#planner-operations">Inspect the hybrid hourly facility workload</a>
+    </div></section>
+    {% if can_decide %}
+    <section class="card shadow-sm mb-4" id="network-decisions"><div class="card-body">
+        <h2 class="h4">Planner decisions &amp; simulated execution</h2>
+        <p class="small text-muted">Separate durable demo records. Approve or reject explicitly, then simulate execution. Logs and planner rationale capture
+            feedback; they do not train a forecasting model. No real transport, labour or sortation system is called.</p>
+        {% for saved in recent %}
+        <article class="border rounded p-3 mb-3">
+            <div class="d-flex flex-wrap justify-content-between gap-2"><h3 class="h6">{{ saved.facility_code }} / {{ saved.day }} / {{ saved.option.label }}</h3><span class="badge bg-secondary">{{ saved.status }}</span></div>
+            <p class="small">AUD {{ '{:,}'.format(saved.option.cost) }} / {{ saved.id }} / saved {{ saved.created_at }}</p>
+            <ul class="small">{% for event in saved.events %}<li>{{ event.action }} / {{ event.actor }} / {{ event.at }}{% if event.note %} — {{ event.note }}{% endif %}</li>{% endfor %}</ul>
+            {% if saved.status in ['proposed','approved'] %}
+            <form class="demo-decision-form" action="{{ url_for('network_planner.decisions') }}" method="post">
+                <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="plan_id" value="{{ saved.id }}">
+                <label for="feedback-{{ loop.index }}" class="small form-label">Decision rationale</label><input class="form-control form-control-sm mb-2" id="feedback-{{ loop.index }}" name="note" maxlength="500">
+                {% if saved.status == 'proposed' %}<button class="btn btn-success btn-sm" name="action" value="approve" {% if not saved.option.viable %}disabled{% endif %}>Approve demo plan</button>
+                {% else %}<button class="btn btn-primary btn-sm" name="action" value="simulate">Simulate execution</button>{% endif %}
+                <button class="btn btn-outline-danger btn-sm" name="action" value="reject">Reject</button>
+            </form>
+            {% endif %}
+            {% if saved.status == 'simulated' %}<details class="small mt-2" open><summary>Execution audit / simulated only</summary>
+                {% if saved.execution %}<pre class="text-wrap">{{ saved.execution | tojson(indent=2) }}</pre>
+                {% else %}<p>No resource actions were required; simulation recorded without system changes.</p>{% endif %}
+            </details>{% endif %}
+            <a class="small" href="{{ url_for('network_planner.index', facility=saved.facility_code, day=saved.day, **saved.inputs) }}">Modify inputs and create a new proposal</a>
+        </article>
+        {% else %}<p>No demo proposals saved yet. Choose a response above to start a review.</p>{% endfor %}
+    </div></section>
+    {% endif %}
+    <div id="network-status" class="alert alert-info alert-persistent d-none" role="status"></div>
+    {% endif %}
+</div>
+{% endblock %}
+{% block extra_js %}
+{% if not error %}
+<script id="network-chat-context" type="application/json">{{ {'snapshot':snapshot,'csrf':csrf,'endpoint':url_for('network_planner.chat')} | tojson }}</script>
+<script src="{{ url_for('static', filename='js/network_planner.js') }}"></script>
+{% endif %}
+{% endblock %}

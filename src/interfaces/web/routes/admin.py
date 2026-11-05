@@ -12,7 +12,7 @@ import random
 import uuid
 import secrets
 
-from azure.core.exceptions import ClientAuthenticationError
+from azure.core.exceptions import ClientAuthenticationError, HttpResponseError, ServiceRequestError, ServiceResponseError
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from openai import OpenAIError
 from pydantic import TypeAdapter, ValidationError
@@ -243,10 +243,13 @@ def demand_planning_chat():
         interpretation = interpret_question(data.message, data.history, engine_context)
     except (PlannerChatUnavailable, ClientAuthenticationError):
         current_app.logger.exception("Demand planner chat configuration or authentication failed")
-        return jsonify(error="Azure AI chat is unavailable. Check the model endpoint and Azure sign-in; manual scenario controls still work."), 503
+        return jsonify(error="The Foundry Demand Planning agent is unavailable. Check the project endpoint, registered agent name/version and Azure sign-in; manual scenario controls still work."), 503
     except OpenAIError:
         current_app.logger.exception("Demand planner Azure AI request failed")
         return jsonify(error="Azure AI could not answer this question. Retry shortly; no scenario was changed."), 503
+    except (HttpResponseError, ServiceRequestError, ServiceResponseError):
+        current_app.logger.exception("Demand planner Foundry project request failed")
+        return jsonify(error="The Foundry Demand Planning agent could not be reached. Check its project, access and registered version; no scenario was changed."), 503
     except (PlannerChatResponseError, ValidationError):
         current_app.logger.exception("Demand planner chat returned an invalid interpretation")
         return jsonify(error="The AI response could not be validated. Rephrase the question; no scenario was changed."), 502
@@ -259,7 +262,7 @@ def demand_planning_chat():
         "reply": interpretation.reply, "changes": changes,
         "current": _projection_metrics(projection), "proposal": None,
         "apply_url": None, "start": context["start"].isoformat(),
-        "source": f"{source}. Results calculated by the planner engine; no operational changes.",
+        "source": f"{source}. Dedicated Foundry agent with read-only planning tools; results calculated by the planner engine; no operational changes.",
     }
     if changes:
         proposed = replace(context["scenario"], **changes)

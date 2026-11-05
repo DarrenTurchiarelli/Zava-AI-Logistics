@@ -154,7 +154,7 @@
         saveHistory();
         send.disabled = clear.disabled = question.disabled = true;
         examples.forEach(button => { button.disabled = true; });
-        status.textContent = 'Asking Azure AI and calculating a scenario preview…';
+        status.textContent = 'Asking the Foundry planning agent and running read-only planning tools…';
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 65000);
         try {
