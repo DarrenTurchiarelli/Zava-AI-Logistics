@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+{% block title %}Demand & Capacity Planning - {{ company.browser_title }}{% endblock %}
+{% block extra_css %}
+<style>
+    .planner-hero { background: linear-gradient(120deg, #102d45, #14666c); color: white; border-radius: 1rem; }
+    .planner-kpi { border-top: 3px solid #14666c; }
+    .planner-chart { width: 100%; min-width: 700px; height: auto; }
+    .planner-legend span { display: inline-block; width: .85rem; height: .85rem; margin-right: .4rem; vertical-align: middle; }
+    .planner-controls label { font-size: .9rem; font-weight: 600; }
+    .planner-controls .form-text { font-size: .78rem; }
+    .planner-table { max-height: 380px; overflow: auto; }
+    .planner-table thead { position: sticky; top: 0; background: white; }
+    .planner-chat-log { max-height: 430px; overflow-y: auto; min-height: 140px; }
+    .planner-chat-message { white-space: pre-wrap; overflow-wrap: anywhere; }
+    .planner-chat-user { background: #eaf3f7; border-left: 3px solid #1976a3; }
+    .planner-chat-assistant { background: #f4f6f8; border-left: 3px solid #14666c; }
+    @media print { .planner-controls, .navbar, footer, .planner-actions { display: none !important; } }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    {% if error %}
+    <h1 class="h3">Demand & Capacity Planning</h1>
+    <div class="alert alert-danger" role="alert">{{ error }}</div>
+    <a class="btn btn-primary" href="{{ url_for('admin.demand_planning') }}">Reset planner inputs</a>
+    {% else %}
+    <div class="planner-hero p-4 mb-4">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+            <div>
+                <span class="badge bg-warning text-dark mb-2">SYNTHETIC DEMO / READ ONLY</span>
+                <h1 class="h2 mb-2">Demand & Capacity Planning</h1>
+                <p class="mb-0">See the bottleneck before the next dispatch. Compare options before making a decision.</p>
+            </div>
+            <a class="btn btn-outline-light" href="{{ url_for('admin.ai_insights', facility=facility.code) }}">Back to AI Insights</a>
+        </div>
+    </div>
+    <div class="alert alert-info alert-persistent">
+        <strong>No live forecast or operational changes.</strong> Arrivals, manifest confirmations, backlog, capacity,
+        costs and receiving reservations below are synthetic assumptions, not connected feeds.
+        Scenarios are not saved and do not approve parcels, change rosters or dispatch vehicles.
+    </div>
+    <section class="card shadow-sm mb-4" aria-labelledby="planner-chat-heading" id="planner-chat">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+                <div>
+                    <h2 class="h5 mb-1" id="planner-chat-heading">Ask the Planner</h2>
+                    <p class="small text-muted mb-0">Azure AI interprets your question. The planner engine calculates every scenario result.</p>
+                </div>
+                <button class="btn btn-sm btn-outline-secondary" type="button" id="planner-chat-clear">Clear chat</button>
+            </div>
+            <div class="row g-3">
+                <div class="col-lg-8">
+                    <div class="planner-chat-log border rounded p-3 mb-3" id="planner-chat-log"
+                         role="log" aria-live="polite" aria-label="Planning conversation">
+                        <p class="text-muted small mb-0" id="planner-chat-welcome">Ask about {{ facility.name }}'s displayed scenario,
+                            or describe a disruption. Proposed changes need your confirmation before they affect the charts.</p>
+                    </div>
+                    <form id="planner-chat-form">
+                        <label class="form-label" for="planner-chat-question">Your planning question</label>
+                        <textarea class="form-control mb-2" id="planner-chat-question" rows="2" maxlength="2000"
+                                  placeholder="What if the inbound truck is two hours late and 15% of staff are absent?" required></textarea>
+                        <div class="d-flex justify-content-between align-items-center gap-2">
+                            <span class="small text-muted" id="planner-chat-status" role="status">Uses the displayed scenario, not unsaved manual edits.</span>
+                            <button class="btn btn-primary flex-shrink-0" type="submit" id="planner-chat-send">Ask planner</button>
+                        </div>
+                    </form>
+                    <div class="alert alert-danger alert-persistent mt-2 mb-0 d-none" id="planner-chat-error" role="alert"></div>
+                </div>
+                <div class="col-lg-4">
+                    <h3 class="h6">Try a question</h3>
+                    {% for question in [
+                        'Why does the backlog build in the current scenario?',
+                        'What if the inbound truck is two hours late and 15% of staff are absent?',
+                        'What would happen if we add four extra afternoon sorters?',
+                        'Which response option has the fewest dispatch-cutoff misses?'
+                    ] %}
+                    <button class="btn btn-sm btn-outline-primary text-start mb-2 w-100 planner-chat-example"
+                            type="button" data-question="{{ question }}">{{ question }}</button>
+                    {% endfor %}
+                    <p class="small text-muted mt-2 mb-0">Planning data remains synthetic. Questions, recent chat and the displayed
+                        scenario are sent to the configured Azure AI model and may incur charges.
+                        Nothing is dispatched, saved to the database or operationally approved.</p>
+                    <p class="small text-muted mt-2 mb-0">Recent conversation stays in this browser tab across scenario changes
+                        for the same centre and horizon. Clear chat removes it; there is no server-side conversation store.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    <form method="get" class="card shadow-sm mb-4 planner-controls" id="planner-form">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <label class="form-label" for="facility">Distribution centre</label>
+                    <select class="form-select" name="facility" id="facility">
+                        {% for code, item in facilities.items() %}
+                        <option value="{{ code }}" {% if code == facility.code %}selected{% endif %}>{{ code }} - {{ item.name }} ({{ item.state }})</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">Changing centre refreshes all results using its own synthetic workload.</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="horizon">Planning horizon</label>
+                    <select class="form-select" name="horizon" id="horizon">
+                        {% for key, label in horizons.items() %}
+                        <option value="{{ key }}" {% if key == horizon %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button class="btn btn-primary w-100" type="submit">Compare scenario</button>
+                </div>
+            </div>
+            <hr>
+            <div class="d-flex justify-content-between flex-wrap gap-2 mb-3">
+                <h2 class="h5 mb-0">What if tomorrow changes?</h2>
+                <div class="planner-actions d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-danger" id="disruption-preset">Demo: surge + late truck + lane outage</button>
+                    <button type="button" class="btn btn-sm btn-outline-success" id="response-preset">Demo response: restore lane + staff + hours</button>
+                    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.demand_planning', facility=facility.code, horizon=horizon) }}">Reset</a>
+                </div>
+            </div>
+            <div class="row g-3">
+                {% for name, label, maximum, help in [
+                    ('surge', 'Additional arrivals (%)', 60, 'Uplift applied to the synthetic hourly arrival profile.'),
+                    ('delay', 'Inbound truck delay (hours)', 4, 'Delays 35% of 08:00-11:00 arrivals; original cutoff stays fixed.'),
+                    ('absence', 'Sort staff absent (%)', 50, 'Reduces the normal team of 12 trained sorters.'),
+                    ('lane_outage', 'Sorting lanes unavailable', 1, 'One of two lanes unavailable for the whole horizon.'),
+                    ('extra_staff', 'Extra afternoon sorters', 8, 'Available from 14:00 until closing; AUD 55 per staff-hour.'),
+                    ('extra_hours', 'Extend closing by (hours)', 2, 'Normal operations 06:00-22:00; AUD 840 per extra hour.'),
+                    ('transfer', 'Transfer reservation (parcels/day)', 800, '09:00-15:00, max 400/hour; AUD 2 per parcel.'),
+                    ('manual_mix', 'Manual-handling parcel mix (%)', 50, 'Manual parcels take 3x sorting effort; baseline mix is 15%.')
+                ] %}
+                <div class="col-sm-6 col-lg-3">
+                    <label class="form-label" for="{{ name }}">{{ label }}</label>
+                    <input class="form-control" type="number" step="1" min="0" max="{{ maximum }}"
+                           name="{{ name }}" id="{{ name }}" value="{{ scenario|attr(name) }}" required
+                           aria-describedby="{{ name }}-help">
+                    <div class="form-text" id="{{ name }}-help">{{ help }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </form>
+
+    <div class="d-flex justify-content-between flex-wrap mb-3 gap-2">
+        <h2 class="h4 mb-0">{{ facility.name }} <small class="text-muted fs-6">{{ facility.code }}</small></h2>
+        <span class="text-muted">Starts {{ start.strftime('%d %b %Y %H:%M %Z') }} / {{ facility.timezone }}</span>
+    </div>
+    <div class="card bg-light mb-4" id="centre-workload-profile">
+        <div class="card-body">
+            <h3 class="h6">Centre-specific synthetic workload</h3>
+            <div class="d-flex flex-wrap gap-4 small">
+                <span>Typical weekday: <strong>{{ '{:,}'.format(facility.daily_volume) }} parcels/day</strong></span>
+                <span>Starting sort backlog: <strong>{{ '{:,}'.format(facility.initial_backlog) }} parcels</strong></span>
+                <span>Arrivals: <strong>centre-specific hourly pattern</strong></span>
+            </div>
+            <p class="small text-muted mb-0 mt-2">Repeatable demo data for {{ facility.code }}, not measured demand.
+                Scenario controls are retained when changing centre; processing-capacity assumptions are shared.</p>
+        </div>
+    </div>
+    <div class="row g-3 mb-4">
+        {% for label, value, detail in [
+            ('Expected arrivals', selected.arrivals, 'Synthetic manifest + forecast volume in this horizon'),
+            ('Peak processing backlog', selected.peak_backlog, 'Parcels waiting across all four stages'),
+            ('Dispatch-cutoff misses', selected.cutoff_misses, 'Unique parcels, not confirmed late deliveries'),
+            ('Incremental scenario cost', 'AUD {:,}'.format(selected.cost), 'Illustrative labour and transfer costs within horizon')
+        ] %}
+        <div class="col-sm-6 col-xl-3">
+            <div class="card h-100 shadow-sm planner-kpi"><div class="card-body">
+                <div class="text-muted small">{{ label }}</div>
+                <div class="h3 my-2">{{ '{:,}'.format(value) if value is number else value }}</div>
+                <div class="small text-muted">{{ detail }}</div>
+            </div></div>
+        </div>
+        {% endfor %}
+    </div>
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between flex-wrap gap-2">
+                <div>
+                    <h2 class="h5">Demand, processing capacity & backlog</h2>
+                    <p class="small text-muted">Scenario hourly arrivals and bottleneck throughput; backlog is a parcel balance, not a rate.
+                        Start rounded down to the facility's current local hour. Vertical markers show 18:00 and 22:00 dispatch cutoffs.</p>
+                </div>
+                <span class="badge bg-light text-dark align-self-start">{{ horizons[horizon] }}</span>
+            </div>
+            <div class="planner-legend d-flex flex-wrap gap-3 small mb-2">
+                <div><span style="background:#1976a3"></span>Manifest-confirmed (synthetic)</div>
+                <div><span style="background:#8ac8df"></span>Additional forecast (synthetic)</div>
+                <div><span style="background:#198754"></span>Capacity / hour</div>
+                <div><span style="background:#7749a6"></span>Scenario backlog</div>
+                <div><span style="background:#6c757d"></span>Baseline backlog (dashed)</div>
+            </div>
+            <div class="overflow-auto">
+                <svg class="planner-chart" viewBox="0 0 1040 330" role="img" aria-labelledby="demand-chart-title demand-chart-desc">
+                    <title id="demand-chart-title">Hourly demand, capacity and backlog for {{ facility.name }}</title>
+                    <desc id="demand-chart-desc">Stacked bars are synthetic arrivals. Green is hourly processing capacity.
+                        Purple is scenario backlog; grey dashed is baseline backlog. Exact values are in the hourly table below.</desc>
+                    {% for tick in range(5) %}
+                    {% set y = 270 - tick * 60 %}
+                    <line x1="65" y1="{{ y }}" x2="1015" y2="{{ y }}" stroke="#e4e9ed"/>
+                    <text x="58" y="{{ y + 4 }}" text-anchor="end" fill="#52616b" font-size="12">{{ (chart_max * tick / 4)|round|int }}</text>
+                    {% endfor %}
+                    {% set width = 950 / selected.hours|length %}
+                    {% for row in selected.hours %}
+                    {% set x = 65 + loop.index0 * width %}
+                    {% if row.cutoff %}
+                    <line x1="{{ x + width }}" y1="30" x2="{{ x + width }}" y2="270" stroke="#dc3545" stroke-dasharray="2,6" opacity=".5"/>
+                    {% endif %}
+                    <rect x="{{ x + 1 }}" y="{{ 270 - row.confirmed / chart_max * 240 }}" width="{{ width * 0.7 }}" height="{{ row.confirmed / chart_max * 240 }}" fill="#1976a3">
+                        <title>{{ row.label }}: {{ row.confirmed }} synthetic confirmed arrivals</title>
+                    </rect>
+                    <rect x="{{ x + 1 }}" y="{{ 270 - row.arrivals / chart_max * 240 }}" width="{{ width * 0.7 }}" height="{{ row.forecast / chart_max * 240 }}" fill="#8ac8df">
+                        <title>{{ row.label }}: {{ row.forecast }} synthetic additional arrivals</title>
+                    </rect>
+                    {% if loop.index0 % (24 if horizon == '7d' else 4) == 0 %}
+                    <text x="{{ x }}" y="292" fill="#52616b" font-size="11">{{ row.label[:10] if horizon == '7d' else row.label[-5:] }}</text>
+                    {% endif %}
+                    {% endfor %}
+                    <polyline fill="none" stroke="#198754" stroke-width="2.5" points="{% for row in selected.hours %}{{ 65 + (loop.index0 + 0.5) * width }},{{ 270 - row.capacity / chart_max * 240 }} {% endfor %}"/>
+                    <polyline fill="none" stroke="#6c757d" stroke-width="2" stroke-dasharray="6,4" points="{% for row in baseline.hours %}{{ 65 + (loop.index0 + 0.5) * width }},{{ 270 - row.backlog / chart_max * 240 }} {% endfor %}"/>
+                    <polyline fill="none" stroke="#7749a6" stroke-width="3" points="{% for row in selected.hours %}{{ 65 + (loop.index0 + 0.5) * width }},{{ 270 - row.backlog / chart_max * 240 }} {% endfor %}"/>
+                    <text x="65" y="318" fill="#52616b" font-size="12">Facility-local time / parcels (capacity and arrivals per hour)</text>
+                </svg>
+            </div>
+            <div class="row g-3 small">
+                <div class="col-md-4"><strong>{{ '{:,}'.format(selected.confirmed) }}</strong> synthetic confirmed arrivals</div>
+                <div class="col-md-4"><strong>{{ '{:,}'.format(selected.forecast) }}</strong> synthetic forecast arrivals</div>
+                <div class="col-md-4"><strong>{{ selected.deferred_arrivals }}</strong> delayed arrivals beyond horizon (not cancelled)</div>
+            </div>
+            <p class="small text-muted mt-2 mb-0">Peak arrival window: <strong>{{ peak_hour.label }}</strong>
+                ({{ '{:,}'.format(peak_hour.arrivals) }} parcels in the hour).</p>
+        </div>
+    </div>
+    <div class="row g-4 mb-4">
+        <div class="col-lg-7">
+            <div class="card shadow-sm h-100"><div class="card-body">
+                <h2 class="h5">Baseline vs selected scenario</h2>
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead><tr><th scope="col">Measure</th><th scope="col">Baseline</th><th scope="col">Scenario</th></tr></thead>
+                        <tbody>
+                            {% for label, key in [('Expected arrivals', 'arrivals'), ('Peak backlog', 'peak_backlog'),
+                                ('Dispatched from facility', 'dispatched'), ('Transferred to reserved facility', 'transferred'),
+                                ('End-of-horizon backlog', 'remaining'), ('Unique dispatch-cutoff misses', 'cutoff_misses'),
+                                ('Incremental cost (AUD)', 'cost')] %}
+                            <tr><th scope="row">{{ label }}</th><td>{{ '{:,}'.format(baseline|attr(key)) }}</td><td>{{ '{:,}'.format(selected|attr(key)) }}</td></tr>
+                            {% endfor %}
+                            <tr><th scope="row">Drain-only recovery after horizon</th>
+                                <td>{{ baseline.recovery_hours|string + ' hours' if baseline.recovery_hours is not none else '>72 hours' }}</td>
+                                <td>{{ selected.recovery_hours|string + ' hours' if selected.recovery_hours is not none else '>72 hours' }}</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="small text-muted mb-0">Baseline uses normal staffing, two lanes, 15% manual mix and no disruption or mitigation.
+                    Recovery assumes no further arrivals; recovery labour is excluded from cost.
+                    Delivery-service risk is <strong>not calculated</strong>: downstream transport and delivery commitments are not connected.</p>
+            </div></div>
+        </div>
+        <div class="col-lg-5">
+            <div class="card shadow-sm h-100"><div class="card-body">
+                <h2 class="h5">Operational decision support</h2>
+                <span class="badge bg-light text-dark mb-3">Calculated explanations / not an AI model forecast</span>
+                <ol class="ps-3 mb-0">{% for item in recommendations %}<li class="mb-3">{{ item }}</li>{% endfor %}</ol>
+            </div></div>
+        </div>
+    </div>
+    <section class="mb-4" aria-labelledby="response-options-heading">
+        <h2 class="h5" id="response-options-heading">Compare response options</h2>
+        <p class="small text-muted">Each option uses your selected disruption and handling mix, replacing mitigation controls.
+            Ranked by fewest cutoff misses, then lowest incremental cost. Lane restoration assumes equipment is available;
+            staff, transport and receiving reservations require a manager's confirmation.</p>
+        <div class="row g-3">
+            {% for option in options %}
+            <div class="col-lg-4">
+                <div class="card shadow-sm h-100"><div class="card-body d-flex flex-column">
+                    <span class="text-muted small mb-1">Option {{ loop.index }}</span>
+                    <h3 class="h6">{{ option.label }}</h3>
+                    <dl class="row small my-2">
+                        <dt class="col-8">Dispatch-cutoff misses</dt><dd class="col-4 text-end">{{ '{:,}'.format(option.projection.cutoff_misses) }}</dd>
+                        <dt class="col-8">End backlog</dt><dd class="col-4 text-end">{{ '{:,}'.format(option.projection.remaining) }}</dd>
+                        <dt class="col-8">Incremental cost</dt><dd class="col-4 text-end">AUD {{ '{:,}'.format(option.projection.cost) }}</dd>
+                    </dl>
+                    <a class="btn btn-outline-primary mt-auto" href="{{ url_for('admin.demand_planning', facility=facility.code, horizon=horizon, **option.inputs) }}">Compare this option</a>
+                </div></div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    <div class="card shadow-sm mb-4"><div class="card-body">
+        <h2 class="h5">Where does the queue build?</h2>
+        <div class="row g-3">
+            {% for stage in selected.stages %}
+            <div class="col-sm-6 col-lg-3"><div class="border rounded p-3 h-100">
+                <div class="small text-muted">Stage {{ loop.index }}</div>
+                <h3 class="h6 mt-1">{{ stage.name }}</h3>
+                <div>Peak queue: <strong>{{ '{:,}'.format(stage.peak_queue) }}</strong></div>
+                <div class="small text-muted">Remaining: {{ '{:,}'.format(stage.remaining) }}</div>
+            </div></div>
+            {% endfor %}
+        </div>
+    </div></div>
+    <details class="card shadow-sm mb-4"><summary class="card-header">Hourly values / accessible chart data</summary>
+        <div class="planner-table">
+            <table class="table table-sm mb-0">
+                <caption class="px-3">All volumes are synthetic. Capacity is the minimum stage throughput for that hour.</caption>
+                <thead><tr><th scope="col">Local hour</th><th scope="col">Arrivals</th><th scope="col">Capacity</th><th scope="col">Backlog</th><th scope="col">Dispatched</th><th scope="col">Cutoff at end</th></tr></thead>
+                <tbody>{% for row in selected.hours %}<tr>
+                    <th scope="row">{{ row.label }}</th><td>{{ row.arrivals }}</td><td>{{ row.capacity }}</td>
+                    <td>{{ row.backlog }}</td><td>{{ row.dispatched }}</td><td>{{ 'Yes' if row.cutoff else '-' }}</td>
+                </tr>{% endfor %}</tbody>
+            </table>
+        </div>
+    </details>
+    <details class="card shadow-sm"><summary class="card-header">Assumptions, sources & limitations</summary>
+        <div class="card-body small">
+            <ul class="mb-0">
+                <li>Sources: the shared 40-centre application catalogue supplies centre codes, names and states. Each centre has its own repeatable synthetic daily volume, starting backlog and hourly arrival pattern, seeded by its centre code within state-level workload ranges. These are not measured demand. Processing-capacity assumptions are shared across centres. No merchant, manifest, historical demand, weather or roster feeds are connected. No measured forecast accuracy or confidence is claimed.</li>
+                <li>Typical weekday volume: {{ '{:,}'.format(facility.daily_volume) }} parcels, adjusted by fixed weekday factors. Existing processing backlog: {{ facility.initial_backlog }} parcels at sorting. All assumed volumes are eligible for processing; held/inspection parcels are outside this model.</li>
+                <li>Demo manifest split is 70% confirmed / 30% forecast. These are not real bookings. Expected counts are rounded to whole parcels.</li>
+                <li>Hours: 06:00-22:00 daily. Unload 1,500/hour; induct 1,400/hour; sort limited by 12 staff at 120 effort units/hour and two lanes at 750 units/hour; load 1,300/hour. No floor/storage capacity is inferred.</li>
+                <li>Each stage consumes at least one hourly step, with FIFO queues. Cutoffs at 18:00 and 22:00; arrivals are assigned the first connection at least four hours after their original scheduled arrival. Later arrivals are due at 18:00 next day. Cutoff misses count each parcel once.</li>
+                <li>Transfers are synthetic authorised receiving reservations, max 800/day and 400/hour, with four hours allowed for transport and receiving processing. Only eligible unload-stage parcels with sufficient connection time can move. Receiving completion is assumed, not simulated.</li>
+                <li>Cost excludes base labour, vehicles, penalties and recovery beyond the horizon. Additional sorters cost AUD 55/hour from 14:00; extended facility hours cost AUD 840/hour plus extra sorters; transfers cost AUD 2/parcel.</li>
+                <li>This is a processing-centre demonstration, not route, delivery-round, network optimisation or an approved operating plan. Scenarios are request-scoped and not persisted.</li>
+            </ul>
+        </div>
+    </details>
+    {% endif %}
+</div>
+{% endblock %}
+{% block extra_js %}
+{% if not error %}
+<script id="planner-chat-context" type="application/json">{{ chat_context | tojson }}</script>
+<script src="{{ url_for('static', filename='js/demand_planner_chat.js') }}"></script>
+<script>
+(() => {
+    const form = document.getElementById('planner-form');
+    form.elements.facility.addEventListener('change', () => form.requestSubmit());
+    function apply(values) {
+        Object.entries(values).forEach(([name, value]) => { form.elements[name].value = value; });
+        form.requestSubmit();
+    }
+    document.getElementById('disruption-preset').addEventListener('click', () =>
+        apply({surge: 25, delay: 2, absence: 15, lane_outage: 1, extra_staff: 0, extra_hours: 0, transfer: 0}));
+    document.getElementById('response-preset').addEventListener('click', () =>
+        apply({lane_outage: 0, extra_staff: 4, extra_hours: 2}));
+})();
+</script>
+{% endif %}
+{% endblock %}

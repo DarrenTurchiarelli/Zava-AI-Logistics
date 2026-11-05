@@ -303,35 +303,35 @@
             </div>
         </div>
 
-        <!-- RBAC -->
+        <!-- Demand Planner -->
         <div class="col-lg-6 col-xl-4">
             <div class="card h-100 shadow-sm hover-shadow">
                 <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0"><i class="bi bi-shield-lock"></i> Role-Based Access Control</h5>
+                    <h5 class="mb-0"><i class="bi bi-calendar-range"></i> Demand &amp; Capacity Planner</h5>
                 </div>
                 <div class="card-body">
                     <p class="card-text">
-                        Secure multi-role access with persona-based navigation and permission enforcement.
+                        Explore demand and capacity across 40 distribution centres, compare disruptions, and ask the planner about what-if scenarios.
                     </p>
                     <h6 class="fw-bold">Try it yourself:</h6>
                     <ol class="small">
-                        <li>Click different user roles below to instantly switch</li>
-                        <li>Observe how navigation menu changes per role</li>
-                        <li>Try accessing admin features as driver (blocked)</li>
+                        <li>Select a distribution centre and planning horizon</li>
+                        <li>Model late trucks, staff absence, or extra sorting capacity</li>
+                        <li>Ask a what-if question, review the calculated preview, and apply it to the planner</li>
                     </ol>
                     <div class="alert alert-light border alert-permanent mt-3">
-                        <strong>What to observe:</strong> Role-based access control, personalised navigation, security restrictions
+                        <strong>What to observe:</strong> Hourly backlog, dispatch-cutoff risk, and scenario costs.
+                        Planning data is synthetic; applying a scenario does not change operations.
                     </div>
                     <div class="alert alert-secondary alert-permanent py-3 mt-2">
                         <div class="d-flex justify-content-between align-items-center flex-wrap">
                             <div style="font-size: 0.85rem;" class="mb-2 mb-sm-0">
                                 <i class="bi bi-person-badge"></i> <strong>Try it:</strong>
-                                <a href="{{ url_for('auth.demo_login', username='admin') }}" class="text-dark fw-bold text-decoration-none"><u>admin</u></a> |
-                                <a href="{{ url_for('auth.demo_login', username='support') }}" class="text-dark fw-bold text-decoration-none"><u>support</u></a> |
-                                <a href="{{ url_for('auth.demo_login', username='driver001') }}" class="text-dark fw-bold text-decoration-none"><u>driver001</u></a>
+                                <a href="{{ url_for('auth.demo_login', username='admin', next=url_for('admin.demand_planning')) }}" class="text-dark fw-bold text-decoration-none"><u>admin</u></a> |
+                                <a href="{{ url_for('auth.demo_login', username='depot_mgr', next=url_for('admin.demand_planning')) }}" class="text-dark fw-bold text-decoration-none"><u>depot_mgr</u></a>
                             </div>
-                            <a href="{{ url_for('auth.demo_login', username='admin') }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6;">
-                                <i class="bi bi-box-arrow-right"></i> Test Login
+                            <a href="{{ url_for('admin.demand_planning') if session.get('user') else url_for('auth.demo_login', username='admin', next=url_for('admin.demand_planning')) }}" class="btn btn-sm" style="background-color: #f8f9fa; color: #007FFF; border: 1px solid #dee2e6;">
+                                <i class="bi bi-calendar-range"></i> Open Demand Planner
                             </a>
                         </div>
                     </div>

@@ -4,26 +4,209 @@ Admin Blueprint - Administrative Dashboard and Insights
 Provides admin-only routes for system monitoring, AI agent performance,
 and operational insights.
 """
-from flask import Blueprint, render_template, jsonify
+from flask import Blueprint, render_template, jsonify, request, abort, session, current_app, url_for
 from datetime import datetime, timezone, timedelta
+from dataclasses import asdict, replace
 import os
 import random
 import uuid
+import secrets
+
+from azure.core.exceptions import ClientAuthenticationError
+from itsdangerous import BadSignature, URLSafeTimedSerializer
+from openai import OpenAIError
+from pydantic import ValidationError
+from werkzeug.exceptions import BadRequest
 
 from src.interfaces.web.middleware import login_required
 from parcel_tracking_db import ParcelTrackingDB
 from utils.async_helpers import run_async
 from src.infrastructure.state import StateManager, AgentDecision
+from src.domain.services.demand_planning import (
+    FACILITIES, HORIZONS, LIMITS, Scenario, planning_start, project, recommendations,
+)
 from src.infrastructure.agents.core.base import (
     call_azure_agent,
     OPTIMIZATION_AGENT_ID,
     SORTING_FACILITY_AGENT_ID,
+)
+from src.infrastructure.agents.demand_planner_chat import (
+    PlannerChatRequest, PlannerChatResponseError, PlannerChatUnavailable, interpret_question,
 )
 
 admin_bp = Blueprint('admin', __name__)
 
 # Global state manager instance for agent performance tracking
 global_state_manager = StateManager()
+
+
+def _demand_context(facility_code="DC-SYD-002", horizon="24h", scenario=None, start=None):
+    facility = FACILITIES[facility_code]
+    start = start or planning_start(facility)
+    baseline = project(facility, horizon, Scenario(), start)
+    scenario = scenario or Scenario()
+    selected = project(facility, horizon, scenario, start)
+    disruption = replace(scenario, extra_staff=0, extra_hours=0, transfer=0)
+    options = []
+    for label, inputs in [
+        ("Restore both lanes + four afternoon sorters", replace(disruption, lane_outage=0, extra_staff=4)),
+        ("Extend operating hours by two", replace(disruption, extra_hours=2)),
+        ("Reserve up to 800 eligible transfers / day", replace(disruption, transfer=800)),
+    ]:
+        options.append({
+            "label": label, "projection": project(facility, horizon, inputs, start), "inputs": asdict(inputs),
+        })
+    options.sort(key=lambda option: (option["projection"].cutoff_misses, option["projection"].cost))
+    return {
+        "facility": facility, "facilities": FACILITIES, "horizons": HORIZONS,
+        "horizon": horizon, "scenario": scenario, "start": start, "options": options,
+        "baseline": baseline, "selected": selected,
+        "peak_hour": max(selected.hours, key=lambda row: row.arrivals),
+        "recommendations": recommendations(baseline, selected),
+        "chart_max": max(
+            1, *(max(row.arrivals, row.capacity, row.backlog) for row in selected.hours + baseline.hours)
+        ),
+    }
+
+
+def _planning_signer():
+    return URLSafeTimedSerializer(current_app.secret_key, salt="demand-planner-context")
+
+
+def _planning_snapshot(context):
+    return _planning_signer().dumps({
+        "facility": context["facility"].code, "horizon": context["horizon"],
+        "scenario": asdict(context["scenario"]), "start": context["start"].isoformat(),
+    })
+
+
+def _load_planning_snapshot(token):
+    data = _planning_signer().loads(token, max_age=3600)
+    return _demand_context(
+        data["facility"], data["horizon"], Scenario(**data["scenario"]),
+        datetime.fromisoformat(data["start"]),
+    )
+
+
+def _projection_metrics(projection):
+    return {
+        name: getattr(projection, name) for name in (
+            "arrivals", "peak_backlog", "remaining", "cutoff_misses", "dispatched",
+            "transferred", "cost", "recovery_hours", "bottleneck",
+        )
+    }
+
+
+@admin_bp.route("/ai/demand-planning")
+@login_required
+def demand_planning():
+    """Read-only synthetic scenario comparison; never writes operational data."""
+    facility = request.args.get("facility", "DC-SYD-002")
+    horizon = request.args.get("horizon", "24h")
+    try:
+        if request.args.get("preview"):
+            context = _load_planning_snapshot(request.args["preview"])
+            return _render_demand_planner(context)
+        if facility not in FACILITIES:
+            raise ValueError("Choose a supported facility.")
+        if horizon not in HORIZONS:
+            raise ValueError("Choose a supported planning horizon.")
+        values = {}
+        for name in LIMITS:
+            raw = request.args.get(name, str(getattr(Scenario(), name)))
+            try:
+                values[name] = int(raw)
+            except ValueError:
+                raise ValueError(f"{name} must be a whole number.") from None
+        scenario = Scenario(**values)
+    except BadSignature:
+        return render_template("demand_planning.html", error="This scenario preview expired or is invalid. Reset the planner."), 400
+    except ValueError as exc:
+        return render_template("demand_planning.html", error=str(exc)), 400
+    return _render_demand_planner(_demand_context(facility, horizon, scenario))
+
+
+def _render_demand_planner(context):
+    csrf = session.setdefault("planner_chat_csrf", secrets.token_urlsafe(32))
+    return render_template(
+        "demand_planning.html", **context,
+        chat_context={
+            "snapshot": _planning_snapshot(context), "csrf": csrf,
+            "facility": context["facility"].code, "horizon": context["horizon"],
+            "scenario": asdict(context["scenario"]),
+            "endpoint": url_for("admin.demand_planning_chat"),
+        },
+    )
+
+
+@admin_bp.route("/api/demand-planning/chat", methods=["POST"])
+@login_required
+def demand_planning_chat():
+    """Interpret questions and calculate a preview, with no operational writes."""
+    csrf = session.get("planner_chat_csrf", "")
+    supplied = request.headers.get("X-Planner-CSRF", "")
+    if not csrf or not secrets.compare_digest(csrf.encode(), supplied.encode()):
+        return jsonify(error="Reload the planner before asking a question."), 403
+    if not request.is_json:
+        return jsonify(error="Send the planning question as JSON."), 415
+    if request.content_length and request.content_length > 48000:
+        return jsonify(error="The planning conversation is too large. Clear the chat and retry."), 413
+    try:
+        data = PlannerChatRequest.model_validate(request.get_json())
+    except (ValidationError, BadRequest):
+        return jsonify(error="Enter a question of up to 2,000 characters with a valid planning context."), 400
+    try:
+        context = _load_planning_snapshot(data.snapshot)
+    except BadSignature:
+        return jsonify(error="The planning context expired or changed. Reload the page and retry."), 400
+
+    projection = context["selected"]
+    engine_context = {
+        "source": "synthetic demo assumptions; not live operational data",
+        "facility": asdict(context["facility"]), "horizon": context["horizon"],
+        "start": context["start"].isoformat(), "scenario": asdict(context["scenario"]),
+        "limits": LIMITS, "baseline": _projection_metrics(context["baseline"]),
+        "current": _projection_metrics(projection),
+        "stages": [asdict(stage) for stage in projection.stages],
+        "hourly": [asdict(hour) for hour in projection.hours],
+        "options": [
+            {"label": option["label"], "inputs": option["inputs"],
+             "metrics": _projection_metrics(option["projection"])}
+            for option in context["options"]
+        ],
+    }
+    try:
+        interpretation = interpret_question(data.message, data.history, engine_context)
+    except (PlannerChatUnavailable, ClientAuthenticationError):
+        current_app.logger.exception("Demand planner chat configuration or authentication failed")
+        return jsonify(error="Azure AI chat is unavailable. Check the model endpoint and Azure sign-in; manual scenario controls still work."), 503
+    except OpenAIError:
+        current_app.logger.exception("Demand planner Azure AI request failed")
+        return jsonify(error="Azure AI could not answer this question. Retry shortly; no scenario was changed."), 503
+    except (PlannerChatResponseError, ValidationError):
+        current_app.logger.exception("Demand planner chat returned an invalid interpretation")
+        return jsonify(error="The AI response could not be validated. Rephrase the question; no scenario was changed."), 502
+
+    changes = {
+        name: value for name, value in interpretation.changes.items()
+        if value != getattr(context["scenario"], name)
+    }
+    result = {
+        "reply": interpretation.reply, "changes": changes,
+        "current": _projection_metrics(projection), "proposal": None,
+        "apply_url": None, "start": context["start"].isoformat(),
+        "source": "Synthetic demo inputs; results calculated by the planner engine.",
+    }
+    if changes:
+        proposed = replace(context["scenario"], **changes)
+        proposal_context = _demand_context(
+            context["facility"].code, context["horizon"], proposed, context["start"]
+        )
+        result["proposal"] = _projection_metrics(proposal_context["selected"])
+        result["apply_url"] = url_for(
+            "admin.demand_planning", preview=_planning_snapshot(proposal_context)
+        )
+    return jsonify(result)
 
 
 @admin_bp.route("/admin/agents")
@@ -97,6 +280,10 @@ def ai_insights():
     
     Access: Admin and depot manager roles
     """
+    facility_code = request.args.get("facility", "DC-SYD-002")
+    if facility_code not in FACILITIES:
+        abort(400, description="Choose a supported distribution centre.")
+
     async def get_insights():
         async with ParcelTrackingDB() as db:
             # Get all parcels for analysis
@@ -245,7 +432,7 @@ def ai_insights():
             }
 
     insights = run_async(get_insights())
-    return render_template("ai_insights.html", insights=insights)
+    return render_template("ai_insights.html", insights=insights, demand=_demand_context(facility_code))
 
 
 @admin_bp.route("/api/insights/refresh", methods=["POST"])

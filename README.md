@@ -8,6 +8,7 @@ Parcel tracking and logistics management platform powered by **8 Azure AI Foundr
 
 - **8 AI Foundry Agents** — Customer service, fraud detection, identity verification, dispatcher, parcel intake, sorting facility, delivery coordination, optimisation
 - **AI Insights Dashboard** — Live agent analysis with 15-second timeout fallback, dynamic peak demand forecasting, health monitoring
+- **Demand & Capacity Planner** — Read-only synthetic processing-centre scenarios, hourly stage queues, dispatch-cutoff risk, and staffing/transfer comparisons; no operational writes
 - **Multi-agent Fraud Workflow** — Fraud Detection → Customer Service → Identity Verification chain, auto-triggered at configurable risk thresholds
 - **AI Approval Engine** — Automated parcel approval/denial with configurable risk thresholds and audit trail
 - **Customer Service Chatbot** — Azure AI Foundry persistent threads, tool-trace panel, GPT-4o attribution badge
@@ -16,6 +17,71 @@ Parcel tracking and logistics management platform powered by **8 Azure AI Foundr
 - **Address Validation** — Azure Maps geocoding with graceful degradation on timeout
 - **Parcel Registration** — OCR via Azure Vision, lodgement photo capture
 - **Real-time Tracking** — Full event history, delivery photos, SMS/email notifications
+
+---
+
+## Demand & Capacity Planning
+
+Open the home page's **Demand & Capacity Planner** tile,
+**AI Insights > Open Demand Planner**, or the **Demand Planner** navigation
+link (`/ai/demand-planning`, login required). Select any of the application's
+40 distribution centres and a rest-of-day, next-24-hour or next-7-day horizon.
+AI Insights, the planner and the Approvals dropdown share one catalogue of centre
+codes, names and states. The planning preview and return link preserve the selected
+centre. Planning clocks use the centre's local timezone, including half-hour
+offsets and daylight saving where applicable.
+
+Use **Demo: surge + late truck + lane outage**, then **Demo response: restore
+lane + staff + hours** to compare the disruption and response. Numeric controls
+also support absence, parcel handling mix and constrained transfer reservations.
+Changing the distribution centre automatically refreshes its workload, hourly chart,
+stage queues, cutoff misses, response options and chat context, retaining the current
+scenario controls. Other input changes recalculate on **Compare scenario**.
+Three response options are ranked by cutoff misses, then incremental
+cost; each retains the selected disruption but replaces mitigation controls.
+Baseline always means normal operations, not the previous scenario.
+
+All arrivals (including the manifest-confirmed split), starting backlog, staffing,
+equipment, costs and receiving reservations are explicitly **synthetic**.
+Each of the 40 centres has a distinct, repeatable daily volume, starting backlog and
+hourly arrival pattern, seeded by its centre code within state-level workload ranges.
+Revisiting a centre reuses its profile rather than generating fresh random data;
+the date, local time, horizon and scenario still affect projected results.
+The centre-specific workload is shown above the results. Processing-capacity
+assumptions remain shared across centres; these are not measured per-centre demand
+or capacity. There are no live planning feeds or statistical forecast-confidence claims. Cutoff
+misses are not confirmed late deliveries: downstream service commitments are not
+connected. The assumptions panel describes stage throughput, connection timing,
+cost exclusions and the no-new-arrivals recovery estimate.
+
+Scenarios are not saved. This feature does not write to Cosmos DB, alter parcel
+approvals, dispatch vehicles, change rosters or deploy infrastructure. Horizon
+starts are rounded down to the current facility-local hour. A deployment is
+required before local code changes appear on the hosted site.
+
+### Ask the Planner
+
+The open chat panel uses the existing Azure AI model deployment to interpret
+questions about the displayed centre, horizon and scenario. For example:
+“What if the inbound truck is two hours late and 15% of staff are absent?”
+The model proposes a validated patch to supported inputs; the deterministic
+planner engine calculates the preview and costs. **Apply scenario to planner**
+explicitly updates the view. Chat never approves parcels or changes operations.
+
+Configure `AZURE_OPENAI_ENDPOINT` and `AZURE_AI_MODEL_DEPLOYMENT_NAME` (default
+`gpt-4o`). The existing Azure OpenAI client uses managed identity when
+`USE_MANAGED_IDENTITY=true`, otherwise the local Azure credential chain. No new
+agent resource, model deployment or API key is required. The identity still needs
+permission to invoke the selected model. Missing configuration, model failures and
+invalid AI output produce visible errors; manual scenario controls remain usable.
+
+Each request sends the question, up to eight recent chat messages, and synthetic
+engine context to Azure AI; normal model charges apply. Chat history stays in the
+browser tab's session storage, separated by centre and horizon; **Clear chat**
+removes it. There is no application-side conversation database. Chat uses the
+displayed snapshot, not unsaved manual edits. Context and apply links expire after
+one hour; applying a preview preserves its calculation start time. Unsupported or
+ambiguous requests should produce a clarification, not a fabricated forecast.
 
 ---
 

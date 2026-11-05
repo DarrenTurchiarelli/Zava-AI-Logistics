@@ -330,6 +330,40 @@
         </div>
     </div>
 
+    <section class="card shadow-sm border-primary mb-4" aria-labelledby="demand-planner-heading">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+                <div>
+                    <span class="badge bg-warning text-dark mb-2">Synthetic planning demo / read only</span>
+                    <h2 class="h4" id="demand-planner-heading">Demand & Capacity Planning</h2>
+                    <p class="text-muted mb-2">{{ demand.facility.name }} / next 24 hours:
+                        identify the bottleneck before dispatch, then compare staffing and disruption scenarios.</p>
+                </div>
+                <a class="btn btn-primary" href="{{ url_for('admin.demand_planning', facility=demand.facility.code, horizon='24h') }}">Open Demand Planner</a>
+            </div>
+            <form method="get" action="{{ url_for('admin.ai_insights') }}" class="row g-2 align-items-end mt-2">
+                <div class="col-md-8">
+                    <label class="form-label small" for="demand-facility">Distribution centre for planning preview</label>
+                    <select class="form-select" name="facility" id="demand-facility">
+                        {% for code, item in demand.facilities.items() %}
+                        <option value="{{ code }}" {% if code == demand.facility.code %}selected{% endif %}>{{ code }} - {{ item.name }} ({{ item.state }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button class="btn btn-outline-primary" type="submit">Update planning preview</button>
+                </div>
+            </form>
+            <div class="row g-3 mt-1">
+                <div class="col-sm-4"><strong class="fs-4">{{ '{:,}'.format(demand.baseline.arrivals) }}</strong><br><span class="text-muted small">Expected arrivals (synthetic)</span></div>
+                <div class="col-sm-4"><strong class="fs-4">{{ demand.baseline.bottleneck }}</strong><br><span class="text-muted small">Largest processing queue</span></div>
+                <div class="col-sm-4"><strong class="fs-4">{{ '{:,}'.format(demand.baseline.cutoff_misses) }}</strong><br><span class="text-muted small">Modelled dispatch-cutoff misses</span></div>
+            </div>
+            <p class="small text-muted mt-3 mb-0">Demo arrivals and resource assumptions, not live demand predictions.
+                Delivery-service risk is not calculated. No scenarios are saved or operational changes executed.</p>
+        </div>
+    </section>
+
     <!-- Sorting Facility Agent - Real-Time Capacity Monitoring -->
     <div class="row mb-4" id="sorting-facility">
         <div class="col-12">
@@ -748,15 +782,11 @@
                                         <small id="predict-tile-badge" class="badge bg-secondary"><span class="spinner-border" style="width:.5rem;height:.5rem;border-width:.1em;"></span> Loading…</small>
                                     </h6>
                                     <div class="mt-3">
-                                        <!-- Volume Prediction -->
-                                        <div class="mb-3 recommendation-item" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#volumePredictModal">
+                                        <div class="mb-3">
                                             <div class="d-flex justify-content-between mb-1 align-items-center">
-                                                <small class="text-muted"><i class="bi bi-info-circle text-primary"></i> Next Week Volume</small>
-                                                <strong id="tile-volume-increase" class="text-success">+{{ ((insights.total_parcels * 1.15)|round(0)|int - insights.total_parcels) }}</strong>
+                                                <a href="{{ url_for('admin.demand_planning') }}">Demand & Capacity Planner</a>
                                             </div>
-                                            <small class="text-success">
-                                                <i class="bi bi-arrow-up"></i> 15% increase predicted
-                                            </small>
+                                            <small class="text-muted">Compare clearly labelled synthetic demand and capacity scenarios.</small>
                                         </div>
 
                                         <!-- Peak Day Prediction -->
@@ -783,7 +813,7 @@
                                     </div>
                                     <hr>
                                     <small class="text-muted">
-                                        <i class="bi bi-robot"></i> AI-powered forecasting<br>
+                                        <i class="bi bi-graph-up"></i> Operational analytics and demand scenarios<br>
                                         <i class="bi bi-hand-index"></i> Click items for details
                                     </small>
                                 </div>
@@ -808,9 +838,9 @@
                             </li>
                             {% endif %}
                             <li>
-                                <strong>This Week:</strong>
-                                {% set predicted = ((insights.total_parcels * 1.15)|round(0)|int - insights.total_parcels) %}
-                                Schedule additional drivers for <span class="js-peak-day">Friday</span> peak — {{ predicted }} additional parcels predicted (15% volume increase).
+                                <strong>Demand Planning:</strong>
+                                <a href="{{ url_for('admin.demand_planning') }}">Compare demand and capacity scenarios</a>
+                                before proposing staffing or transport changes. Planning inputs are synthetic.
                             </li>
                             <li>
                                 <strong>Optimisation:</strong>
@@ -1105,56 +1135,6 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-info">Run Pilot Program</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Volume Prediction Modal -->
-<div class="modal fade" id="volumePredictModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="bi bi-graph-up-arrow"></i> Volume Forecast - AI Analysis</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-info">
-                    <strong><i class="bi bi-robot"></i> AI Confidence:</strong> 78% (High) | <strong>Predicted Increase:</strong> +{{ ((insights.total_parcels * 1.15)|round(0)|int - insights.total_parcels) }} parcels
-                </div>
-
-                <h6 class="text-primary"><i class="bi bi-clipboard-data"></i> Historical Pattern Analysis</h6>
-                <ul>
-                    <li>Last 4 weeks average: {{ insights.total_parcels }} parcels/week</li>
-                    <li>Year-over-year growth: 12% for this period</li>
-                    <li>Recent trend: +3% week-over-week for last 3 weeks</li>
-                    <li>Seasonal factor: Pre-holiday shopping surge (Dec 18-25)</li>
-                </ul>
-
-                <h6 class="text-primary mt-3"><i class="bi bi-lightbulb"></i> AI Recommendation</h6>
-                <div class="card bg-light">
-                    <div class="card-body">
-                        <p><strong>Capacity Planning for Next Week:</strong></p>
-                        <ul class="mb-0">
-                            <li>Add 1 temporary driver for <span class="js-peak-day">Friday</span> peak (estimated 25 extra parcels)</li>
-                            <li>Extend sorting facility hours by 2 hours on Thursday</li>
-                            <li>Pre-position stock at DC-MEL-001 for faster processing</li>
-                            <li>Estimated additional cost: $450 vs. $1,200 for overtime/expedited delivery</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <h6 class="text-primary mt-3"><i class="bi bi-database"></i> Model Inputs</h6>
-                <ul class="small">
-                    <li>Historical data: 12 months of parcel volumes</li>
-                    <li>External factors: Public holidays, weather forecasts</li>
-                    <li>Economic indicators: Consumer confidence index</li>
-                    <li>Web traffic patterns: E-commerce site activity</li>
-                </ul>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary">Approve Capacity Plan</button>
             </div>
         </div>
     </div>
@@ -1617,7 +1597,6 @@
                         setClass('resource-tile-badge', liveBadgeClass);
 
                         // Predictive Analytics tile
-                        setText('tile-volume-increase', '+' + s.predicted_increase.toLocaleString());
                         // Update all js-peak-day spans
                         document.querySelectorAll('.js-peak-day').forEach(el => { el.textContent = s.peak_day; });
                         const riskColor = s.exception_risk_class === 'danger' ? 'text-danger' : s.exception_risk_class === 'warning' ? 'text-warning' : 'text-success';
@@ -1641,7 +1620,7 @@
                                 recoHTML += `<li><strong>Immediate:</strong> Facilities well-balanced — ${s.busiest.name} leading at ${s.busiest.pct}% capacity. No redistribution required.</li>`;
                             }
                             // This Week: volume peak
-                            recoHTML += `<li><strong>This Week:</strong> Schedule additional drivers for <span class="js-peak-day">${s.peak_day}</span> peak — ${s.predicted_increase.toLocaleString()} additional parcels predicted (15% volume increase).</li>`;
+                            recoHTML += `<li><strong>Demand Planning:</strong> <a href="{{ url_for('admin.demand_planning') }}">Compare demand and capacity scenarios</a> before proposing staffing or transport changes. Planning inputs are synthetic.</li>`;
                             // Optimisation: depot backlog or route consolidation
                             if (s.at_depot > 500) {
                                 recoHTML += `<li><strong>Optimisation:</strong> ${s.at_depot.toLocaleString()} parcels queued at depot — pre-assign to active facilities to reduce processing backlog.</li>`;

@@ -5,6 +5,7 @@ Complete implementation with CQRS pattern integration
 """
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
 from datetime import datetime, timezone
+from dataclasses import asdict
 import json
 import os
 import re
@@ -13,8 +14,14 @@ import random
 from src.interfaces.web.middleware import login_required, depot_manager_required
 from parcel_tracking_db import ParcelTrackingDB
 from utils.async_helpers import run_async
+from src.domain.models.distribution_centre import DISTRIBUTION_CENTRES
 
 approvals_bp = Blueprint('approvals', __name__, url_prefix='/approvals')
+
+
+@approvals_bp.context_processor
+def distribution_centre_context():
+    return {"distribution_centres": [asdict(centre) for centre in DISTRIBUTION_CENTRES]}
 
 
 def _ai_batch_approve(items: list, config: dict) -> dict:
