@@ -41,18 +41,103 @@ Three response options are ranked by cutoff misses, then incremental
 cost; each retains the selected disruption but replaces mitigation controls.
 Baseline always means normal operations, not the previous scenario.
 
-All arrivals (including the manifest-confirmed split), starting backlog, staffing,
-equipment, costs and receiving reservations are explicitly **synthetic**.
-Each of the 40 centres has a distinct, repeatable daily volume, starting backlog and
-hourly arrival pattern, seeded by its centre code within state-level workload ranges.
-Revisiting a centre reuses its profile rather than generating fresh random data;
-the date, local time, horizon and scenario still affect projected results.
-The centre-specific workload is shown above the results. Processing-capacity
-assumptions remain shared across centres; these are not measured per-centre demand
-or capacity. There are no live planning feeds or statistical forecast-confidence claims. Cutoff
-misses are not confirmed late deliveries: downstream service commitments are not
-connected. The assumptions panel describes stage throughput, connection timing,
-cost exclusions and the no-new-arrivals recovery estimate.
+### Hybrid application snapshot and synthetic forecast
+
+For admin and depot-manager users, the planner reads bounded, non-personal
+projections from the existing `parcels`, `delivery_attempts`, `driver_manifests`
+and `users` Cosmos containers. It uses existing Cosmos connection settings and
+managed identity/key/CLI authentication; it never creates databases, containers,
+or operational records. Each feed is capped at 20,000 records. A failed or
+over-limit feed is visibly **unavailable**, not an empty or partially complete total.
+
+When both parcel and approval feeds are complete, distinct eligible parcel records
+replace the synthetic starting backlog. Exact current centre codes/names are
+mapped to the shared catalogue; lodgement/origin locations, destinations and
+states are not used to invent current occupancy. Tracking/barcode aliases deduplicate
+parcels; conflicting identities/locations and unmapped records are excluded and
+reported. At-depot parcels start at unload and sorting parcels start at sort.
+Terminal, outbound and pre-arrival parcels are not added to processing queues.
+Explicit holds and unresolved required release are excluded. Otherwise-processable
+parcels linked to pending approvals are conservatively excluded as **awaiting review**,
+not asserted to be confirmed physical holds. Several requests for one parcel
+never create several parcels. The planner cannot approve or release anything.
+
+Today's active delivery manifests are linked through parcel identities to provide
+outbound context, never confirmed inbound demand. Differently dated manifests are
+excluded and flagged. Driver accounts are shown only as directory context:
+state-wide accounts and assigned delivery drivers are not available drivers,
+trained sorters or measured facility capacity. Missing state assignments are flagged.
+The source panel shows read time, last stored update, missing feeds and reconciliation
+warnings. Stored update times are not interpreted as arrival/processing events.
+Records may themselves be seeded demo data, not real-world operating measurements.
+
+Future arrivals, staffing, equipment, deadlines, costs and receiving reservations
+remain explicitly **synthetic**. Each centre retains its reproducible future daily
+volume and hourly arrival pattern. Future arrivals are additional simulated demand,
+not a second count of starting application parcels. There is no confirmed inbound
+booking feed or invented 70/30 manifest-confirmed split. Processing-capacity
+assumptions remain shared across centres. If current parcel/approval eligibility
+cannot be established, the projection uses a clearly labelled synthetic starting
+backlog, never a synthetic number labelled as an application count.
+
+AI Insights uses the same hybrid preview. The planner links to parcel records,
+centre-filtered Approvals, and today's state manifests. Source reads are shared
+per worker for up to 30 seconds (5 seconds after an unavailable feed) to avoid four
+cross-partition reads on every centre selection. Independent feeds are fetched
+concurrently. **Refresh application snapshot** explicitly bypasses this cache;
+changing centre or submitting manual controls uses the latest cached/read snapshot.
+Chat Apply and ranked response-option links instead preserve the signed source
+snapshot and calculation start, so comparisons do not silently change workload.
+Other authenticated roles retain synthetic planning without operational reads;
+application snapshots cannot be replayed by those roles.
+
+There are no statistical forecast-confidence claims. Cutoff misses are not confirmed
+late deliveries: downstream service commitments are not connected. The assumptions
+panel describes stage throughput, connection timing, cost exclusions and the
+no-new-arrivals recovery estimate.
+
+### Indicative planner costs
+
+The expanded **Cost assumptions** panel accepts whole-AUD, GST-exclusive planning
+inputs. Defaults are illustrative Australian demo assumptions, **not verified
+market rates, payroll data or supplier quotes**:
+
+| Input | Default |
+|---|---:|
+| Paid normal site team (all costed roles, not just sorters) | 36 people |
+| Loaded normal labour | AUD 65/person-hour |
+| Loaded extra sorters | AUD 95/person-hour |
+| Extended-hours site team | 24 people |
+| Loaded overtime | AUD 110/person-hour |
+| Site overhead, including closed hours | AUD 350/elapsed hour |
+| Consolidated transfer transport | AUD 650/trip |
+| Transfer handling | AUD 3/parcel actually moved |
+| Costed transfer load size | 400 parcels/trip |
+| Restore an unavailable sorting lane | AUD 1,500 once per horizon |
+
+**Total indicative operating cost** includes normal paid labour, site overhead and
+additional response spend. **Additional response cost** includes extra sorters,
+the extended-hours crew, actual transfers and lane restoration. A disruption
+without a paid response can still have zero additional spend, but not zero site
+operating cost. Breakdowns expose each component, paid staff-hours and assumed trips
+for the selected scenario and each ranked option.
+
+Normal site labour is paid during 06:00-22:00 hours within the horizon, without
+assuming absence reduces payroll. Extra sorters work from 14:00 until closing,
+including extensions; the separate overtime crew works after 22:00. Site-team
+costing inputs do not change the synthetic 12-sorter processing-capacity model.
+Rates are blended: no automatic award, weekend, public-holiday or night premiums.
+Transport rounds actual transfers up to whole configured loads separately per
+facility-local day, assuming consolidation; it does not add receiving capacity.
+`restore_lane=1` restores an underlying `lane_outage=1`, charging once per horizon;
+without an outage it has no effect or fee. Base fleet costs, post-horizon recovery,
+claims, penalties and lost revenue remain excluded, so this is not a cost-of-inaction
+or ROI model.
+
+Rates travel with manual form updates, centre/horizon changes, scenario resets,
+signed option links and chat Apply previews. They are not saved to Cosmos or as
+centre budgets. Chat can explain supplied rates and costs but cannot change rates;
+edit the panel instead.
 
 Scenarios are not saved. This feature does not write to Cosmos DB, alter parcel
 approvals, dispatch vehicles, change rosters or deploy infrastructure. Horizon
@@ -75,9 +160,11 @@ agent resource, model deployment or API key is required. The identity still need
 permission to invoke the selected model. Missing configuration, model failures and
 invalid AI output produce visible errors; manual scenario controls remain usable.
 
-Each request sends the question, up to eight recent chat messages, and synthetic
-engine context to Azure AI; normal model charges apply. Chat history stays in the
-browser tab's session storage, separated by centre and horizon; **Clear chat**
+Each request sends the question, up to eight recent chat messages, anonymous
+application counts/source warnings and synthetic engine assumptions to Azure AI;
+normal model charges apply. Customer details and parcel/driver identifiers from
+source feeds are not included. Chat history stays in the
+browser tab's session storage, separated by centre, horizon and hybrid/synthetic mode; **Clear chat**
 removes it. There is no application-side conversation database. Chat uses the
 displayed snapshot, not unsaved manual edits. Context and apply links expire after
 one hour; applying a preview preserves its calculation start time. Unsupported or

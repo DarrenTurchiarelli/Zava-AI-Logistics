@@ -1,4 +1,4 @@
-"""Deterministic, synthetic parcel-facility planning; no operational side effects."""
+"""Deterministic parcel-facility scenarios with synthetic future demand and capacity."""
 
 from collections import deque
 from dataclasses import dataclass
@@ -71,7 +71,71 @@ LIMITS = {
     "extra_hours": (0, 2),
     "transfer": (0, 800),
     "manual_mix": (0, 50),
+    "restore_lane": (0, 1),
 }
+
+COST_LIMITS = {
+    "base_team": (1, 1000),
+    "base_hourly": (0, 10000),
+    "extra_hourly": (0, 10000),
+    "overtime_team": (1, 1000),
+    "overtime_hourly": (0, 10000),
+    "overhead_hourly": (0, 10000),
+    "transfer_trip": (0, 1000000),
+    "transfer_parcel": (0, 1000),
+    "transfer_load": (1, 10000),
+    "lane_restoration": (0, 1000000),
+}
+
+
+@dataclass(frozen=True)
+class CostAssumptions:
+    base_team: int = 36
+    base_hourly: int = 65
+    extra_hourly: int = 95
+    overtime_team: int = 24
+    overtime_hourly: int = 110
+    overhead_hourly: int = 350
+    transfer_trip: int = 650
+    transfer_parcel: int = 3
+    transfer_load: int = 400
+    lane_restoration: int = 1500
+
+    def __post_init__(self):
+        for name, (minimum, maximum) in COST_LIMITS.items():
+            value = getattr(self, name)
+            if type(value) is not int or not minimum <= value <= maximum:
+                raise ValueError(f"Cost assumption {name} must be a whole number from {minimum} to {maximum}.")
+
+
+@dataclass(frozen=True)
+class CostBreakdown:
+    base_labour: int
+    facility_overhead: int
+    extra_labour: int
+    overtime_labour: int
+    transfer_transport: int
+    transfer_handling: int
+    lane_restoration: int
+    transfer_trips: int
+    base_staff_hours: int
+    extra_staff_hours: int
+    overtime_staff_hours: int
+
+    @property
+    def operating(self) -> int:
+        return self.base_labour + self.facility_overhead
+
+    @property
+    def response(self) -> int:
+        return (
+            self.extra_labour + self.overtime_labour + self.transfer_transport
+            + self.transfer_handling + self.lane_restoration
+        )
+
+    @property
+    def total(self) -> int:
+        return self.operating + self.response
 
 
 @dataclass(frozen=True)
@@ -84,6 +148,7 @@ class Scenario:
     extra_hours: int = 0
     transfer: int = 0
     manual_mix: int = 15
+    restore_lane: int = 0
 
     def __post_init__(self):
         for name, (minimum, maximum) in LIMITS.items():
@@ -135,6 +200,15 @@ class Projection:
     cost: int
     recovery_hours: int | None
     bottleneck: str
+    cost_breakdown: CostBreakdown
+
+    @property
+    def operating_cost(self) -> int:
+        return self.cost_breakdown.operating
+
+    @property
+    def total_cost(self) -> int:
+        return self.cost_breakdown.total
 
 
 def planning_start(facility: Facility, now: datetime | None = None) -> datetime:
@@ -161,7 +235,8 @@ def _capacities(at: datetime, scenario: Scenario) -> list[int]:
         staff += scenario.extra_staff
     # Manual items require three times the sorting effort of machine-sortable items.
     effort = 1 + 2 * scenario.manual_mix / 100
-    sorting = floor(min(staff * 120, (2 - scenario.lane_outage) * 750) / effort)
+    unavailable_lanes = max(0, scenario.lane_outage - scenario.restore_lane)
+    sorting = floor(min(staff * 120, (2 - unavailable_lanes) * 750) / effort)
     return [1500, 1400, sorting, 1300]
 
 
@@ -183,9 +258,22 @@ def _hour_at(start: datetime, offset: int) -> datetime:
     return (start.astimezone(UTC) + timedelta(hours=offset)).astimezone(start.tzinfo)
 
 
-def project(facility: Facility, horizon: str, scenario: Scenario, start: datetime) -> Projection:
+def project(
+    facility: Facility,
+    horizon: str,
+    scenario: Scenario,
+    start: datetime,
+    initial_queues: tuple[int, int, int, int] | None = None,
+    costs: CostAssumptions | None = None,
+) -> Projection:
     if horizon not in HORIZONS:
         raise ValueError("Choose a supported planning horizon.")
+    costs = costs or CostAssumptions()
+    starting = initial_queues if initial_queues is not None else (0, 0, facility.initial_backlog, 0)
+    if len(starting) != 4 or any(type(count) is not int or count < 0 for count in starting):
+        raise ValueError("Starting queues must contain four non-negative whole parcel counts.")
+    if sum(starting) != facility.initial_backlog:
+        raise ValueError("Starting queues must reconcile to the facility's initial workload.")
     midnight = (start + timedelta(days=1)).replace(hour=0)
     remaining_today = round((midnight.astimezone(UTC) - start.astimezone(UTC)).total_seconds() / 3600)
     length = {"today": remaining_today, "24h": 24, "7d": 168}[horizon]
@@ -212,10 +300,13 @@ def project(facility: Facility, horizon: str, scenario: Scenario, start: datetim
             deferred += delayed
 
     queues: list[deque[Batch]] = [deque() for _ in STAGES]
-    queues[2].append(Batch(facility.initial_backlog, _deadline(start)))
-    peak_queues = [0, 0, facility.initial_backlog, 0]
+    for index, count in enumerate(starting):
+        if count:
+            queues[index].append(Batch(count, _deadline(start)))
+    peak_queues = list(starting)
     rows = []
-    missed = dispatched = transferred = cost = 0
+    missed = dispatched = transferred = 0
+    base_staff_hours = extra_staff_hours = overtime_staff_hours = 0
     transfer_budget: dict[str, int] = {}
     for index, batches in enumerate(arrivals):
         at = _hour_at(start, index)
@@ -252,12 +343,14 @@ def project(facility: Facility, horizon: str, scenario: Scenario, start: datetim
         sizes = [sum(batch.count for batch in queue) for queue in queues]
         for stage, size in enumerate(sizes):
             peak_queues[stage] = max(peak_queues[stage], size)
+        if 6 <= at.hour < 22:
+            base_staff_hours += costs.base_team
         if caps[0]:
             if at.hour >= 14:
-                cost += scenario.extra_staff * 55
+                extra_staff_hours += scenario.extra_staff
             if at.hour >= 22:
-                cost += 12 * 70
-        confirmed = round(count * 0.7)
+                overtime_staff_hours += costs.overtime_team
+        confirmed = 0
         rows.append(
             Hour(
                 at.strftime("%a %d %b %H:00"),
@@ -278,6 +371,21 @@ def project(facility: Facility, horizon: str, scenario: Scenario, start: datetim
         for index, name in enumerate(STAGES)
     ]
     recovery = None
+    # Costing assumes transfers can consolidate into the configured load size within each local day.
+    transfer_trips = sum((count + costs.transfer_load - 1) // costs.transfer_load for count in transfer_budget.values())
+    breakdown = CostBreakdown(
+        base_labour=base_staff_hours * costs.base_hourly,
+        facility_overhead=length * costs.overhead_hourly,
+        extra_labour=extra_staff_hours * costs.extra_hourly,
+        overtime_labour=overtime_staff_hours * costs.overtime_hourly,
+        transfer_transport=transfer_trips * costs.transfer_trip,
+        transfer_handling=transferred * costs.transfer_parcel,
+        lane_restoration=costs.lane_restoration if scenario.lane_outage and scenario.restore_lane else 0,
+        transfer_trips=transfer_trips,
+        base_staff_hours=base_staff_hours,
+        extra_staff_hours=extra_staff_hours,
+        overtime_staff_hours=overtime_staff_hours,
+    )
     # Drain-only estimate: no further arrivals; these hours are not included in plan cost.
     for extra in range(73):
         if not any(queues):
@@ -299,9 +407,10 @@ def project(facility: Facility, horizon: str, scenario: Scenario, start: datetim
         max([facility.initial_backlog] + [row.backlog for row in rows]),
         remaining,
         missed,
-        cost + transferred * 2,
+        breakdown.response,
         recovery,
         max(stages, key=lambda stage: stage.peak_queue).name,
+        breakdown,
     )
 
 

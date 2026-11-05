@@ -9,17 +9,19 @@
     const send = document.getElementById('planner-chat-send');
     const clear = document.getElementById('planner-chat-clear');
     const examples = Array.from(document.querySelectorAll('.planner-chat-example'));
-    const storageKey = `zava-planner-chat:${context.facility}:${context.horizon}`;
+    const storageKey = `zava-planner-chat:${context.facility}:${context.horizon}:${context.source}`;
     const labels = {
         surge: 'Additional arrivals (%)', delay: 'Inbound truck delay (hours)',
         absence: 'Sort staff absent (%)', lane_outage: 'Sorting lanes unavailable',
         extra_staff: 'Extra afternoon sorters', extra_hours: 'Extra operating hours',
-        transfer: 'Transfer reservation (parcels/day)', manual_mix: 'Manual-handling mix (%)'
+        transfer: 'Transfer reservation (parcels/day)', manual_mix: 'Manual-handling mix (%)',
+        restore_lane: 'Restore unavailable lane (0 / 1)'
     };
     const metrics = [
         ['arrivals', 'Expected arrivals'], ['peak_backlog', 'Peak backlog'],
         ['cutoff_misses', 'Dispatch-cutoff misses'], ['remaining', 'End backlog'],
-        ['transferred', 'Transferred parcels'], ['cost', 'Incremental cost (AUD)'],
+        ['transferred', 'Transferred parcels'], ['operating_cost', 'Normal operating cost (AUD)'],
+        ['cost', 'Additional response cost (AUD)'], ['total_cost', 'Total indicative cost (AUD)'],
         ['recovery_hours', 'Drain-only recovery (hours)']
     ];
     let history = [];

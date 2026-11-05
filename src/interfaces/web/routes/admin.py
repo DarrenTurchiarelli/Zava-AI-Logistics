@@ -4,7 +4,7 @@ Admin Blueprint - Administrative Dashboard and Insights
 Provides admin-only routes for system monitoring, AI agent performance,
 and operational insights.
 """
-from flask import Blueprint, render_template, jsonify, request, abort, session, current_app, url_for
+from flask import Blueprint, render_template, jsonify, request, abort, session, current_app, url_for, has_request_context
 from datetime import datetime, timezone, timedelta
 from dataclasses import asdict, replace
 import os
@@ -15,7 +15,7 @@ import secrets
 from azure.core.exceptions import ClientAuthenticationError
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from openai import OpenAIError
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 from werkzeug.exceptions import BadRequest
 
 from src.interfaces.web.middleware import login_required
@@ -23,8 +23,10 @@ from parcel_tracking_db import ParcelTrackingDB
 from utils.async_helpers import run_async
 from src.infrastructure.state import StateManager, AgentDecision
 from src.domain.services.demand_planning import (
-    FACILITIES, HORIZONS, LIMITS, Scenario, planning_start, project, recommendations,
+    COST_LIMITS, FACILITIES, HORIZONS, LIMITS, CostAssumptions, Scenario, planning_start, project, recommendations,
 )
+from src.domain.services.planning_operations import PlanningOperations
+from src.infrastructure.database.planning_source import read_planning_operations
 from src.infrastructure.agents.core.base import (
     call_azure_agent,
     OPTIMIZATION_AGENT_ID,
@@ -40,27 +42,37 @@ admin_bp = Blueprint('admin', __name__)
 global_state_manager = StateManager()
 
 
-def _demand_context(facility_code="DC-SYD-002", horizon="24h", scenario=None, start=None):
+def _demand_context(facility_code="DC-SYD-002", horizon="24h", scenario=None, start=None, operations=None, costs=None):
     facility = FACILITIES[facility_code]
+    initial_queues = None
+    if operations is not None:
+        if operations.facility_code != facility_code:
+            raise ValueError("Operational snapshot belongs to a different centre.")
+        initial_queues = operations.initial_queues
+        if initial_queues is not None:
+            facility = replace(facility, initial_backlog=sum(initial_queues))
     start = start or planning_start(facility)
-    baseline = project(facility, horizon, Scenario(), start)
+    costs = costs or CostAssumptions()
+    baseline = project(facility, horizon, Scenario(), start, initial_queues, costs)
     scenario = scenario or Scenario()
-    selected = project(facility, horizon, scenario, start)
-    disruption = replace(scenario, extra_staff=0, extra_hours=0, transfer=0)
+    selected = project(facility, horizon, scenario, start, initial_queues, costs)
+    disruption = replace(scenario, extra_staff=0, extra_hours=0, transfer=0, restore_lane=0)
     options = []
     for label, inputs in [
-        ("Restore both lanes + four afternoon sorters", replace(disruption, lane_outage=0, extra_staff=4)),
+        ("Restore both lanes + four afternoon sorters",
+         replace(disruption, restore_lane=disruption.lane_outage, extra_staff=4)),
         ("Extend operating hours by two", replace(disruption, extra_hours=2)),
         ("Reserve up to 800 eligible transfers / day", replace(disruption, transfer=800)),
     ]:
         options.append({
-            "label": label, "projection": project(facility, horizon, inputs, start), "inputs": asdict(inputs),
+            "label": label, "projection": project(facility, horizon, inputs, start, initial_queues, costs),
+            "inputs": asdict(inputs),
         })
     options.sort(key=lambda option: (option["projection"].cutoff_misses, option["projection"].cost))
     return {
         "facility": facility, "facilities": FACILITIES, "horizons": HORIZONS,
-        "horizon": horizon, "scenario": scenario, "start": start, "options": options,
-        "baseline": baseline, "selected": selected,
+        "horizon": horizon, "scenario": scenario, "start": start, "options": options, "operations": operations,
+        "baseline": baseline, "selected": selected, "costs": costs, "cost_limits": COST_LIMITS,
         "peak_hour": max(selected.hours, key=lambda row: row.arrivals),
         "recommendations": recommendations(baseline, selected),
         "chart_max": max(
@@ -69,30 +81,51 @@ def _demand_context(facility_code="DC-SYD-002", horizon="24h", scenario=None, st
     }
 
 
+def _connected_demand_context(facility_code, horizon="24h", scenario=None, refresh=False, costs=None):
+    if has_request_context() and session.get("user", {}).get("role") not in {"admin", "depot_manager"}:
+        return _demand_context(facility_code, horizon, scenario, costs=costs)
+    start = planning_start(FACILITIES[facility_code])
+    day = start.date().isoformat()
+    operations = (
+        read_planning_operations(facility_code, day, refresh=True) if refresh
+        else read_planning_operations(facility_code, day)
+    )
+    return _demand_context(facility_code, horizon, scenario, start, operations, costs)
+
+
 def _planning_signer():
     return URLSafeTimedSerializer(current_app.secret_key, salt="demand-planner-context")
 
 
-def _planning_snapshot(context):
+def _planning_snapshot(context, scenario=None):
     return _planning_signer().dumps({
         "facility": context["facility"].code, "horizon": context["horizon"],
-        "scenario": asdict(context["scenario"]), "start": context["start"].isoformat(),
+        "scenario": asdict(scenario or context["scenario"]), "start": context["start"].isoformat(),
+        "costs": asdict(context["costs"]),
+        "operations": TypeAdapter(PlanningOperations).dump_python(context["operations"], mode="json")
+        if context["operations"] is not None else None,
     })
 
 
 def _load_planning_snapshot(token):
     data = _planning_signer().loads(token, max_age=3600)
-    return _demand_context(
-        data["facility"], data["horizon"], Scenario(**data["scenario"]),
-        datetime.fromisoformat(data["start"]),
-    )
+    try:
+        operations = TypeAdapter(PlanningOperations).validate_python(data["operations"]) if data.get("operations") else None
+        if operations is not None and has_request_context() and session.get("user", {}).get("role") not in {"admin", "depot_manager"}:
+            abort(403, description="Application planning snapshots require an admin or depot manager role.")
+        return _demand_context(
+            data["facility"], data["horizon"], Scenario(**data["scenario"]),
+            datetime.fromisoformat(data["start"]), operations, CostAssumptions(**data.get("costs", {})),
+        )
+    except (ValueError, KeyError, TypeError) as exc:
+        raise BadSignature("Invalid operational planning snapshot") from exc
 
 
 def _projection_metrics(projection):
     return {
         name: getattr(projection, name) for name in (
             "arrivals", "peak_backlog", "remaining", "cutoff_misses", "dispatched",
-            "transferred", "cost", "recovery_hours", "bottleneck",
+            "transferred", "cost", "operating_cost", "total_cost", "recovery_hours", "bottleneck",
         )
     }
 
@@ -100,7 +133,7 @@ def _projection_metrics(projection):
 @admin_bp.route("/ai/demand-planning")
 @login_required
 def demand_planning():
-    """Read-only synthetic scenario comparison; never writes operational data."""
+    """Read-only application snapshot plus synthetic future demand and capacity."""
     facility = request.args.get("facility", "DC-SYD-002")
     horizon = request.args.get("horizon", "24h")
     try:
@@ -111,6 +144,9 @@ def demand_planning():
             raise ValueError("Choose a supported facility.")
         if horizon not in HORIZONS:
             raise ValueError("Choose a supported planning horizon.")
+        refresh = request.args.get("refresh", "0")
+        if refresh not in {"0", "1"}:
+            raise ValueError("Refresh must be 0 or 1.")
         values = {}
         for name in LIMITS:
             raw = request.args.get(name, str(getattr(Scenario(), name)))
@@ -119,22 +155,39 @@ def demand_planning():
             except ValueError:
                 raise ValueError(f"{name} must be a whole number.") from None
         scenario = Scenario(**values)
+        cost_values = {}
+        for name in COST_LIMITS:
+            raw = request.args.get(f"cost_{name}", str(getattr(CostAssumptions(), name)))
+            try:
+                cost_values[name] = int(raw)
+            except ValueError:
+                raise ValueError(f"Cost assumption {name} must be a whole number.") from None
+        costs = CostAssumptions(**cost_values)
     except BadSignature:
         return render_template("demand_planning.html", error="This scenario preview expired or is invalid. Reset the planner."), 400
     except ValueError as exc:
         return render_template("demand_planning.html", error=str(exc)), 400
-    return _render_demand_planner(_demand_context(facility, horizon, scenario))
+    return _render_demand_planner(_connected_demand_context(facility, horizon, scenario, refresh == "1", costs))
 
 
 def _render_demand_planner(context):
     csrf = session.setdefault("planner_chat_csrf", secrets.token_urlsafe(32))
+    for option in context["options"]:
+        option["preview_url"] = url_for(
+            "admin.demand_planning", preview=_planning_snapshot(context, Scenario(**option["inputs"]))
+        )
     return render_template(
         "demand_planning.html", **context,
+        reset_url=url_for(
+            "admin.demand_planning", facility=context["facility"].code, horizon=context["horizon"],
+            **{f"cost_{name}": value for name, value in asdict(context["costs"]).items()},
+        ),
         chat_context={
             "snapshot": _planning_snapshot(context), "csrf": csrf,
             "facility": context["facility"].code, "horizon": context["horizon"],
             "scenario": asdict(context["scenario"]),
             "endpoint": url_for("admin.demand_planning_chat"),
+            "source": "hybrid" if context["operations"] is not None and context["operations"].connected else "synthetic",
         },
     )
 
@@ -161,17 +214,28 @@ def demand_planning_chat():
         return jsonify(error="The planning context expired or changed. Reload the page and retry."), 400
 
     projection = context["selected"]
+    operations = context["operations"]
+    source = (
+        "application workload snapshot (may include seeded demo records); synthetic future demand and capacity"
+        if operations is not None and operations.connected
+        else "synthetic projection; application starting workload unavailable or not connected"
+    )
     engine_context = {
-        "source": "synthetic demo assumptions; not live operational data",
+        "source": source,
         "facility": asdict(context["facility"]), "horizon": context["horizon"],
         "start": context["start"].isoformat(), "scenario": asdict(context["scenario"]),
         "limits": LIMITS, "baseline": _projection_metrics(context["baseline"]),
         "current": _projection_metrics(projection),
+        "cost_assumptions": asdict(context["costs"]),
+        "cost_breakdown": asdict(projection.cost_breakdown),
         "stages": [asdict(stage) for stage in projection.stages],
         "hourly": [asdict(hour) for hour in projection.hours],
+        "operations": TypeAdapter(PlanningOperations).dump_python(operations, mode="json")
+        if operations is not None else None,
         "options": [
             {"label": option["label"], "inputs": option["inputs"],
-             "metrics": _projection_metrics(option["projection"])}
+             "metrics": _projection_metrics(option["projection"]),
+             "cost_breakdown": asdict(option["projection"].cost_breakdown)}
             for option in context["options"]
         ],
     }
@@ -195,12 +259,12 @@ def demand_planning_chat():
         "reply": interpretation.reply, "changes": changes,
         "current": _projection_metrics(projection), "proposal": None,
         "apply_url": None, "start": context["start"].isoformat(),
-        "source": "Synthetic demo inputs; results calculated by the planner engine.",
+        "source": f"{source}. Results calculated by the planner engine; no operational changes.",
     }
     if changes:
         proposed = replace(context["scenario"], **changes)
         proposal_context = _demand_context(
-            context["facility"].code, context["horizon"], proposed, context["start"]
+            context["facility"].code, context["horizon"], proposed, context["start"], operations, context["costs"],
         )
         result["proposal"] = _projection_metrics(proposal_context["selected"])
         result["apply_url"] = url_for(
@@ -432,7 +496,7 @@ def ai_insights():
             }
 
     insights = run_async(get_insights())
-    return render_template("ai_insights.html", insights=insights, demand=_demand_context(facility_code))
+    return render_template("ai_insights.html", insights=insights, demand=_connected_demand_context(facility_code))
 
 
 @admin_bp.route("/api/insights/refresh", methods=["POST"])

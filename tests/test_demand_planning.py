@@ -1,8 +1,8 @@
 import json
 import re
 from collections import deque
-from dataclasses import replace
-from datetime import UTC, datetime
+from dataclasses import asdict, replace
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -13,9 +13,11 @@ from pydantic import ValidationError
 
 from src.domain.models.distribution_centre import DISTRIBUTION_CENTRES
 from src.domain.services.demand_planning import (
+    COST_LIMITS,
     FACILITIES,
     LIMITS,
     Batch,
+    CostAssumptions,
     Scenario,
     _capacities,
     _deadline,
@@ -25,6 +27,11 @@ from src.domain.services.demand_planning import (
     planning_start,
     project,
 )
+from src.domain.services.planning_operations import (
+    PlanningFeed,
+    reconcile_operations,
+    resolve_centre,
+)
 from src.infrastructure.agents.demand_planner_chat import (
     ChatMessage,
     PlannerChatResponseError,
@@ -33,9 +40,517 @@ from src.infrastructure.agents.demand_planner_chat import (
 )
 
 
+@pytest.fixture(autouse=True)
+def isolate_planning_sources(monkeypatch):
+    from src.infrastructure.database import planning_source
+    from src.interfaces.web.routes import admin
+
+    def unavailable(facility_code, local_day):
+        now = datetime.now(UTC)
+        names = ("parcels", "approvals", "manifests", "drivers")
+        feeds = tuple(PlanningFeed(name, False, now, issue=f"{name}: test feed unavailable.") for name in names)
+        return reconcile_operations(facility_code, local_day, dict.fromkeys(names), feeds, now)
+
+    monkeypatch.setattr(admin, "read_planning_operations", unavailable)
+    monkeypatch.setattr(planning_source, "_cached_snapshot", None)
+    monkeypatch.setattr(planning_source, "_cache_expires", 0.0)
+
+
 @pytest.fixture
 def start():
     return planning_start(FACILITIES["DC-SYD-002"], datetime(2026, 11, 5, 19, tzinfo=UTC))
+
+
+def _operations(records, code="DC-SYD-001", now=None):
+    now = now or datetime(2026, 11, 5, 8, tzinfo=UTC)
+    all_records = {"parcels": [], "approvals": [], "manifests": [], "drivers": [], **records}
+    feeds = tuple(
+        PlanningFeed(name, rows is not None, now, records=len(rows) if rows is not None else None,
+                     issue=f"{name}: unavailable." if rows is None else None)
+        for name, rows in all_records.items()
+    )
+    return reconcile_operations(code, now.date().isoformat(), all_records, feeds, now)
+
+
+def _parcel(barcode, status="At Depot", centre="DC-SYD-001", **values):
+    return {
+        "id": f"id-{barcode}", "barcode": barcode, "tracking_number": f"track-{barcode}",
+        "current_status": status, "current_location": centre, **values,
+    }
+
+
+def test_operations_reconcile_workload_holds_pending_requests_and_duplicate_parcels():
+    a = _parcel("a")
+    operations = _operations({
+        "parcels": [
+            a, dict(a), _parcel("b", "Sorting"), _parcel("c", "held"),
+            _parcel("d", requires_approval=True), _parcel("e", "Out For Delivery"),
+            _parcel("f", "in_transit"), _parcel("g", "Delivered"), _parcel("h"),
+            _parcel("i", "Registered"), _parcel("j", centre="Unknown", store_location="DC-SYD-001"),
+            _parcel("k", centre="DC-MEL-001"), _parcel("m", "unrecognised"),
+            {"current_location": "DC-SYD-001", "current_status": "At Depot"},
+        ],
+        "approvals": [
+            {"id": "request-1", "parcel_barcode": "h", "status": "pending"},
+            {"id": "request-2", "tracking_number": "track-h", "status": "pending"},
+            {"id": "request-3", "parcel_barcode": "g", "status": "pending"},
+            {"id": "request-4", "parcel_barcode": "b", "status": "approved"},
+            {"id": "request-5", "parcel_barcode": "missing", "status": "pending"},
+        ],
+    })
+    assert operations.connected
+    assert operations.initial_queues == (1, 0, 1, 0)
+    assert operations.eligible == 2
+    assert operations.held == 2
+    assert operations.awaiting_review == 1
+    assert operations.pending_requests == 3
+    assert operations.pending_parcels == 2
+    assert operations.outbound == 2
+    assert operations.pre_arrival == 1
+    assert operations.unknown_status == 1
+    assert operations.unmapped_parcels == 2
+    assert operations.duplicate_parcels == 1
+    assert any("physical holds" in warning for warning in operations.warnings)
+
+
+def test_current_location_is_required_and_no_destination_or_lodgement_guess_is_used():
+    operations = _operations({"parcels": [
+        _parcel("a", centre="Sydney Metro Hub"),
+        _parcel("b", centre="DC-MEL-001", store_location="DC-SYD-001"),
+        _parcel("c", centre="Sydney", destination_state="NSW"),
+        _parcel("d", centre=None, store_location="DC-SYD-001", origin_location="DC-SYD-001"),
+    ]})
+    assert operations.eligible == 1
+    assert operations.unmapped_parcels == 2
+    assert resolve_centre(" dc-syd-001 ") == "DC-SYD-001"
+    assert resolve_centre("Sydney Metro Hub") == "DC-SYD-001"
+    assert resolve_centre("Sydney") is None
+    for centre in DISTRIBUTION_CENTRES:
+        assert resolve_centre(centre.id) == resolve_centre(centre.name) == centre.id
+
+
+def test_transitive_duplicate_identity_and_conflicting_locations_are_excluded():
+    operations = _operations({"parcels": [
+        _parcel("a", tracking_number="shared-1", _ts=1),
+        _parcel("b", tracking_number="shared-2", _ts=2),
+        _parcel("a", tracking_number="shared-2", centre="DC-MEL-001", _ts=3),
+    ]})
+    assert operations.duplicate_parcels == 2
+    assert operations.eligible == 0
+    assert operations.unmapped_parcels == 1
+    assert any("conflicting centre" in warning for warning in operations.warnings)
+
+
+@pytest.mark.parametrize("missing", ["parcels", "approvals"])
+def test_required_feed_failure_does_not_invent_zero_or_use_partial_workload(missing):
+    operations = _operations({"parcels": [_parcel("a")], missing: None})
+    assert not operations.connected
+    assert operations.initial_queues is None
+    assert operations.eligible is None
+    assert any("synthetic starting backlog" in warning for warning in operations.warnings)
+
+
+def test_empty_complete_feeds_mean_zero_not_synthetic_starting_backlog():
+    operations = _operations({})
+    assert operations.connected
+    assert operations.initial_queues == (0, 0, 0, 0)
+    assert operations.eligible == operations.held == operations.pending_requests == 0
+
+
+def test_outbound_context_uses_today_identity_links_not_manifest_totals_or_driver_capacity():
+    today = "2026-11-05"
+    items = [{"barcode": "a"}, {"tracking_number": "track-a"}, {"barcode": "other"}]
+    operations = _operations({
+        "parcels": [_parcel("a", "Out for Delivery"), _parcel("other", centre="DC-MEL-001")],
+        "manifests": [
+            {"id": "m1", "manifest_date": today, "status": "active", "driver_id": "d1",
+             "items": items, "total_items": 9999},
+            {"id": "m2", "manifest_date": today, "status": "in_progress", "driver_id": "d1", "items": items},
+            {"id": "old", "manifest_date": "2026-10-15", "status": "active", "items": items},
+            {"id": "future", "manifest_date": "2026-11-06", "status": "active", "items": items},
+            {"id": "completed", "manifest_date": today, "status": "completed", "items": items},
+        ],
+        "drivers": [
+            {"id": "d1", "state": "NSW", "active": True},
+            {"id": "d2", "state": "VIC", "active": True},
+            {"id": "d3", "active": True},
+            {"id": "d4", "state": "NSW", "active": False},
+        ],
+    })
+    assert operations.active_manifests == 2
+    assert operations.manifest_parcels == 1
+    assert operations.assigned_drivers == 1
+    assert operations.stale_manifests == 2
+    assert operations.state_driver_accounts == 1
+    assert operations.unlocated_driver_accounts == 1
+    assert operations.eligible == 0
+    assert operations.outbound == 1
+
+
+def test_optional_feed_failures_do_not_prevent_verified_processing_workload():
+    operations = _operations({"parcels": [_parcel("a")], "manifests": None, "drivers": None})
+    assert operations.connected
+    assert operations.eligible == 1
+    assert operations.active_manifests is None
+    assert operations.assigned_drivers is None
+    assert operations.state_driver_accounts is None
+
+
+def test_manifest_items_with_conflicting_or_missing_identities_are_not_invented():
+    operations = _operations({
+        "parcels": [_parcel("a"), _parcel("b")],
+        "manifests": [
+            {"id": "m1", "status": "active", "manifest_date": "2026-11-05",
+             "items": [{"barcode": "a", "tracking_number": "track-b"}, {"barcode": "missing"}, None]},
+            {"id": "m2", "status": "active", "manifest_date": "2026-11-05", "items": None},
+        ],
+    })
+    assert operations.manifest_parcels == operations.active_manifests == 0
+    assert any("3 current manifest item references" in warning for warning in operations.warnings)
+    assert any("no valid item list" in warning for warning in operations.warnings)
+
+
+def test_stored_update_time_is_exposed_as_stale_not_interpreted_as_an_arrival():
+    now = datetime(2026, 11, 5, 8, tzinfo=UTC)
+    feed = PlanningFeed("parcels", True, now, records=1, latest_update=now - timedelta(days=3))
+    operations = reconcile_operations(
+        "DC-SYD-001", now.date().isoformat(),
+        {"parcels": [_parcel("a")], "approvals": [], "manifests": [], "drivers": []}, (feed,), now,
+    )
+    assert operations.eligible == 1
+    assert any("not a fresh scan feed" in warning for warning in operations.warnings)
+
+
+def test_initial_queues_feed_the_correct_stages_and_future_arrivals_are_not_confirmed(start):
+    facility = replace(FACILITIES["DC-SYD-001"], daily_volume=0, initial_backlog=2)
+    result = project(facility, "24h", Scenario(), start, (1, 0, 1, 0))
+    assert [row.dispatched for row in result.hours[:4]] == [0, 1, 0, 1]
+    assert result.dispatched == 2
+    assert result.arrivals == result.remaining == 0
+    future = project(FACILITIES["DC-SYD-001"], "24h", Scenario(), start)
+    assert future.confirmed == 0
+    assert future.forecast == future.arrivals
+
+
+@pytest.mark.parametrize("queues", [(1, 2), (-1, 0, 0, 3), (0.5, 0, 1.5, 0), (False, 0, 2, 0), (3, 0, 0, 0)])
+def test_initial_queues_validate_stage_counts_and_total(start, queues):
+    facility = replace(FACILITIES["DC-SYD-001"], initial_backlog=2)
+    with pytest.raises(ValueError, match="Starting queues"):
+        project(facility, "24h", Scenario(), start, queues)
+
+
+def test_planning_source_uses_only_bounded_nonpersonal_projections(monkeypatch):
+    from src.infrastructure.database import planning_source
+
+    queries = []
+
+    def query_items(**kwargs):
+        queries.append(kwargs["query"])
+        return []
+
+    database = SimpleNamespace(get_container_client=lambda name: SimpleNamespace(query_items=query_items))
+    monkeypatch.setattr(planning_source, "_planning_database", lambda: database)
+    operations = planning_source.read_planning_operations("DC-SYD-001", "2026-11-05")
+    assert operations.connected
+    assert len(queries) == 4
+    for query in queries:
+        assert query.startswith("SELECT TOP 20001 ")
+        assert "SELECT *" not in query
+        assert not any(field in query for field in ("recipient_name", "address", "password", "salt", "email", "phone"))
+
+
+def test_planning_source_surfaces_read_failure_and_safety_limit(monkeypatch, caplog):
+    from azure.core.exceptions import ServiceRequestError
+
+    from src.infrastructure.database import planning_source
+
+    def container(name):
+        def query_items(**kwargs):
+            if name == "delivery_attempts":
+                raise ServiceRequestError("Test connection unavailable")
+            return [_parcel("a"), _parcel("b"), _parcel("c")] if name == "parcels" else []
+        return SimpleNamespace(query_items=query_items)
+
+    monkeypatch.setattr(planning_source, "_LIMIT", 2)
+    monkeypatch.setattr(planning_source, "_planning_database",
+                        lambda: SimpleNamespace(get_container_client=container))
+    operations = planning_source.read_planning_operations("DC-SYD-001", "2026-11-05")
+    assert not operations.connected
+    assert operations.eligible is None
+    assert [feed.available for feed in operations.feeds] == [False, False, True, True]
+    assert any("partial totals are not used" in warning for warning in operations.warnings)
+    assert "read failed" in caplog.text
+    assert "safety limit" in caplog.text
+
+
+def test_planning_source_configuration_failure_is_explicit(monkeypatch, caplog):
+    from src.infrastructure.database import planning_source
+
+    def missing():
+        raise ValueError("Missing connection configuration")
+
+    monkeypatch.setattr(planning_source, "_planning_database", missing)
+    operations = planning_source.read_planning_operations("DC-SYD-001", "2026-11-05")
+    assert all(not feed.available and feed.records is None for feed in operations.feeds)
+    assert not operations.connected
+    assert "connection is unavailable" in caplog.text
+
+
+def test_read_only_planning_connection_is_reused_and_never_creates_resources(monkeypatch):
+    from src.infrastructure.database import planning_source
+
+    client = MagicMock()
+    constructor = MagicMock(return_value=client)
+    monkeypatch.setattr(planning_source, "CosmosClient", constructor)
+    monkeypatch.setattr(planning_source, "ParcelTrackingDB", lambda: SimpleNamespace(
+        endpoint="https://test.invalid", key="test-only", database_name="planning",
+    ))
+    monkeypatch.setenv("USE_MANAGED_IDENTITY", "false")
+    planning_source._planning_database.cache_clear()
+    try:
+        first = planning_source._planning_database()
+        assert planning_source._planning_database() is first
+        constructor.assert_called_once()
+        client.get_database_client.assert_called_once_with("planning")
+        client.create_database.assert_not_called()
+        client.create_database_if_not_exists.assert_not_called()
+        first.create_container.assert_not_called()
+        first.create_container_if_not_exists.assert_not_called()
+    finally:
+        planning_source._planning_database.cache_clear()
+
+
+def test_source_cache_shares_reads_between_centres_expires_at_30_seconds_and_can_be_refreshed(monkeypatch):
+    from src.infrastructure.database import planning_source
+
+    clock = [0.0]
+    reads = []
+    now = datetime(2026, 11, 5, 8, tzinfo=UTC)
+    records = {
+        "parcels": [_parcel("a"), _parcel("b", centre="DC-MEL-001")],
+        "approvals": [], "manifests": [], "drivers": [],
+    }
+    feeds = tuple(PlanningFeed(name, True, now, records=len(rows)) for name, rows in records.items())
+
+    def read():
+        reads.append(clock[0])
+        return records, feeds, now
+
+    monkeypatch.setattr(planning_source, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(planning_source, "_read_source_snapshot", read)
+    first = planning_source.read_planning_operations("DC-SYD-001", "2026-11-05")
+    clock[0] = 29.99
+    second = planning_source.read_planning_operations("DC-MEL-001", "2026-11-05")
+    assert first.eligible == second.eligible == 1
+    assert first.facility_code != second.facility_code
+    assert first.fetched_at == second.fetched_at
+    assert len(reads) == 1
+    clock[0] = 30.0
+    planning_source.read_planning_operations("DC-SYD-001", "2026-11-05")
+    assert len(reads) == 2
+    planning_source.read_planning_operations("DC-SYD-001", "2026-11-05", refresh=True)
+    assert len(reads) == 3
+
+
+def test_unavailable_feeds_are_retried_after_five_seconds(monkeypatch):
+    from src.infrastructure.database import planning_source
+
+    now = datetime.now(UTC)
+    clock = [0.0]
+    reader = MagicMock(return_value=(
+        {"parcels": None}, (PlanningFeed("parcels", False, now, issue="Unavailable"),), now,
+    ))
+    monkeypatch.setattr(planning_source, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(planning_source, "_read_source_snapshot", reader)
+    assert not planning_source.read_planning_operations("DC-SYD-001", "2026-11-05").connected
+    clock[0] = 4.99
+    planning_source.read_planning_operations("DC-SYD-001", "2026-11-05")
+    assert reader.call_count == 1
+    clock[0] = 5.0
+    planning_source.read_planning_operations("DC-SYD-001", "2026-11-05")
+    assert reader.call_count == 2
+
+
+def test_explicit_snapshot_refresh_passes_cache_bypass_and_preserves_scenario(planner_client, monkeypatch):
+    from src.interfaces.web.routes import admin
+
+    read = MagicMock(return_value=_operations({}))
+    monkeypatch.setattr(admin, "read_planning_operations", read)
+    response = planner_client.get("/ai/demand-planning?facility=DC-SYD-001&surge=25&refresh=1")
+    assert response.status_code == 200
+    assert read.call_args.args[0] == "DC-SYD-001"
+    assert read.call_args.kwargs == {"refresh": True}
+    assert _chat_context(response)["scenario"]["surge"] == 25
+    assert b"refresh=1" in response.data
+
+
+def test_hybrid_workload_is_frozen_across_chat_apply_and_response_options(planner_client, monkeypatch, start):
+    from src.interfaces.web.routes import admin
+
+    snapshot = _operations({
+        "parcels": [
+            _parcel("a", recipient_name="PRIVATE CUSTOMER"), _parcel("b", "Sorting"),
+            _parcel("held", "held"), _parcel("review"),
+        ],
+        "approvals": [{"id": "request", "parcel_barcode": "review", "status": "pending"}],
+    })
+    reads = []
+    current_source = [snapshot]
+    captured = {}
+
+    def read(code, local_day):
+        reads.append((code, local_day))
+        return current_source[0]
+
+    def interpret(message, history, engine_context):
+        captured.update(engine_context)
+        return PlannerInterpretation(reply="Preview four extra sorters.", changes={"extra_staff": 4})
+
+    monkeypatch.setattr(admin, "read_planning_operations", read)
+    monkeypatch.setattr(admin, "planning_start", lambda facility: start)
+    monkeypatch.setattr(admin, "interpret_question", interpret)
+    page_response = planner_client.get("/ai/demand-planning?facility=DC-SYD-001&surge=25")
+    assert page_response.status_code == 200
+    page = page_response.get_data(as_text=True)
+    assert "HYBRID PLANNING / READ ONLY" in page
+    assert "Application workload snapshot" in page
+    assert "Projection starts with 2 eligible parcels" in page
+    assert "/approvals/?dc=DC-SYD-001" in page
+    assert "PRIVATE CUSTOMER" not in page
+    assert "Manifest-confirmed" not in page
+    context = _chat_context(page_response)
+    assert context["source"] == "hybrid"
+    assert len(context["snapshot"]) <= 6000
+    current_source[0] = _operations({"parcels": [_parcel(f"new-{index}") for index in range(100)]})
+    chat = planner_client.post(
+        "/api/demand-planning/chat",
+        json={"snapshot": context["snapshot"], "message": "Add four extra sorters.", "history": []},
+        headers={"X-Planner-CSRF": context["csrf"]},
+    )
+    assert chat.status_code == 200
+    result = chat.get_json()
+    assert captured["operations"]["eligible"] == 2
+    assert captured["operations"]["held"] == captured["operations"]["awaiting_review"] == 1
+    assert "PRIVATE CUSTOMER" not in json.dumps(captured)
+    assert "parcel_barcode" not in json.dumps(captured)
+    applied_response = planner_client.get(result["apply_url"])
+    assert applied_response.status_code == 200
+    applied = _chat_context(applied_response)
+    with planner_client.application.app_context():
+        restored = admin._load_planning_snapshot(applied["snapshot"])
+    assert restored["operations"] == snapshot
+    assert restored["facility"].initial_backlog == 2
+    assert restored["start"] == start
+    assert restored["selected"].remaining == result["proposal"]["remaining"]
+    assert restored["selected"].arrivals + 2 == (
+        restored["selected"].dispatched + restored["selected"].transferred + restored["selected"].remaining
+    )
+    option_links = re.findall(r'href="([^"]+\?preview=[^"]+)"', page)
+    assert len(option_links) == 3
+    for link in option_links:
+        option_response = planner_client.get(link)
+        assert option_response.status_code == 200
+        assert b"Projection starts with 2 eligible parcels" in option_response.data
+    assert len(reads) == 1
+    refreshed = planner_client.get("/ai/demand-planning?facility=DC-SYD-001&surge=25")
+    assert refreshed.status_code == 200
+    assert b"Projection starts with 100 eligible parcels" in refreshed.data
+    assert len(reads) == 2
+
+
+def test_hybrid_empty_application_workload_does_not_restore_demo_backlog(planner_client, monkeypatch, start):
+    from src.interfaces.web.routes import admin
+
+    monkeypatch.setattr(admin, "read_planning_operations", lambda code, day: _operations({}))
+    response = planner_client.get("/ai/demand-planning?facility=DC-SYD-001")
+    context = _chat_context(response)
+    with planner_client.application.app_context():
+        restored = admin._load_planning_snapshot(context["snapshot"])
+    assert restored["facility"].initial_backlog == 0
+    assert restored["operations"].eligible == 0
+    assert b"Projection starts with 0 eligible parcels" in response.data
+
+
+def test_non_operations_users_keep_synthetic_planner_without_operational_reads(flask_app, monkeypatch):
+    from src.interfaces.web.routes import admin
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("Non-operations users must not read operational planning data")
+
+    monkeypatch.setattr(admin, "read_planning_operations", forbidden)
+    captured = {}
+
+    def interpret(message, history, engine_context):
+        captured.update(engine_context)
+        return PlannerInterpretation(reply="This is a synthetic projection.", changes={})
+
+    monkeypatch.setattr(admin, "interpret_question", interpret)
+    client = flask_app.test_client()
+    with client.session_transaction() as user_session:
+        user_session["user"] = {"username": "customer", "role": "customer"}
+    response = client.get("/ai/demand-planning")
+    assert response.status_code == 200
+    assert b"Application workload access requires an admin or depot manager role" in response.data
+    context = _chat_context(response)
+    assert context["source"] == "synthetic"
+    chat = client.post(
+        "/api/demand-planning/chat",
+        json={"snapshot": context["snapshot"], "message": "Show counts", "history": []},
+        headers={"X-Planner-CSRF": context["csrf"]},
+    )
+    assert chat.status_code == 200
+    assert captured["operations"] is None
+
+
+def test_operational_snapshots_cannot_be_replayed_by_non_operations_users(planner_client, monkeypatch):
+    from src.interfaces.web.routes import admin
+
+    monkeypatch.setattr(admin, "read_planning_operations", lambda code, day: _operations({}))
+    response = planner_client.get("/ai/demand-planning?facility=DC-SYD-001")
+    context = _chat_context(response)
+    with planner_client.session_transaction() as user_session:
+        user_session["user"] = {"username": "driver", "role": "driver"}
+    assert planner_client.get("/ai/demand-planning", query_string={"preview": context["snapshot"]}).status_code == 403
+    assert planner_client.post(
+        "/api/demand-planning/chat",
+        json={"snapshot": context["snapshot"], "message": "Show counts", "history": []},
+        headers={"X-Planner-CSRF": context["csrf"]},
+    ).status_code == 403
+
+
+def test_depot_manager_can_view_hybrid_planner(flask_app):
+    client = flask_app.test_client()
+    with client.session_transaction() as user_session:
+        user_session["user"] = {"username": "depot", "role": "depot_manager"}
+    assert client.get("/ai/demand-planning").status_code == 200
+
+
+def test_hybrid_context_rejects_a_different_centres_snapshot():
+    from src.interfaces.web.routes import admin
+
+    with pytest.raises(ValueError, match="different centre"):
+        admin._demand_context("DC-MEL-001", operations=_operations({}))
+
+
+def test_ai_insights_uses_the_same_hybrid_workload_and_exposes_source_limitations(planner_client, monkeypatch):
+    from src.interfaces.web.routes import admin
+
+    snapshot = _operations({
+        "parcels": [_parcel("a"), _parcel("b", "Sorting"), _parcel("unknown", centre="Unknown")],
+    })
+    db = AsyncMock()
+    db.__aenter__.return_value = db
+    db.get_all_parcels.return_value = []
+    db.get_all_pending_approvals.return_value = []
+    db.database = MagicMock()
+    db.database.get_container_client.side_effect = RuntimeError("No approval feed in test")
+    monkeypatch.setattr(admin, "ParcelTrackingDB", lambda: db)
+    monkeypatch.setattr(admin, "read_planning_operations", lambda code, day: snapshot)
+    response = planner_client.get("/ai/insights?facility=DC-SYD-001")
+    assert response.status_code == 200
+    assert b"Hybrid planning / read only" in response.data
+    assert b"Starts with 2 eligible application parcels" in response.data
+    assert b"Review source warnings and freshness in the planner" in response.data
 
 
 @pytest.mark.parametrize("facility", FACILITIES.values())
@@ -178,7 +693,9 @@ def test_arrivals_beyond_horizon_are_reported_not_cancelled(start):
 def test_transfer_cost_and_daily_and_hourly_constraints(start):
     result = project(FACILITIES["DC-SYD-002"], "24h", Scenario(transfer=800), start)
     assert 0 < result.transferred <= 800
-    assert result.cost == result.transferred * 2
+    costs = CostAssumptions()
+    expected_trips = (result.transferred + costs.transfer_load - 1) // costs.transfer_load
+    assert result.cost == result.transferred * costs.transfer_parcel + expected_trips * costs.transfer_trip
     previous_backlog = FACILITIES["DC-SYD-002"].initial_backlog
     for row in result.hours:
         transferred = previous_backlog + row.arrivals - row.dispatched - row.backlog
@@ -186,6 +703,101 @@ def test_transfer_cost_and_daily_and_hourly_constraints(start):
         if not 9 <= row.hour < 15:
             assert transferred == 0
         previous_backlog = row.backlog
+
+
+@pytest.mark.parametrize("name,bounds", COST_LIMITS.items())
+@pytest.mark.parametrize("invalid", ["below", "above", "fraction", "string", "boolean", "none"])
+def test_cost_assumptions_reject_invalid_values(name, bounds, invalid):
+    minimum, maximum = bounds
+    value = {"below": minimum - 1, "above": maximum + 1, "fraction": 1.5,
+             "string": "100", "boolean": True, "none": None}[invalid]
+    with pytest.raises(ValueError, match=f"Cost assumption {name}"):
+        CostAssumptions(**{name: value})
+
+
+@pytest.mark.parametrize("name,bounds", COST_LIMITS.items())
+def test_cost_assumptions_accept_exact_boundaries(name, bounds):
+    for value in bounds:
+        assert getattr(CostAssumptions(**{name: value}), name) == value
+
+
+def test_normal_operating_cost_is_nonzero_without_a_paid_response(start):
+    result = project(FACILITIES["DC-SYD-002"], "24h", Scenario(), start)
+    assert result.cost == 0
+    assert result.cost_breakdown.base_staff_hours == 36 * 16
+    assert result.cost_breakdown.base_labour == 36 * 16 * 65
+    assert result.cost_breakdown.facility_overhead == 24 * 350
+    assert result.operating_cost == result.total_cost == 45840
+
+
+def test_custom_costs_reconcile_exact_response_components(start):
+    costs = CostAssumptions(
+        base_hourly=100, extra_hourly=200, overtime_hourly=150,
+        transfer_trip=1000, transfer_parcel=5, lane_restoration=2000,
+    )
+    scenario = Scenario(lane_outage=1, restore_lane=1, extra_staff=4, extra_hours=2, transfer=800)
+    result = project(FACILITIES["DC-SYD-002"], "24h", scenario, start, costs=costs)
+    breakdown = result.cost_breakdown
+    assert breakdown.extra_staff_hours == 40
+    assert breakdown.extra_labour == 8000
+    assert breakdown.overtime_staff_hours == 48
+    assert breakdown.overtime_labour == 7200
+    assert result.transferred == 800
+    assert breakdown.transfer_trips == 2
+    assert breakdown.transfer_transport == 2000
+    assert breakdown.transfer_handling == 4000
+    assert breakdown.lane_restoration == 2000
+    assert result.cost == 23200
+    assert result.operating_cost == 66000
+    assert result.total_cost == 89200
+
+
+@pytest.mark.parametrize("horizon", ["today", "24h", "7d"])
+def test_costs_cover_only_elapsed_horizon_and_count_transfers_per_local_day(start, horizon):
+    costs = CostAssumptions(transfer_load=300)
+    result = project(FACILITIES["DC-SYD-002"], horizon, Scenario(transfer=800), start, costs=costs)
+    daily = {}
+    previous = FACILITIES["DC-SYD-002"].initial_backlog
+    for index, row in enumerate(result.hours):
+        moved = previous + row.arrivals - row.dispatched - row.backlog
+        day = _hour_at(start, index).date()
+        daily[day] = daily.get(day, 0) + moved
+        previous = row.backlog
+    expected_trips = sum((count + 299) // 300 for count in daily.values())
+    assert result.cost_breakdown.transfer_trips == expected_trips
+    assert result.cost == expected_trips * 650 + result.transferred * 3
+    normal_hours = sum(6 <= row.hour < 22 for row in result.hours)
+    assert result.operating_cost == normal_hours * 36 * 65 + len(result.hours) * 350
+    assert result.total_cost == result.operating_cost + result.cost
+
+
+def test_unfulfilled_transfer_reservation_does_not_create_transport_cost(start):
+    empty = replace(FACILITIES["DC-SYD-002"], daily_volume=0, initial_backlog=0)
+    result = project(empty, "24h", Scenario(transfer=800), start)
+    assert result.transferred == result.cost_breakdown.transfer_trips == result.cost == 0
+    assert result.total_cost == 45840
+
+
+def test_lane_restoration_charges_once_per_horizon_and_restores_capacity(start):
+    restored = Scenario(lane_outage=1, restore_lane=1)
+    assert _capacities(start, restored) == _capacities(start, Scenario())
+    for horizon in ("today", "24h", "7d"):
+        result = project(FACILITIES["DC-SYD-002"], horizon, restored, start)
+        assert result.cost == result.cost_breakdown.lane_restoration == 1500
+    unnecessary = project(FACILITIES["DC-SYD-002"], "24h", Scenario(restore_lane=1), start)
+    assert unnecessary.cost == 0
+
+
+def test_absence_does_not_assume_payroll_savings_and_rates_do_not_change_capacity(start):
+    facility = FACILITIES["DC-SYD-002"]
+    scenario = Scenario(absence=50, extra_staff=4)
+    normal = project(facility, "24h", Scenario(), start)
+    original = project(facility, "24h", scenario, start)
+    expensive = project(facility, "24h", scenario, start, costs=CostAssumptions(base_hourly=200, extra_hourly=300))
+    assert original.operating_cost == normal.operating_cost
+    assert expensive.hours == original.hours
+    assert expensive.stages == original.stages
+    assert expensive.total_cost > original.total_cost
 
 
 @pytest.mark.parametrize(
@@ -237,6 +849,7 @@ def test_authenticated_planner_renders_without_external_calls(planner_client, ho
     [
         {"facility": "unknown"},
         {"horizon": "year"},
+        {"refresh": "now"},
         {"surge": "-1"},
         {"absence": "51"},
         {"delay": "two"},
@@ -465,6 +1078,96 @@ def test_chat_proposes_engine_calculated_changes_and_requires_explicit_apply(cha
     assert after["selected"].remaining == expected.remaining
 
 
+@pytest.mark.parametrize("name,bounds", COST_LIMITS.items())
+@pytest.mark.parametrize("invalid", ["text", "-1", "1.5", "1000001"])
+def test_invalid_cost_form_values_show_explicit_errors(planner_client, name, bounds, invalid):
+    response = planner_client.get("/ai/demand-planning", query_string={f"cost_{name}": invalid})
+    assert response.status_code == 400
+    assert f"Cost assumption {name}".encode() in response.data
+
+
+def test_custom_costs_survive_options_chat_apply_centre_horizon_and_reset(planner_client, monkeypatch, start):
+    from src.interfaces.web.routes import admin
+
+    monkeypatch.setattr(admin, "planning_start", lambda facility: start)
+    costs = CostAssumptions(base_hourly=80, extra_hourly=200, overhead_hourly=500, lane_restoration=2500)
+    query = {f"cost_{name}": value for name, value in asdict(costs).items()}
+    response = planner_client.get("/ai/demand-planning", query_string={**query, "lane_outage": 1})
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    assert 'id="planner-cost-assumptions"' in page
+    assert "not verified market rates" in page
+    assert "not zero facility operating cost" in page
+    assert "AUD 58,080" in page
+    option_links = re.findall(r'class="btn btn-outline-primary mt-auto" href="([^"]+)"', page)
+    assert len(option_links) == 3
+    for link in option_links:
+        option_response = planner_client.get(link)
+        assert option_response.status_code == 200
+        token = _chat_context(option_response)["snapshot"]
+        with planner_client.application.app_context():
+            option = admin._load_planning_snapshot(token)
+        assert option["costs"] == costs
+        assert option["selected"].operating_cost == 58080
+        if option["scenario"].restore_lane:
+            assert option["selected"].cost == 8900
+    context = _chat_context(response)
+    captured = {}
+
+    def interpret(message, history, engine_context):
+        captured.update(engine_context)
+        return PlannerInterpretation(
+            reply="Preview four extra sorters and restore the unavailable lane.",
+            changes={"extra_staff": 4, "restore_lane": 1},
+        )
+
+    monkeypatch.setattr(admin, "interpret_question", interpret)
+    chat = planner_client.post(
+        "/api/demand-planning/chat",
+        json={"snapshot": context["snapshot"], "message": "Add four sorters and restore the lane."},
+        headers={"X-Planner-CSRF": context["csrf"]},
+    )
+    assert chat.status_code == 200
+    result = chat.get_json()
+    assert captured["cost_assumptions"] == asdict(costs)
+    assert captured["current"]["total_cost"] == 58080
+    assert all("cost_breakdown" in option for option in captured["options"])
+    assert result["proposal"]["cost"] == 8900
+    assert result["proposal"]["total_cost"] == 66980
+    applied = _chat_context(planner_client.get(result["apply_url"]))
+    with planner_client.application.app_context():
+        restored = admin._load_planning_snapshot(applied["snapshot"])
+    assert restored["costs"] == costs
+    assert restored["scenario"].lane_outage == restored["scenario"].restore_lane == 1
+    assert restored["start"] == start
+    for scope in ({"facility": "DC-MEL-001"}, {"horizon": "7d"}):
+        switched = _chat_context(planner_client.get("/ai/demand-planning", query_string={**query, **scope}))
+        with planner_client.application.app_context():
+            assert admin._load_planning_snapshot(switched["snapshot"])["costs"] == costs
+    reset_link = re.search(r'href="([^"]+)">Reset scenario</a>', page).group(1).replace("&amp;", "&")
+    reset = _chat_context(planner_client.get(reset_link))
+    with planner_client.application.app_context():
+        reset_context = admin._load_planning_snapshot(reset["snapshot"])
+    assert reset_context["costs"] == costs
+    assert reset_context["scenario"] == Scenario()
+
+
+def test_legacy_signed_snapshot_defaults_costs_and_tampered_rates_are_rejected(planner_client):
+    from src.interfaces.web.routes import admin
+
+    with planner_client.application.app_context():
+        original = admin._demand_context()
+        token = admin._planning_snapshot(original)
+        data = admin._planning_signer().loads(token)
+        data.pop("costs")
+        legacy = admin._planning_signer().dumps(data)
+        assert admin._load_planning_snapshot(legacy)["costs"] == CostAssumptions()
+        data["costs"] = {"transfer_load": 0}
+        invalid = admin._planning_signer().dumps(data)
+    assert planner_client.get("/ai/demand-planning", query_string={"preview": invalid}).status_code == 400
+    assert planner_client.get("/ai/demand-planning", query_string={"preview": token + "tamper"}).status_code == 400
+
+
 def test_chat_explanation_does_not_offer_an_apply_action(chat_client, monkeypatch):
     from src.interfaces.web.routes import admin
 
@@ -654,7 +1357,7 @@ def test_home_tile_replaces_rbac_and_links_to_planner(flask_app, path, logged_in
     assert "Role-Based Access Control" not in page
     assert "Demand &amp; Capacity Planner" in page
     assert "40 distribution centres" in page
-    assert "Planning data is synthetic" in page
+    assert "synthetic future demand and capacity" in page
     planner_link = re.search(
         r'<a href="([^"]+)"[^>]*>\s*<i class="bi bi-calendar-range"></i> Open Demand Planner',
         page,

@@ -737,10 +737,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Do NOT restore saved DC filter on page load — always start with all cards visible.
-    // A stale filter from a previous session would hide cards before the user sees them.
+    // Honour explicit planner links, but never restore a stale saved filter.
     function loadSelectedDCs() {
         localStorage.removeItem('selectedDCs');
+        const requestedDC = new URLSearchParams(window.location.search).get('dc');
+        if (distributionCenters.some(dc => dc.id === requestedDC)) {
+            document.getElementById(`dc_${requestedDC}`).checked = true;
+        }
         updateSelectedDCs();
     }
     

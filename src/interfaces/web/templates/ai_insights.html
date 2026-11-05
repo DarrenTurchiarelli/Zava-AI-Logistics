@@ -334,7 +334,7 @@
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
                 <div>
-                    <span class="badge bg-warning text-dark mb-2">Synthetic planning demo / read only</span>
+                    <span class="badge bg-warning text-dark mb-2">{{ 'Hybrid planning / read only' if demand.operations and demand.operations.connected else 'Synthetic planning demo / read only' }}</span>
                     <h2 class="h4" id="demand-planner-heading">Demand & Capacity Planning</h2>
                     <p class="text-muted mb-2">{{ demand.facility.name }} / next 24 hours:
                         identify the bottleneck before dispatch, then compare staffing and disruption scenarios.</p>
@@ -359,8 +359,19 @@
                 <div class="col-sm-4"><strong class="fs-4">{{ demand.baseline.bottleneck }}</strong><br><span class="text-muted small">Largest processing queue</span></div>
                 <div class="col-sm-4"><strong class="fs-4">{{ '{:,}'.format(demand.baseline.cutoff_misses) }}</strong><br><span class="text-muted small">Modelled dispatch-cutoff misses</span></div>
             </div>
-            <p class="small text-muted mt-3 mb-0">Demo arrivals and resource assumptions, not live demand predictions.
+            <p class="small text-muted mt-3 mb-0">
+                {% if demand.operations and demand.operations.connected %}
+                Starts with {{ demand.operations.eligible }} eligible application parcels; holds and unresolved approval review are excluded.
+                {% else %}
+                Application starting workload is not established; this preview uses synthetic backlog.
+                {% endif %}
+                Future arrivals and resource assumptions are synthetic, not live demand predictions.
                 Delivery-service risk is not calculated. No scenarios are saved or operational changes executed.</p>
+            {% if demand.operations and demand.operations.warnings %}
+            <div class="alert alert-warning alert-persistent small mt-2 mb-0">
+                Application sources have limitations. <a href="{{ url_for('admin.demand_planning', facility=demand.facility.code) }}#planner-operations">Review source warnings and freshness in the planner.</a>
+            </div>
+            {% endif %}
         </div>
     </section>
 
@@ -786,7 +797,7 @@
                                             <div class="d-flex justify-content-between mb-1 align-items-center">
                                                 <a href="{{ url_for('admin.demand_planning') }}">Demand & Capacity Planner</a>
                                             </div>
-                                            <small class="text-muted">Compare clearly labelled synthetic demand and capacity scenarios.</small>
+                                            <small class="text-muted">Connect application workload to clearly labelled synthetic demand and capacity scenarios.</small>
                                         </div>
 
                                         <!-- Peak Day Prediction -->
@@ -840,7 +851,7 @@
                             <li>
                                 <strong>Demand Planning:</strong>
                                 <a href="{{ url_for('admin.demand_planning') }}">Compare demand and capacity scenarios</a>
-                                before proposing staffing or transport changes. Planning inputs are synthetic.
+                                before proposing staffing or transport changes. Future demand and capacity remain synthetic.
                             </li>
                             <li>
                                 <strong>Optimisation:</strong>
@@ -1620,7 +1631,7 @@
                                 recoHTML += `<li><strong>Immediate:</strong> Facilities well-balanced — ${s.busiest.name} leading at ${s.busiest.pct}% capacity. No redistribution required.</li>`;
                             }
                             // This Week: volume peak
-                            recoHTML += `<li><strong>Demand Planning:</strong> <a href="{{ url_for('admin.demand_planning') }}">Compare demand and capacity scenarios</a> before proposing staffing or transport changes. Planning inputs are synthetic.</li>`;
+                            recoHTML += `<li><strong>Demand Planning:</strong> <a href="{{ url_for('admin.demand_planning') }}">Compare demand and capacity scenarios</a> before proposing staffing or transport changes. Future demand and capacity remain synthetic.</li>`;
                             // Optimisation: depot backlog or route consolidation
                             if (s.at_depot > 500) {
                                 recoHTML += `<li><strong>Optimisation:</strong> ${s.at_depot.toLocaleString()} parcels queued at depot — pre-assign to active facilities to reduce processing backlog.</li>`;
